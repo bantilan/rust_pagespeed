@@ -1,0 +1,14 @@
+[package]
+name = "ps-nginx"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ps-http = { path = "../ps-http" }
+ps-config = { path = "../ps-config" }
+# Pinned nginx FFI bindings (Slice 0); verified against the staged
+# nginx 1.31.8 tree in `../../.nginx-build` (see README there).
+ngx = "=0.5.1"
+# Raw OS bindings for the crash handler (`signal`, `alarm`, `kill`).
+libc = "=0.2.191"

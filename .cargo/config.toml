@@ -1,0 +1,15 @@
+# Build environment for the workspace.
+#
+# `NGINX_SOURCE_DIR` points at the staged nginx 1.31.8 tree that
+# `nginx-sys` runs bindgen against (see `../.nginx-build/README.md`).
+# An explicitly exported `NGINX_SOURCE_DIR` / `NGINX_BUILD_DIR` in
+# the environment takes precedence over these defaults.
+#
+# `BINDGEN_EXTRA_CLANG_ARGS` hands libclang the gcc builtin-header
+# directory: only the libclang runtime ships on this machine (no
+# `lib/clang/<ver>/include`), so Bindgen cannot find `stddef.h`
+# without it.
+
+[env]
+NGINX_SOURCE_DIR = { value = "../.nginx-build/nginx-1.31.8", relative = true }
+BINDGEN_EXTRA_CLANG_ARGS = "-I/usr/lib/gcc/x86_64-linux-gnu/13/include"

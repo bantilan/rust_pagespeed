@@ -1,0 +1,17 @@
+[package]
+name = "ps-compat"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dev-dependencies]
+ps-admin = { path = "../ps-admin" }
+ps-cache = { path = "../ps-cache" }
+ps-config = { path = "../ps-config" }
+ps-css = { path = "../ps-css" }
+ps-html = { path = "../ps-html" }
+ps-http = { path = "../ps-http" }
+ps-image = { path = "../ps-image" }
+ps-js = { path = "../ps-js" }
+ps-nginx = { path = "../ps-nginx" }
+ps-stats = { path = "../ps-stats" }

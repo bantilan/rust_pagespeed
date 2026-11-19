@@ -1,0 +1,22 @@
+[package]
+name = "ps-image"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+gif = "0.14.2"
+# No default features: jpeg-decoder's rayon thread pool has no place in a
+# latency-sensitive Nginx worker; single-threaded decode is the C++ parity path.
+jpeg-decoder = { version = "0.3.2", default-features = false }
+jpeg-encoder = "0.7.1"
+libwebp-sys2 = { version = "0.2.0", features = ["static", "demux", "mux"] }
+png = { version = "0.18.1", features = ["zlib-rs"] }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+flate2 = "1"
+
+[[bench]]
+name = "image"
+harness = false

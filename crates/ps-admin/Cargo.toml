@@ -1,0 +1,12 @@
+[package]
+name = "ps-admin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ps-cache = { path = "../ps-cache" }
+ps-config = { path = "../ps-config" }
+ps-html = { path = "../ps-html" }
+ps-http = { path = "../ps-http" }
+ps-stats = { path = "../ps-stats" }

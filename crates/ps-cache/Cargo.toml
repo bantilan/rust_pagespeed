@@ -1,0 +1,19 @@
+[package]
+name = "ps-cache"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+md-5 = "0.10"
+hmac = "0.12"
+sha1 = "0.10"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+ps-config = { path = "../ps-config" }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "cache"
+harness = false

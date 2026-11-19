@@ -1,0 +1,21 @@
+[package]
+name = "ps-html"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ps-cache = { path = "../ps-cache" }
+ps-config = { path = "../ps-config" }
+ps-css = { path = "../ps-css" }
+ps-http = { path = "../ps-http" }
+ps-image = { path = "../ps-image" }
+ps-js = { path = "../ps-js" }
+ps-stats = { path = "../ps-stats" }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "rewrite"
+harness = false

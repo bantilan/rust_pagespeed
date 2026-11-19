@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/ps-html",
+    "crates/ps-css",
+    "crates/ps-js",
+    "crates/ps-image",
+    "crates/ps-cache",
+    "crates/ps-http",
+    "crates/ps-stats",
+    "crates/ps-config",
+    "crates/ps-admin",
+    "crates/ps-nginx",
+    "crates/ps-compat",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
