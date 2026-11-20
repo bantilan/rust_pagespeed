@@ -1893,6 +1893,56 @@ impl crate::rewrite_filter::RewriteFilter for ImageRewriteFilter {
         FILTER_ID
     }
 
+    fn rewrite_in_place(
+        &self,
+        driver: &Rc<ResourceDriver>,
+        input: &[u8],
+        content_type: &ps_http::content_type::ContentType,
+    ) -> Option<crate::rewrite_filter::InPlaceOutput> {
+        // IPRO origin serve: the same transcode core as the
+        // `.pagespeed.` path, without resize or UA-derived
+        // formats (conservative: webp/avif need the request
+        // Accept header, unavailable here). Larger outputs
+        // fail back to the original.
+        let analysis = ps_image::image::analyze(input).ok()?;
+        if analysis.width < 1 || analysis.height < 1 {
+            return None;
+        }
+        let resource_context = ImageResourceContext::default();
+        let options = driver.options().clone();
+        let image_options =
+            image_options_for_loaded_resource(&resource_context, input.len() as i64, &options);
+        let ctx = ps_image::image::TranscodeContext {
+            resized: false,
+            resized_dims: None,
+            original_type: Some(ps_image::format::sniff(input)),
+        };
+        let mut budget = ps_image::image::ConversionBudget::new();
+        let recorder = StatsRecorder {
+            server: driver.server_context().clone(),
+        };
+        let transcoded = ps_image::image::transcode(
+            input,
+            Some((analysis.width, analysis.height)),
+            ctx,
+            &image_options,
+            &mut budget,
+            false,
+            &recorder,
+        )
+        .ok()?;
+        if transcoded.bytes.len() >= input.len() {
+            return None;
+        }
+        let content_type =
+            image_type_to_content_type(transcoded.image_type).unwrap_or(*content_type);
+        Some(crate::rewrite_filter::InPlaceOutput {
+            bytes: transcoded.bytes,
+            content_type,
+            optimized_image_type: Some(transcoded.image_type),
+        })
+    }
+
     fn encoder(&self) -> &'static dyn UrlSegmentEncoder {
         &IMAGE_ENCODER
     }

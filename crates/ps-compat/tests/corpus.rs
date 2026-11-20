@@ -146,6 +146,23 @@ pub const CASES: &[CaseDef] = &[
         known_gap: None,
     },
     CaseDef {
+        name: "png-resource",
+        path: "/r.png",
+        html: Some(include_bytes!(
+            "../../ps-image/tests/data/png/pagespeed-33x34.png"
+        )),
+        extra: &[],
+        directives: &[
+            ("on", ""),
+            ("FileCachePath", CACHE_PLACEHOLDER),
+            ("RewriteLevel", "CoreFilters"),
+        ],
+        fetches: 2,
+        poll_optimized: true,
+        fixed_mtime: false,
+        known_gap: None,
+    },
+    CaseDef {
         name: "page-with-links",
         path: "/links.html",
         html: Some(

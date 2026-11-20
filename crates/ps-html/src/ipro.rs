@@ -243,6 +243,11 @@ fn get_rewrite_filter(
         return driver.find_filter("jm");
     }
     if content_type.is_image() && options.image_optimization_enabled() {
+        if driver.find_filter("ic").is_none() {
+            driver.add_filter(Rc::new(super::filters::ImageRewriteFilter::new(
+                driver.clone(),
+            )));
+        }
         return driver.find_filter("ic");
     }
     None

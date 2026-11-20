@@ -46,6 +46,14 @@ pub enum Assertion {
         /// Actual status.
         actual: u16,
     },
+    /// Two images must decode to identical pixels (encoders
+    /// differ, so bytes never match; lossless only).
+    ImagePixelsEqual {
+        /// Expected bytes.
+        expected: Vec<u8>,
+        /// Actual bytes.
+        actual: Vec<u8>,
+    },
 }
 
 /// The verdict for one assertion.
@@ -139,6 +147,70 @@ pub fn evaluate(assertion: &Assertion) -> AssertionResult {
                 },
             }
         }
+        Assertion::ImagePixelsEqual { expected, actual } => image_pixels_equal(expected, actual),
+    }
+}
+
+/// Decodes two images and compares dimensions, pixel format,
+/// and pixels.
+fn image_pixels_equal(expected: &[u8], actual: &[u8]) -> AssertionResult {
+    use ps_image::format::{sniff, ImageType};
+    let fail = |detail: String| AssertionResult {
+        kind: "image-pixels-equal",
+        passed: false,
+        detail,
+    };
+    let decode = |bytes: &[u8], side: &str| -> Result<ps_image::frame::Frame, String> {
+        match sniff(bytes) {
+            ImageType::Png => ps_image::png::decode(bytes),
+            ImageType::Jpeg => ps_image::jpeg::decode(bytes),
+            ImageType::Gif => ps_image::gif::first_frame(bytes),
+            other => {
+                return Err(format!("{side}: unsupported format {other:?}"));
+            }
+        }
+        .map_err(|error| format!("{side}: decode failed: {error:?}"))
+    };
+    let expected_frame = match decode(expected, "expected") {
+        Ok(frame) => frame,
+        Err(detail) => return fail(detail),
+    };
+    let actual_frame = match decode(actual, "actual") {
+        Ok(frame) => frame,
+        Err(detail) => return fail(detail),
+    };
+    if (expected_frame.width(), expected_frame.height())
+        != (actual_frame.width(), actual_frame.height())
+    {
+        return fail(format!(
+            "dimensions: expected {}x{}, got {}x{}",
+            expected_frame.width(),
+            expected_frame.height(),
+            actual_frame.width(),
+            actual_frame.height()
+        ));
+    }
+    if expected_frame.format() != actual_frame.format() {
+        return fail(format!(
+            "pixel format: expected {:?}, got {:?}",
+            expected_frame.format(),
+            actual_frame.format()
+        ));
+    }
+    if expected_frame.pixels() != actual_frame.pixels() {
+        return fail(format!(
+            "pixels differ: {}x{} {:?}, first bytes {:02x?} vs {:02x?}",
+            expected_frame.width(),
+            expected_frame.height(),
+            expected_frame.format(),
+            &expected_frame.pixels()[..expected_frame.pixels().len().min(16)],
+            &actual_frame.pixels()[..actual_frame.pixels().len().min(16)],
+        ));
+    }
+    AssertionResult {
+        kind: "image-pixels-equal",
+        passed: true,
+        detail: String::new(),
     }
 }
 
@@ -238,6 +310,20 @@ impl Runner for NullRunner {
 mod tests {
     use super::*;
 
+    /// One-pixel PNG with the given red channel (via our own
+    /// encoder, so fixtures never rot).
+    fn tiny_png(red: u8) -> Vec<u8> {
+        let frame = ps_image::frame::Frame::from_parts(
+            1,
+            1,
+            ps_image::frame::PixelFormat::Rgb888,
+            vec![red, 0, 0],
+        )
+        .expect("1x1 frame");
+        ps_image::png::encode(&frame, &ps_image::png::PngEncodeOptions::default())
+            .expect("png encodes")
+    }
+
     #[test]
     fn assertions_evaluate_both_ways() {
         let passing = vec![
@@ -260,6 +346,10 @@ mod tests {
                 expected: "k".to_string(),
                 actual: "k".to_string(),
             },
+            Assertion::ImagePixelsEqual {
+                expected: tiny_png(1),
+                actual: tiny_png(1),
+            },
         ];
         for assertion in &passing {
             let result = evaluate(assertion);
@@ -276,6 +366,14 @@ mod tests {
                 before: 3,
                 after: 4,
                 expected_delta: 2,
+            },
+            Assertion::ImagePixelsEqual {
+                expected: tiny_png(1),
+                actual: tiny_png(2),
+            },
+            Assertion::ImagePixelsEqual {
+                expected: vec![0, 1, 2],
+                actual: vec![0, 1, 2],
             },
         ];
         for assertion in &failing {

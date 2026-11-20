@@ -857,25 +857,54 @@ fn page_corpus() {
                 case_failures.push(result.detail.clone());
             }
         }
+        // Image responses compare pixels (encoders differ) and
+        // skip the content-hash etag (likewise encoder-bound).
+        let is_image = expected
+            .iter()
+            .any(|(name, value)| name == "content-type" && value.starts_with("image/"));
+        let (headers, expected) = if is_image {
+            let strip = |headers: &[(String, String)]| {
+                headers
+                    .iter()
+                    .filter(|(name, _)| name != "etag")
+                    .cloned()
+                    .collect::<Vec<_>>()
+            };
+            (strip(&headers), strip(&expected))
+        } else {
+            (headers, expected)
+        };
         if headers != expected {
             case_failures.push(format!(
                 "headers differ:\n  expected: {expected:?}\n  actual:   {headers:?}"
             ));
         }
-        let body_result = evaluate(&Assertion::ByteEqual {
-            expected: case.body.clone(),
-            actual: body.clone(),
-        });
+        let body_result = if is_image {
+            evaluate(&Assertion::ImagePixelsEqual {
+                expected: case.body.clone(),
+                actual: body.clone(),
+            })
+        } else {
+            evaluate(&Assertion::ByteEqual {
+                expected: case.body.clone(),
+                actual: body.clone(),
+            })
+        };
         if !body_result.passed {
-            let preview =
-                |bytes: &[u8]| String::from_utf8_lossy(&bytes[..bytes.len().min(300)]).into_owned();
-            case_failures.push(format!(
-                "body differs ({} vs {} bytes):\n  expected: {:?}\n  actual:   {:?}",
-                case.body.len(),
-                body.len(),
-                preview(&case.body),
-                preview(&body)
-            ));
+            if is_image {
+                case_failures.push(format!("image differs: {}", body_result.detail));
+            } else {
+                let preview = |bytes: &[u8]| {
+                    String::from_utf8_lossy(&bytes[..bytes.len().min(300)]).into_owned()
+                };
+                case_failures.push(format!(
+                    "body differs ({} vs {} bytes):\n  expected: {:?}\n  actual:   {:?}",
+                    case.body.len(),
+                    body.len(),
+                    preview(&case.body),
+                    preview(&body)
+                ));
+            }
         }
         match (&case.known_gap, case_failures.is_empty()) {
             (Some(reason), false) => {

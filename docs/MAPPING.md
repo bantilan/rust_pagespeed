@@ -386,3 +386,9 @@ Known gaps (suite reports, never fails):
   over-optimizes); MetaTag/SupportNoscript slots;
   CriticalImagesBeacon (no impl); nested CSS subsets
   in servants.
+- Fetch epic F4 DONE: image servant (`rewrite_in_place`
+  via the shared transcode core; pixel-identical to
+  C++ on the corpus PNG). Compat: 9 page + 7 config
+  green with pixel comparison. Gaps: webp/avif
+  servants (need request Accept); lossy JPEG corpus
+  coverage (needs tolerance).

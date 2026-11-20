@@ -1485,3 +1485,18 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   (no impl); nested CSS @import/image subsets in
   servants; second-hit recall for first-hit-only
   coverage.
+- Fetch epic F4 (this session): DONE. Image optimization:
+  `ImageRewriteFilter::rewrite_in_place` runs the same
+  transcode core as the `.pagespeed.` path (no resize,
+  no UA-derived formats — webp/avif need the request
+  Accept header, unavailable in the servant path) with
+  lazy `ic` servant registration. Compat grows
+  `ImagePixelsEqual` (encoders differ, so bodies never
+  match; pixels must — png/jpeg/gif decode + dims/
+  format/pixel compare, etag skipped as encoder-bound)
+  and a `png-resource` case (poll-optimized): our
+  output is pixel-identical to C++'s. Suite: 9/9 page
+  + 7/7 config green. Workspace: 2579 passed, 0
+  failed. Follow-ups: webp/avif servants (need
+  request-headers plumbing); lossy JPEG corpus
+  coverage (needs pixel tolerance).
