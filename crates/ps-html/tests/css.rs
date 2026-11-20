@@ -2120,3 +2120,83 @@ fn inline_style_that_would_hold_markup_is_left_alone() {
         );
     }
 }
+
+/// Reads a testdata image (mirrors `image_rewrite.rs`).
+fn read_image(name: &str) -> Vec<u8> {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data");
+    std::fs::read(dir.join(name)).unwrap_or_else(|_| panic!("missing image {name}"))
+}
+
+#[test]
+fn servant_flattens_imports_and_rewrites_images() {
+    use ps_config::filter::RewriteLevel;
+    use ps_html::rewrite_filter::RewriteFilter;
+    let fixture = Fixture::new();
+    fixture
+        .options
+        .borrow_mut()
+        .filters_mut()
+        .set_level(RewriteLevel::CoreFilters);
+    fixture.mock_css(
+        &format!("{TEST_DOMAIN}inner.css"),
+        b".inner { margin: 0; }\n",
+        300,
+    );
+    let mut headers = ResponseHeaders::new(HttpOptions::default_for_tests());
+    fixture.server.set_default_long_cache_headers(
+        ps_http::content_type::mime_to_content_type("image/png"),
+        "",
+        "",
+        &mut headers,
+    );
+    headers.set_date_and_caching(fixture.server.now_ms(), 300 * 1000, "");
+    headers.compute_caching();
+    fixture.fetcher.set_response(
+        &format!("{TEST_DOMAIN}bg.png"),
+        headers,
+        &read_image("Cuppa.png"),
+    );
+    let css_url = format!("{TEST_DOMAIN}outer.css");
+    let driver = fixture.driver_for(&css_url);
+    let servant = CssFilter::new(driver.clone());
+    let input =
+        b"@import url(\"inner.css\");\nbody { background: url(\"bg.png\"); color: blue; }\n";
+    let content_type = ps_http::content_type::mime_to_content_type("text/css").expect("css known");
+    let output = servant
+        .rewrite_in_place(&driver, input, &content_type)
+        .expect("servant rewrites");
+    let text = String::from_utf8(output.bytes).expect("utf8 css");
+    assert!(!text.contains("@import"), "import flattened: {text}");
+    assert!(text.contains(".inner{margin:0}"), "inner inlined: {text}");
+    assert!(
+        text.contains(".pagespeed.ic."),
+        "image url rewritten: {text}"
+    );
+    assert!(!text.contains("url(bg.png)"), "original gone: {text}");
+}
+
+#[test]
+fn servant_leaves_unfetchable_imports_and_images() {
+    use ps_config::filter::RewriteLevel;
+    use ps_html::rewrite_filter::RewriteFilter;
+    // Nothing staged: every nested fetch fails closed and the
+    // servant degrades to minify-only.
+    let fixture = Fixture::new();
+    fixture
+        .options
+        .borrow_mut()
+        .filters_mut()
+        .set_level(RewriteLevel::CoreFilters);
+    let css_url = format!("{TEST_DOMAIN}outer.css");
+    let driver = fixture.driver_for(&css_url);
+    let servant = CssFilter::new(driver.clone());
+    let input =
+        b"@import url(\"missing.css\");\nbody { background: url(\"missing.png\"); color: blue; }\n";
+    let content_type = ps_http::content_type::mime_to_content_type("text/css").expect("css known");
+    let output = servant
+        .rewrite_in_place(&driver, input, &content_type)
+        .expect("minify still applies");
+    let text = String::from_utf8(output.bytes).expect("utf8 css");
+    assert!(text.contains("@import"), "import kept: {text}");
+    assert!(text.contains("missing.png"), "image kept: {text}");
+}

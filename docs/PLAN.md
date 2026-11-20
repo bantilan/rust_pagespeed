@@ -1575,4 +1575,26 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   ratio, not absolutes): rewrite-html ~22.4ms/iter
   (~45 req/s), passthrough-text ~161us/iter
   (~6.2k req/s), ~139x. First run caught the
-  bitfield hang above (60s/iter both arms).
+  bitfield hang above (60s/iter both arms). Latency
+  sketch (steady, no cross-hit caching — HtmlCache
+  still out): bare 5KB HTML ~3.4ms, +css/js
+  servants ~12ms, +image servant ~9ms.
+- CSS in-place imports+images (this session): DONE.
+  The servant was minify-only; C++ flattens
+  `@import`s and rewrites image URLs to `.ic.` form
+  in place. Servant now flattens via the pure-core
+  `ps_css::flatten` (server fetcher, sync) and
+  rewrites each image URL (fetch, image servant,
+  inline under the cap or hashed `.ic.` URL through
+  the same namer/output path, relativized), failing
+  closed per URL. Also fixed: serving drivers never
+  registered servant filters, so standalone
+  `.pagespeed.` fetches 404'd unless cached
+  (`register_serving_filters` at all nginx driver
+  births). Live: our output is structurally
+  identical to C++'s (hash differs — encoder bytes
+  differ); served `.ic.` pixels identical. Corpus
+  grows `css-import-image` with a per-case
+  `.pagespeed.<id>.<hash>.` mask (+etag strip).
+  Suite: 11/11 page + 7/7 config green. Workspace:
+  2586 passed, 0 failed.

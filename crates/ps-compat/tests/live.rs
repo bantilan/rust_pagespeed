@@ -786,6 +786,11 @@ fn page_corpus() {
                 }
             }
             let (headers, body) = normalize(&response.headers, &response.body);
+            let body = if def.normalize_pagespeed_hashes {
+                corpus::normalize_pagespeed_hashes(&body)
+            } else {
+                body
+            };
             recorded.push(RecordedCase {
                 name: def.name.to_string(),
                 path: def.path.to_string(),
@@ -906,7 +911,10 @@ fn page_corpus() {
         let is_image = expected
             .iter()
             .any(|(name, value)| name == "content-type" && value.starts_with("image/"));
-        let (headers, expected) = if is_image {
+        // Hash-normalized cases embed rewritten image URLs (and a
+        // content-hash etag) in text: mask both sides.
+        let mask_hashes = def.is_some_and(|def| def.normalize_pagespeed_hashes);
+        let (headers, expected) = if is_image || mask_hashes {
             let strip = |headers: &[(String, String)]| {
                 headers
                     .iter()
@@ -927,6 +935,11 @@ fn page_corpus() {
             evaluate(&Assertion::ImagePixelsEqual {
                 expected: case.body.clone(),
                 actual: body.clone(),
+            })
+        } else if mask_hashes {
+            evaluate(&Assertion::ByteEqual {
+                expected: case.body.clone(),
+                actual: corpus::normalize_pagespeed_hashes(&body),
             })
         } else {
             evaluate(&Assertion::ByteEqual {

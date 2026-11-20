@@ -2,10 +2,9 @@
 //!
 //! Minifies external stylesheets and inline `<style>` blocks plus
 //! `style` attributes, refusing output that could read as markup.
-//! Nested image/`@import` contexts, fallback URL rewriting, and
-//! absolutification land in later batches; this batch minifies only,
-//! matching C++ whenever image rewriting, flattening, and domain
-//! mapping are all off.
+//! The `.pagespeed.` path flattens `@import`s and rewrites image
+//! URLs through slots; the in-place servant below mirrors both
+//! synchronously (server fetcher + image servant + namer).
 //!
 //! NOTE: CSP gating waits for the CSP subsystem.
 
@@ -16,10 +15,15 @@ use ps_cache::hash::Hasher;
 use ps_config::filter::Filter;
 use ps_config::options::{Category, RewriteOptions};
 use ps_css::ast::{Declarations, Stylesheet, NO_ERROR};
+use ps_css::flatten::{Fetch as FlattenFetch, FetchedCss, Resolve as FlattenResolve};
 use ps_css::minify::Minifier;
 use ps_css::parser::Parser;
+use ps_css::stats::CssStats;
+use ps_css::unicode_text::UnicodeText;
 use ps_css::value::ValueType;
+use ps_http::fetch::{AsyncFetch, BufferingFetch};
 use ps_http::google_url::GoogleUrl;
+use ps_http::request::RequestContext;
 
 use super::css_hierarchy::CssHierarchy;
 use super::meta_tag::extract_meta_tag_details;
@@ -1487,6 +1491,213 @@ impl HtmlFilter for CssFilter {
     }
 }
 
+/// URL callbacks for servant flattening (`Resolve` over
+/// `GoogleUrl`; nested contents rebase only across directories).
+struct ServantResolve;
+
+impl FlattenResolve for ServantResolve {
+    fn resolve(&self, base: &[u8], link: &[u8]) -> Option<Vec<u8>> {
+        let base = GoogleUrl::new(&String::from_utf8_lossy(base));
+        let resolved = GoogleUrl::resolve(&base, &String::from_utf8_lossy(link));
+        if !resolved.is_web_valid() {
+            return None;
+        }
+        Some(resolved.spec().as_bytes().to_vec())
+    }
+
+    fn dir_differs(&self, first: &[u8], second: &[u8]) -> bool {
+        let first = GoogleUrl::new(&String::from_utf8_lossy(first));
+        let second = GoogleUrl::new(&String::from_utf8_lossy(second));
+        first.all_except_leaf() != second.all_except_leaf()
+    }
+
+    fn resolve_nested_contents(
+        &self,
+        contents: &[u8],
+        base: &[u8],
+        trim: &[u8],
+    ) -> Option<Vec<u8>> {
+        if !self.dir_differs(base, trim) {
+            return Some(contents.to_vec());
+        }
+        // Cross-directory imports absolutify (relative URLs would
+        // break under the trim base); scanner failure keeps raw.
+        struct Absolutify {
+            base: Vec<u8>,
+        }
+        impl ps_css::scanner::Transformer for Absolutify {
+            fn transform(&mut self, url: &mut Vec<u8>) -> ps_css::scanner::TransformStatus {
+                let base = GoogleUrl::new(&String::from_utf8_lossy(&self.base));
+                let resolved = GoogleUrl::resolve(&base, &String::from_utf8_lossy(url));
+                if !resolved.is_web_valid() {
+                    return ps_css::scanner::TransformStatus::NoChange;
+                }
+                let absolute = resolved.spec().as_bytes().to_vec();
+                if absolute == *url {
+                    return ps_css::scanner::TransformStatus::NoChange;
+                }
+                *url = absolute;
+                ps_css::scanner::TransformStatus::Success
+            }
+        }
+        let mut absolutify = Absolutify {
+            base: base.to_vec(),
+        };
+        ps_css::scanner::transform_urls(contents, &mut absolutify)
+    }
+}
+
+/// Stylesheet fetcher for servant flattening (server fetcher,
+/// synchronously driven; failures fail the import closed).
+struct ServantFetch {
+    driver: Rc<ResourceDriver>,
+}
+
+impl FlattenFetch for ServantFetch {
+    fn fetch(&mut self, url: &[u8]) -> Option<FetchedCss> {
+        let url = String::from_utf8_lossy(url).into_owned();
+        if !self.driver.options().is_allowed(&url) {
+            return None;
+        }
+        let context = RequestContext::new(ps_http::response::HttpOptions::default());
+        let mut fetch = BufferingFetch::new(&url, context);
+        self.driver
+            .server_context()
+            .fetcher()
+            .fetch(&url, &mut fetch);
+        if !fetch.success() || fetch.body().is_empty() {
+            return None;
+        }
+        let is_css = fetch
+            .response_headers()
+            .determine_content_type()
+            .is_some_and(|content_type| content_type.is_css());
+        if !is_css {
+            return None;
+        }
+        let charset = fetch
+            .response_headers()
+            .determine_charset()
+            .unwrap_or_default()
+            .into_bytes();
+        Some(FetchedCss {
+            bytes: fetch.body().to_vec(),
+            charset_from_headers: charset,
+        })
+    }
+}
+
+/// Rewrites image URLs synchronously (servant mirror of
+/// `rewrite_css_images`): fetch, optimize via the image servant,
+/// inline under the cap or emit an `.ic.` URL. Failures leave
+/// the URL untouched; unparseable input passes through.
+fn rewrite_css_images_in_place(
+    driver: &Rc<ResourceDriver>,
+    css_url: &str,
+    bytes: &[u8],
+) -> Vec<u8> {
+    use crate::image_url_encoder::{ImageResourceContext, ImageUrlEncoder};
+    use crate::resource_slot::relativize_or_passthrough;
+
+    let options = driver.options();
+    if !super::css_image_rewriter::rewrites_enabled(&options, options.css_image_inline_max_bytes())
+    {
+        return bytes.to_vec();
+    }
+    let Some((mut stylesheet, _)) = parse_stylesheet(bytes) else {
+        return bytes.to_vec();
+    };
+    let css_base = GoogleUrl::new(css_url);
+    let image_filter = super::image_rewrite::ImageRewriteFilter::new(driver.clone());
+    let mut changed = false;
+    for location in ps_css::rewrite::collect_image_urls(&stylesheet) {
+        let raw_url = stylesheet.rulesets()[location.ruleset].declarations()[location.declaration]
+            .values()[location.value]
+            .string_value()
+            .as_bytes()
+            .to_vec();
+        let original_url = GoogleUrl::resolve(&css_base, &String::from_utf8_lossy(&raw_url));
+        if !original_url.is_web_valid() {
+            continue;
+        }
+        let mapped = match driver.map_output_base(original_url.spec()) {
+            Ok(mapped) => mapped,
+            Err(_) => continue,
+        };
+        let url_string = original_url.spec().to_string();
+        let context = RequestContext::new(ps_http::response::HttpOptions::default());
+        let mut fetch = BufferingFetch::new(&url_string, context);
+        driver
+            .server_context()
+            .fetcher()
+            .fetch(&url_string, &mut fetch);
+        if !fetch.success() || fetch.body().is_empty() {
+            continue;
+        }
+        let Some(content_type) = fetch
+            .response_headers()
+            .determine_content_type()
+            .filter(|content_type| content_type.is_image())
+        else {
+            continue;
+        };
+        let Some(optimized) = image_filter.rewrite_in_place(driver, fetch.body(), &content_type)
+        else {
+            continue;
+        };
+        // Inline under the cap when the client allows it, else
+        // name the optimized output (hash of our bytes; the
+        // `.ic.` serve recomputes deterministically).
+        let cap = options.css_image_inline_max_bytes();
+        let mut properties = driver.request_properties();
+        let is_webp = optimized.content_type.kind() == ps_http::content_type::ContentTypeKind::Webp;
+        let replacement = if cap > 0
+            && (optimized.bytes.len() as i64) < cap
+            && properties.supports_image_inlining()
+            && !(is_webp && properties.forbid_webp_inlining())
+        {
+            String::from_utf8_lossy(&ps_http::data_url::make_data_url(
+                optimized.content_type,
+                ps_http::data_url::Encoding::Base64,
+                &optimized.bytes,
+            ))
+            .into_owned()
+        } else {
+            let leaf = mapped.leaf_with_query().as_bytes().to_vec();
+            let name = ImageUrlEncoder.encode(&leaf, &ImageResourceContext::default());
+            let mut output = match driver.create_output_resource_with_name(
+                super::image_rewrite::FILTER_ID,
+                &name,
+                &mapped,
+                &original_url,
+                OutputResourceKind::Rewritten,
+            ) {
+                Ok(output) => output,
+                Err(_) => continue,
+            };
+            output.set_type(Some(optimized.content_type));
+            output.begin_write().extend_from_slice(&optimized.bytes);
+            output.end_write();
+            let relativity = GoogleUrl::find_relativity(&String::from_utf8_lossy(&raw_url));
+            relativize_or_passthrough(&options, &output.url(), relativity, &css_base)
+        };
+        let value = &mut stylesheet.rulesets_mut()[location.ruleset].declarations_mut()
+            [location.declaration]
+            .values_mut()[location.value];
+        let Some(text) = value.string_value_mut() else {
+            continue;
+        };
+        *text = UnicodeText::from_utf8(replacement.as_bytes());
+        changed = true;
+    }
+    if !changed {
+        return bytes.to_vec();
+    }
+    minify_sheet(&stylesheet)
+        .map(|(out, _)| out)
+        .unwrap_or_else(|| bytes.to_vec())
+}
+
 impl RewriteFilter for CssFilter {
     fn id(&self) -> &'static str {
         FILTER_ID
@@ -1494,14 +1705,42 @@ impl RewriteFilter for CssFilter {
 
     fn rewrite_in_place(
         &self,
-        _driver: &Rc<ResourceDriver>,
+        driver: &Rc<ResourceDriver>,
         input: &[u8],
         content_type: &ps_http::content_type::ContentType,
     ) -> Option<crate::rewrite_filter::InPlaceOutput> {
-        // Minify-only subset: nested @import flattening and
-        // image-URL rewriting need slot contexts (the full
-        // `.pagespeed.` path stays authoritative for those).
-        let bytes = ps_css::minify::minify_css(input)?;
+        let css_url = driver.base_url().spec().to_string();
+        let (text, has_bom) = ps_css::combine::strip_utf8_bom(input);
+        let mut bytes = text.to_vec();
+        if flatten_css_imports_enabled(&driver.options()) {
+            let max_bytes = driver.options().css_flatten_max_bytes();
+            let resolve = ServantResolve;
+            let mut fetch = ServantFetch {
+                driver: driver.clone(),
+            };
+            let mut stats = CssStats::new();
+            let outcome = ps_css::flatten::flatten(
+                css_url.as_bytes(),
+                css_url.as_bytes(),
+                &bytes,
+                b"",
+                &[],
+                max_bytes,
+                &resolve,
+                &mut fetch,
+                &mut stats,
+            );
+            if outcome.flattened {
+                bytes = outcome.text;
+            }
+        }
+        bytes = rewrite_css_images_in_place(driver, &css_url, &bytes);
+        let mut bytes = ps_css::minify::minify_css(&bytes)?;
+        if has_bom {
+            let mut bom = b"\xef\xbb\xbf".to_vec();
+            bom.append(&mut bytes);
+            bytes = bom;
+        }
         Some(crate::rewrite_filter::InPlaceOutput {
             bytes,
             content_type: *content_type,

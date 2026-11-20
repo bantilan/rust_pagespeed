@@ -1277,6 +1277,27 @@ impl ResourceDriver {
         self.filters.borrow_mut().insert(filter.id(), filter);
     }
 
+    /// Registers every serving filter (`AddFilters` shape):
+    /// `.pagespeed.` fetches decode to a filter id and 404 without
+    /// its servant, so serving drivers register the full set.
+    /// Tests keep bare drivers unless they register explicitly.
+    pub fn register_serving_filters(self: &Rc<Self>) {
+        use super::filters::cache_extender::CacheExtenderFilter;
+        use super::filters::css::CssFilter;
+        use super::filters::css_combine::CssCombineFilter;
+        use super::filters::image_combine::ImageCombineFilter;
+        use super::filters::image_rewrite::ImageRewriteFilter;
+        use super::filters::javascript::JavascriptFilter;
+        use super::filters::js_combine::JsCombineFilter;
+        self.add_filter(Rc::new(CacheExtenderFilter::new(self.clone())));
+        self.add_filter(Rc::new(CssFilter::new(self.clone())));
+        self.add_filter(Rc::new(CssCombineFilter::new(self.clone())));
+        self.add_filter(Rc::new(ImageCombineFilter::new(self.clone())));
+        self.add_filter(Rc::new(ImageRewriteFilter::new(self.clone())));
+        self.add_filter(Rc::new(JavascriptFilter::new(self.clone())));
+        self.add_filter(Rc::new(JsCombineFilter::new(self.clone())));
+    }
+
     /// Looks up a serving filter (`FindFilter`).
     #[must_use]
     pub fn find_filter(&self, id: &str) -> Option<Rc<dyn RewriteFilter>> {

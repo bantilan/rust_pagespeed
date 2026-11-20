@@ -2647,6 +2647,7 @@ unsafe fn resource_response(
                     // CDATA wrapping on plain HTML.
                     driver.set_is_xhtml(content_type_is_xml_like(&content_type));
                     crate::terminal::install_request_context(&driver, &request_headers);
+                    driver.register_serving_filters();
                     driver
                 });
                 let sink = crate::send::HtmlSink::new(

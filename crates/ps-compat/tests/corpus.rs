@@ -42,6 +42,10 @@ pub struct CaseDef {
     pub fixed_mtime: bool,
     /// Extra request headers as (name, value) (per-case UA/Accept).
     pub request_headers: &'static [(&'static str, &'static str)],
+    /// Mask `.pagespeed.<id>.<hash>.` segments before compare
+    /// (optimized-image bytes differ by encoder, so content
+    /// hashes never match; the URL shape still pins).
+    pub normalize_pagespeed_hashes: bool,
     /// Known divergence reason (reported, never fails).
     pub known_gap: Option<&'static str>,
 }
@@ -64,6 +68,7 @@ pub const CASES: &[CaseDef] = &[
         poll_optimized: false,
         fixed_mtime: true,
         request_headers: &[],
+        normalize_pagespeed_hashes: false,
         known_gap: None,
     },
     CaseDef {
@@ -80,6 +85,7 @@ pub const CASES: &[CaseDef] = &[
         poll_optimized: false,
         fixed_mtime: true,
         request_headers: &[],
+        normalize_pagespeed_hashes: false,
         known_gap: None,
     },
     CaseDef {
@@ -92,6 +98,7 @@ pub const CASES: &[CaseDef] = &[
         poll_optimized: false,
         fixed_mtime: true,
         request_headers: &[],
+        normalize_pagespeed_hashes: false,
         known_gap: None,
     },
     CaseDef {
@@ -108,6 +115,7 @@ pub const CASES: &[CaseDef] = &[
         poll_optimized: false,
         fixed_mtime: true,
         request_headers: &[],
+        normalize_pagespeed_hashes: false,
         known_gap: None,
     },
     CaseDef {
@@ -120,6 +128,7 @@ pub const CASES: &[CaseDef] = &[
         poll_optimized: false,
         fixed_mtime: true,
         request_headers: &[],
+        normalize_pagespeed_hashes: false,
         known_gap: None,
     },
     CaseDef {
@@ -136,6 +145,7 @@ pub const CASES: &[CaseDef] = &[
         poll_optimized: true,
         fixed_mtime: false,
         request_headers: &[],
+        normalize_pagespeed_hashes: false,
         known_gap: None,
     },
     CaseDef {
@@ -152,6 +162,7 @@ pub const CASES: &[CaseDef] = &[
         poll_optimized: true,
         fixed_mtime: false,
         request_headers: &[],
+        normalize_pagespeed_hashes: false,
         known_gap: None,
     },
     CaseDef {
@@ -170,6 +181,7 @@ pub const CASES: &[CaseDef] = &[
         poll_optimized: true,
         fixed_mtime: false,
         request_headers: &[],
+        normalize_pagespeed_hashes: false,
         known_gap: None,
     },
     CaseDef {
@@ -195,6 +207,35 @@ pub const CASES: &[CaseDef] = &[
             ),
             ("Accept", "image/webp,image/*,*/*;q=0.8"),
         ],
+        normalize_pagespeed_hashes: false,
+        known_gap: None,
+    },
+    CaseDef {
+        name: "css-import-image",
+        path: "/o.css",
+        html: Some(
+            b"@import url(\"inner.css\");\nbody { background: url(\"bg.png\"); color: blue; }\n",
+        ),
+        extra: &[
+            (
+                "/inner.css",
+                b".inner { margin: 0; }\n" as &[u8],
+            ),
+            (
+                "/bg.png",
+                include_bytes!("../../ps-image/tests/data/png/pagespeed-33x34.png") as &[u8],
+            ),
+        ],
+        directives: &[
+            ("on", ""),
+            ("FileCachePath", CACHE_PLACEHOLDER),
+            ("RewriteLevel", "CoreFilters"),
+        ],
+        fetches: 2,
+        poll_optimized: true,
+        fixed_mtime: false,
+        request_headers: &[],
+        normalize_pagespeed_hashes: true,
         known_gap: None,
     },
     CaseDef {
@@ -216,6 +257,7 @@ pub const CASES: &[CaseDef] = &[
         poll_optimized: false,
         fixed_mtime: true,
         request_headers: &[],
+        normalize_pagespeed_hashes: false,
         known_gap: None,
     },
 ];
@@ -275,6 +317,50 @@ pub fn normalize(headers: &[(String, String)], body: &[u8]) -> (Vec<(String, Str
         .collect();
     kept.sort();
     (kept, body.to_vec())
+}
+
+/// Masks `.pagespeed.<id>.<hash>.` segments to
+/// `.pagespeed.<id>.H.` (optimized-image bytes differ by
+/// encoder, so content hashes never match; id, name, and
+/// extension still pin). Byte scanner, no regex dependency.
+#[must_use]
+pub fn normalize_pagespeed_hashes(body: &[u8]) -> Vec<u8> {
+    const MARKER: &[u8] = b".pagespeed.";
+    let mut out = Vec::with_capacity(body.len());
+    let mut rest = body;
+    while let Some(pos) = rest
+        .windows(MARKER.len())
+        .position(|window| window == MARKER)
+    {
+        out.extend_from_slice(&rest[..pos + MARKER.len()]);
+        rest = &rest[pos + MARKER.len()..];
+        // Identifier: lowercase letters up to the next dot.
+        let id_len = rest
+            .iter()
+            .take_while(|byte| byte.is_ascii_lowercase())
+            .count();
+        let Some(b'.') = rest.get(id_len).copied() else {
+            continue;
+        };
+        if id_len == 0 {
+            continue;
+        }
+        out.extend_from_slice(&rest[..id_len + 1]);
+        rest = &rest[id_len + 1..];
+        // Hash/signature segment up to the next dot.
+        let hash_len = rest
+            .iter()
+            .take_while(|byte| byte.is_ascii_alphanumeric() || **byte == b'-' || **byte == b'_')
+            .count();
+        if rest.get(hash_len) != Some(&b'.') || hash_len == 0 {
+            continue;
+        }
+        out.push(b'H');
+        out.push(b'.');
+        rest = &rest[hash_len + 1..];
+    }
+    out.extend_from_slice(rest);
+    out
 }
 
 /// Rewrites volatile `max-age` values to `N` (optimized-serve

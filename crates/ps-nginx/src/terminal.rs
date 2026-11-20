@@ -125,6 +125,7 @@ pub fn fetch_resource_body(
         url,
     ));
     install_request_context(&driver, request_headers);
+    driver.register_serving_filters();
     ps_html::server_context::ResourceDriver::fetch_resource(&driver, url, &mut fetch);
     collect_fetch(&fetch)
 }
@@ -167,6 +168,7 @@ pub fn fetch_in_place_body(
         url,
     ));
     install_request_context(&driver, request_headers);
+    driver.register_serving_filters();
     ps_html::ipro::fetch_in_place_resource(&driver, url, &mut fetch, false);
     collect_fetch(&fetch)
 }
