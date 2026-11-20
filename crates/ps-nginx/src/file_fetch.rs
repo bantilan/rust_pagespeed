@@ -85,7 +85,11 @@ impl FileFetcher {
 
     /// Maps a URL to a jailed file path (pure join + checks; the
     /// canonicalization read is the only I/O).
-    fn resolve(&self, url: &str) -> Option<PathBuf> {
+    /// Lexically joins a URL path under the root (no filesystem
+    /// touch): shape-valid, jail-contained-or-missing names.
+    /// `None` only for malformed URLs, foreign hosts, and
+    /// `..` escapes.
+    fn join_root(&self, url: &str) -> Option<PathBuf> {
         let gurl = GoogleUrl::new(url);
         if !gurl.is_web_valid() || gurl.scheme() != "http" {
             return None;
@@ -114,6 +118,11 @@ impl FileFetcher {
         if segments == 0 {
             return None;
         }
+        Some(joined)
+    }
+
+    fn resolve(&self, url: &str) -> Option<PathBuf> {
+        let joined = self.join_root(url)?;
         let canonical = joined.canonicalize().ok()?;
         if !canonical.starts_with(&self.root) {
             return None;
@@ -123,12 +132,38 @@ impl FileFetcher {
         }
         Some(canonical)
     }
+
+    /// Reports a mapped-but-missing name as the subrequest's
+    /// 404 status (downstream classifies Error4xx like C++).
+    /// The transport still fails (`Done(false)`), matching the
+    /// fetcher's existing missing-file contract.
+    fn serve_not_found(&self, fetch: &mut dyn AsyncFetch) {
+        let headers = fetch.response_headers_mut();
+        headers.set_status_and_reason(404);
+        headers.headers_mut().remove_all(header::CONTENT_TYPE);
+        headers.headers_mut().add(header::CONTENT_TYPE, "text/html");
+        headers.set_date(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|age| age.as_millis() as i64)
+                .unwrap_or(0),
+        );
+        fetch.headers_complete();
+        fetch.handle_done(false);
+    }
 }
 
 impl AsyncFetcher for FileFetcher {
     fn fetch(&self, url: &str, fetch: &mut dyn AsyncFetch) {
         let Some(path) = self.resolve(url) else {
-            fetch.handle_done(false);
+            // Mapped-but-missing names answer the subrequest's
+            // 404 (completed transaction); malformed URLs and
+            // foreign hosts fail the transport instead.
+            if self.join_root(url).is_none() {
+                fetch.handle_done(false);
+                return;
+            }
+            self.serve_not_found(fetch);
             return;
         };
         let modified = std::fs::metadata(&path)
@@ -136,9 +171,11 @@ impl AsyncFetcher for FileFetcher {
             .ok()
             .and_then(|time| time.duration_since(SystemTime::UNIX_EPOCH).ok())
             .map(|age| age.as_millis() as i64);
-        // C++ fails the load when the mtime or the read fails.
+        // A mapped-but-missing file synthesizes the subrequest's
+        // 404 (completed transaction, not a transport failure),
+        // so downstream classifies Error4xx like C++.
         let (Some(mtime_ms), Ok(bytes)) = (modified, std::fs::read(&path)) else {
-            fetch.handle_done(false);
+            self.serve_not_found(fetch);
             return;
         };
         if self.max_file_bytes >= 0 && bytes.len() as i64 > self.max_file_bytes {
@@ -486,5 +523,26 @@ mod tests {
             "<html><head><style>.a{color:red}</style></head><body>hi</body></html>",
             out
         );
+    }
+
+    #[test]
+    fn missing_file_reports_404_status() {
+        use ps_http::fetch::AsyncFetch;
+        let scratch = Scratch::new(&[("a.css", b".a{color:red}")]);
+        let fetcher = scratch.fetcher();
+        let fetch = scratch.fetch(&fetcher, "http://localhost/missing.css");
+        assert!(fetch.done());
+        assert!(!fetch.success());
+        assert_eq!(404, fetch.response_headers().status_code());
+    }
+
+    #[test]
+    fn unmapped_host_still_fails_transport() {
+        use ps_http::fetch::AsyncFetch;
+        let scratch = Scratch::new(&[("a.css", b".a{color:red}")]);
+        let fetcher = scratch.fetcher();
+        let fetch = scratch.fetch(&fetcher, "http://elsewhere.test/a.css");
+        assert!(fetch.done());
+        assert!(!fetch.success());
     }
 }
