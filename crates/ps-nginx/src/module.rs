@@ -29,11 +29,11 @@ use ngx::ffi::{
     ngx_cycle_t, ngx_http_conf_ctx_t, ngx_http_core_loc_conf_t, ngx_http_core_main_conf_t,
     ngx_http_core_srv_conf_t, ngx_http_handler_pt, ngx_http_module_t, ngx_http_phase_handler_t,
     ngx_http_phases_NGX_HTTP_POST_READ_PHASE, ngx_http_phases_NGX_HTTP_PRECONTENT_PHASE,
-    ngx_http_request_t, ngx_int_t, ngx_module_t, ngx_pool_cleanup_add, ngx_str_t, ngx_table_elt_t,
-    ngx_uint_t, NGX_AGAIN, NGX_CONF_TAKE1, NGX_CONF_TAKE2, NGX_CONF_TAKE3, NGX_CONF_TAKE4,
-    NGX_CONF_TAKE5, NGX_DECLINED, NGX_DONE, NGX_ERROR, NGX_HTTP_INTERNAL_SERVER_ERROR,
-    NGX_HTTP_LIF_CONF, NGX_HTTP_LOC_CONF, NGX_HTTP_MAIN_CONF, NGX_HTTP_MODULE, NGX_HTTP_SRV_CONF,
-    NGX_OK,
+    ngx_http_request_t, ngx_http_server_name_t, ngx_int_t, ngx_module_t, ngx_pool_cleanup_add,
+    ngx_str_t, ngx_table_elt_t, ngx_uint_t, NGX_AGAIN, NGX_CONF_TAKE1, NGX_CONF_TAKE2,
+    NGX_CONF_TAKE3, NGX_CONF_TAKE4, NGX_CONF_TAKE5, NGX_DECLINED, NGX_DONE, NGX_ERROR,
+    NGX_HTTP_INTERNAL_SERVER_ERROR, NGX_HTTP_LIF_CONF, NGX_HTTP_LOC_CONF, NGX_HTTP_MAIN_CONF,
+    NGX_HTTP_MODULE, NGX_HTTP_SRV_CONF, NGX_OK,
 };
 use ps_config::message_handler::MessageLevel;
 use ps_config::options::{
@@ -44,6 +44,7 @@ use ps_config::scope::Scope;
 use std::ffi::c_void;
 use std::mem;
 use std::ptr;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -1004,11 +1005,64 @@ pub unsafe extern "C" fn init_child_process(cycle: *mut ngx_cycle_t) -> ngx_int_
     }
 }
 
+/// Builds the server's file fetcher (`None` falls back to the
+/// unavailable fetcher with a loud log): server-level root
+/// only (aliases, variables, relative, and missing roots fail
+/// closed), every configured server name (regex names never
+/// match).
+///
+/// # Safety
+///
+/// `cscf`/`clcf` must point at live confs.
+unsafe fn file_fetcher_for_server(
+    cscf: *mut ngx_http_core_srv_conf_t,
+    clcf: *mut ngx_http_core_loc_conf_t,
+    options: &ps_config::options::RewriteOptions,
+) -> Option<crate::file_fetch::FileFetcher> {
+    // SAFETY: caller guarantees live confs.
+    unsafe {
+        if clcf.is_null() || (*clcf).alias != 0 {
+            return None;
+        }
+        let root = &raw const (*clcf).root;
+        if (*root).len == 0 || (*root).data.is_null() {
+            return None;
+        }
+        let root = ngx_str_text(root);
+        let mut names = Vec::new();
+        let first = &raw const (*cscf).server_name;
+        if (*first).len != 0 && !(*first).data.is_null() {
+            names.push(ngx_str_text(first));
+        }
+        let array = &raw const (*cscf).server_names;
+        if !(*array).elts.is_null() {
+            let elts = (*array).elts as *const ngx_http_server_name_t;
+            for i in 0..(*array).nelts {
+                let entry = &*elts.add(i);
+                if entry.regex.is_null() && entry.name.len != 0 && !entry.name.data.is_null() {
+                    names.push(ngx_str_text(&raw const entry.name));
+                }
+            }
+        }
+        names.sort();
+        names.dedup();
+        crate::file_fetch::FileFetcher::new(
+            &root,
+            &names,
+            options.max_cacheable_response_content_length(),
+            options.load_from_file_cache_ttl_ms(),
+            options.was_set("lfct"),
+            options.implicit_cache_ttl_ms(),
+        )
+    }
+}
+
 /// Runs per-server child init: cache assembly plus the
 /// initialized latch (`ServerContext::ChildInit`), then the
 /// message handler (`SetServerContextMessageHandler`) over the
-/// shared message buffer. No proxy-fetch factories: the sync
-/// bridge serves from cache without origin machinery.
+/// shared message buffer. No proxy-fetch factories: origin
+/// inputs load from the server root (file fetcher); proxy and
+/// unmapped origins fail closed.
 ///
 /// # Safety
 ///
@@ -1037,22 +1091,38 @@ unsafe fn child_init_servers(cycle: *mut ngx_cycle_t, main: &mut MainConf) {
                 continue;
             }
             if let Some(context) = (*srv).context.as_mut() {
+                let clcf = *(*sctx).loc_conf.add(core) as *mut ngx_http_core_loc_conf_t;
                 if let Some(assembled) = main.driver_factory.caches.setup_caches(&context.options) {
                     let now_ms = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .map(|age| age.as_millis() as i64)
                         .unwrap_or(0);
+                    let fetcher: Rc<dyn ps_http::fetch::AsyncFetcher> = if clcf.is_null() {
+                        Rc::new(crate::rewrite::UnavailableFetcher)
+                    } else {
+                        match file_fetcher_for_server(cscf, clcf, &context.options.core) {
+                            Some(fetcher) => Rc::new(fetcher),
+                            None => {
+                                main.driver_factory.message_handler.message(
+                                    MessageLevel::Info,
+                                    "pagespeed: origin file fetching unavailable for this \
+                                     server (unmapped root); resources serve from cache only",
+                                );
+                                Rc::new(crate::rewrite::UnavailableFetcher)
+                            }
+                        }
+                    };
                     context.html_context = Some(crate::rewrite::html_context(
                         assembled.http_backend,
                         Arc::clone(&assembled.metadata_cache),
                         Arc::clone(&main.driver_factory.statistics),
                         now_ms,
+                        fetcher,
                     ));
                     context.http_cache = Some(assembled.http_cache);
                     context.metadata_cache = Some(assembled.metadata_cache);
                 }
                 context.initialized = true;
-                let clcf = *(*sctx).loc_conf.add(core) as *mut ngx_http_core_loc_conf_t;
                 if clcf.is_null() {
                     continue;
                 }

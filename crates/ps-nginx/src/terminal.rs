@@ -418,6 +418,7 @@ mod tests {
             metadata,
             Arc::new(ps_stats::core::Statistics::new()),
             0,
+            std::rc::Rc::new(crate::rewrite::UnavailableFetcher),
         );
         let options = ps_config::options::RewriteOptions::new();
         let response = fetch_resource_body(&html, &options, "http://h/not-a-resource", 0);

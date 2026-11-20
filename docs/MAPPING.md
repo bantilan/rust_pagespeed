@@ -368,3 +368,11 @@ Known gaps (suite reports, never fails):
   `cache_control_values_to_preserve`, and
   `set_cache_control_max_age` divergences fixed this
   session; all three writers now C++-verbatim.)
+- Fetch epic F1 DONE: `FileFetcher`
+  (`ps-nginx/src/file_fetch.rs`) serves same-server
+  static inputs (server root + names from child-init;
+  `http`-only, jailed, capped, `SetDefaultHeaders`
+  headers). Gaps: per-location roots/aliases/
+  `try_files`/index, regex server names, proxy/TLS/
+  mapped origins (fail closed); recording cache
+  writes (only repeated-404 notes now).

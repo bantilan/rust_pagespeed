@@ -30,6 +30,7 @@ pub mod directives;
 pub mod factory;
 pub mod fetch;
 pub mod fetch_body;
+pub mod file_fetch;
 pub mod filters;
 pub mod gzip_rollback;
 pub mod gzip_setter;

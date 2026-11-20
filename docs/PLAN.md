@@ -1436,3 +1436,20 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   (`caching_writers_match_cxx`); no existing test
   flipped. Workspace: 2569 passed, 0 failed; live
   suite still 5/5 + 7/7.
+- Fetch epic F1 (this session): DONE. Same-server file
+  fetcher replaces `UnavailableFetcher`: `FileFetcher`
+  maps `http` URLs to the server root (exact/`*.`
+  host match, unescape, `..`/NUL/symlink-escape jail,
+  regular files under the cacheable size cap) and
+  serves `FileInputResource::SetDefaultHeaders`
+  headers verbatim. Child-init builds it per server
+  (server-level root only; aliases/variables/relative/
+  missing roots and null confs fall back loud).
+  `html_context` takes the fetcher; 8 unit tests incl.
+  traversal/symlink attacks. Live: IPRO reconstructs
+  and serves static files itself (original bytes;
+  optimization needs F3). Workspace: 2577 passed, 0
+  failed; live suite still 5/5 + 7/7. F2 (recording
+  cache backend) deprioritized: file hits no longer
+  decline, so it would only persist repeated-404
+  notes.

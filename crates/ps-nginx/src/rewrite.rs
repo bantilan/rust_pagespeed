@@ -2,10 +2,10 @@
 //!
 //! Builds per-server HTML contexts over the assembled caches:
 //! backends shared, statistics shared with the worker registry,
-//! clock reset per request. Origin fetching is unavailable (the
-//! native fetcher is dormant until async drivers exist), so
-//! input fetches fail the way network failures do and rewrites
-//! proceed from cache.
+//! clock reset per request. Origin inputs load through the
+//! injected fetcher (the file fetcher on mapped roots); the
+//! native fetcher stays dormant until async drivers exist, and
+//! unmapped origins fail the way network failures do.
 
 use ps_cache::cache::Cache;
 use ps_html::server_context::ServerContext as HtmlServerContext;
@@ -13,8 +13,9 @@ use ps_http::fetch::{AsyncFetch, AsyncFetcher};
 use std::rc::Rc;
 use std::sync::Arc;
 
-/// Origin fetcher that always fails (`Done(false)`): input
-/// resources must come from cache until async drivers exist.
+/// Origin fetcher that always fails (`Done(false)`): unmapped
+/// origins (proxy, aliases, unmapped roots) fail closed and
+/// rewrites proceed from cache.
 #[derive(Debug, Default)]
 pub struct UnavailableFetcher;
 
@@ -30,20 +31,19 @@ impl AsyncFetcher for UnavailableFetcher {
 
 /// Builds an HTML context over assembled caches.
 /// `http_backend`/`metadata` come from `setup_caches`;
-/// `statistics` is the worker registry (shared, like C++).
+/// `statistics` is the worker registry (shared, like C++);
+/// `fetcher` serves origin inputs (the file fetcher on
+/// static roots, unavailable otherwise).
 #[must_use]
 pub fn html_context(
     http_backend: Arc<dyn Cache>,
     metadata: Arc<dyn Cache>,
     statistics: Arc<ps_stats::core::Statistics>,
     start_ms: i64,
+    fetcher: Rc<dyn AsyncFetcher>,
 ) -> Rc<HtmlServerContext> {
-    let mut context = HtmlServerContext::new_with_metadata(
-        http_backend,
-        metadata,
-        Rc::new(UnavailableFetcher) as Rc<dyn AsyncFetcher>,
-        start_ms,
-    );
+    let mut context =
+        HtmlServerContext::new_with_metadata(http_backend, metadata, fetcher, start_ms);
     context.set_statistics(statistics);
     Rc::new(context)
 }
@@ -79,7 +79,13 @@ mod tests {
         let backend: Arc<dyn Cache> = Arc::new(MemoryCache::new());
         let metadata: Arc<dyn Cache> = Arc::new(MemoryCache::new());
         let statistics = Arc::new(ps_stats::core::Statistics::new());
-        let context = html_context(backend, metadata, Arc::clone(&statistics), 1000);
+        let context = html_context(
+            backend,
+            metadata,
+            Arc::clone(&statistics),
+            1000,
+            Rc::new(UnavailableFetcher),
+        );
         assert_eq!(1000, context.now_ms());
         reset_context_clock(&context, 2000);
         assert_eq!(2000, context.now_ms());
