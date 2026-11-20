@@ -1494,6 +1494,23 @@ impl RewriteFilter for CssFilter {
         FILTER_ID
     }
 
+    fn rewrite_in_place(
+        &self,
+        _driver: &Rc<ResourceDriver>,
+        input: &[u8],
+        content_type: &ps_http::content_type::ContentType,
+    ) -> Option<crate::rewrite_filter::InPlaceOutput> {
+        // Minify-only subset: nested @import flattening and
+        // image-URL rewriting need slot contexts (the full
+        // `.pagespeed.` path stays authoritative for those).
+        let bytes = ps_css::minify::minify_css(input)?;
+        Some(crate::rewrite_filter::InPlaceOutput {
+            bytes,
+            content_type: *content_type,
+            optimized_image_type: None,
+        })
+    }
+
     fn encoder(&self) -> &'static dyn UrlSegmentEncoder {
         &CSS_ENCODER
     }

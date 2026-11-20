@@ -818,7 +818,8 @@ mod tests {
                 assert!(options.filters_mut().enable_by_comma_list(filters));
             }
             let sink = SharedVec::default();
-            let mut driver = Driver::new(&options, &ChainContext::new(true, true), sink.clone());
+            let mut driver =
+                Driver::new(&options, &ChainContext::new(true, true), sink.clone(), None);
             driver.start_parse(b"http://compat.test/page.html", false);
             driver.write(input.as_bytes());
             driver.finish();

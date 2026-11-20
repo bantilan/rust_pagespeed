@@ -152,6 +152,10 @@ pub struct PageCase {
     pub url: String,
     /// Origin HTML.
     pub html: Vec<u8>,
+    /// Extra origin files as (path, bytes) pairs.
+    pub extra: Vec<(String, Vec<u8>)>,
+    /// Pin the origin mtime (stable ETag/Last-Modified).
+    pub fixed_mtime: bool,
     /// Directives as (name, value) pairs.
     pub directives: Vec<(String, String)>,
     /// Expectations over the rewritten response.
@@ -288,6 +292,8 @@ mod tests {
             name: "p".to_string(),
             url: "http://x/".to_string(),
             html: vec![],
+            extra: vec![],
+            fixed_mtime: true,
             directives: vec![],
             assertions: vec![Assertion::ByteEqual {
                 expected: vec![],
@@ -316,6 +322,8 @@ mod tests {
                 name: "p".to_string(),
                 url: "http://x/".to_string(),
                 html: vec![],
+                extra: vec![],
+                fixed_mtime: true,
                 directives: vec![],
                 assertions: vec![byte],
             }],

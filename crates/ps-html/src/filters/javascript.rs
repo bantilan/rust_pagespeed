@@ -679,6 +679,25 @@ impl RewriteFilter for JavascriptFilter {
         }
     }
 
+    fn rewrite_in_place(
+        &self,
+        _driver: &Rc<ResourceDriver>,
+        input: &[u8],
+        content_type: &ps_http::content_type::ContentType,
+    ) -> Option<crate::rewrite_filter::InPlaceOutput> {
+        // Minify-only subset (no combining; the full
+        // `.pagespeed.` path stays authoritative for that).
+        let (bytes, success) = ps_js::minify::minify_utf8(&self.patterns, input);
+        if !success {
+            return None;
+        }
+        Some(crate::rewrite_filter::InPlaceOutput {
+            bytes,
+            content_type: *content_type,
+            optimized_image_type: None,
+        })
+    }
+
     fn fetch(
         &self,
         driver: &Rc<ResourceDriver>,

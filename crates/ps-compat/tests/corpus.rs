@@ -27,8 +27,19 @@ pub struct CaseDef {
     pub path: &'static str,
     /// Origin bytes (`None` serves nothing: 404 cases).
     pub html: Option<&'static [u8]>,
+    /// Extra origin files as (path, bytes).
+    pub extra: &'static [(&'static str, &'static [u8])],
     /// Directives as (name, value); empty value renders bare.
     pub directives: &'static [(&'static str, &'static str)],
+    /// Request count (last response recorded/compared; resource
+    /// cases use 2 to pin steady-state convergence).
+    pub fetches: u8,
+    /// Poll until the body differs from the origin input (C++
+    /// optimizes asynchronously; the sync bridge inline).
+    pub poll_optimized: bool,
+    /// Pin the origin mtime (stable ETag/Last-Modified); resource
+    /// cases leave it fresh so C++ considers inputs rewritable.
+    pub fixed_mtime: bool,
     /// Known divergence reason (reported, never fails).
     pub known_gap: Option<&'static str>,
 }
@@ -45,44 +56,114 @@ pub const CASES: &[CaseDef] = &[
         name: "smoke-html",
         path: "/page.html",
         html: Some(b"<html><head><title>t</title></head><body><p>hi</p></body></html>"),
+        extra: &[],
         directives: &[("on", ""), ("FileCachePath", CACHE_PLACEHOLDER)],
+        fetches: 1,
+        poll_optimized: false,
+        fixed_mtime: true,
         known_gap: None,
     },
     CaseDef {
         name: "whitespace-comments",
         path: "/ws.html",
         html: Some(WS_HTML),
+        extra: &[],
         directives: &[
             ("on", ""),
             ("FileCachePath", CACHE_PLACEHOLDER),
             ("EnableFilters", "collapse_whitespace,remove_comments"),
         ],
+        fetches: 1,
+        poll_optimized: false,
+        fixed_mtime: true,
         known_gap: None,
     },
     CaseDef {
         name: "core-rich",
         path: "/rich.html",
         html: Some(RICH_HTML),
+        extra: &[],
         directives: &[("on", ""), ("FileCachePath", CACHE_PLACEHOLDER)],
+        fetches: 1,
+        poll_optimized: false,
+        fixed_mtime: true,
         known_gap: None,
     },
     CaseDef {
         name: "elide-attributes",
         path: "/elide.html",
         html: Some(RICH_HTML),
+        extra: &[],
         directives: &[
             ("on", ""),
             ("FileCachePath", CACHE_PLACEHOLDER),
             ("EnableFilters", "elide_attributes"),
         ],
+        fetches: 1,
+        poll_optimized: false,
+        fixed_mtime: true,
         known_gap: None,
     },
     CaseDef {
         name: "missing-file",
         path: "/no-such-file.html",
         html: None,
+        extra: &[],
         directives: &[("on", ""), ("FileCachePath", CACHE_PLACEHOLDER)],
-        known_gap: Some("error s-maxage rides unported recorder arming"),
+        fetches: 1,
+        poll_optimized: false,
+        fixed_mtime: true,
+        known_gap: None,
+    },
+    CaseDef {
+        name: "css-resource",
+        path: "/r.css",
+        html: Some(b"a { color : red; }\n/* comment */\nb { margin : 0; }\n"),
+        extra: &[],
+        directives: &[
+            ("on", ""),
+            ("FileCachePath", CACHE_PLACEHOLDER),
+            ("RewriteLevel", "CoreFilters"),
+        ],
+        fetches: 2,
+        poll_optimized: true,
+        fixed_mtime: false,
+        known_gap: None,
+    },
+    CaseDef {
+        name: "js-resource",
+        path: "/r.js",
+        html: Some(b"function hello( ) {\n  // greeting\n  return 1 + 1 ;\n}\n"),
+        extra: &[],
+        directives: &[
+            ("on", ""),
+            ("FileCachePath", CACHE_PLACEHOLDER),
+            ("RewriteLevel", "CoreFilters"),
+        ],
+        fetches: 2,
+        poll_optimized: true,
+        fixed_mtime: false,
+        known_gap: None,
+    },
+    CaseDef {
+        name: "page-with-links",
+        path: "/links.html",
+        html: Some(
+            b"<html><head><link rel=\"stylesheet\" href=\"a.css\"><script src=\"a.js\"></script></head><body>hi</body></html>",
+        ),
+        extra: &[
+            ("/a.css", b"a { color : red; }\n" as &[u8]),
+            ("/a.js", b"function f( ) { return 2 ; }\n" as &[u8]),
+        ],
+        directives: &[
+            ("on", ""),
+            ("FileCachePath", CACHE_PLACEHOLDER),
+            ("RewriteLevel", "CoreFilters"),
+        ],
+        fetches: 1,
+        poll_optimized: false,
+        fixed_mtime: true,
+        known_gap: None,
     },
 ];
 
@@ -95,6 +176,8 @@ pub struct RecordedCase {
     pub path: String,
     /// Origin bytes (empty when the case serves nothing).
     pub html: Vec<u8>,
+    /// Extra origin files as (path, bytes).
+    pub extra: Vec<(String, Vec<u8>)>,
     /// Directives with `{CACHE}` already substituted at record
     /// time (compare re-substitutes per case).
     pub directives: Vec<(String, String)>,
@@ -116,6 +199,9 @@ const DROPPED_HEADERS: &[&str] = &[
     "connection",
     "transfer-encoding",
     "content-length",
+    // Clock-derived from Date+TTL (Date is already dropped, so the
+    // absolute value is uncheckable; max-age pins the TTL).
+    "expires",
 ];
 
 /// Normalizes a response for comparison: drops framing/clock/
@@ -136,6 +222,36 @@ pub fn normalize(headers: &[(String, String)], body: &[u8]) -> (Vec<(String, Str
         .collect();
     kept.sort();
     (kept, body.to_vec())
+}
+
+/// Rewrites volatile `max-age` values to `N` (optimized-serve
+/// TTLs count down from first record, so record/compare ages
+/// differ systematically between the async C++ stack and the
+/// sync bridge; the directive's presence still pins).
+#[must_use]
+pub fn normalize_volatile(headers: &[(String, String)]) -> Vec<(String, String)> {
+    headers
+        .iter()
+        .map(|(name, value)| {
+            if name != "cache-control" {
+                return (name.clone(), value.clone());
+            }
+            let mut out = String::new();
+            let mut rest = value.as_str();
+            while let Some(pos) = rest.find("max-age=") {
+                out.push_str(&rest[..pos + 8]);
+                rest = &rest[pos + 8..];
+                let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+                if digits == 0 {
+                    continue;
+                }
+                out.push('N');
+                rest = &rest[digits..];
+            }
+            out.push_str(rest);
+            (name.clone(), out)
+        })
+        .collect()
 }
 
 /// Renders bytes as a Rust vec literal.
@@ -201,6 +317,15 @@ pub fn write_recorded(
             "            html: {},\n",
             byte_literal(&case.html)
         ));
+        out.push_str("            extra: vec![\n");
+        for (path, bytes) in &case.extra {
+            out.push_str(&format!(
+                "                ({}.to_string(), {}),\n",
+                str_literal(path),
+                byte_literal(bytes)
+            ));
+        }
+        out.push_str("            ],\n");
         out.push_str("            directives: vec![\n");
         for (name, value) in &case.directives {
             out.push_str(&format!(

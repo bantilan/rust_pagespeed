@@ -52,7 +52,9 @@ pub struct HtmlSink<'a> {
 impl<'a> HtmlSink<'a> {
     /// Builds a sink over request options (`ProxyFetch` ctor
     /// shape): beacon results on (system default), property
-    /// cache off (unported).
+    /// cache off (unported). `resource_driver` instantiates the
+    /// driver-bound CSS/JS filters (`None` keeps the minify
+    /// subsets).
     #[must_use]
     pub fn new(
         options: &ps_config::options::RewriteOptions,
@@ -60,6 +62,7 @@ impl<'a> HtmlSink<'a> {
         content_is_xml_like: bool,
         fetch: &Arc<SharedBaseFetch>,
         slot: &'a Mutex<Option<crate::pipe::PipeChannel>>,
+        resource_driver: Option<Rc<ps_html::server_context::ResourceDriver>>,
     ) -> Self {
         let output = Rc::new(RefCell::new(Vec::new()));
         let context = ps_html::chain::ChainContext::new(true, false);
@@ -69,6 +72,7 @@ impl<'a> HtmlSink<'a> {
             VecSink {
                 output: Rc::clone(&output),
             },
+            resource_driver,
         );
         driver.start_parse(url.as_bytes(), content_is_xml_like);
         HtmlSink {
@@ -366,7 +370,7 @@ mod tests {
             HttpOptions::default(),
         );
         let options = RewriteOptions::new();
-        let mut sink = HtmlSink::new(&options, "http://h/p", false, &ps_side, &slot);
+        let mut sink = HtmlSink::new(&options, "http://h/p", false, &ps_side, &slot, None);
         sink.write(b"<html><head><title>t</title></head><body><p>hi</p></body></html>");
         sink.done();
         // Rewritten bytes landed in the fetch with Done latched.

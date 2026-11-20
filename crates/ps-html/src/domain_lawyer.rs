@@ -71,7 +71,7 @@ enum MapKind {
 }
 
 /// Domain authorization and mapping (`DomainLawyer`).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct DomainLawyer {
     domains: Vec<Domain>,
     map: BTreeMap<String, usize>,

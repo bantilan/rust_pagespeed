@@ -1050,9 +1050,6 @@ unsafe fn file_fetcher_for_server(
             &root,
             &names,
             options.max_cacheable_response_content_length(),
-            options.load_from_file_cache_ttl_ms(),
-            options.was_set("lfct"),
-            options.implicit_cache_ttl_ms(),
         )
     }
 }
@@ -1864,6 +1861,14 @@ unsafe fn serve_response(
         ) {
             return NGX_ERROR as ngx_int_t;
         }
+        // Known body length (`CopyHeadersFromFetch`): nginx emits
+        // `Content-Length` (and `Accept-Ranges`) from it instead
+        // of chunking.
+        (*r).headers_out.content_length = std::ptr::null_mut();
+        #[allow(clippy::cast_possible_wrap)]
+        {
+            (*r).headers_out.content_length_n = body.len() as i64;
+        }
         let rc = ngx_http_send_header(r);
         if rc == NGX_ERROR as ngx_int_t || rc > NGX_OK as ngx_int_t || (*r).header_only() != 0 {
             return rc;
@@ -2619,12 +2624,25 @@ unsafe fn resource_response(
                 // cookies have no driver setters yet; the
                 // property-cache lookup waits for the store.
                 let content_type = ngx_str_text(&raw const (*r).headers_out.content_type);
+                let resource_driver = server.html_context.clone().map(|html| {
+                    let driver = Rc::new(ps_html::server_context::ResourceDriver::new(
+                        html,
+                        Rc::new(std::cell::RefCell::new(resolved.core.clone())),
+                        &url_string,
+                    ));
+                    // XHTML verdict from the page content-type
+                    // (`MimeTypeXhtmlStatus`): inline scripts skip
+                    // CDATA wrapping on plain HTML.
+                    driver.set_is_xhtml(content_type_is_xml_like(&content_type));
+                    driver
+                });
                 let sink = crate::send::HtmlSink::new(
                     &resolved.core,
                     &url_string,
                     content_type_is_xml_like(&content_type),
                     &ps_side,
                     crate::pipe::base_fetch_channel_slot(),
+                    resource_driver,
                 );
                 (*ctx_ptr).html_sink = Some(sink);
                 drop(ps_side);
@@ -2650,7 +2668,7 @@ unsafe fn resource_response(
                     return NGX_DECLINED as ngx_int_t;
                 };
                 (*ctx_ptr).in_place = true;
-                let response = crate::terminal::fetch_resource_body(
+                let response = crate::terminal::fetch_in_place_body(
                     &html,
                     &resolved.core,
                     &url_string,
@@ -2715,8 +2733,9 @@ unsafe fn resource_response(
                     decline_request_state(&mut *ctx_ptr, None);
                     return NGX_DECLINED as ngx_int_t;
                 }
-                let mut headers = response.headers;
-                headers.push((X_PAGE_SPEED.to_string(), resolved.core.x_header_value()));
+                // No `X-Page-Speed`: C++ stamps it on HTML and
+                // `.pagespeed.` serves, never on in-place serves.
+                let headers = response.headers;
                 serve_response(r, response.status, &headers, &response.body)
             }
             Branch::PassThrough => {

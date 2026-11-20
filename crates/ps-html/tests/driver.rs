@@ -30,7 +30,7 @@ fn enable(options: &mut RewriteOptions, filters: &[Filter]) {
 fn passthrough_round_trip() {
     let options = RewriteOptions::new();
     let sink = SharedSink::default();
-    let mut driver = Driver::new(&options, &ctx(), sink.clone());
+    let mut driver = Driver::new(&options, &ctx(), sink.clone(), None);
     assert_eq!(
         driver.skipped_slots(),
         [
@@ -60,7 +60,7 @@ fn executes_implemented_slots_across_phases() {
         ],
     );
     let sink = SharedSink::default();
-    let mut driver = Driver::new(&options, &ctx(), sink.clone());
+    let mut driver = Driver::new(&options, &ctx(), sink.clone(), None);
     assert_eq!(
         driver.skipped_slots(),
         [
@@ -77,11 +77,12 @@ fn executes_implemented_slots_across_phases() {
 #[test]
 fn core_plan_leaves_unplanned_content_alone() {
     // Core enables no comment/whitespace filters: content passes through
-    // even though those filters exist.
+    // even though those filters exist (AddHead still inserts the
+    // missing head, verbatim C++).
     let mut options = RewriteOptions::new();
     options.filters_mut().set_level(RewriteLevel::CoreFilters);
     let sink = SharedSink::default();
-    let mut driver = Driver::new(&options, &ctx(), sink.clone());
+    let mut driver = Driver::new(&options, &ctx(), sink.clone(), None);
     // Minify subsets cover the CSS/JS slots now.
     assert!(!driver
         .skipped_slots()
@@ -105,7 +106,7 @@ fn core_plan_leaves_unplanned_content_alone() {
     driver.start_parse(b"http://test.com/core.html", false);
     driver.write(input);
     driver.finish();
-    assert_eq!(sink.bytes(), input);
+    assert_eq!(sink.bytes(), b"<head/><div><!--c-->x  y</div>".as_slice());
 }
 
 #[test]
@@ -115,7 +116,7 @@ fn size_limit_propagates() {
         .set_option("MaxHtmlParseBytes", "10", Scope::ProcessStrict)
         .unwrap();
     let sink = SharedSink::default();
-    let mut driver = Driver::new(&options, &ctx(), sink.clone());
+    let mut driver = Driver::new(&options, &ctx(), sink.clone(), None);
     assert_eq!(driver.plan().size_limit, Some(10));
     driver.start_parse(b"http://test.com/limit.html", false);
     driver.write(b"<html><body>\n<div>hello</div></body></html>\n");
@@ -132,7 +133,7 @@ fn writer_disabled_means_no_output() {
         .disabled_set_mut()
         .insert(Filter::HtmlWriterFilter);
     let sink = SharedSink::default();
-    let mut driver = Driver::new(&options, &ctx(), sink.clone());
+    let mut driver = Driver::new(&options, &ctx(), sink.clone(), None);
     assert!(!driver.plan().post.contains(&ChainFilter::HtmlWriter));
     driver.start_parse(b"http://test.com/nowriter.html", false);
     driver.write(b"<div>x</div>");
@@ -207,7 +208,7 @@ fn flush_html_no_extra_flushes() {
     // Ports NoExtraFlushes: score 12 stays quiet until finish.
     let options = flush_options();
     let sink = SharedSink::default();
-    let mut driver = Driver::new(&options, &ctx(), sink.clone());
+    let mut driver = Driver::new(&options, &ctx(), sink.clone(), None);
     let mut input = css_link(b"a.css");
     input.extend_from_slice(b"<img src='b.png'/>");
     driver.start_parse(b"http://example.com", false);
@@ -222,7 +223,7 @@ fn flush_html_induces_flushes() {
     // Ports InduceFlushes: 7 stylesheets + 1 script hit 80 mid-write.
     let options = flush_options();
     let sink = SharedSink::default();
-    let mut driver = Driver::new(&options, &ctx(), sink.clone());
+    let mut driver = Driver::new(&options, &ctx(), sink.clone(), None);
     let mut input = Vec::new();
     for _ in 0..7 {
         input.extend_from_slice(&css_link(b"a.css"));
@@ -240,7 +241,7 @@ fn flush_html_not_enough() {
     // Ports NotEnoughToInduceFlushes: 72 stays quiet until finish.
     let options = flush_options();
     let sink = SharedSink::default();
-    let mut driver = Driver::new(&options, &ctx(), sink.clone());
+    let mut driver = Driver::new(&options, &ctx(), sink.clone(), None);
     let mut input = Vec::new();
     for _ in 0..7 {
         input.extend_from_slice(&css_link(b"a.css"));
@@ -268,12 +269,82 @@ fn amp_verdict_through_driver() {
 fn driver_amp_verdict(html: &[u8]) -> Option<bool> {
     let options = RewriteOptions::new();
     let sink = SharedSink::default();
-    let mut driver = Driver::new(&options, &ctx(), sink.clone());
+    let mut driver = Driver::new(&options, &ctx(), sink.clone(), None);
     assert_eq!(driver.is_amp_document(), None);
     driver.start_parse(b"http://test.com/amp.html", false);
     driver.write(html);
     driver.finish();
     driver.is_amp_document()
+}
+
+#[test]
+fn driver_bound_css_inlines_small_link() {
+    use ps_cache::cache::MemoryCache;
+    use ps_html::server_context::{ResourceDriver, ServerContext};
+    use ps_http::mock::MockUrlFetcher;
+    use ps_http::response::{HttpOptions, ResponseHeaders};
+    use std::sync::Arc;
+
+    let http_backend = Arc::new(MemoryCache::new());
+    let metadata_backend = Arc::new(MemoryCache::new());
+    let fetcher = Rc::new(MockUrlFetcher::new());
+    let server = Rc::new(ServerContext::new_with_metadata(
+        http_backend,
+        metadata_backend,
+        fetcher.clone(),
+        1_700_000_000_000,
+    ));
+    let mut css_headers = ResponseHeaders::new(HttpOptions::default_for_tests());
+    css_headers.set_status_code(200);
+    css_headers
+        .headers_mut()
+        .add("Date", "Sun, 06 Nov 1994 08:49:37 GMT");
+    css_headers.headers_mut().add("Content-Type", "text/css");
+    css_headers
+        .headers_mut()
+        .add("Cache-Control", "max-age=300");
+    css_headers.compute_caching();
+    fetcher.set_response(
+        "http://test.com/a.css",
+        css_headers,
+        b".a { color: red; }\n",
+    );
+    // Live passes one CoreFilters-leveled options object to both
+    // the plan and the resource driver (no explicit enables).
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .set_option(
+            "RewriteLevel",
+            "CoreFilters",
+            ps_config::scope::Scope::Directory,
+        )
+        .unwrap();
+    let resource_driver = Rc::new(ResourceDriver::new(
+        server,
+        options.clone(),
+        "http://test.com/index.html",
+    ));
+    let sink = SharedSink::default();
+    let live_ctx = ps_html::chain::ChainContext::new(true, false);
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &live_ctx,
+        sink.clone(),
+        Some(resource_driver),
+    );
+    driver.start_parse(b"http://test.com/index.html", false);
+    driver.write(
+        b"<html><head><link rel=\"stylesheet\" href=\"a.css\"></head><body>hi</body></html>",
+    );
+    driver.finish();
+    // Small stylesheets inline (verbatim C++); larger ones take
+    // `.pagespeed.cf.` URLs.
+    let out = String::from_utf8(sink.bytes()).unwrap();
+    assert_eq!(
+        "<html><head><style>.a{color:red}</style></head><body>hi</body></html>",
+        out
+    );
 }
 
 #[test]

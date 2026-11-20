@@ -126,6 +126,29 @@ pub fn fetch_resource_body(
     collect_fetch(&fetch)
 }
 
+/// Serves an origin URL in place through the sync bridge
+/// (the nginx content handler calls `FetchInPlaceResource`
+/// directly with proxy mode off): unrewritable content
+/// fails back to the server's native method.
+pub fn fetch_in_place_body(
+    html: &std::rc::Rc<ps_html::server_context::ServerContext>,
+    options: &ps_config::options::RewriteOptions,
+    url: &str,
+    now_ms: i64,
+) -> ResourceResponse {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    crate::rewrite::reset_context_clock(html, now_ms);
+    let mut fetch = BufferingFetch::new(url, RequestContext::new(HttpOptions::default()));
+    let driver = Rc::new(ps_html::server_context::ResourceDriver::new(
+        Rc::clone(html),
+        Rc::new(RefCell::new(options.clone())),
+        url,
+    ));
+    ps_html::ipro::fetch_in_place_resource(&driver, url, &mut fetch, false);
+    collect_fetch(&fetch)
+}
+
 /// Collects a buffered fetch into a servable response.
 fn collect_fetch(fetch: &BufferingFetch) -> ResourceResponse {
     let headers = fetch

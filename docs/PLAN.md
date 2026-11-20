@@ -1453,3 +1453,35 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   cache backend) deprioritized: file hits no longer
   decline, so it would only persist repeated-404
   notes.
+- Fetch epic F3 (this session): DONE. Resource rewriting end
+  to end. Driver-bound `CssFilter`/`JavascriptFilter` replace
+  the minify subsets once a `ResourceDriver` exists (plumbed
+  through `HtmlSink`/module, with the XHTML verdict from the
+  page content-type); `proxy_mode` threads through IPRO so
+  non-proxy callers fail unrewritable content back to native
+  handling (notably HTML, which IPRO must never serve);
+  minify-only `rewrite_in_place` servants with lazy
+  registration; 8 more CoreFilters slots instantiated
+  (combines, inlines, cache extender, image rewrite,
+  AddHead, import-to-link, subresource hints).
+  FileFetcher redesigned to subrequest-faithful bare
+  headers (no synthesized TTL). First-hit transients
+  differ architecturally (C++ declines+records, then
+  optimizes async in ~30s; the sync bridge reconstructs
+  inline) but steady states converge and match
+  byte-exact. Serve path now matches C++ byte-exact:
+  no `X-Page-Speed` on IPRO serves, `content_length_n`
+  set (length + ranges, no chunking),
+  `X-Original-Content-Length` end to end, output
+  headers seeded from inputs. Compat grows extras,
+  fetch counts, poll-until-optimized, per-case mtimes,
+  staged mime.types, volatile max-age normalization,
+  and 3 resource cases (css/js-resource,
+  page-with-links). Suite: 8/8 page + 7/7 config
+  green. Workspace: 2579 passed, 0 failed. Follow-ups:
+  old-mtime IPRO gate mechanism (C++ refuses, ours
+  over-optimizes); MetaTag/SupportNoscript slots
+  (need headers/URL plumbing); CriticalImagesBeacon
+  (no impl); nested CSS @import/image subsets in
+  servants; second-hit recall for first-hit-only
+  coverage.

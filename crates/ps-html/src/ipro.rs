@@ -39,12 +39,16 @@ pub const IN_PLACE_OVERSIZED_OPT_STREAM: &str = "in_place_oversized_opt_stream";
 /// Uncacheable rewrites (`kInPlaceUncacheableRewrites`).
 pub const IN_PLACE_UNCACHEABLE_REWRITES: &str = "in_place_uncacheable_rewrites";
 
-/// Serves an origin URL in place (`FetchInPlaceResource`,
-/// proxy mode).
+/// Serves an origin URL in place (`FetchInPlaceResource`).
+/// Non-proxy callers (nginx) fail content IPRO doesn't
+/// rewrite so the server falls back to its native method
+/// (notably HTML, which the HTML pipeline owns); proxy
+/// callers serve such bytes through.
 pub fn fetch_in_place_resource(
     driver: &Rc<ResourceDriver>,
     url: &str,
     fetch: &mut dyn AsyncFetch,
+    proxy_mode: bool,
 ) -> bool {
     let gurl = GoogleUrl::new(url);
     if !gurl.is_web_valid() {
@@ -52,20 +56,30 @@ pub fn fetch_in_place_resource(
     }
     if fetch.request_headers().method() == Method::Head {
         // A HEAD response carries no body to record or rewrite.
-        return serve_head(driver, url, fetch);
+        return serve_head(driver, url, fetch, proxy_mode);
     }
     // The UA key feeds the metadata key, so servant UA encoding
     // runs on every fetch, hit or miss.
     let ua_key = user_agent_cache_key(driver, url);
     let mkey = metadata_key(driver, url, &ua_key);
     if let Some(cached) = lookup_metadata(driver, &mkey) {
-        return serve_from_metadata(driver, url, fetch, &cached, &mkey);
+        return serve_from_metadata(driver, url, fetch, &cached, &mkey, proxy_mode);
     }
-    reconstruct(driver, url, fetch, &mkey)
+    reconstruct(driver, url, fetch, &mkey, proxy_mode)
 }
 
 /// Serves headers without a body or rewrite (HEAD requests).
-fn serve_head(driver: &Rc<ResourceDriver>, url: &str, fetch: &mut dyn AsyncFetch) -> bool {
+fn serve_head(
+    driver: &Rc<ResourceDriver>,
+    url: &str,
+    fetch: &mut dyn AsyncFetch,
+    proxy_mode: bool,
+) -> bool {
+    if !proxy_mode {
+        // HEAD never rewrites: non-proxy callers fall back to
+        // the server's native method.
+        return fail_fetch(driver, fetch);
+    }
     if let Some((headers, _)) = find_original(driver, url) {
         fetch.response_headers_mut().copy_from(&headers);
         fetch.headers_complete();
@@ -205,7 +219,9 @@ fn in_place_optimize_for_browser_enabled(driver: &Rc<ResourceDriver>) -> bool {
 }
 
 /// Picks the servant filter for a content type
-/// (`GetRewriteFilter`).
+/// (`GetRewriteFilter`). Servants register lazily on first
+/// lookup (C++ constructs all filters in the driver ctor;
+/// lazy construction is observationally identical).
 fn get_rewrite_filter(
     driver: &Rc<ResourceDriver>,
     content_type: &ContentType,
@@ -213,9 +229,17 @@ fn get_rewrite_filter(
     use ps_config::filter::Filter;
     let options = driver.options();
     if content_type.is_css() && options.enabled(Filter::RewriteCss) {
+        if driver.find_filter("cf").is_none() {
+            driver.add_filter(Rc::new(super::filters::css::CssFilter::new(driver.clone())));
+        }
         return driver.find_filter("cf");
     }
     if content_type.is_js_like() && options.enabled(Filter::RewriteJavascriptExternal) {
+        if driver.find_filter("jm").is_none() {
+            driver.add_filter(Rc::new(super::filters::JavascriptFilter::new(
+                driver.clone(),
+            )));
+        }
         return driver.find_filter("jm");
     }
     if content_type.is_image() && options.image_optimization_enabled() {
@@ -241,6 +265,7 @@ fn serve_from_metadata(
     fetch: &mut dyn AsyncFetch,
     cached: &CachedResult,
     mkey: &str,
+    proxy_mode: bool,
 ) -> bool {
     let now_ms = driver.server_context().now_ms();
     let (date_ms, expire_ms) = input_window(&cached.input);
@@ -248,17 +273,19 @@ fn serve_from_metadata(
     if stale {
         let threshold = driver.options().metadata_cache_staleness_threshold_ms();
         if cached.optimizable && now_ms < expire_ms + threshold {
-            return serve_stale_rewritten(driver, url, fetch, cached, date_ms, expire_ms);
+            return serve_stale_rewritten(
+                driver, url, fetch, cached, date_ms, expire_ms, proxy_mode,
+            );
         }
         // Beyond the threshold: revalidate synchronously (the
         // async rewrite would refresh in the background).
-        return revalidate(driver, url, fetch, mkey, Some(cached));
+        return revalidate(driver, url, fetch, mkey, Some(cached), proxy_mode);
     }
     if !cached.optimizable {
-        return serve_original_cached(driver, url, fetch, mkey);
+        return serve_original_cached(driver, url, fetch, mkey, proxy_mode);
     }
     serve_rewritten(
-        driver, url, fetch, cached, mkey, date_ms, expire_ms, false, None,
+        driver, url, fetch, cached, mkey, date_ms, expire_ms, false, None, proxy_mode,
     )
 }
 
@@ -271,6 +298,7 @@ fn serve_stale_rewritten(
     cached: &CachedResult,
     date_ms: i64,
     expire_ms: i64,
+    proxy_mode: bool,
 ) -> bool {
     // Revalidate inline (the background refresh): unchanged
     // inputs reuse the rewrite without recomputing.
@@ -278,7 +306,7 @@ fn serve_stale_rewritten(
     let ua_key = user_agent_cache_key(driver, url);
     let mkey = metadata_key(driver, url, &ua_key);
     serve_rewritten(
-        driver, url, fetch, cached, &mkey, date_ms, expire_ms, true, None,
+        driver, url, fetch, cached, &mkey, date_ms, expire_ms, true, None, proxy_mode,
     )
 }
 
@@ -325,9 +353,10 @@ fn revalidate(
     fetch: &mut dyn AsyncFetch,
     mkey: &str,
     cached: Option<&CachedResult>,
+    proxy_mode: bool,
 ) -> bool {
     let Some(previous) = cached else {
-        return reconstruct(driver, url, fetch, mkey);
+        return reconstruct(driver, url, fetch, mkey, proxy_mode);
     };
     match revalidate_input(driver, url, previous) {
         None => {
@@ -345,7 +374,7 @@ fn revalidate(
                 // the injected window, like a miss.
                 serve_with_window(driver, fetch, &headers, &body)
             } else {
-                reconstruct_from_response(driver, url, fetch, mkey, headers, body)
+                reconstruct_from_response(driver, url, fetch, mkey, headers, body, proxy_mode)
             }
         }
     }
@@ -378,6 +407,10 @@ fn reput_rewritten(driver: &Rc<ResourceDriver>, refreshed: &CachedResult) {
         return;
     };
     let (date_ms, expire_ms) = input_window(&refreshed.input);
+    let original_content_length = headers
+        .headers()
+        .lookup1(header::X_ORIGINAL_CONTENT_LENGTH)
+        .and_then(|value| value.parse::<i64>().ok());
     put_response(
         driver,
         &refreshed.url,
@@ -385,6 +418,8 @@ fn reput_rewritten(driver: &Rc<ResourceDriver>, refreshed: &CachedResult) {
         expire_ms,
         &content_type,
         &body,
+        original_content_length,
+        Some(&headers),
     );
 }
 
@@ -400,6 +435,7 @@ fn serve_rewritten(
     expire_ms: i64,
     stale: bool,
     input_headers: Option<ResponseHeaders>,
+    proxy_mode: bool,
 ) -> bool {
     let aj_etag = format!("{ETAG_PREFIX}aj-{}\"", cached.hash);
     if let Some(request_etag) = fetch
@@ -418,7 +454,7 @@ fn serve_rewritten(
     let Some((mut headers, body)) = find_rewritten(driver, &cached.url) else {
         // Metadata without bytes: reconstruct with a forced
         // nested rewrite.
-        return reconstruct(driver, url, fetch, mkey);
+        return reconstruct(driver, url, fetch, mkey, proxy_mode);
     };
     fix_fetch_fallback_headers(driver, url, cached, date_ms, expire_ms, stale, &mut headers);
     add_vary_if_required(driver, cached, &mut headers);
@@ -477,6 +513,7 @@ fn serve_original_cached(
     url: &str,
     fetch: &mut dyn AsyncFetch,
     mkey: &str,
+    proxy_mode: bool,
 ) -> bool {
     if let Some((headers, body)) = find_original(driver, url) {
         fetch.response_headers_mut().copy_from(&headers);
@@ -485,7 +522,7 @@ fn serve_original_cached(
         fetch.handle_done(ok);
         return true;
     }
-    reconstruct(driver, url, fetch, mkey)
+    reconstruct(driver, url, fetch, mkey, proxy_mode)
 }
 
 /// Serves a response with the injected s-maxage window.
@@ -507,9 +544,10 @@ fn reconstruct(
     url: &str,
     fetch: &mut dyn AsyncFetch,
     mkey: &str,
+    proxy_mode: bool,
 ) -> bool {
     if let Some((headers, body)) = find_original(driver, url) {
-        return reconstruct_from_response(driver, url, fetch, mkey, headers, body);
+        return reconstruct_from_response(driver, url, fetch, mkey, headers, body, proxy_mode);
     }
     let mut scratch = scratch_fetch_for_origin(driver, url);
     driver.server_context().fetcher().fetch(url, &mut scratch);
@@ -520,7 +558,9 @@ fn reconstruct(
     fix_fetched_headers(driver, &mut headers);
     let body = scratch.body().to_vec();
     // Oversized responses stream through unrecorded (the
-    // mid-stream overflow, observed whole).
+    // mid-stream overflow, observed whole) — but only
+    // rewritable ones stream; anything else fails in
+    // non-proxy mode like below.
     if !driver
         .server_context()
         .http_cache()
@@ -530,13 +570,16 @@ fn reconstruct(
             .server_context()
             .variable(IN_PLACE_OVERSIZED_OPT_STREAM)
             .add(1);
+        if !proxy_mode && can_in_place_rewrite(driver, fetch, &headers).is_none() {
+            return fail_fetch(driver, fetch);
+        }
         fetch.response_headers_mut().copy_from(&headers);
         fetch.headers_complete();
         let ok = fetch.handle_write(&body);
         fetch.handle_done(ok);
         return true;
     }
-    reconstruct_from_response(driver, url, fetch, mkey, headers, body)
+    reconstruct_from_response(driver, url, fetch, mkey, headers, body, proxy_mode)
 }
 
 /// Records, rewrites, and serves a fetched response.
@@ -547,6 +590,7 @@ fn reconstruct_from_response(
     mkey: &str,
     headers: ResponseHeaders,
     body: Vec<u8>,
+    proxy_mode: bool,
 ) -> bool {
     // The HTTP layer records cacheable origin responses (except
     // codings it cannot adapt) regardless of rewriting.
@@ -554,9 +598,13 @@ fn reconstruct_from_response(
         put_original(driver, url, &headers, &body);
     }
     let Some(content_type) = can_in_place_rewrite(driver, fetch, &headers) else {
-        // Proxy mode serves the bytes through; origin fallback
-        // waits for server integration.
-        return serve_response(fetch, &headers, &body);
+        // Proxy mode serves the bytes through; non-proxy
+        // callers fail so the server falls back to its native
+        // method (notably HTML, which the HTML pipeline owns).
+        if proxy_mode {
+            return serve_response(fetch, &headers, &body);
+        }
+        return fail_fetch(driver, fetch);
     };
     // Servant lookup happens at rewrite time, after the
     // streaming serve already committed to the window.
@@ -611,6 +659,7 @@ fn reconstruct_from_response(
                     expire_ms,
                     false,
                     Some(headers.clone()),
+                    proxy_mode,
                 )
             } else {
                 serve_with_window(driver, fetch, &headers, &body)
@@ -672,8 +721,10 @@ fn rewrite_and_store(
         &output.bytes,
     );
     let hash = driver.server_context().hasher().hash(&output.bytes);
+    #[allow(clippy::cast_possible_wrap)]
+    let original_len = body.len() as i64;
     let cached = optimizable_result(headers, body, driver, &rewritten, &hash, &output);
-    put_rewritten(driver, &rewritten, &cached, &output);
+    put_rewritten(driver, &rewritten, &cached, &output, original_len, headers);
     store_metadata(driver, mkey, &cached);
     Some((cached, output))
 }
@@ -821,6 +872,8 @@ fn put_rewritten(
     rewritten_url: &str,
     cached: &CachedResult,
     output: &crate::rewrite_filter::InPlaceOutput,
+    original_len: i64,
+    seed: &ResponseHeaders,
 ) {
     if cached.input.first().is_none() {
         return;
@@ -836,10 +889,14 @@ fn put_rewritten(
         expire_ms,
         &output.content_type,
         &output.bytes,
+        Some(original_len),
+        Some(seed),
     );
 }
 
-/// Stores bytes under a URL with a TTL window.
+/// Stores bytes under a URL with a TTL window. `seed` carries
+/// input headers the output keeps (notably `Accept-Ranges`;
+/// length, type, and caching recompute below).
 fn put_response(
     driver: &Rc<ResourceDriver>,
     url: &str,
@@ -847,13 +904,23 @@ fn put_response(
     expire_ms: i64,
     content_type: &ContentType,
     body: &[u8],
+    original_content_length: Option<i64>,
+    seed: Option<&ResponseHeaders>,
 ) {
-    let mut headers = ResponseHeaders::new(http_options(driver));
+    let mut headers = seed.cloned().unwrap_or_else(|| {
+        let mut fresh = ResponseHeaders::new(http_options(driver));
+        fresh.set_status_and_reason(200);
+        fresh
+    });
     headers.set_status_and_reason(200);
     headers
         .headers_mut()
         .replace(header::CONTENT_TYPE, content_type.mime_type());
+    headers.headers_mut().remove_all(header::CONTENT_LENGTH);
     headers.set_date_and_caching(date_ms, (expire_ms - date_ms).max(0), "");
+    if let Some(length) = original_content_length {
+        headers.set_original_content_length(length);
+    }
     headers.compute_caching();
     let mut value = ps_http::value::HttpValue::new();
     value.set_headers(headers);

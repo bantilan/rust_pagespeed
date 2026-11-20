@@ -15,6 +15,7 @@ use ps_config::options::RewriteOptions;
 use crate::chain::{build_chain, ChainContext, ChainFilter, ChainPlan, Phase};
 use crate::filters::{self, AmpDocumentFilter, FlushHtmlFilter};
 use crate::parser::Parser;
+use crate::server_context::ResourceDriver;
 use crate::writer::{ByteSink, WriterFilter};
 
 /// Plan-built streaming rewriter over one parser instance.
@@ -29,11 +30,14 @@ impl Driver {
     /// Builds the driver: plan, instantiate implemented slots, apply the
     /// size cap. The sink backs the terminal writer, which is only added
     /// when the plan enables it (as in C++ `SetWriter`).
+    /// `resource_driver` instantiates the driver-bound CSS/JS
+    /// filters (`None` keeps the inline minify subsets).
     #[must_use]
     pub fn new(
         options: &RewriteOptions,
         ctx: &ChainContext,
         sink: impl ByteSink + 'static,
+        resource_driver: Option<Rc<ResourceDriver>>,
     ) -> Self {
         let plan = build_chain(options, ctx);
         let mut parser = Parser::new();
@@ -63,7 +67,94 @@ impl Driver {
                 if *slot == ChainFilter::HtmlWriter {
                     continue;
                 }
-                match filters::instantiate(*slot) {
+                // Driver-bound filters replace the minify subsets
+                // once a resource driver exists (external
+                // resources need fetch machinery).
+                let bound: Option<Box<dyn crate::filter::HtmlFilter>> = match slot {
+                    ChainFilter::CssFilter => resource_driver.clone().map(|driver| {
+                        Box::new(filters::css::CssFilter::new(driver))
+                            as Box<dyn crate::filter::HtmlFilter>
+                    }),
+                    ChainFilter::Javascript => resource_driver.clone().map(|driver| {
+                        Box::new(filters::JavascriptFilter::new(driver))
+                            as Box<dyn crate::filter::HtmlFilter>
+                    }),
+                    ChainFilter::CssCombine => resource_driver.clone().map(|driver| {
+                        Box::new(filters::css_combine::CssCombineFilter::new(driver))
+                            as Box<dyn crate::filter::HtmlFilter>
+                    }),
+                    ChainFilter::CssInline => resource_driver.clone().map(|driver| {
+                        Box::new(filters::CssInlineFilter::new(driver))
+                            as Box<dyn crate::filter::HtmlFilter>
+                    }),
+                    ChainFilter::JsCombine => resource_driver.clone().map(|driver| {
+                        Box::new(filters::js_combine::JsCombineFilter::new(driver))
+                            as Box<dyn crate::filter::HtmlFilter>
+                    }),
+                    ChainFilter::JsInline => resource_driver.clone().map(|driver| {
+                        Box::new(filters::JsInlineFilter::new(driver))
+                            as Box<dyn crate::filter::HtmlFilter>
+                    }),
+                    ChainFilter::CacheExtender => resource_driver.clone().map(|driver| {
+                        Box::new(filters::CacheExtenderFilter::new(driver))
+                            as Box<dyn crate::filter::HtmlFilter>
+                    }),
+                    ChainFilter::ImageRewrite => resource_driver.clone().map(|driver| {
+                        Box::new(filters::ImageRewriteFilter::new(driver))
+                            as Box<dyn crate::filter::HtmlFilter>
+                    }),
+                    ChainFilter::AddHead => Some(Box::new(filters::AddHeadFilter::new(
+                        options
+                            .filters()
+                            .enabled(ps_config::filter::Filter::CombineHeads),
+                    ))
+                        as Box<dyn crate::filter::HtmlFilter>),
+                    ChainFilter::CssInlineImportToLink => resource_driver.clone().map(|driver| {
+                        use crate::server_context::XhtmlStatus as DriverXhtml;
+                        let xhtml = match driver.mime_type_xhtml_status() {
+                            DriverXhtml::IsXhtml => crate::filters::common::XhtmlStatus::IsXhtml,
+                            DriverXhtml::IsNotXhtml => {
+                                crate::filters::common::XhtmlStatus::IsNotXhtml
+                            }
+                            DriverXhtml::Unknown => crate::filters::common::XhtmlStatus::Unknown,
+                        };
+                        Box::new(filters::CssInlineImportToLinkFilter::new(
+                            filters::CssInlineImportToLinkConfig { xhtml },
+                        )) as Box<dyn crate::filter::HtmlFilter>
+                    }),
+                    ChainFilter::StripSubresourceHints => {
+                        resource_driver.clone().map(|driver| {
+                            // `can_modify_urls` aggregates the
+                            // chain in C++; here any planned
+                            // URL-rewriting slot implies it.
+                            let rewrites_urls = plan.pre.iter().chain(plan.post.iter()).any(|s| {
+                                matches!(
+                                    s,
+                                    ChainFilter::CssFilter
+                                        | ChainFilter::Javascript
+                                        | ChainFilter::ImageRewrite
+                                        | ChainFilter::DomainRewrite
+                                        | ChainFilter::CacheExtender
+                                )
+                            });
+                            let lawyer = std::rc::Rc::new(
+                                crate::domain_lawyer::DomainLawyer::clone(driver.lawyer()),
+                            );
+                            Box::new(filters::StripSubresourceHintsFilter::new(
+                                filters::StripSubresourceHintsConfig {
+                                    can_modify_urls: rewrites_urls,
+                                    css_preserve_urls: options.filters().css_preserve_urls(),
+                                    js_preserve_urls: options.filters().js_preserve_urls(),
+                                    image_preserve_urls: options.filters().image_preserve_urls(),
+                                    allow_resources: options.allow_resources().clone(),
+                                },
+                                &lawyer,
+                            )) as Box<dyn crate::filter::HtmlFilter>
+                        })
+                    }
+                    _ => None,
+                };
+                match bound.or_else(|| filters::instantiate(*slot)) {
                     Some(filter) => match phase {
                         Phase::EarlyPreRender => parser.add_early_pre_render_filter(filter),
                         Phase::PreRender => parser.add_pre_render_filter(filter),

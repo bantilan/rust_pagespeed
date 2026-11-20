@@ -12,6 +12,8 @@ vec![
         108, 101, 62, 116, 60, 47, 116, 105, 116, 108, 101, 62, 60, 47, 104, 101, 
         97, 100, 62, 60, 98, 111, 100, 121, 62, 60, 112, 62, 104, 105, 60, 47, 
         112, 62, 60, 47, 98, 111, 100, 121, 62, 60, 47, 104, 116, 109, 108, 62],
+            extra: vec![
+            ],
             directives: vec![
                 ("on".to_string(), "".to_string()),
                 ("FileCachePath".to_string(), "{CACHE}".to_string()),
@@ -41,6 +43,8 @@ vec![
         100, 121, 62, 32, 32, 60, 112, 62, 32, 32, 104, 105, 32, 32, 60, 47, 
         112, 62, 32, 32, 60, 47, 98, 111, 100, 121, 62, 32, 32, 60, 47, 104, 
         116, 109, 108, 62],
+            extra: vec![
+            ],
             directives: vec![
                 ("on".to_string(), "".to_string()),
                 ("FileCachePath".to_string(), "{CACHE}".to_string()),
@@ -87,6 +91,8 @@ vec![
         116, 104, 61, 34, 49, 48, 34, 32, 104, 101, 105, 103, 104, 116, 61, 34, 
         49, 48, 34, 62, 60, 47, 100, 105, 118, 62, 60, 47, 98, 111, 100, 121, 
         62, 60, 47, 104, 116, 109, 108, 62],
+            extra: vec![
+            ],
             directives: vec![
                 ("on".to_string(), "".to_string()),
                 ("FileCachePath".to_string(), "{CACHE}".to_string()),
@@ -148,6 +154,8 @@ vec![
         116, 104, 61, 34, 49, 48, 34, 32, 104, 101, 105, 103, 104, 116, 61, 34, 
         49, 48, 34, 62, 60, 47, 100, 105, 118, 62, 60, 47, 98, 111, 100, 121, 
         62, 60, 47, 104, 116, 109, 108, 62],
+            extra: vec![
+            ],
             directives: vec![
                 ("on".to_string(), "".to_string()),
                 ("FileCachePath".to_string(), "{CACHE}".to_string()),
@@ -189,6 +197,8 @@ vec![
             name: "missing-file".to_string(),
             path: "/no-such-file.html".to_string(),
             html: vec![],
+            extra: vec![
+            ],
             directives: vec![
                 ("on".to_string(), "".to_string()),
                 ("FileCachePath".to_string(), "{CACHE}".to_string()),
@@ -210,6 +220,99 @@ vec![
         51, 54, 98, 48, 60, 47, 99, 101, 110, 116, 101, 114, 62, 13, 10, 60, 
         47, 98, 111, 100, 121, 62, 13, 10, 60, 47, 104, 116, 109, 108, 62, 13, 
         10],
+            known_gap: None,
+        },
+        RecordedCase {
+            name: "css-resource".to_string(),
+            path: "/r.css".to_string(),
+            html: vec![97, 32, 123, 32, 99, 111, 108, 111, 114, 32, 58, 32, 114, 101, 100, 59, 
+        32, 125, 10, 47, 42, 32, 99, 111, 109, 109, 101, 110, 116, 32, 42, 47, 
+        10, 98, 32, 123, 32, 109, 97, 114, 103, 105, 110, 32, 58, 32, 48, 59, 
+        32, 125, 10],
+            extra: vec![
+            ],
+            directives: vec![
+                ("on".to_string(), "".to_string()),
+                ("FileCachePath".to_string(), "{CACHE}".to_string()),
+                ("RewriteLevel".to_string(), "CoreFilters".to_string()),
+            ],
+            status: 200,
+            headers: vec![
+                ("accept-ranges".to_string(), "bytes".to_string()),
+                ("cache-control".to_string(), "max-age=296".to_string()),
+                ("content-type".to_string(), "text/css".to_string()),
+                ("etag".to_string(), "W/\"PSA-aj-3mkth2VvMn\"".to_string()),
+                ("vary".to_string(), "Accept-Encoding".to_string()),
+                ("x-original-content-length".to_string(), "51".to_string()),
+            ],
+            body: vec![97, 123, 99, 111, 108, 111, 114, 58, 114, 101, 100, 125, 98, 123, 109, 97, 
+        114, 103, 105, 110, 58, 48, 125],
+            known_gap: None,
+        },
+        RecordedCase {
+            name: "js-resource".to_string(),
+            path: "/r.js".to_string(),
+            html: vec![102, 117, 110, 99, 116, 105, 111, 110, 32, 104, 101, 108, 108, 111, 40, 32, 
+        41, 32, 123, 10, 32, 32, 47, 47, 32, 103, 114, 101, 101, 116, 105, 110, 
+        103, 10, 32, 32, 114, 101, 116, 117, 114, 110, 32, 49, 32, 43, 32, 49, 
+        32, 59, 10, 125, 10],
+            extra: vec![
+            ],
+            directives: vec![
+                ("on".to_string(), "".to_string()),
+                ("FileCachePath".to_string(), "{CACHE}".to_string()),
+                ("RewriteLevel".to_string(), "CoreFilters".to_string()),
+            ],
+            status: 200,
+            headers: vec![
+                ("accept-ranges".to_string(), "bytes".to_string()),
+                ("cache-control".to_string(), "max-age=296".to_string()),
+                ("content-type".to_string(), "application/javascript".to_string()),
+                ("etag".to_string(), "W/\"PSA-aj-sldmBRHcxx\"".to_string()),
+                ("vary".to_string(), "Accept-Encoding".to_string()),
+                ("x-original-content-length".to_string(), "53".to_string()),
+            ],
+            body: vec![102, 117, 110, 99, 116, 105, 111, 110, 32, 104, 101, 108, 108, 111, 40, 41, 
+        123, 114, 101, 116, 117, 114, 110, 32, 49, 43, 49, 59, 125],
+            known_gap: None,
+        },
+        RecordedCase {
+            name: "page-with-links".to_string(),
+            path: "/links.html".to_string(),
+            html: vec![60, 104, 116, 109, 108, 62, 60, 104, 101, 97, 100, 62, 60, 108, 105, 110, 
+        107, 32, 114, 101, 108, 61, 34, 115, 116, 121, 108, 101, 115, 104, 101, 101, 
+        116, 34, 32, 104, 114, 101, 102, 61, 34, 97, 46, 99, 115, 115, 34, 62, 
+        60, 115, 99, 114, 105, 112, 116, 32, 115, 114, 99, 61, 34, 97, 46, 106, 
+        115, 34, 62, 60, 47, 115, 99, 114, 105, 112, 116, 62, 60, 47, 104, 101, 
+        97, 100, 62, 60, 98, 111, 100, 121, 62, 104, 105, 60, 47, 98, 111, 100, 
+        121, 62, 60, 47, 104, 116, 109, 108, 62],
+            extra: vec![
+                ("/a.css".to_string(), vec![97, 32, 123, 32, 99, 111, 108, 111, 114, 32, 58, 32, 114, 101, 100, 59, 
+        32, 125, 10]),
+                ("/a.js".to_string(), vec![102, 117, 110, 99, 116, 105, 111, 110, 32, 102, 40, 32, 41, 32, 123, 32, 
+        114, 101, 116, 117, 114, 110, 32, 50, 32, 59, 32, 125, 10]),
+            ],
+            directives: vec![
+                ("on".to_string(), "".to_string()),
+                ("FileCachePath".to_string(), "{CACHE}".to_string()),
+                ("RewriteLevel".to_string(), "CoreFilters".to_string()),
+            ],
+            status: 200,
+            headers: vec![
+                ("cache-control".to_string(), "max-age=0, no-cache".to_string()),
+                ("content-type".to_string(), "text/html".to_string()),
+                ("vary".to_string(), "Accept".to_string()),
+                ("vary".to_string(), "Accept-Encoding".to_string()),
+                ("vary".to_string(), "User-Agent".to_string()),
+                ("x-page-speed".to_string(), "VERSION".to_string()),
+            ],
+            body: vec![60, 104, 116, 109, 108, 62, 60, 104, 101, 97, 100, 62, 60, 115, 116, 121, 
+        108, 101, 62, 97, 123, 99, 111, 108, 111, 114, 58, 114, 101, 100, 125, 60, 
+        47, 115, 116, 121, 108, 101, 62, 60, 115, 99, 114, 105, 112, 116, 62, 102, 
+        117, 110, 99, 116, 105, 111, 110, 32, 102, 40, 41, 123, 114, 101, 116, 117, 
+        114, 110, 32, 50, 59, 125, 60, 47, 115, 99, 114, 105, 112, 116, 62, 60, 
+        47, 104, 101, 97, 100, 62, 60, 98, 111, 100, 121, 62, 104, 105, 60, 47, 
+        98, 111, 100, 121, 62, 60, 47, 104, 116, 109, 108, 62],
             known_gap: None,
         },
     ]

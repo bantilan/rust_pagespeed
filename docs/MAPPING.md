@@ -371,8 +371,18 @@ Known gaps (suite reports, never fails):
 - Fetch epic F1 DONE: `FileFetcher`
   (`ps-nginx/src/file_fetch.rs`) serves same-server
   static inputs (server root + names from child-init;
-  `http`-only, jailed, capped, `SetDefaultHeaders`
-  headers). Gaps: per-location roots/aliases/
+  `http`-only, jailed, capped, subrequest-faithful
+  bare headers). Gaps: per-location roots/aliases/
   `try_files`/index, regex server names, proxy/TLS/
   mapped origins (fail closed); recording cache
   writes (only repeated-404 notes now).
+- Fetch epic F3 DONE: end-to-end resource rewriting
+  (driver-bound CSS/JS slots, `proxy_mode` IPRO
+  fallback, minify servants + lazy registration, 8
+  more CoreFilters slots, C++-exact serve headers).
+  Compat: 8 page + 7 config cases green (resource
+  cases poll to steady state). Gaps: old-mtime IPRO
+  gate (C++ refuses, mechanism unidentified — ours
+  over-optimizes); MetaTag/SupportNoscript slots;
+  CriticalImagesBeacon (no impl); nested CSS subsets
+  in servants.

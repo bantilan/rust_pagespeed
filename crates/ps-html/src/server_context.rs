@@ -1619,8 +1619,9 @@ impl ResourceDriver {
         let gurl = GoogleUrl::new(url);
         let Some((output, filter)) = self.decode_output_resource(&gurl) else {
             if self.options().in_place_rewriting_enabled() {
-                // This is an ajax resource.
-                return super::ipro::fetch_in_place_resource(self, url, fetch);
+                // This is an ajax resource (`FetchInPlaceResource`
+                // with `proxy_mode`, verbatim).
+                return super::ipro::fetch_in_place_resource(self, url, fetch, true);
             }
             return false;
         };

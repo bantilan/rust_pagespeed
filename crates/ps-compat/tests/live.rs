@@ -116,6 +116,15 @@ impl NginxInstance {
                 directives.push_str(&format!("    pagespeed {name} {value};\n"));
             }
         }
+        // Staged tree's mime types (absolute, so both stacks
+        // share it): without content types, static resources
+        // serve text/plain and neither stack rewrites them.
+        let mime_types = workspace_root()
+            .parent()
+            .expect("projects dir")
+            .join(".nginx-build/nginx-1.31.8/conf/mime.types")
+            .display()
+            .to_string();
         let conf = format!(
             "load_module {module_so};\n\
              worker_processes 1;\n\
@@ -123,10 +132,12 @@ impl NginxInstance {
              pid logs/nginx.pid;\n\
              events {{ worker_connections 64; }}\n\
              http {{\n\
+             include {mime_types};\n\
              access_log logs/access.log;\n\
              {directives}\
              server {{\n\
              listen {};\n\
+             server_name 127.0.0.1 localhost;\n\
              root {};\n\
              location / {{ try_files $uri $uri/ =404; }}\n\
              }}\n\
@@ -401,12 +412,28 @@ impl LiveStack {
         if !case.html.is_empty() {
             std::fs::write(&serve_path, &case.html)?;
             // Fixed mtime keeps ETag/Last-Modified identical
-            // across stacks and runs.
+            // across stacks and runs (resource cases leave it
+            // fresh so C++ considers inputs rewritable).
+            if case.fixed_mtime {
+                let mtime = std::time::UNIX_EPOCH
+                    + std::time::Duration::from_secs(corpus::FIXED_MTIME_SECS);
+                std::fs::File::options()
+                    .write(true)
+                    .open(&serve_path)?
+                    .set_modified(mtime)?;
+            }
+        }
+        for (path, bytes) in &case.extra {
+            let extra_path = doc_root.join(path.trim_start_matches('/'));
+            if let Some(parent) = extra_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&extra_path, bytes)?;
             let mtime =
                 std::time::UNIX_EPOCH + std::time::Duration::from_secs(corpus::FIXED_MTIME_SECS);
             std::fs::File::options()
                 .write(true)
-                .open(&serve_path)?
+                .open(&extra_path)?
                 .set_modified(mtime)?;
         }
         instance.write_case_config(&module_so, case, &doc_root)?;
@@ -579,6 +606,8 @@ fn smoke_case() -> PageCase {
         name: "smoke-html".to_string(),
         url: "http://127.0.0.1/page.html".to_string(),
         html: b"<html><head><title>t</title></head><body><p>hi</p></body></html>".to_vec(),
+        extra: vec![],
+        fixed_mtime: true,
         directives: vec![
             ("on".to_string(), String::new()),
             (
@@ -626,12 +655,30 @@ fn cpp_stack_serves_html() {
     }
 }
 
+/// Looks up a case's mtime pinning (recorded cases predate the
+/// flag, so the live defs are authoritative).
+fn def_fixed_mtime(name: &str) -> bool {
+    corpus::CASES
+        .iter()
+        .find(|def| def.name == name)
+        .is_none_or(|def| def.fixed_mtime)
+}
+
 /// Builds a [`PageCase`] from corpus inputs.
-fn corpus_page(name: &str, path: &str, html: &[u8], directives: &[(String, String)]) -> PageCase {
+fn corpus_page(
+    name: &str,
+    path: &str,
+    html: &[u8],
+    extra: &[(String, Vec<u8>)],
+    fixed_mtime: bool,
+    directives: &[(String, String)],
+) -> PageCase {
     PageCase {
         name: name.to_string(),
         url: format!("http://127.0.0.1{path}"),
         html: html.to_vec(),
+        extra: extra.to_vec(),
+        fixed_mtime,
         directives: directives.to_vec(),
         assertions: vec![],
     }
@@ -654,10 +701,17 @@ fn page_corpus() {
                 .iter()
                 .map(|(name, value)| (name.to_string(), value.to_string()))
                 .collect();
+            let extra: Vec<(String, Vec<u8>)> = def
+                .extra
+                .iter()
+                .map(|(path, bytes)| (path.to_string(), bytes.to_vec()))
+                .collect();
             let case = corpus_page(
                 def.name,
                 def.path,
                 def.html.unwrap_or_default(),
+                &extra,
+                def.fixed_mtime,
                 &directives,
             );
             let mut stack = LiveStack::boot(
@@ -668,14 +722,37 @@ fn page_corpus() {
                 &case,
             )
             .unwrap_or_else(|error| panic!("record boot {}: {error}", def.name));
-            let response = stack
+            let mut response = stack
                 .fetch(def.path)
                 .unwrap_or_else(|error| panic!("record fetch {}: {error}", def.name));
+            for _ in 1..def.fetches {
+                response = stack
+                    .fetch(def.path)
+                    .unwrap_or_else(|error| panic!("record fetch {}: {error}", def.name));
+            }
+            if def.poll_optimized {
+                // C++ optimizes asynchronously; poll until the
+                // body differs from the origin input (or cap).
+                let origin = def.html.unwrap_or_default();
+                for _ in 0..20 {
+                    if response.body.as_slice() != origin {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_secs(3));
+                    response = stack
+                        .fetch(def.path)
+                        .unwrap_or_else(|error| panic!("record fetch {}: {error}", def.name));
+                }
+                if response.body.as_slice() == origin {
+                    eprintln!("note {}: body never optimized within cap", def.name);
+                }
+            }
             let (headers, body) = normalize(&response.headers, &response.body);
             recorded.push(RecordedCase {
                 name: def.name.to_string(),
                 path: def.path.to_string(),
                 html: def.html.unwrap_or_default().to_vec(),
+                extra,
                 directives,
                 status: response.status,
                 headers,
@@ -701,7 +778,14 @@ fn page_corpus() {
     for case in &recorded {
         // Compare replays the RECORDED INPUT html, not the
         // expected body.
-        let page = corpus_page(&case.name, &case.path, &case.html, &case.directives);
+        let page = corpus_page(
+            &case.name,
+            &case.path,
+            &case.html,
+            &case.extra,
+            def_fixed_mtime(&case.name),
+            &case.directives,
+        );
         let mut stack = match LiveStack::boot(
             "rust",
             runner.binary.clone(),
@@ -716,7 +800,10 @@ fn page_corpus() {
                 continue;
             }
         };
-        let response = match stack.fetch(&case.path) {
+        let def = corpus::CASES.iter().find(|def| def.name == case.name);
+        let fetches = def.map(|def| def.fetches).unwrap_or(1);
+        let poll = def.is_some_and(|def| def.poll_optimized);
+        let mut response = match stack.fetch(&case.path) {
             Ok(response) => response,
             Err(error) => {
                 eprintln!("FAIL {}: fetch: {error}", case.name);
@@ -724,7 +811,43 @@ fn page_corpus() {
                 continue;
             }
         };
+        for _ in 1..fetches {
+            response = match stack.fetch(&case.path) {
+                Ok(response) => response,
+                Err(error) => {
+                    eprintln!("FAIL {}: fetch: {error}", case.name);
+                    failures += 1;
+                    continue;
+                }
+            };
+        }
+        if poll {
+            for _ in 0..20 {
+                if response.body.as_slice() != case.html.as_slice() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                response = match stack.fetch(&case.path) {
+                    Ok(response) => response,
+                    Err(error) => {
+                        eprintln!("FAIL {}: fetch: {error}", case.name);
+                        failures += 1;
+                        continue;
+                    }
+                };
+            }
+        }
         let (headers, body) = normalize(&response.headers, &response.body);
+        // Poll cases compare volatile-normalized headers (TTL
+        // countdowns differ by stack timing).
+        let (headers, expected) = if poll {
+            (
+                corpus::normalize_volatile(&headers),
+                corpus::normalize_volatile(&case.headers),
+            )
+        } else {
+            (headers, case.headers.clone())
+        };
         let mut case_failures = Vec::new();
         for result in [evaluate(&Assertion::StatusEqual {
             expected: case.status,
@@ -734,10 +857,9 @@ fn page_corpus() {
                 case_failures.push(result.detail.clone());
             }
         }
-        if headers != case.headers {
+        if headers != expected {
             case_failures.push(format!(
-                "headers differ:\n  expected: {:?}\n  actual:   {headers:?}",
-                case.headers
+                "headers differ:\n  expected: {expected:?}\n  actual:   {headers:?}"
             ));
         }
         let body_result = evaluate(&Assertion::ByteEqual {
@@ -794,7 +916,14 @@ fn config_corpus() {
                 .iter()
                 .map(|(name, value)| (name.to_string(), value.to_string()))
                 .collect();
-            let case = corpus_page(def.name, def.path, corpus::CONFIG_PROBE_HTML, &directives);
+            let case = corpus_page(
+                def.name,
+                def.path,
+                corpus::CONFIG_PROBE_HTML,
+                &[],
+                true,
+                &directives,
+            );
             let mut stack = match LiveStack::boot(
                 "cpp",
                 runner.binary.clone(),
@@ -850,6 +979,8 @@ fn config_corpus() {
             &case.name,
             &case.path,
             corpus::CONFIG_PROBE_HTML,
+            &[],
+            true,
             &case.directives,
         );
         let mut stack = match LiveStack::boot(

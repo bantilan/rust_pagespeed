@@ -23,7 +23,7 @@ fn corpus(repeats: usize) -> Vec<u8> {
 
 fn rewrite_once(options: &RewriteOptions, input: &[u8]) {
     let ctx = ChainContext::new(true, true);
-    let mut driver = Driver::new(options, &ctx, Vec::new());
+    let mut driver = Driver::new(options, &ctx, Vec::new(), None);
     driver.start_parse(b"http://bench.test/page.html", false);
     driver.write(black_box(input));
     driver.finish();

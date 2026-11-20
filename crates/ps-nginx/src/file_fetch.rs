@@ -1,4 +1,4 @@
-//! Same-server file fetcher (`FileInputResource` behavior over `root`).
+//! Same-server file fetcher (subrequest substitute over `root`).
 //!
 //! C++ fetches same-server inputs through nginx subrequests; the
 //! sync bridge cannot park for them, so this fetcher reads the
@@ -7,15 +7,19 @@
 //! URLs whose host matches a server name, paths unescaped then
 //! jailed under the canonical root (`..`, NUL, and escaping
 //! symlinks fail closed), regular files under the cacheable
-//! size cap. Served headers mirror
-//! `FileInputResource::SetDefaultHeaders` exactly (1.1/200,
-//! extension content-type, `SetDateAndCaching` with the
-//! file-input TTL, mtime `Last-Modified`).
+//! size cap. Served headers mirror what static would send
+//! (200, extension content-type, length, mtime
+//! `Last-Modified`, nginx-format ETag, `Accept-Ranges`,
+//! current `Date`) with NO caching headers, so downstream
+//! cacheability verdicts compute exactly like C++'s
+//! (synthesizing a TTL here would over-optimize inputs C++
+//! refuses as uncacheable).
 //!
 //! Known gaps: per-location roots/aliases/`try_files`/index
 //! resolution stay unmapped (server root only); regex server
 //! names never match; non-UTF8 filenames fail closed;
-//! `https` fails (no TLS); ports are ignored.
+//! `https` fails (no TLS); ports are ignored; extension table
+//! approximates mime.types.
 
 use ps_http::content_type::extension_to_content_type;
 use ps_http::fetch::{AsyncFetch, AsyncFetcher};
@@ -33,12 +37,6 @@ pub struct FileFetcher {
     names: Vec<String>,
     /// Cacheable size cap (`max_cacheable_response_content_length`).
     max_file_bytes: i64,
-    /// File-input TTL (`load_from_file_cache_ttl_ms`).
-    file_cache_ttl_ms: i64,
-    /// Whether the file-input TTL was explicitly set.
-    file_cache_ttl_set: bool,
-    /// Fallback TTL (`implicit_cache_ttl_ms`).
-    implicit_cache_ttl_ms: i64,
 }
 
 impl FileFetcher {
@@ -46,14 +44,7 @@ impl FileFetcher {
     /// and canonicalizable) for `names`. `None` fails closed to
     /// the unavailable fetcher.
     #[must_use]
-    pub fn new(
-        root: &str,
-        names: &[String],
-        max_file_bytes: i64,
-        file_cache_ttl_ms: i64,
-        file_cache_ttl_set: bool,
-        implicit_cache_ttl_ms: i64,
-    ) -> Option<Self> {
+    pub fn new(root: &str, names: &[String], max_file_bytes: i64) -> Option<Self> {
         if root.is_empty() || root.contains('$') {
             return None;
         }
@@ -67,9 +58,6 @@ impl FileFetcher {
             root,
             names,
             max_file_bytes,
-            file_cache_ttl_ms,
-            file_cache_ttl_set,
-            implicit_cache_ttl_ms,
         })
     }
 
@@ -135,15 +123,6 @@ impl FileFetcher {
         }
         Some(canonical)
     }
-
-    /// File-input TTL (`SetDefaultHeaders` selection).
-    fn cache_ttl_ms(&self) -> i64 {
-        if self.file_cache_ttl_set {
-            self.file_cache_ttl_ms
-        } else {
-            self.implicit_cache_ttl_ms
-        }
-    }
 }
 
 impl AsyncFetcher for FileFetcher {
@@ -171,6 +150,9 @@ impl AsyncFetcher for FileFetcher {
             .map(|age| age.as_millis() as i64)
             .unwrap_or(0);
         {
+            // Static-faithful headers (what a subrequest would
+            // see): no caching headers, so cacheability verdicts
+            // compute exactly like C++'s.
             let headers = fetch.response_headers_mut();
             headers.set_status_and_reason(200);
             headers.headers_mut().remove_all(header::CONTENT_TYPE);
@@ -183,8 +165,17 @@ impl AsyncFetcher for FileFetcher {
                     .headers_mut()
                     .add(header::CONTENT_TYPE, content_type.mime_type());
             }
-            headers.set_date_and_caching(now_ms, self.cache_ttl_ms(), "");
+            headers.set_date(now_ms);
             headers.set_last_modified(mtime_ms);
+            headers.set_original_content_length(bytes.len() as i64);
+            headers.headers_mut().add(
+                header::ETAG,
+                &format!("\"{:x}-{:x}\"", mtime_ms / 1000, bytes.len()),
+            );
+            headers.headers_mut().add(header::ACCEPT_RANGES, "bytes");
+            headers
+                .headers_mut()
+                .add(header::CONTENT_LENGTH, &bytes.len().to_string());
             headers.compute_caching();
         }
         fetch.headers_complete();
@@ -203,7 +194,9 @@ mod tests {
     use ps_http::fetch::BufferingFetch;
     use ps_http::request::RequestContext;
     use ps_http::response::HttpOptions;
+    use std::rc::Rc;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
 
     static COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -232,9 +225,6 @@ mod tests {
                 self.dir.to_str().unwrap(),
                 &["localhost".to_string()],
                 16 * 1024 * 1024,
-                5 * 60 * 1000,
-                false,
-                5 * 60 * 1000,
             )
             .expect("scratch root fetches")
         }
@@ -266,11 +256,8 @@ mod tests {
             Some("text/css".to_string()),
             headers.headers().lookup1(header::CONTENT_TYPE)
         );
-        assert_eq!(
-            "max-age=300",
-            headers.headers().lookup_joined(header::CACHE_CONTROL)
-        );
-        // Mtime round-trips through Last-Modified.
+        // Mtime round-trips through Last-Modified, and the ETag
+        // matches nginx's `"<hexmtime>-<hexsize>"` shape.
         let mtime = std::fs::metadata(scratch.dir.join("a.css"))
             .unwrap()
             .modified()
@@ -279,29 +266,31 @@ mod tests {
             .unwrap()
             .as_millis() as i64;
         assert_eq!(mtime / 1000 * 1000, headers.last_modified_time_ms());
+        assert_eq!(
+            format!("\"{:x}-{:x}\"", mtime / 1000, 12),
+            headers.headers().lookup_joined(header::ETAG)
+        );
     }
 
     #[test]
-    fn explicit_file_ttl_wins() {
+    fn static_headers_derive_implicit_caching() {
+        // Static-faithful fetch carries no caching headers, but
+        // caching computation derives the implicit TTL exactly
+        // like C++ (same inputs, same code).
         let scratch = Scratch::new(&[("a.css", b"a{}")]);
-        let fetcher = FileFetcher::new(
-            scratch.dir.to_str().unwrap(),
-            &["localhost".to_string()],
-            16 * 1024 * 1024,
-            60_000,
-            true,
-            5 * 60 * 1000,
-        )
-        .expect("scratch root fetches");
+        let fetcher = scratch.fetcher();
         let fetch = scratch.fetch(&fetcher, "http://localhost/a.css");
         assert!(fetch.success());
+        let headers = fetch.response_headers();
         assert_eq!(
-            "max-age=60",
-            fetch
-                .response_headers()
-                .headers()
-                .lookup_joined(header::CACHE_CONTROL)
+            "max-age=300",
+            headers.headers().lookup_joined(header::CACHE_CONTROL)
         );
+        assert_eq!(
+            "bytes",
+            headers.headers().lookup_joined(header::ACCEPT_RANGES)
+        );
+        assert_eq!("3", headers.headers().lookup_joined(header::CONTENT_LENGTH));
     }
 
     #[test]
@@ -368,9 +357,6 @@ mod tests {
             scratch.dir.to_str().unwrap(),
             &["*.example.com".to_string()],
             16 * 1024 * 1024,
-            5 * 60 * 1000,
-            false,
-            5 * 60 * 1000,
         )
         .expect("scratch root fetches");
         assert!(scratch
@@ -408,24 +394,97 @@ mod tests {
             .lookup1(header::CONTENT_TYPE)
             .is_none());
         // Oversized files fail closed.
-        let small = FileFetcher::new(
-            scratch.dir.to_str().unwrap(),
-            &["localhost".to_string()],
-            2,
-            5 * 60 * 1000,
-            false,
-            5 * 60 * 1000,
-        )
-        .expect("scratch root fetches");
+        let small = FileFetcher::new(scratch.dir.to_str().unwrap(), &["localhost".to_string()], 2)
+            .expect("scratch root fetches");
         assert!(!scratch.fetch(&small, "http://localhost/a.css").success());
     }
 
     #[test]
     fn construction_rejects_bad_roots() {
         let names = ["localhost".to_string()];
-        assert!(FileFetcher::new("/nonexistent-root-psff", &names, 1, 1, false, 1).is_none());
-        assert!(FileFetcher::new("relative/root", &names, 1, 1, false, 1).is_none());
-        assert!(FileFetcher::new("/root/$var", &names, 1, 1, false, 1).is_none());
-        assert!(FileFetcher::new("", &names, 1, 1, false, 1).is_none());
+        assert!(FileFetcher::new("/nonexistent-root-psff", &names, 1).is_none());
+        assert!(FileFetcher::new("relative/root", &names, 1).is_none());
+        assert!(FileFetcher::new("/root/$var", &names, 1).is_none());
+        assert!(FileFetcher::new("", &names, 1).is_none());
+    }
+
+    /// Full HTML flow over file-backed inputs (mirrors the live
+    /// module path: context, driver, CoreFilters, beacon-less
+    /// chain): the small stylesheet inlines (verbatim C++).
+    #[test]
+    fn html_driver_inlines_file_backed_link() {
+        use ps_cache::cache::MemoryCache;
+        use ps_config::options::RewriteOptions;
+        use std::cell::RefCell;
+
+        let scratch = Scratch::new(&[
+            ("a.css", b".a { color: red; }\n"),
+            (
+                "index.html",
+                b"<html><head><link rel=\"stylesheet\" href=\"a.css\"></head>\
+                  <body>hi</body></html>",
+            ),
+        ]);
+        // Live-likeness probe: a stale context clock
+        // (child-init lags file mtimes).
+        let now_ms = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|age| age.as_millis() as i64)
+            .unwrap_or(0)
+            - 3_600_000;
+        let fetcher = Rc::new(
+            FileFetcher::new(
+                scratch.dir.to_str().unwrap(),
+                &["test.com".to_string()],
+                16 * 1024 * 1024,
+            )
+            .expect("scratch root fetches"),
+        );
+        let html = crate::rewrite::html_context(
+            Arc::new(MemoryCache::new()),
+            Arc::new(MemoryCache::new()),
+            Arc::new(ps_stats::core::Statistics::new()),
+            now_ms,
+            fetcher,
+        );
+        let options = Rc::new(RefCell::new(RewriteOptions::new()));
+        options
+            .borrow_mut()
+            .set_option(
+                "RewriteLevel",
+                "CoreFilters",
+                ps_config::scope::Scope::Directory,
+            )
+            .unwrap();
+        let resource_driver = Rc::new(ps_html::server_context::ResourceDriver::new(
+            html,
+            options.clone(),
+            "http://test.com:18081/index.html",
+        ));
+        let output = Rc::new(RefCell::new(Vec::new()));
+        struct VecSink(Rc<RefCell<Vec<u8>>>);
+        impl ps_html::writer::ByteSink for VecSink {
+            fn write_bytes(&mut self, bytes: &[u8]) -> bool {
+                self.0.borrow_mut().extend_from_slice(bytes);
+                true
+            }
+        }
+        let context = ps_html::chain::ChainContext::new(true, false);
+        let mut driver = ps_html::driver::Driver::new(
+            &options.borrow(),
+            &context,
+            VecSink(Rc::clone(&output)),
+            Some(resource_driver),
+        );
+        driver.start_parse(b"http://test.com:18081/index.html", false);
+        driver.write(
+            b"<html><head><link rel=\"stylesheet\" href=\"a.css\"></head><body>hi</body></html>",
+        );
+        driver.finish();
+        let out = String::from_utf8(output.borrow().clone()).unwrap();
+        assert_eq!(
+            "<html><head><style>.a{color:red}</style></head><body>hi</body></html>",
+            out
+        );
     }
 }
