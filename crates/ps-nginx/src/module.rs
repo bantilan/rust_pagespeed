@@ -1849,6 +1849,14 @@ unsafe fn serve_response(
         let mut response = ResponseHeaders::new(HttpOptions::default());
         response.set_status_and_reason(status);
         for (name, value) in headers {
+            // Content-Length is applied from the body below
+            // (`content_length_n` drives the header filter);
+            // copying it here too emits a duplicate: the
+            // filter generates one from `_n` (the shortcut is
+            // cleared) and also emits the pushed list entry.
+            if name.eq_ignore_ascii_case("content-length") {
+                continue;
+            }
             response.headers_mut().add(name, value);
         }
         let mut set_psol_vary = false;
