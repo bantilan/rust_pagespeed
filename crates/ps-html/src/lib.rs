@@ -54,6 +54,7 @@ pub mod resource_slot;
 pub mod resource_tag_scanner;
 pub mod rewrite_context;
 pub mod rewrite_filter;
+pub mod rewrite_stats;
 pub mod script_scanner;
 pub mod server_context;
 pub mod show_ads_snippet_parser;
