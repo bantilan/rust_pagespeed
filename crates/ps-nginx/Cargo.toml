@@ -24,3 +24,9 @@ libc = "=0.2.191"
 [dev-dependencies]
 # Test-only gzip fixtures (same pure-Rust backend as ps-http).
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+criterion = { version = "0.5", features = ["html_reports"] }
+ps-image = { path = "../ps-image" }
+
+[[bench]]
+name = "nginx"
+harness = false

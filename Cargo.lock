@@ -941,6 +941,7 @@ dependencies = [
 name = "ps-nginx"
 version = "0.1.0"
 dependencies = [
+ "criterion",
  "flate2",
  "libc",
  "ngx",
@@ -949,6 +950,7 @@ dependencies = [
  "ps-config",
  "ps-html",
  "ps-http",
+ "ps-image",
  "ps-stats",
 ]
 
