@@ -1050,3 +1050,194 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   (`bound_nginx_version() == 1031008`, `SUPPORTED_NGINX =
   ["1.31.8"]`). 29 ps-nginx tests green. MAPPING corrected
   (nginx-gap-1 in progress, `N:test/` row).
+- Step 6 remainder, slice 1 (this session): DONE. Module skeleton:
+  new `module.rs` (3-context directive table + null end, dual
+  module structs with a signature test computed from the
+  `NGX_MODULE_SIGNATURE_*` bits, pre/postconfiguration gating,
+  conf create/merge wiring, phase-step insertion, directive-line
+  dispatch with `GzipCall` recording, hand-written `ngx_modules!`
+  export tables), `conf.rs` (level confs, `NgxOptions`,
+  order-sensitive `ps_merge_options`, dummy identity, cache-path
+  validation texts, seeded context, factory-delete guards),
+  `directives.rs` (on/off/gzip classification, dir prep +
+  ownership fixup, `$ps_dollar`), `filters.rs` (six slots in
+  load-bearing init/execution order, bodies stubbed to Slices
+  2-5), `log_bridge.rs`/`message.rs` (severity maps, formats,
+  crash-handler installer), `self_fetch.rs` (loopback/peer
+  checks, label init, relabel/restore round trip), and `mock.rs`
+  (ABI link stubs + chain-composition proofs). Hooks run the
+  real gating and decline until their slice lands. 70 ps-nginx
+  tests green. Workspace: 2375 passed, 0 failed.
+- Step 6 remainder, slice 2 (this session): DONE. Server context
+  + content dispatch + self-fetch handler. ps-config grew the
+  six admin paths + `PurgeMethod` on `NginxSystemOptions` (1-arg
+  parse, case-sensitive `NGINX_PROPERTY_SCOPES` gate mirroring
+  `AddProperties` — the 167-row table stays pinned), the six
+  `*Domains` wildcard groups (2-arg allow/disallow, verbatim
+  error), and `beacon_url()` (`None` when unset; the nginx
+  default is factory behavior). New `routing.rs`: 15-way `Route`
+  decision branch-for-branch (gates, URL validity, subrequest,
+  static prefix, admin paths with `AllowDomain` checks, purge,
+  beacon with the nginx default + absolute-URL quirk),
+  `ps_determine_port` host half (`str::parse::<i32>` proven
+  identical to Chromium `StringToInt`), `build_url`, and the
+  `ContentAction` dispatch table. `SeededContext` grew into the
+  live `ServerContext` (http2 index, initialized latch,
+  `FormatOption`, `PROXIES_HTML`); merge covers the new system
+  options. module.rs wires the real `content_handler` (disabled/
+  initialized gates, flush poll, URL build, route, dispatch —
+  terminal actions decline until their slices land) and
+  `self_fetch_handler` (main/subrequest/peer checks, pool
+  cleanup, relabel, restore callback). Fixed a real port gap the
+  new tests caught: `enabled_state` never survived `merge` (C++
+  `enabled_` is an `Option`), so server-level `off` was lost at
+  merge — added the `was_set` bit with verbatim `MergeHelper`
+  semantics. Benchmark gate smoked on ps-config (the one hot path
+  touched): lookup ~6.7ns vs ~7ns recorded, merge ~776ns inside
+  the 730-833ns established noise band. 81 ps-nginx + 55
+  ps-config tests green. Workspace: 2388 passed, 0 failed.
+- Step 6 remainder, slice 3a (this session): DONE. Request
+  foundation under the filter bodies (Slice 3 splits into three
+  turns: 3a foundation, 3b options determination, 3c filter
+  bodies). ps-config grew request-time getters (`follow_flushes`,
+  `respect_x_forwarded_proto`, `remote_configuration_url`,
+  `running_experiment`, `enroll_experiment` as `!= -2`,
+  rebeaconing key + match + integration predicates). ps-http
+  grew the full `Method` table (`Trace`/`Connect`/`Patch`,
+  case-insensitive `from_string`) and request versions. New
+  `caching.rs` (preserve policy, privacy limits note/keep,
+  disabled-page value, `ApplySMaxAge` with its lifetime reader),
+  `headers.rs` (request/response copy cores with injected clock,
+  override-token predicate, cache-control join + get/set FFI),
+  `request.rs` (`RequestCtx` plain data, buffered bit, ctx
+  get/set/attach/release wiring), and `resource.rs` (pre-options
+  gates with the `CHECK`-faithful panic, post-options 7-way
+  branch selection, HEAD→GET rule). 95 ps-nginx + 56 ps-config
+  tests green. Workspace: 2404 passed, 0 failed.
+- Step 6 remainder, slice 3b (this session): DONE. Options
+  determination: the `RewriteQuery::Scan` orchestration
+  (related-options path over the nine-id decoding registry,
+  Ajax disables, custom-option pre-scan, authenticated cookie
+  loop, query loop with URL rebuild, generalized header scans,
+  CoreFilters default, always-strip response token) plus
+  `GetQueryOptions` with threshold limiting, in new ps-http
+  `query.rs` (14 tests incl. C++-ported override/sticky/cookie/
+  related cases). Servants: ps-config related tables (`cf`/`ic`
+  sets, seven registered-empty ids), Ajax disables, default
+  level, threshold caps, override/cookie/timeout getters;
+  ps-http cookies, XHR detection, sticky context field, method
+  table completion, query-param mutation, best-effort unescape,
+  public query escape, fragment accessor. New ps-nginx
+  `script.rs` (script execution over an injected substituter,
+  fail-closed to `Off`) and `options.rs` (remote-config plan
+  with the native-fetcher zero-wait rule, request scan, merge
+  assembly, experiment gate with cookie builder), wired into
+  resource gating via `resolve_from` with an integration test.
+  Seams (Slice 6): remote fetch, purge inheritance, experiment
+  matcher (gate fails closed without a verdict), script
+  recording/compilation, cookie write. Notably, the related
+  tables looked binary-search-broken until `Initialize()`'s
+  sort turned up — no C++ bug after all. 104 ps-nginx + 58
+  ps-config + 139 ps-http tests green. Workspace: 2432 passed,
+  0 failed.
+- Step 6 remainder, slice 3c (this session): DONE. Filter bodies:
+  new ps-http `inflate.rs` ports the streaming `GzipInflater`
+  (gzip/zlib/raw over miniz_oxide plus manual gzip framing with
+  CRC/trailer verification, deflate-to-raw fallback both ways,
+  output limiting, finished/error accounting; 11 tests incl.
+  split-at-every-boundary, tiny buffers, limit/corrupt/trailer/
+  FDICT cases). New ps-nginx `send.rs` ports the body-delivery
+  walk over an injected sink (pass-through/inflate/flush-gated/
+  last-completes semantics, limit-vs-corrupt reporting; 4 tests).
+  `filters.rs` carries the real html_rewrite dispatch (live
+  gates, encoding/strip/Vary/limits cores, `finish_*` tails
+  awaiting the Slice 6 fetch), a fully live fix_headers filter
+  (token strip, disabled-`Cache-Control` write with an alloc-
+  failure hardening where C++ would segfault, etag/last-
+  modified/expires clears), and the etag rename plus `gzip_vary`
+  (its recorder-backed `s-maxage` half moves to Slice 5).
+  Header-list walker with fabricated-list tests; `RequestCtx`
+  gains the decoder slot. 116 ps-nginx + 150 ps-http tests
+  green. Workspace: 2455 passed, 0 failed (no hot paths
+  touched, so the bench gate holds trivially).
+- Step 6 remainder, slice 4 (this session): DONE. Base-fetch
+  bridge and serving. New `fetch.rs`: `BaseFetch` state core
+  (write buffering with the 1 MiB flush window, flush/done
+  latches, chain-copy policy with exactly-once `last_buf`,
+  two-reference lifecycle with in-flight event accounting,
+  detach/suppress gating, content-length stashing) over an
+  injected event channel, plus the base-fetch gate, handler
+  status/preserve/discard matrices, send-header and collect
+  routing, and the full read-callback plan (10 tests).
+  `headers.rs` grew the outbound disposition (verbatim shortcut
+  table incl. exact-case matches, weak-etag rename, `Vary` flag)
+  with its FFI writer and the pool chain builder. Live: the
+  base-fetch body filter, `CollectHeaders`/
+  `CollectAccumulatedWrites`, async-wait suspend (fabricated-
+  request test), and the discard failure core. Recorded seams:
+  shared wrapper/pipe/threads, cache validation, handler/event
+  FFI assembly (Slice 6); decline lands with its in-place
+  callers (Slice 5); beacon/simple/resource terminal bodies all
+  need factory services (Slice 6). 130 ps-nginx tests green.
+  Workspace: 2469 passed, 0 failed.
+- Step 6 remainder, slice 5 (this session): DONE. In-place
+  recording. New `recording.rs`: the `InPlaceRecorder` core
+  (concurrency gate with process-wide count, coding gate,
+  content-type gate, size shortcut, origin capture/application
+  with TTL clamping, empty/truncation rules, saved-`Cache-
+  Control` lifecycle, gunzipping writes) over an injected
+  cache/stats/log backend (8 tests). Live: both in-place
+  filters (header plan + preliminary feed + miss/serve/decline
+  routing with Slice 6 creation/stats seams; body drive over
+  fabricated chains), decline (ctx reset + nginx advance, both
+  fabricated-tested; resume calls live-only), and the etag
+  `s-maxage` completion (auth gate, global value, save/restore,
+  alloc-failure hardening). Fixed a 3b mistake along the way:
+  C++ `Lookup1Unescaped` is exactly-one (not first-match), so
+  the strict lookup went best-effort and repeated override
+  tokens now deny. FOUND C++ BUG (ported faithfully): the size
+  shortcut's `<= 0` gate fires exactly when unlimited. 142
+  ps-nginx tests green. Workspace: 2481 passed, 0 failed.
+- Step 6 remainder, slice 6a (this session): DONE. Factory
+  config surface + module lifecycle. New `factory.rs`
+  (`DriverFactory`: verified ctor defaults incl. beacon, inode
+  limit, introspective-JS; the ten system factory directives
+  with verbatim scope texts; resolver record/check;
+  one-shot thread-count finalization; owned message handlers +
+  `LoggingInit`; `PostConfig`; remote warnings; idempotent
+  shutdown). Fixed a 3c mistake along the way: nginx config
+  errors quote (`"directive" detail`, `"full line" detail`,
+  empty details keep the trailing space), the gate runs before
+  the arity check, and the invalid-wrap joins the raw
+  (unstripped) words. Dispatch is table-first with a factory
+  fallback that gate rejections bypass. `MainConf` owns the
+  factory now; `merge_srv_conf` runs `SetMainConf`;
+  postconfiguration presence is the deletion latch. New
+  `init_module`/`init_process`/`exit_process` hooks (pure plan
+  + FFI: reload guard, prefixed PostConfig errors, resolver
+  gate, stats/RootInit flags, active-generation tracking) and
+  `create_main_conf` logging/init calls. On-demand options
+  added: `Statistics`, `FileCacheInodeLimit`,
+  `MemcachedServers`, `RedisServer` (validated specs, verbatim
+  errors). `init_all` completed (stdio, rate, RPC, shutdown,
+  404 count, HTML histogram, dependencies cohort). Gzip-setter
+  execution deferred to Slice 7 (live-only). 155 ps-nginx, 60
+  ps-config, 20 ps-stats tests green. Workspace: 2497 passed,
+  0 failed.
+- Step 6 remainder, slice 6b (this session): DONE. Threading.
+  Key finding: nginx spawns no rewrite-thread pool
+  (`NumRewriteThreads` only sizes cache thread limits);
+  `StartThreads` starts one scheduler thread. New
+  `scheduler.rs`: injectable `Clock` (`SystemClock` epoch us,
+  `ManualClock` tests), `Scheduler` (deadline/index-ordered
+  alarms, add/cancel/run/signal/process/pump, ms-rounded
+  waits, unlocked callbacks), and the 255s pump with an
+  atomic check-then-wait stop (no missed wakeup). The
+  condvar-wait family, sequences, and the locked alarm add
+  have no nginx-path users and wait for their first caller.
+  `DriverFactory` owns the scheduler plus the named thread
+  (`start_threads` idempotent, `Drop` joins at the
+  deferred-cleanup position); `init_child_process` starts it.
+  No shared-state wrappers needed: only `Send` alarm
+  callbacks cross threads. 165 ps-nginx tests green (timing
+  tests stable 5/5). Workspace: 2507 passed, 0 failed.

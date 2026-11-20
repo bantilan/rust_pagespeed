@@ -61,7 +61,11 @@ pub mod header {
     pub const X_PSA_CLIENT_OPTIONS: &str = "X-PSA-Client-Options";
     pub const X_PSA_LOAD_SHED: &str = "X-Psa-Load-Shed";
     pub const X_PSA_PURGE_REQUEST: &str = "X-PSA-Purge-Request";
+    pub const X_REQUESTED_WITH: &str = "X-Requested-With";
 }
+
+/// Ajax marker value (`HttpAttributes::kXmlHttpRequest`).
+pub const XML_HTTP_REQUEST: &str = "XMLHttpRequest";
 
 /// Hop-by-hop headers (`SortedHopByHopHeaders`), case-insensitively sorted.
 pub const HOP_BY_HOP_HEADERS: &[&str] = &[

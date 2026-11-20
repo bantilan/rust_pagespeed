@@ -53,6 +53,14 @@ pub struct NgxMessageHandler {
     log: *mut ngx_log_t,
 }
 
+impl std::fmt::Debug for NgxMessageHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NgxMessageHandler")
+            .field("log", &format_args!("{:p}", self.log))
+            .finish()
+    }
+}
+
 // SAFETY: the handler only forwards a raw log pointer to
 // `ngx_log_error`, which is thread-safe in nginx; the pointer
 // itself is set at config time before workers fork.

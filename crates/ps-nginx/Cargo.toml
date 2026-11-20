@@ -7,8 +7,13 @@ license.workspace = true
 [dependencies]
 ps-http = { path = "../ps-http" }
 ps-config = { path = "../ps-config" }
+ps-cache = { path = "../ps-cache" }
 # Pinned nginx FFI bindings (Slice 0); verified against the staged
 # nginx 1.31.8 tree in `../../.nginx-build` (see README there).
 ngx = "=0.5.1"
 # Raw OS bindings for the crash handler (`signal`, `alarm`, `kill`).
 libc = "=0.2.191"
+
+[dev-dependencies]
+# Test-only gzip fixtures (same pure-Rust backend as ps-http).
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }

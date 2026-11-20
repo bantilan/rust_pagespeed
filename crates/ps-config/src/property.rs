@@ -177,13 +177,33 @@ pub const SERVER_ONLY_OPTIONS: &[&str] = &[
 /// Options rejected below http scope (`main_only` in `ngx_rewrite_options.cc`).
 pub const MAIN_ONLY_OPTIONS: &[&str] = &["UseNativeFetcher", "NativeFetcherMaxKeepaliveRequests"];
 
+/// Nginx-only property scopes (`NgxRewriteOptions::AddProperties` plus
+/// the `SystemRewriteOptions` names ported on demand). These live
+/// outside the shared property table (which stays pinned at its
+/// audited shape), so the gate consults this list with the same
+/// case-**sensitive** match the C++ `all_options()` loop uses.
+pub const NGINX_PROPERTY_SCOPES: &[(&str, Scope)] = &[
+    ("StatisticsPath", Scope::Server),
+    ("GlobalStatisticsPath", Scope::ProcessStrict),
+    ("ConsolePath", Scope::Server),
+    ("MessagesPath", Scope::Server),
+    ("AdminPath", Scope::Server),
+    ("GlobalAdminPath", Scope::ProcessStrict),
+    ("PurgeMethod", Scope::Server),
+    ("FileCacheInodeLimit", Scope::Server),
+    ("Statistics", Scope::Server),
+    ("MemcachedServers", Scope::Server),
+    ("RedisServer", Scope::Server),
+];
+
 /// Full nginx scope resolution (`NgxRewriteOptions::GetOptionScope`).
 ///
 /// Main-only names resolve to process scope, server-only names to server
-/// scope (both case-insensitive); otherwise the property table is consulted
-/// with a case-**sensitive** name match, treating legacy-process scope as
-/// process-strict; unknown names default to directory scope. Callers pass
-/// the directive with any `ModPagespeed` prefix already stripped.
+/// scope (both case-insensitive); otherwise the property table (plus the
+/// nginx-only property scopes) is consulted with a case-**sensitive**
+/// name match, treating legacy-process scope as process-strict; unknown
+/// names default to directory scope. Callers pass the directive with any
+/// `ModPagespeed` prefix already stripped.
 #[must_use]
 pub fn nginx_option_scope(name: &str) -> Scope {
     if let Some(scope) = nginx_min_scope(name) {
@@ -195,6 +215,9 @@ pub fn nginx_option_scope(name: &str) -> Scope {
         } else {
             prop.scope
         };
+    }
+    if let Some((_, scope)) = NGINX_PROPERTY_SCOPES.iter().find(|(n, _)| *n == name) {
+        return *scope;
     }
     Scope::Directory
 }

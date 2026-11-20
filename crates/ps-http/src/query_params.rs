@@ -86,6 +86,17 @@ impl QueryParams {
             .and_then(unescape_query_value)
     }
 
+    /// Best-effort unescaped value (`UnescapeQueryParam`): `None`
+    /// only when the pair had no `=`; malformed escapes pass
+    /// through literally and non-UTF8 decodes lossily, like C++.
+    #[must_use]
+    pub fn unescaped_value_best_effort(&self, index: usize) -> Option<String> {
+        self.entries[index]
+            .1
+            .as_deref()
+            .map(unescape_query_value_best_effort)
+    }
+
     /// Whether a name occurs (`Has`).
     #[must_use]
     pub fn has(&self, name: &str) -> bool {
@@ -109,7 +120,8 @@ impl QueryParams {
     }
 
     /// Single unescaped value (`Lookup1Unescaped`): `None` when
-    /// absent, repeated, valueless, or undecodable.
+    /// absent, repeated, or valueless; malformed escapes decode
+    /// best-effort, like C++.
     #[must_use]
     pub fn lookup1_unescaped(&self, name: &str) -> Option<String> {
         let mut found = None;
@@ -121,7 +133,7 @@ impl QueryParams {
                 found = Some(value.as_deref()?);
             }
         }
-        found.and_then(unescape_query_value)
+        found.map(unescape_query_value_best_effort)
     }
 
     /// All escaped values for a name (`LookupEscaped`).
@@ -133,6 +145,79 @@ impl QueryParams {
             .map(|(_, value)| value.clone())
             .collect()
     }
+
+    /// Drops all entries (`Clear`).
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Appends an escaped pair (`AddEscaped`): the value is kept
+    /// verbatim (possibly empty, never absent).
+    pub fn add_escaped(&mut self, name: &str, escaped_value: &str) {
+        self.entries
+            .push((name.to_string(), Some(escaped_value.to_string())));
+    }
+
+    /// Renders `name=value` pairs joined by `&` (`ToEscapedString`;
+    /// valueless entries render bare).
+    #[must_use]
+    pub fn to_escaped_string(&self) -> String {
+        self.entries
+            .iter()
+            .map(|(name, value)| match value {
+                Some(value) => format!("{name}={value}"),
+                None => name.clone(),
+            })
+            .collect::<Vec<_>>()
+            .join("&")
+    }
+}
+
+/// Best-effort decode (`UnescapeQueryParam`): `+` becomes a
+/// space, valid `%XX` decodes, and anything malformed passes
+/// through literally (the `%` plus its text, unconsumed).
+#[must_use]
+pub fn unescape_query_value_best_effort(value: &str) -> String {
+    let digit = |byte: u8| (byte as char).to_digit(16).map(|digit| digit as u8);
+    let mut out: Vec<u8> = Vec::with_capacity(value.len());
+    let bytes = value.as_bytes();
+    let mut index = 0;
+    // Pending first hex digit: the raw char plus its value (a failed
+    // second digit re-emits the raw char).
+    let mut escape: Option<(u8, u8)> = None;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if let Some((raw, high)) = escape {
+            if let Some(low) = digit(byte) {
+                out.push(high * 16 + low);
+                escape = None;
+                index += 1;
+            } else {
+                out.push(b'%');
+                out.push(raw);
+                escape = None;
+            }
+        } else if byte == b'%' {
+            // Peek the first hex digit without consuming on failure.
+            if index + 1 < bytes.len() {
+                if let Some(high) = digit(bytes[index + 1]) {
+                    escape = Some((bytes[index + 1], high));
+                    index += 2;
+                    continue;
+                }
+            }
+            out.push(b'%');
+            index += 1;
+        } else {
+            out.push(if byte == b'+' { b' ' } else { byte });
+            index += 1;
+        }
+    }
+    if let Some((raw, _)) = escape {
+        out.push(b'%');
+        out.push(raw);
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Decodes `%XX` and `+` (`UnescapeQueryParamValue`-ish):
@@ -185,11 +270,11 @@ mod tests {
     }
 
     #[test]
-    fn lookup1_rejects_repeats_and_bad_escapes() {
+    fn lookup1_rejects_repeats_decodes_bad_escapes() {
         let mut params = QueryParams::new();
         params.parse_from_untrusted_string("a=1&a=2&b=%zz");
         assert_eq!(params.lookup1_unescaped("a"), None);
-        assert_eq!(params.lookup1_unescaped("b"), None);
+        assert_eq!(params.lookup1_unescaped("b").as_deref(), Some("%zz"));
         assert_eq!(params.lookup1_unescaped("missing"), None);
     }
 
@@ -200,5 +285,32 @@ mod tests {
             Some("Hello, World!")
         );
         assert_eq!(unescape_query_value("a%2"), None);
+    }
+
+    #[test]
+    fn best_effort_passes_malformed_through() {
+        assert_eq!("Hello, World!", unescape_query_value_best_effort("Hello%2c+World%21"));
+        assert_eq!("%zz", unescape_query_value_best_effort("%zz"));
+        assert_eq!("a%2", unescape_query_value_best_effort("a%2"));
+        assert_eq!("%A%", unescape_query_value_best_effort("%A%"));
+        assert_eq!("%Azz", unescape_query_value_best_effort("%Azz"));
+        assert_eq!("%", unescape_query_value_best_effort("%"));
+    }
+
+    #[test]
+    fn builds_and_renders() {
+        let mut params = QueryParams::new();
+        params.add_escaped("a", "1");
+        params.add_escaped("b", "");
+        assert_eq!("a=1&b=", params.to_escaped_string());
+        assert_eq!(2, params.len());
+        params.clear();
+        assert!(params.is_empty());
+        assert_eq!("", params.to_escaped_string());
+        // Exactly-one lookup ignores repeats.
+        params.parse_from_untrusted_string("a=1&a=2&b");
+        assert_eq!(params.lookup1_unescaped("a"), None);
+        assert_eq!(params.lookup1_unescaped("b"), None);
+        assert_eq!(params.lookup1_unescaped("z"), None);
     }
 }

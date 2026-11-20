@@ -361,6 +361,34 @@ pub fn init_cache_flush(stats: &Statistics) {
     updown(stats, "cache_flush_timestamp_ms");
 }
 
+/// `StdioFileSystem::InitStats`.
+pub fn init_stdio_fs(stats: &Statistics) {
+    updown(stats, "stdio_fs_outstanding_ops");
+    var(stats, "stdio_fs_slow_ops");
+    var(stats, "stdio_fs_total_ops");
+}
+
+/// `RateController::InitStats`.
+pub fn init_rate_controller(stats: &Statistics) {
+    updown(stats, "current-fetch-queue-size");
+    timed(stats, "queued-fetch-count");
+    timed(stats, "dropped-fetch-count");
+}
+
+/// `CentralControllerRpcClient::InitStats`.
+pub fn init_controller_rpc_client(stats: &Statistics) {
+    updown(stats, "central-controller-reconnect-time-ms");
+}
+
+/// `SystemServerContext::InitStats` count + histogram (the flush
+/// pair lives in `init_cache_flush`, the fetcher family in
+/// `init_http_fetcher`).
+pub fn init_server_context_stats(stats: &Statistics) {
+    var(stats, "statistics_404_count");
+    let histogram = stats.add_histogram("Html Time us Histogram");
+    histogram.set_max_value(2_000_000.0); // 2s in us, as in C++.
+}
+
 /// `UrlAsyncFetcherStats::InitStats("http")`.
 pub fn init_http_fetcher(stats: &Statistics) {
     let histogram = stats.add_histogram("http_fetch_latency_us");
@@ -399,12 +427,19 @@ pub fn init_all(stats: &Statistics) {
     init_purge_context(stats);
     init_redis_cache(stats);
     init_serf_fetcher(stats);
+    init_stdio_fs(stats);
     init_ipro_recorder(stats);
+    init_rate_controller(stats);
+    init_controller_rpc_client(stats);
+    // `kShutdownCount` (registered inline in C++).
+    var(stats, "child_shutdown_count");
     init_cache_flush(stats);
+    init_server_context_stats(stats);
     init_http_fetcher(stats);
     // Known cohorts (see graphs var list).
     init_property_cache_cohort("dom", stats);
     init_property_cache_cohort("beacon_cohort", stats);
+    init_property_cache_cohort("dependencies_cohort", stats);
 }
 
 // -- 27-filter fan-out bodies (RewriteDriver::InitStats order) --
@@ -883,6 +918,35 @@ mod tests {
         }
         // Registry is non-trivially populated.
         assert!(snapshot.len() > 200, "only {} counters", snapshot.len());
+    }
+
+    #[test]
+    fn factory_tail_kinds() {
+        let stats = Statistics::new();
+        init_all(&stats);
+        // Stdio filesystem: one counter, two variables.
+        assert!(stats.get_up_down_counter("stdio_fs_outstanding_ops").is_some());
+        assert!(stats.get_variable("stdio_fs_slow_ops").is_some());
+        assert!(stats.get_variable("stdio_fs_total_ops").is_some());
+        // Rate controller: one counter, two timed variables.
+        assert!(stats.get_up_down_counter("current-fetch-queue-size").is_some());
+        assert!(stats.get_timed_variable("queued-fetch-count").is_some());
+        assert!(stats.get_timed_variable("dropped-fetch-count").is_some());
+        // RPC client reconnect gauge.
+        assert!(stats
+            .get_up_down_counter("central-controller-reconnect-time-ms")
+            .is_some());
+        // Shutdown count and server-context tail.
+        assert!(stats.get_variable("child_shutdown_count").is_some());
+        assert!(stats.get_variable("statistics_404_count").is_some());
+        assert!(stats.get_histogram("Html Time us Histogram").is_some());
+        // All three cohorts carry cache families.
+        for cohort in ["dom", "beacon_cohort", "dependencies_cohort"] {
+            assert!(
+                stat_exists(&stats, &format!("pcache-cohorts-{cohort}_hits")),
+                "missing cohort family: {cohort}"
+            );
+        }
     }
 
     #[test]

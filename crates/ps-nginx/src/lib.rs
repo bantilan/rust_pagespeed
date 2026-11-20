@@ -21,17 +21,29 @@
 //! added here for anything other than NGINX FFI.
 #![deny(unsafe_op_in_unsafe_fn)]
 
+pub mod caching;
 pub mod conf;
 pub mod directives;
+pub mod factory;
+pub mod fetch;
 pub mod fetch_body;
 pub mod filters;
 pub mod gzip_rollback;
+pub mod headers;
 pub mod inplace_url_agreement;
 pub mod log_bridge;
 pub mod message;
 pub mod mock;
 pub mod module;
+pub mod options;
+pub mod request;
+pub mod recording;
 pub mod request_body;
+pub mod resource;
+pub mod send;
+pub mod routing;
+pub mod scheduler;
+pub mod script;
 pub mod self_fetch;
 
 /// Name under which this module registers itself with NGINX.

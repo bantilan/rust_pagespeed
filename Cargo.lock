@@ -905,8 +905,10 @@ dependencies = [
 name = "ps-http"
 version = "0.1.0"
 dependencies = [
+ "crc32fast",
  "criterion",
  "flate2",
+ "miniz_oxide 0.8.9",
  "ps-cache",
  "ps-config",
  "regex",
@@ -939,8 +941,10 @@ dependencies = [
 name = "ps-nginx"
 version = "0.1.0"
 dependencies = [
+ "flate2",
  "libc",
  "ngx",
+ "ps-cache",
  "ps-config",
  "ps-http",
 ]

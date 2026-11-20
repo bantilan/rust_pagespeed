@@ -5,7 +5,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+crc32fast = { version = "1" }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+miniz_oxide = { version = "0.8" }
 ps-cache = { path = "../ps-cache" }
 ps-config = { path = "../ps-config" }
 regex = { version = "1", default-features = false, features = ["std", "unicode"] }

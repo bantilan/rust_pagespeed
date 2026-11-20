@@ -14,25 +14,35 @@
 //! manual filter chaining), so this file drives `ngx::ffi`
 //! directly with per-call `SAFETY:` comments.
 
-use crate::conf::{self, LocConf, MainConf, NgxOptions, SrvConf};
+use crate::conf::{self, FactorySlot, LocConf, MainConf, NgxOptions, SrvConf};
 use crate::directives::{self, Directive};
+use crate::factory::{
+    apply_factory_directive_1, apply_factory_directive_2, DriverFactory, FactoryDirectiveOutcome,
+    PostConfigContext, post_config, remote_config_warning,
+};
 use crate::filters;
+use crate::routing::{self, ContentAction, RoutingInputs, STATIC_ASSET_PREFIX};
+use crate::self_fetch;
 use ngx::ffi::{
-    ngx_array_push, ngx_command_t, ngx_conf_t, ngx_http_conf_ctx_t,
-    ngx_http_core_main_conf_t, ngx_http_handler_pt, ngx_http_module_t, ngx_http_phase_handler_t,
+    ngx_array_push, ngx_command_t, ngx_conf_t, ngx_connection_local_sockaddr, ngx_cycle_t,
+    ngx_http_conf_ctx_t, ngx_http_core_loc_conf_t, ngx_http_core_main_conf_t,
+    ngx_http_core_srv_conf_t, ngx_http_handler_pt, ngx_http_module_t, ngx_http_phase_handler_t,
     ngx_http_phases_NGX_HTTP_POST_READ_PHASE, ngx_http_phases_NGX_HTTP_PRECONTENT_PHASE,
-    ngx_http_request_t, ngx_int_t, ngx_module_t, ngx_pool_cleanup_add, ngx_str_t, ngx_uint_t,
-    NGX_AGAIN, NGX_CONF_TAKE1, NGX_CONF_TAKE2,
-    NGX_CONF_TAKE3, NGX_CONF_TAKE4, NGX_CONF_TAKE5, NGX_DECLINED, NGX_ERROR, NGX_HTTP_LIF_CONF,
-    NGX_HTTP_LOC_CONF, NGX_HTTP_MAIN_CONF, NGX_HTTP_MODULE, NGX_HTTP_SRV_CONF, NGX_OK,
-    nginx_version,
+    ngx_http_request_t, ngx_int_t, ngx_module_t, ngx_pool_cleanup_add, ngx_str_t, ngx_table_elt_t,
+    ngx_uint_t, NGX_AGAIN, NGX_CONF_TAKE1, NGX_CONF_TAKE2, NGX_CONF_TAKE3, NGX_CONF_TAKE4,
+    NGX_CONF_TAKE5, NGX_DECLINED, NGX_DONE, NGX_ERROR, NGX_HTTP_INTERNAL_SERVER_ERROR,
+    NGX_HTTP_LIF_CONF, NGX_HTTP_LOC_CONF, NGX_HTTP_MAIN_CONF, NGX_HTTP_MODULE, NGX_HTTP_SRV_CONF,
+    NGX_OK, nginx_version,
 };
 use ngx::core::{NGX_CONF_ERROR, NGX_CONF_OK};
-use ps_config::options::{apply_nginx_directive, NginxFactoryOptions};
+use ps_config::message_handler::MessageLevel;
+use ps_config::options::{apply_nginx_directive, check_nginx_scope, nginx_config_error, SetOutcome};
+use ps_config::property::strip_mod_pagespeed_prefix;
 use ps_config::scope::Scope;
 use std::ffi::c_void;
 use std::mem;
 use std::ptr;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 // ---------------------------------------------------------------------------
 // Directive table (pure data)
@@ -114,6 +124,140 @@ pub const fn etag_plan(factory_present: bool) -> bool {
 pub const PRECONTENT_FLOOR: u32 = 1013004;
 
 // ---------------------------------------------------------------------------
+// Init-module plan (pure core of `ps_init_module`)
+// ---------------------------------------------------------------------------
+
+/// Reload-guard text (logged, non-fatal: the cycle stays down).
+pub const RELOAD_UNSUPPORTED: &str = "ngx_pagespeed: reload with master_process off is not \
+    supported; optimization will stay off until nginx is restarted";
+
+/// Missing-resolver text (fatal).
+pub const RESOLVER_REQUIRED: &str = "UseNativeFetcher is on, please configure a resolver.";
+
+/// PostConfig error prefix (handler report).
+pub const POST_CONFIG_PREFIX: &str = "ngx_pagespeed is enabled. ";
+
+/// One server's remote-config inputs (warning loop).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteWarningInput {
+    /// Remote-configuration URL (empty when unset).
+    pub url: String,
+    /// Whether an external (non-blocking) cache is configured.
+    pub external_cache: bool,
+}
+
+/// Init-module inputs (`ps_init_module` past the null check).
+pub struct InitModuleInputs<'a> {
+    /// Cycle factory (resolver already recorded).
+    pub factory: &'a DriverFactory,
+    /// Collected server contexts.
+    pub contexts: &'a [PostConfigContext<'a>],
+    /// First cycle in this process.
+    pub initial_cycle: bool,
+    /// Single-process mode (`master_process off`).
+    pub single_process: bool,
+    /// Configuration test (`nginx -t`).
+    pub test_config: bool,
+    /// Remote-config inputs, one per server with a URL.
+    pub remotes: &'a [RemoteWarningInput],
+}
+
+/// Init-module decision.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InitModuleOutcome {
+    /// Reload refused: log and return OK without bringing up.
+    pub reload_unsupported: bool,
+    /// Fatal error text (already prefixed), if the cycle fails.
+    pub error: Option<String>,
+    /// Whether any server context exists (else delete factory).
+    pub has_contexts: bool,
+    /// Whether to init null statistics (no shared-mem stats).
+    pub init_null_stats: bool,
+    /// Whether to run `RootInit` (skipped for config tests).
+    pub root_init: bool,
+    /// Remote-config warnings, one per affected server.
+    pub warnings: Vec<String>,
+}
+
+/// Plans module init (`ps_init_module` past context collection):
+/// the reload guard first, then PostConfig; empty cycles delete
+/// the factory and skip everything else, otherwise the resolver
+/// check and the remote warnings run. Shared-memory statistics
+/// setup and `RootInit` run live in later slices; the flags land
+/// now.
+#[must_use]
+pub fn init_module_plan(inputs: InitModuleInputs) -> InitModuleOutcome {
+    if !inputs.initial_cycle && inputs.single_process {
+        return InitModuleOutcome {
+            reload_unsupported: true,
+            error: None,
+            has_contexts: false,
+            init_null_stats: false,
+            root_init: false,
+            warnings: Vec::new(),
+        };
+    }
+    let post = post_config(inputs.factory, inputs.contexts);
+    if let Some((_, message)) = post.error {
+        return InitModuleOutcome {
+            reload_unsupported: false,
+            error: Some(format!("{POST_CONFIG_PREFIX}{message}")),
+            has_contexts: !inputs.contexts.is_empty(),
+            init_null_stats: false,
+            root_init: false,
+            warnings: Vec::new(),
+        };
+    }
+    // Empty cycles delete the factory and skip the resolver
+    // block, stats init, and `RootInit` entirely.
+    if inputs.contexts.is_empty() {
+        return InitModuleOutcome {
+            reload_unsupported: false,
+            error: None,
+            has_contexts: false,
+            init_null_stats: false,
+            root_init: false,
+            warnings: Vec::new(),
+        };
+    }
+    if !inputs.factory.check_resolver() {
+        return InitModuleOutcome {
+            reload_unsupported: false,
+            error: Some(RESOLVER_REQUIRED.to_string()),
+            has_contexts: !inputs.contexts.is_empty(),
+            init_null_stats: false,
+            root_init: false,
+            warnings: Vec::new(),
+        };
+    }
+    let mut warnings = Vec::new();
+    for remote in inputs.remotes {
+        if let Some(warning) = remote_config_warning(
+            inputs.factory.factory_options.use_native_fetcher,
+            &remote.url,
+            remote.external_cache,
+        ) {
+            warnings.push(warning);
+        }
+    }
+    InitModuleOutcome {
+        reload_unsupported: false,
+        error: None,
+        has_contexts: !inputs.contexts.is_empty(),
+        init_null_stats: !post.wants_global_statistics,
+        root_init: !inputs.test_config,
+        warnings,
+    }
+}
+
+/// Whether child init proceeds (`ps_init_child_process` null
+/// checks: a deleted factory is the port's null factory).
+#[must_use]
+pub const fn child_process_proceeds(factory_deleted: bool) -> bool {
+    !factory_deleted
+}
+
+// ---------------------------------------------------------------------------
 // Phase-engine surgery (pure core over the FFI type)
 // ---------------------------------------------------------------------------
 
@@ -153,18 +297,16 @@ pub fn phase_step_slot(at: usize) -> ngx_http_phase_handler_t {
 ///
 /// Handles the master switch, the gzip toggle reporting, the
 /// directory prep creation half, and the `ClearInheritedScripts`
-/// flag, then delegates option lines to ps-config. Returns the
-/// config error text on failure (null/`NGX_CONF_OK` mapping and
-/// the ownership-fixup half happen in the FFI wrapper).
+/// flag, then delegates option lines to ps-config with the
+/// factory fallback. Returns the config error text on failure
+/// (null/`NGX_CONF_OK` mapping and the ownership-fixup half
+/// happen in the FFI wrapper).
 pub fn apply_directive_line(
     options: &mut Option<NgxOptions>,
-    factory: &mut NginxFactoryOptions,
+    factory: &mut DriverFactory,
     scope: Scope,
     args: &[&str],
 ) -> Result<LineOutcome, String> {
-    if args.len() > directives::MAX_DIRECTIVE_ARGS {
-        return Err("too many arguments".to_string());
-    }
     match directives::classify(args) {
         // The master switch arms the gzip setter AND falls through
         // to option parsing; `gzip` returns after the setter call.
@@ -176,16 +318,8 @@ pub fn apply_directive_line(
             };
             ensure_options(options);
             let slot = options.as_mut().expect("ensured above");
-            apply_nginx_directive(
-                &mut slot.core,
-                factory,
-                &mut slot.system,
-                args[0],
-                &[],
-                scope,
-            )
-            .map_err(|err| err.message)?;
-            Ok(LineOutcome::gzip(gzip))
+            let warnings = apply_option_or_factory(slot, factory, args[0], &[], scope)?;
+            Ok(LineOutcome::with_warnings(gzip, warnings))
         }
         Directive::Gzip(value) => Ok(LineOutcome::gzip(GzipCall::SetForLocation(value))),
         Directive::InvalidGzip => Err("Invalid pagespeed gzip setting".to_string()),
@@ -194,21 +328,14 @@ pub fn apply_directive_line(
             directives::prepare_dir(name, path)?;
             ensure_options(options);
             let slot = options.as_mut().expect("ensured above");
-            apply_nginx_directive(
-                &mut slot.core,
-                factory,
-                &mut slot.system,
-                name,
-                &args[1..],
-                scope,
-            )
-            .map_err(|err| err.message)?;
+            let warnings = apply_option_or_factory(slot, factory, name, &args[1..], scope)?;
             Ok(LineOutcome {
                 gzip: GzipCall::None,
                 dir_prep: Some(DirPrepPath {
                     directive: name.to_string(),
                     path: path.to_string(),
                 }),
+                warnings,
             })
         }
         Directive::Options => {
@@ -217,17 +344,60 @@ pub fn apply_directive_line(
             if args.len() == 1 && args[0].eq_ignore_ascii_case("ClearInheritedScripts") {
                 slot.clear_inherited_scripts = true;
             }
-            apply_nginx_directive(
-                &mut slot.core,
-                factory,
-                &mut slot.system,
-                args[0],
-                &args[1..],
-                scope,
-            )
-            .map_err(|err| err.message)?;
-            Ok(LineOutcome::gzip(GzipCall::None))
+            let warnings = apply_option_or_factory(slot, factory, args[0], &args[1..], scope)?;
+            Ok(LineOutcome::with_warnings(GzipCall::None, warnings))
         }
+    }
+}
+
+/// Runs option dispatch with the factory fallback
+/// (`ParseAndSetOptions` past the script block): the option
+/// table first, the system factory on unknown names (one- and
+/// two-arg lines only). Returns warn-and-ignore texts alongside.
+fn apply_option_or_factory(
+    slot: &mut NgxOptions,
+    factory: &mut DriverFactory,
+    directive: &str,
+    args: &[&str],
+    scope: Scope,
+) -> Result<Vec<String>, String> {
+    match apply_nginx_directive(
+        &mut slot.core,
+        &mut factory.factory_options,
+        &mut slot.system,
+        directive,
+        args,
+        scope,
+    ) {
+        Ok(()) => Ok(Vec::new()),
+        Err(err) if err.outcome == SetOutcome::NameUnknown => {
+            // Gate rejections bypass the factory (the C++ gate
+            // returns before dispatch).
+            if check_nginx_scope(directive, scope).is_err() {
+                return Err(err.message);
+            }
+            let stripped = strip_mod_pagespeed_prefix(directive);
+            let outcome = match args.len() {
+                1 => apply_factory_directive_1(factory, stripped, args[0], scope),
+                2 => apply_factory_directive_2(factory, stripped, args[0], args[1], scope),
+                _ => FactoryDirectiveOutcome::NotFactory,
+            };
+            match outcome {
+                FactoryDirectiveOutcome::Ok => Ok(Vec::new()),
+                FactoryDirectiveOutcome::WarnIgnored(warning) => Ok(vec![warning]),
+                // The wrap joins the raw words, prefix included.
+                FactoryDirectiveOutcome::Invalid(detail) => {
+                    let mut full = String::from(directive);
+                    for arg in args {
+                        full.push(' ');
+                        full.push_str(arg);
+                    }
+                    Err(nginx_config_error(&full, &detail))
+                }
+                FactoryDirectiveOutcome::NotFactory => Err(err.message),
+            }
+        }
+        Err(err) => Err(err.message),
     }
 }
 
@@ -243,15 +413,21 @@ pub struct DirPrepPath {
 /// Outcome of one applied directive line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LineOutcome {
-    /// Gzip-setter call the line requests (Slice 6 executes).
+    /// Gzip-setter call the line requests (Slice 7 executes).
     pub gzip: GzipCall,
     /// Directory needing ownership fixup, if any.
     pub dir_prep: Option<DirPrepPath>,
+    /// Warn-and-ignore texts (the FFI wrapper logs them).
+    pub warnings: Vec<String>,
 }
 
 impl LineOutcome {
     fn gzip(gzip: GzipCall) -> Self {
-        LineOutcome { gzip, dir_prep: None }
+        LineOutcome::with_warnings(gzip, Vec::new())
+    }
+
+    fn with_warnings(gzip: GzipCall, warnings: Vec<String>) -> Self {
+        LineOutcome { gzip, dir_prep: None, warnings }
     }
 }
 
@@ -333,9 +509,9 @@ pub static mut PS_ETAG_MODULE: ngx_http_module_t = ngx_http_module_t {
 /// Main module (`ngx_pagespeed`).
 ///
 /// Lifecycle hooks (`init_module`, `init_process`, `exit_process`)
-/// stay null until Slice 6 wires the driver factory and threading;
-/// until then the module configures, chains filters, and declines
-/// every request (unoptimized passthrough).
+/// run the factory lifecycle; thread startup, fetcher init, and
+/// cache init inside them land with their slices (live-tested in
+/// Slice 7).
 pub static mut NGX_PAGE_SPEED: ngx_module_t = ngx_module_t {
     ctx_index: MODULE_UNSET_INDEX,
     index: MODULE_UNSET_INDEX,
@@ -348,11 +524,11 @@ pub static mut NGX_PAGE_SPEED: ngx_module_t = ngx_module_t {
     commands: &raw mut PS_COMMANDS as *mut ngx_command_t,
     type_: NGX_HTTP_MODULE as ngx_uint_t,
     init_master: None,
-    init_module: None,
-    init_process: None,
+    init_module: Some(init_module),
+    init_process: Some(init_child_process),
     init_thread: None,
     exit_thread: None,
-    exit_process: None,
+    exit_process: Some(exit_child_process),
     exit_master: None,
     spare_hook0: 0,
     spare_hook1: 0,
@@ -445,13 +621,14 @@ pub unsafe fn loc_conf_of(cf: *mut ngx_conf_t) -> *mut LocConf {
 // Hooks (FFI bodies; live-tested in Slice 7)
 // ---------------------------------------------------------------------------
 
-/// Preconfiguration (`ps_pre_init`): arms the gzip setter (Slice 6).
+/// Preconfiguration (`ps_pre_init`): arms the gzip setter.
 ///
 /// # Safety
 ///
 /// `cf` must point at a live `ngx_conf_t`.
 pub unsafe extern "C" fn preconfiguration(_cf: *mut ngx_conf_t) -> ngx_int_t {
-    // Slice 6: `g_gzip_setter.Init(cf)` (config-time gzip scan).
+    // Slice 7: `g_gzip_setter.Init(cf)` scans the live gzip
+    // module's commands (no unit-testable core).
     NGX_OK as ngx_int_t
 }
 
@@ -488,7 +665,10 @@ pub unsafe extern "C" fn postconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
     // SAFETY: caller guarantees a live conf.
     unsafe {
         let cfg = main_conf_of(cf);
-        let plan = postconfiguration_plan(!(*cfg).factory.generation.is_none());
+        // The factory is eagerly owned, so presence is the
+        // deletion latch (`driver_factory != NULL` ⟺
+        // `!factory_deleted`: the deleter sets both together).
+        let plan = postconfiguration_plan(!(*cfg).factory.deleted);
         if !plan.install_filters {
             return NGX_OK as ngx_int_t;
         }
@@ -524,11 +704,290 @@ pub unsafe extern "C" fn etag_postconfiguration(cf: *mut ngx_conf_t) -> ngx_int_
     // SAFETY: caller guarantees a live conf.
     unsafe {
         let cfg = main_conf_of(cf);
-        if !cfg.is_null() && etag_plan(!(*cfg).factory.generation.is_none()) {
+        if !cfg.is_null() && etag_plan(!(*cfg).factory.deleted) {
             filters::etag::init();
         }
     }
     NGX_OK as ngx_int_t
+}
+
+// ---------------------------------------------------------------------------
+// Module hooks (FFI bodies; live-tested in Slice 7)
+// ---------------------------------------------------------------------------
+
+/// Live factory generation (`active_driver_factory`, 0 = none).
+static ACTIVE_GENERATION: AtomicU64 = AtomicU64::new(0);
+/// Generation counter for cycle factories.
+static NEXT_GENERATION: AtomicU64 = AtomicU64::new(1);
+
+/// Assigns the next factory generation (config time).
+fn next_generation() -> u64 {
+    NEXT_GENERATION.fetch_add(1, Ordering::SeqCst)
+}
+
+/// Reads the live factory generation, if any.
+fn active_generation() -> Option<u64> {
+    match ACTIVE_GENERATION.load(Ordering::SeqCst) {
+        0 => None,
+        generation => Some(generation),
+    }
+}
+
+/// Retargets the live factory generation.
+fn set_active_generation(generation: Option<u64>) {
+    ACTIVE_GENERATION.store(generation.unwrap_or(0), Ordering::SeqCst);
+}
+
+/// Deletes the cycle factory against the live active pointer
+/// (`ps_delete_cycle_factory`).
+fn delete_cycle_factory_live(slot: &mut FactorySlot) {
+    let mut active = active_generation();
+    conf::delete_cycle_factory(slot, &mut active);
+    set_active_generation(active);
+}
+
+/// Reads our main conf from a cycle (`ngx_http_cycle_get_module_main_conf`).
+///
+/// # Safety
+///
+/// `cycle` must point at a live `ngx_cycle_t`; the module must be
+/// loaded (index set). Returns null when this cycle carries no
+/// main conf for the module.
+unsafe fn cycle_main_conf_of(cycle: *mut ngx_cycle_t) -> *mut MainConf {
+    use ngx::ffi::ngx_http_module;
+    // SAFETY: caller guarantees a live cycle; both indices were
+    // assigned by nginx at load.
+    unsafe {
+        let http_index = ngx_http_module.index;
+        let ctx = *(*cycle).conf_ctx.add(http_index) as *mut ngx_http_conf_ctx_t;
+        if ctx.is_null() {
+            return ptr::null_mut();
+        }
+        let ours = NGX_PAGE_SPEED.ctx_index;
+        *(*ctx).main_conf.add(ours) as *mut MainConf
+    }
+}
+
+/// Collects core server confs (`cmcf->servers` walk).
+///
+/// # Safety
+///
+/// `cycle` must point at a live `ngx_cycle_t` with its http
+/// config contexts built.
+unsafe fn core_servers(cycle: *mut ngx_cycle_t) -> Vec<*mut ngx_http_core_srv_conf_t> {
+    use ngx::ffi::{ngx_http_core_module, ngx_http_module};
+    // SAFETY: caller guarantees a live configured cycle.
+    unsafe {
+        let http_index = ngx_http_module.index;
+        let ctx = *(*cycle).conf_ctx.add(http_index) as *mut ngx_http_conf_ctx_t;
+        if ctx.is_null() {
+            return Vec::new();
+        }
+        let core_index = ngx_http_core_module.ctx_index;
+        let cmcf = *(*ctx).main_conf.add(core_index) as *mut ngx_http_core_main_conf_t;
+        if cmcf.is_null() {
+            return Vec::new();
+        }
+        let elts = (*cmcf).servers.elts as *mut *mut ngx_http_core_srv_conf_t;
+        if elts.is_null() {
+            return Vec::new();
+        }
+        (0..(*cmcf).servers.nelts).map(|i| *elts.add(i)).collect()
+    }
+}
+
+/// Whether this is the first cycle in the process (`old_cycle`
+/// unset or context-less).
+///
+/// # Safety
+///
+/// `cycle` must point at a live `ngx_cycle_t`.
+unsafe fn is_initial_cycle(cycle: *mut ngx_cycle_t) -> bool {
+    // SAFETY: caller guarantees a live cycle.
+    unsafe {
+        let old = (*cycle).old_cycle;
+        old.is_null() || (*old).conf_ctx.is_null()
+    }
+}
+
+/// Whether nginx runs single-process (`master_process off`).
+fn is_single_process() -> bool {
+    use ngx::ffi::{NGX_PROCESS_SINGLE, ngx_process};
+    // SAFETY: nginx global, always readable.
+    unsafe { ngx_process == NGX_PROCESS_SINGLE as ngx_uint_t }
+}
+
+/// Whether this is a configuration test (`nginx -t`).
+fn is_test_config() -> bool {
+    use ngx::ffi::ngx_test_config;
+    // SAFETY: nginx global, always readable.
+    unsafe { ngx_test_config != 0 }
+}
+
+/// Ignores SIGPIPE (`ps_ignore_sigpipe`).
+fn ignore_sigpipe() {
+    // SAFETY: zeroed `sigaction` with `SIG_IGN`; installing it is
+    // async-signal-safe.
+    unsafe {
+        let mut act: libc::sigaction = std::mem::zeroed();
+        act.sa_sigaction = libc::SIG_IGN;
+        libc::sigemptyset(&mut act.sa_mask);
+        act.sa_flags = 0;
+        libc::sigaction(libc::SIGPIPE, &act, ptr::null_mut());
+    }
+}
+
+/// Module init (`ps_init_module`).
+///
+/// # Safety
+///
+/// `cycle` must point at a live `ngx_cycle_t` past configuration.
+pub unsafe extern "C" fn init_module(cycle: *mut ngx_cycle_t) -> ngx_int_t {
+    // SAFETY: caller guarantees a live configured cycle.
+    unsafe {
+        let cfg = cycle_main_conf_of(cycle);
+        if cfg.is_null() {
+            return NGX_OK as ngx_int_t;
+        }
+        // Collect server contexts, remote inputs, and the first
+        // server's resolver settings (verbatim: `(*cscfp)`).
+        let ours = NGX_PAGE_SPEED.ctx_index;
+        let core = ngx::ffi::ngx_http_core_module.ctx_index;
+        let mut contexts = Vec::new();
+        let mut remotes = Vec::new();
+        let mut first_clcf: Option<*mut ngx_http_core_loc_conf_t> = None;
+        for (index, cscf) in core_servers(cycle).iter().enumerate() {
+            if cscf.is_null() {
+                continue;
+            }
+            let sctx = (**cscf).ctx;
+            if sctx.is_null() {
+                continue;
+            }
+            if index == 0 {
+                let clcf = *(*sctx).loc_conf.add(core) as *mut ngx_http_core_loc_conf_t;
+                if !clcf.is_null() {
+                    first_clcf = Some(clcf);
+                }
+            }
+            let srv = *(*sctx).srv_conf.add(ours) as *mut SrvConf;
+            if srv.is_null() {
+                continue;
+            }
+            if let Some(context) = (*srv).context.as_ref() {
+                remotes.push(RemoteWarningInput {
+                    url: context.options.core.remote_configuration_url(),
+                    external_cache: !context.options.system.memcached_servers.is_empty()
+                        || context.options.system.redis_server.is_some(),
+                });
+                contexts.push(PostConfigContext { options: &context.options });
+            }
+        }
+        // The resolver and the log sink install before the plan
+        // runs: C++ logs through the main conf's handler, the
+        // port through the freshly wired factory handler, so
+        // `LoggingInit` moves ahead of the checks (logging-only
+        // reorder; every decision keeps its order).
+        {
+            let main = &mut *cfg;
+            if let Some(clcf) = first_clcf {
+                main.driver_factory.set_resolver(!(*clcf).resolver.is_null());
+                main.driver_factory
+                    .set_resolver_timeout((*clcf).resolver_timeout as i64);
+            }
+            main.driver_factory.logging_init((*cycle).log, true);
+        }
+        let outcome = {
+            let main = &*cfg;
+            init_module_plan(InitModuleInputs {
+                factory: &main.driver_factory,
+                contexts: &contexts,
+                initial_cycle: is_initial_cycle(cycle),
+                single_process: is_single_process(),
+                test_config: is_test_config(),
+                remotes: &remotes,
+            })
+        };
+        // SAFETY: the cycle log outlives the hook; every emit
+        // below runs through the wired factory handler.
+        if outcome.reload_unsupported {
+            let main = &*cfg;
+            main.driver_factory
+                .message_handler
+                .message(MessageLevel::Error, RELOAD_UNSUPPORTED);
+            return NGX_OK as ngx_int_t;
+        }
+        if let Some(error) = &outcome.error {
+            let main = &*cfg;
+            main.driver_factory
+                .message_handler
+                .message(MessageLevel::Error, error);
+            return NGX_ERROR as ngx_int_t;
+        }
+        if !outcome.has_contexts {
+            let main = &mut *cfg;
+            delete_cycle_factory_live(&mut main.factory);
+            return NGX_OK as ngx_int_t;
+        }
+        ignore_sigpipe();
+        if outcome.init_null_stats {
+            // Slice 7: `ps_stats::init_all` on the null registry.
+        }
+        if outcome.root_init {
+            // Slice 6d: `RootInit` (cache volumes).
+        }
+        set_active_generation((*cfg).factory.generation);
+        for warning in &outcome.warnings {
+            let main = &*cfg;
+            main.driver_factory
+                .message_handler
+                .message(MessageLevel::Warning, warning);
+        }
+        NGX_OK as ngx_int_t
+    }
+}
+
+/// Child-process init (`ps_init_child_process`).
+///
+/// # Safety
+///
+/// `cycle` must point at a live `ngx_cycle_t`.
+pub unsafe extern "C" fn init_child_process(cycle: *mut ngx_cycle_t) -> ngx_int_t {
+    // SAFETY: caller guarantees a live cycle.
+    unsafe {
+        let cfg = cycle_main_conf_of(cycle);
+        if cfg.is_null() {
+            return NGX_OK as ngx_int_t;
+        }
+        let main = &mut *cfg;
+        if !child_process_proceeds(main.factory.deleted) {
+            return NGX_OK as ngx_int_t;
+        }
+        // Slice 6c: `NgxBaseFetch::Initialize(cycle)` fails the
+        // worker when it returns false.
+        main.driver_factory.logging_init((*cycle).log, true);
+        // Slice 6d slots in here: `ChildInit`, then per-server
+        // proxy-fetch factories plus message handlers.
+        main.driver_factory.start_threads();
+        NGX_OK as ngx_int_t
+    }
+}
+
+/// Child-process exit (`ps_exit_child_process`).
+///
+/// # Safety
+///
+/// `cycle` must point at a live `ngx_cycle_t`.
+pub unsafe extern "C" fn exit_child_process(cycle: *mut ngx_cycle_t) {
+    // SAFETY: caller guarantees a live cycle.
+    unsafe {
+        let cfg = cycle_main_conf_of(cycle);
+        if cfg.is_null() || (*cfg).factory.deleted {
+            return;
+        }
+        // Slice 6c: `NgxBaseFetch::Terminate()`.
+        (*cfg).driver_factory.shutdown();
+    }
 }
 
 /// Registers a pool cleanup (`ps_set_conf_cleanup_handler`).
@@ -586,17 +1045,23 @@ unsafe extern "C" fn drop_loc_conf(data: *mut c_void) {
 ///
 /// `cf` must point at a live `ngx_conf_t`.
 pub unsafe extern "C" fn create_main_conf(cf: *mut ngx_conf_t) -> *mut c_void {
-    // Slice 6 owns the factory (`InitApr`, `NgxRewriteDriverFactory`,
-    // `LoggingInit`, `Init`); until then the slot records presence
-    // only. Note the C++ creates the factory eagerly here and
-    // `ps_init_module` retargets the active pointer later.
-    let conf = Box::new(MainConf::default());
-    let raw = Box::into_raw(conf);
-    // SAFETY: live conf; the box outlives the pool via cleanup.
+    // No `InitApr`: Rust has no APR to initialize, and the
+    // filter tables are compile-time (no `Initialize()` step).
+    let mut conf = Box::new(MainConf::default());
+    conf.factory.generation = Some(next_generation());
+    // SAFETY: live conf; the cycle log outlives config parsing;
+    // the box outlives the pool via cleanup.
     unsafe {
+        conf.driver_factory.logging_init((*(*cf).cycle).log, false);
+        if let Some(info) = conf.driver_factory.init() {
+            conf.driver_factory
+                .message_handler
+                .message(MessageLevel::Info, &info);
+        }
+        let raw = Box::into_raw(conf);
         set_cleanup(cf, Some(drop_main_conf), raw as *mut c_void);
+        raw as *mut c_void
     }
-    raw as *mut c_void
 }
 
 /// Creates the server conf (`ps_create_srv_conf`).
@@ -687,12 +1152,7 @@ pub unsafe extern "C" fn merge_loc_conf(
         let parent_opts = (*(parent as *mut LocConf)).options.as_ref();
         let loc = &mut *(child as *mut LocConf);
         let srv = &*srv_conf_of(cf);
-        // `ps_disabled`: no context, or an unplugged one.
-        let disabled = srv
-            .context
-            .as_ref()
-            .is_none_or(|ctx| ctx.options.unplugged());
-        conf::merge_loc_conf(parent_opts, loc, srv_context_options(srv), disabled);
+        conf::merge_loc_conf(parent_opts, loc, srv_context_options(srv), srv.disabled());
         NGX_CONF_OK
     }
 }
@@ -796,15 +1256,17 @@ unsafe fn run_directive_line(
         // server offset); locations use their own slot.
         let outcome = if server_level {
             let srv = &mut *srv_conf_of(cf);
-            apply_directive_line(&mut srv.options, &mut main.factory_options, scope, &refs)
+            apply_directive_line(&mut srv.options, &mut main.driver_factory, scope, &refs)
         } else {
             let loc = &mut *loc_conf_of(cf);
-            apply_directive_line(&mut loc.options, &mut main.factory_options, scope, &refs)
+            apply_directive_line(&mut loc.options, &mut main.driver_factory, scope, &refs)
         };
         match outcome {
             Ok(applied) => {
-                // Slice 6 executes the gzip call.
+                // Slice 7 executes the gzip call (live gzip conf).
                 let _ = applied.gzip;
+                // Slice 7 logs these at warn level (live `ngx_log_t`).
+                let _ = applied.warnings;
                 if let Some(prep) = applied.dir_prep {
                     let ccf = core_conf_of(cf);
                     if let Err(text) = crate::directives::fix_dir_ownership(
@@ -822,7 +1284,7 @@ unsafe fn run_directive_line(
                     }
                 }
                 // `$ps_dollar` when script variables are on.
-                let mode = (*main_conf_of(cf)).factory_options.script_variables;
+                let mode = (*main_conf_of(cf)).driver_factory.factory_options.script_variables;
                 if directives::should_register_dollar(mode)
                     && register_dollar_variable(cf).is_null()
                 {
@@ -903,13 +1365,200 @@ pub unsafe extern "C" fn preaccess_handler(r: *mut ngx_http_request_t) -> ngx_in
     NGX_DECLINED as ngx_int_t
 }
 
-/// Request content stub (Slice 2 installs `ps_content_handler`).
+/// Reads our server conf from a live request (`ps_get_srv_config`).
+///
+/// # Safety
+///
+/// `r` must point at a live request; the module must be loaded
+/// (index set).
+pub unsafe fn srv_conf_of_request(r: *mut ngx_http_request_t) -> *mut SrvConf {
+    // SAFETY: caller guarantees as documented.
+    unsafe {
+        let index = NGX_PAGE_SPEED.ctx_index as usize;
+        *(*r).srv_conf.add(index) as *mut SrvConf
+    }
+}
+
+/// Reads an `ngx_str_t` lossily (`str_to_string_piece` for text we
+/// match on; invalid UTF-8 mangles and fails closed downstream).
+///
+/// # Safety
+///
+/// `s` must point at a readable string.
+unsafe fn ngx_str_text(s: *const ngx_str_t) -> String {
+    // SAFETY: caller guarantees a readable string.
+    unsafe {
+        let bytes = std::slice::from_raw_parts((*s).data, (*s).len);
+        String::from_utf8_lossy(bytes).into_owned()
+    }
+}
+
+/// Reads an optional request header value.
+///
+/// # Safety
+///
+/// `header`, when non-null, must point at a readable table entry.
+unsafe fn header_value(header: *mut ngx_table_elt_t) -> Option<String> {
+    if header.is_null() {
+        return None;
+    }
+    // SAFETY: non-null per the check above.
+    unsafe { Some(ngx_str_text(&raw const (*header).value)) }
+}
+
+/// Whether the worker is shutting down (`ngx_terminate || ngx_exiting`).
+fn shutting_down() -> bool {
+    // SAFETY: nginx-owned globals; read-only here.
+    unsafe { ngx::ffi::ngx_terminate != 0 || ngx::ffi::ngx_exiting != 0 }
+}
+
+/// Whether the request arrived over TLS (`ps_is_https`).
 ///
 /// # Safety
 ///
 /// `r` must point at a live request.
-unsafe fn content_stub(_r: *mut ngx_http_request_t) -> ngx_int_t {
-    NGX_DECLINED as ngx_int_t
+unsafe fn request_is_https(r: *mut ngx_http_request_t) -> bool {
+    // SAFETY: caller guarantees a live request.
+    unsafe { !(*(*r).connection).ssl.is_null() }
+}
+
+/// Reads the local port (`ps_determine_port` sockaddr half).
+///
+/// # Safety
+///
+/// `r` must point at a live request with a connected socket.
+unsafe fn local_port(r: *mut ngx_http_request_t) -> i32 {
+    use ngx::ffi::{AF_INET6, sockaddr_in, sockaddr_in6};
+    // SAFETY: caller guarantees a live connected request; the
+    // family selects the valid sockaddr view.
+    unsafe {
+        let local = (*(*r).connection).local_sockaddr;
+        if (*local).sa_family as u32 == AF_INET6 {
+            u16::from_be((*(local as *mut sockaddr_in6)).sin6_port) as i32
+        } else {
+            u16::from_be((*(local as *mut sockaddr_in)).sin_port) as i32
+        }
+    }
+}
+
+/// Reads the local address text, if the lookup succeeds
+/// (`ngx_connection_local_sockaddr` into a scratch buffer).
+///
+/// # Safety
+///
+/// `connection` must point at a live connection.
+unsafe fn local_address_text(connection: *mut ngx::ffi::ngx_connection_t) -> Vec<u8> {
+    // Scratch capacity: comfortably above `NGX_SOCKADDR_STRLEN`
+    // (55 with IPv6); the callee honors `len` as the bound.
+    let mut buf = vec![0u8; 128];
+    // SAFETY: caller guarantees a live connection; the buffer
+    // outlives the call.
+    unsafe {
+        let mut s = ngx_str_t { len: buf.len(), data: buf.as_mut_ptr() };
+        if ngx_connection_local_sockaddr(connection, &mut s, 0) != NGX_OK as ngx_int_t {
+            return Vec::new();
+        }
+        buf.truncate(s.len);
+        buf
+    }
+}
+
+/// Determines the request port (`ps_determine_port`): the Host
+/// header first, else the connection's local port.
+///
+/// # Safety
+///
+/// `r` must point at a live request with a connected socket.
+unsafe fn request_port(r: *mut ngx_http_request_t) -> i32 {
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        let host = header_value((*r).headers_in.host);
+        let port = routing::parse_host_port(host.as_deref());
+        if port != routing::NO_PORT {
+            return port;
+        }
+        local_port(r)
+    }
+}
+
+/// Determines the request host (`ps_determine_host`): the server
+/// name nginx selected, else the local address text.
+///
+/// # Safety
+///
+/// `r` must point at a live request with a connected socket.
+unsafe fn request_host(r: *mut ngx_http_request_t) -> String {
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        let host = ngx_str_text(&raw const (*r).headers_in.server);
+        if !host.is_empty() {
+            return host;
+        }
+        let bytes = local_address_text((*r).connection);
+        String::from_utf8_lossy(&bytes).into_owned()
+    }
+}
+
+/// Builds the full request URL (`ps_determine_url`).
+///
+/// # Safety
+///
+/// `r` must point at a live request with a connected socket.
+unsafe fn request_url_text(r: *mut ngx_http_request_t) -> String {
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        let https = request_is_https(r);
+        let port = request_port(r);
+        let host = request_host(r);
+        let uri = ngx_str_text(&raw const (*r).unparsed_uri);
+        routing::build_url(https, port, &host, &uri)
+    }
+}
+
+/// Content handler (`ps_content_handler`).
+///
+/// # Safety
+///
+/// `r` must point at a live request with a connected socket.
+pub unsafe extern "C" fn content_handler(r: *mut ngx_http_request_t) -> ngx_int_t {
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        let cfg_s = &*srv_conf_of_request(r);
+        if cfg_s.disabled() {
+            return NGX_DECLINED as ngx_int_t;
+        }
+        let Some(ctx) = cfg_s.context.as_ref() else {
+            return NGX_DECLINED as ngx_int_t;
+        };
+        if !ctx.initialized() {
+            return NGX_DECLINED as ngx_int_t;
+        }
+        ctx.poll_cache_flush();
+        let url_text = request_url_text(r);
+        let agent = header_value((*r).headers_in.user_agent);
+        let method = ngx_str_text(&raw const (*r).method_name);
+        let route = routing::route_request(&RoutingInputs {
+            disabled: false,
+            shutting_down: shutting_down(),
+            err_status: (*r).err_status != 0,
+            url_text: &url_text,
+            subrequest: routing::is_pagespeed_subrequest(agent.as_deref()),
+            // Slice 6 reads this off the live factory.
+            static_asset_prefix: STATIC_ASSET_PREFIX,
+            options: &ctx.options,
+            https: request_is_https(r),
+            method: &method,
+        });
+        match routing::content_decision(false, true, route) {
+            ContentAction::Error => NGX_ERROR as ngx_int_t,
+            ContentAction::Decline => NGX_DECLINED as ngx_int_t,
+            // Later slices install the beacon, simple, and
+            // resource bodies; decline until they land.
+            ContentAction::Beacon | ContentAction::Simple | ContentAction::Resource => {
+                NGX_DECLINED as ngx_int_t
+            }
+        }
+    }
 }
 
 /// Phase step handler (`ps_phase_handler`).
@@ -925,7 +1574,7 @@ pub unsafe extern "C" fn phase_handler(
     // SAFETY: caller guarantees a live request.
     unsafe {
         (*r).write_event_handler = Some(ngx_http_request_empty_handler);
-        let rc = content_stub(r);
+        let rc = content_handler(r);
         if rc == NGX_DECLINED as ngx_int_t {
             (*r).write_event_handler = Some(ngx_http_core_run_phases);
             (*r).phase_handler += 1;
@@ -936,17 +1585,202 @@ pub unsafe extern "C" fn phase_handler(
     NGX_OK as ngx_int_t
 }
 
-/// Post-read self-fetch handler stub (`ps_self_fetch_post_read_handler`).
-///
-/// Slice 2 installs the subrequest check plus relabel/restore;
-/// until then every request declines.
+/// Restores a relabeled connection at request cleanup
+/// (`ps_self_fetch_restore`).
+unsafe extern "C" fn self_fetch_restore(data: *mut c_void) {
+    // SAFETY: `data` is the pool-allocated relabel scratch whose
+    // connection is still live at cleanup time.
+    unsafe {
+        let relabel = &*(data as *const self_fetch::SelfFetchRelabel);
+        self_fetch::restore_self_fetch(&relabel.saved);
+    }
+}
+
+/// Body-discard failure outcome (`ps_discard_request_body` past
+/// the call): the connection leaves keepalive, and lingers closed
+/// when body bytes may remain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DiscardFailureOutcome {
+    /// Keepalive stays on (always false here: failures leave it).
+    pub keepalive: bool,
+    /// Drain leftover bytes before closing.
+    pub lingering_close: bool,
+}
+
+/// Plans a failed body discard: lingering closes when the length
+/// is positive or the body is chunked.
+#[must_use]
+pub const fn discard_failure_outcome(content_length: i64, chunked: bool) -> DiscardFailureOutcome {
+    DiscardFailureOutcome {
+        keepalive: false,
+        lingering_close: content_length > 0 || chunked,
+    }
+}
+
+/// Discards the request body before answering directly
+/// (`ps_discard_request_body`).
 ///
 /// # Safety
 ///
 /// `r` must point at a live request.
+pub unsafe fn discard_request_body(r: *mut ngx_http_request_t) {
+    use ngx::ffi::ngx_http_discard_request_body;
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        if ngx_http_discard_request_body(r) != NGX_OK as ngx_int_t {
+            let outcome = discard_failure_outcome(
+                (*r).headers_in.content_length_n,
+                (*r).headers_in.chunked() != 0,
+            );
+            (*r).set_keepalive(u32::from(outcome.keepalive));
+            (*r).set_lingering_close(u32::from(outcome.lingering_close));
+        }
+    }
+}
+
+/// Reads the attached context, aborting when absent (`CHECK(ctx
+/// != NULL)` shared by the suspend/resume path).
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+unsafe fn require_request_ctx(r: *mut ngx_http_request_t) -> *mut crate::request::RequestCtx {
+    // SAFETY: caller guarantees a live request.
+    let ctx = unsafe { crate::request::get_request_ctx(r) };
+    assert!(!ctx.is_null(), "async wait without a request context");
+    ctx
+}
+
+/// Suspends the request while PageSpeed works
+/// (`ps_async_wait_response`): holds a reference, arms the abort
+/// read handler (client close or HTTP/2 reset cleans up instead
+/// of resuming), idles the write handler, and buffers output.
+///
+/// # Safety
+///
+/// `r` must point at a live request with an attached context.
+pub unsafe extern "C" fn async_wait_response(r: *mut ngx_http_request_t) -> ngx_int_t {
+    use ngx::ffi::{ngx_http_request_empty_handler, ngx_http_test_reading};
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        let _ = require_request_ctx(r);
+        let count = (*r).count();
+        (*r).set_count(count + 1);
+        (*r).read_event_handler = Some(ngx_http_test_reading);
+        (*r).write_event_handler = Some(ngx_http_request_empty_handler);
+        crate::request::set_buffered(r, true);
+        NGX_DONE as ngx_int_t
+    }
+}
+
+/// Resets context state for decline (`ps_decline_request` ctx
+/// half): restores the HTML-rewrite flags and detaches the fetch
+/// bridge. `release_driver` cleans the driver (always `Some` once
+/// Slice 6 owns drivers).
+pub fn decline_request_state(
+    ctx: &mut crate::request::RequestCtx,
+    release_driver: Option<&mut dyn FnMut()>,
+) {
+    if let Some(release) = release_driver {
+        release();
+    }
+    ctx.location_field_set = false;
+    ctx.psol_vary_accept_only = false;
+    ctx.html_rewrite = true;
+    ctx.in_place = false;
+    if let Some(mut fetch) = ctx.base_fetch.take() {
+        fetch.detach();
+    }
+}
+
+/// Advances nginx state past decline: holds a reference, steps to
+/// the next phase, restores the blocking read handler with the
+/// phase runner, and unbuffers.
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+pub unsafe fn advance_past_decline(r: *mut ngx_http_request_t) {
+    use ngx::ffi::{ngx_http_block_reading, ngx_http_core_run_phases};
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        let count = (*r).count();
+        (*r).set_count(count + 1);
+        (*r).phase_handler += 1;
+        (*r).read_event_handler = Some(ngx_http_block_reading);
+        (*r).write_event_handler = Some(ngx_http_core_run_phases);
+        crate::request::set_buffered(r, false);
+    }
+}
+
+/// Releases an in-place lookup back to nginx (`ps_decline_request`).
+/// Plain linkage (like C++): only our own code calls it, and the
+/// driver callback is not FFI-safe.
+///
+/// # Safety
+///
+/// `r` must point at a live request with an attached context.
+pub unsafe fn decline_request(
+    r: *mut ngx_http_request_t,
+    release_driver: Option<&mut dyn FnMut()>,
+) -> ngx_int_t {
+    use ngx::ffi::{ngx_http_core_run_phases, ngx_http_run_posted_requests, NGX_DONE};
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        let ctx = &mut *require_request_ctx(r);
+        decline_request_state(ctx, release_driver);
+        advance_past_decline(r);
+        ngx_http_core_run_phases(r);
+        ngx_http_run_posted_requests((*r).connection);
+        NGX_DONE as ngx_int_t
+    }
+}
+
+/// Post-read self-fetch handler (`ps_self_fetch_post_read_handler`).
+///
+/// Mirrors `plan_self_fetch` branch-for-branch (allocation sits
+/// between the peer check and the relabel, so the plan fn cannot
+/// be called directly).
+///
+/// # Safety
+///
+/// `r` must point at a live request with a connected socket.
 pub unsafe extern "C" fn self_fetch_handler(r: *mut ngx_http_request_t) -> ngx_int_t {
-    let _ = r;
-    NGX_DECLINED as ngx_int_t
+    // SAFETY: caller guarantees a live connected request.
+    unsafe {
+        if r != (*r).main {
+            return NGX_DECLINED as ngx_int_t;
+        }
+        let agent = header_value((*r).headers_in.user_agent);
+        if !routing::is_pagespeed_subrequest(agent.as_deref()) {
+            return NGX_DECLINED as ngx_int_t;
+        }
+        let connection = (*r).connection;
+        // A failed local lookup reads as NULL (a NULL `s` only
+        // refreshes the cached sockaddr); loopback peers still match.
+        let local = if ngx_connection_local_sockaddr(connection, ptr::null_mut(), 0)
+            == NGX_OK as ngx_int_t
+        {
+            (*connection).local_sockaddr as *const libc::sockaddr
+        } else {
+            ptr::null()
+        };
+        let peer = (*connection).sockaddr as *const libc::sockaddr;
+        if !self_fetch::peer_is_this_server(peer, local) {
+            return NGX_DECLINED as ngx_int_t;
+        }
+        let cleanup = ngx_pool_cleanup_add(
+            (*r).pool,
+            mem::size_of::<self_fetch::SelfFetchRelabel>(),
+        );
+        if cleanup.is_null() {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR as ngx_int_t;
+        }
+        let relabel = (*cleanup).data as *mut self_fetch::SelfFetchRelabel;
+        self_fetch::relabel_self_fetch(connection, &mut (*relabel).label, &mut (*relabel).saved);
+        (*cleanup).handler = Some(self_fetch_restore);
+        NGX_DECLINED as ngx_int_t
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1046,6 +1880,132 @@ mod tests {
     }
 
     #[test]
+    fn discard_failure_matrix() {
+        assert_eq!(
+            DiscardFailureOutcome { keepalive: false, lingering_close: true },
+            discard_failure_outcome(10, false)
+        );
+        assert_eq!(
+            DiscardFailureOutcome { keepalive: false, lingering_close: true },
+            discard_failure_outcome(0, true)
+        );
+        assert_eq!(
+            DiscardFailureOutcome { keepalive: false, lingering_close: false },
+            discard_failure_outcome(0, false)
+        );
+        assert_eq!(
+            DiscardFailureOutcome { keepalive: false, lingering_close: false },
+            discard_failure_outcome(-1, false)
+        );
+    }
+
+    /// Simulates module load for ctx-slot tests: nginx assigns the
+    /// context index once at startup; tests pin it to slot zero the
+    /// same way (race-free; no test depends on the unset value).
+    fn simulate_module_load() {
+        use std::sync::Once;
+        static LOAD: Once = Once::new();
+        LOAD.call_once(|| {
+            // SAFETY: single assignment under `Once`.
+            unsafe {
+                NGX_PAGE_SPEED.ctx_index = 0;
+            }
+        });
+    }
+
+    #[test]
+    fn async_wait_arms_and_holds() {
+        use crate::request::RequestCtx;
+        use ngx::ffi::{
+            ngx_http_request_empty_handler, ngx_http_request_t, ngx_http_test_reading,
+        };
+        use std::mem::MaybeUninit;
+        simulate_module_load();
+        // SAFETY: all structures are test-owned; stub addresses are
+        // stored, never called.
+        unsafe {
+            let mut request: ngx_http_request_t = MaybeUninit::zeroed().assume_init();
+            let mut ctx = RequestCtx::for_resource(
+                "http://h/a",
+                true,
+                crate::caching::PreserveCachingHeaders::DontPreserve,
+            );
+            let mut slots = [std::ptr::null_mut()];
+            slots[0] = &mut ctx as *mut _ as *mut _;
+            request.ctx = slots.as_mut_ptr();
+            let rc = async_wait_response(&mut request);
+            assert_eq!(NGX_DONE as ngx_int_t, rc);
+            assert_eq!(1, request.count());
+            assert!(request.buffered() & crate::request::PAGESPEED_BUFFERED != 0);
+            let read = request.read_event_handler.expect("read handler armed");
+            assert_eq!(read as *const (), ngx_http_test_reading as *const ());
+            let write = request.write_event_handler.expect("write handler armed");
+            assert_eq!(write as *const (), ngx_http_request_empty_handler as *const ());
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "async wait without a request context")]
+    fn async_wait_requires_context() {
+        use ngx::ffi::ngx_http_request_t;
+        use std::mem::MaybeUninit;
+        // SAFETY: zeroed request with an empty ctx slot (`CHECK`).
+        // Calls the plain helper: panics cannot unwind through the
+        // `extern "C"` wrapper, so the wrapper itself is untestable
+        // here and aborts live instead, like `CHECK`.
+        simulate_module_load();
+        unsafe {
+            let mut request: ngx_http_request_t = MaybeUninit::zeroed().assume_init();
+            let mut slots = [std::ptr::null_mut()];
+            request.ctx = slots.as_mut_ptr();
+            let _ = require_request_ctx(&mut request);
+        }
+    }
+
+    #[test]
+    fn decline_resets_and_advances() {
+        use crate::caching::PreserveCachingHeaders;
+        use crate::fetch::{BaseFetch, BaseFetchType};
+        use crate::request::RequestCtx;
+        use ngx::ffi::{ngx_http_block_reading, ngx_http_core_run_phases, ngx_http_request_t};
+        use ps_http::response::HttpOptions;
+        use std::mem::MaybeUninit;
+        // Context half: flags restored, fetch detached.
+        let mut ctx = RequestCtx::for_resource("http://h/a", true, PreserveCachingHeaders::DontPreserve);
+        ctx.location_field_set = true;
+        ctx.psol_vary_accept_only = true;
+        ctx.in_place = true;
+        ctx.base_fetch = Some(BaseFetch::new(
+            "http://h/a",
+            BaseFetchType::IproLookup,
+            PreserveCachingHeaders::DontPreserve,
+            HttpOptions::default_for_tests(),
+        ));
+        let mut released = false;
+        decline_request_state(&mut ctx, Some(&mut || released = true));
+        assert!(released);
+        assert!(!ctx.location_field_set);
+        assert!(!ctx.psol_vary_accept_only);
+        assert!(ctx.html_rewrite);
+        assert!(!ctx.in_place);
+        assert!(ctx.base_fetch.is_none());
+        // Nginx half over a fabricated request.
+        unsafe {
+            let mut request: ngx_http_request_t = MaybeUninit::zeroed().assume_init();
+            crate::request::set_buffered(&mut request, true);
+            request.phase_handler = 3;
+            advance_past_decline(&mut request);
+            assert_eq!(1, request.count());
+            assert_eq!(4, request.phase_handler);
+            assert_eq!(0, request.buffered() & crate::request::PAGESPEED_BUFFERED);
+            let read = request.read_event_handler.expect("read handler restored");
+            assert_eq!(read as *const (), ngx_http_block_reading as *const ());
+            let write = request.write_event_handler.expect("write handler restored");
+            assert_eq!(write as *const (), ngx_http_core_run_phases as *const ());
+        }
+    }
+
+    #[test]
     fn phase_insertion_overwrites_and_steps_back() {
         // SAFETY: fabricated engine array; no nginx involved.
         unsafe {
@@ -1108,7 +2068,7 @@ mod tests {
     #[test]
     fn directive_lines_dispatch() {
         use ps_config::options::EnabledState;
-        let mut factory = NginxFactoryOptions::default();
+        let mut factory = DriverFactory::default();
         // Master switch reports the gzip call AND parses the state.
         let mut options: Option<NgxOptions> = None;
         let out = apply_directive_line(&mut options, &mut factory, Scope::Server, &["on"]).unwrap();
@@ -1153,14 +2113,204 @@ mod tests {
         apply_directive_line(&mut options, &mut factory, Scope::Server, &["ClearInheritedScripts"])
             .unwrap();
         assert!(options.as_ref().unwrap().clear_inherited_scripts);
-        // Over-arity rejected.
+        // Over-arity reports the unknown-name error.
         let many = ["a"; 11];
-        assert!(apply_directive_line(&mut options, &mut factory, Scope::Server, &many).is_err());
+        assert_eq!(
+            Err("\"a\" not recognized or too many arguments".to_string()),
+            apply_directive_line(&mut options, &mut factory, Scope::Server, &many)
+        );
+    }
+
+    #[test]
+    fn factory_fallback_lines() {
+        let mut factory = DriverFactory::default();
+        let mut options: Option<NgxOptions> = None;
+        // Top level applies.
+        let out = apply_directive_line(
+            &mut options,
+            &mut factory,
+            Scope::ProcessStrict,
+            &["NumRewriteThreads", "4"],
+        )
+        .unwrap();
+        assert_eq!(4, factory.num_rewrite_threads);
+        assert!(out.warnings.is_empty());
+        // Bad values wrap the full line around the (empty) detail.
+        assert_eq!(
+            Err("\"NumRewriteThreads many\" ".to_string()),
+            apply_directive_line(
+                &mut options,
+                &mut factory,
+                Scope::ProcessStrict,
+                &["NumRewriteThreads", "many"]
+            )
+        );
+        // The hard-error five pass the gate at server scope but
+        // the factory rejects them there; the gate only stops
+        // them at directory scope.
+        assert_eq!(
+            Err("\"NumRewriteThreads 4\" 'NumRewriteThreads' is global and can't be set at this scope.".to_string()),
+            apply_directive_line(
+                &mut options,
+                &mut factory,
+                Scope::Server,
+                &["NumRewriteThreads", "4"]
+            )
+        );
+        assert_eq!(
+            Err("\"NumRewriteThreads\" cannot be set at this scope.".to_string()),
+            apply_directive_line(
+                &mut options,
+                &mut factory,
+                Scope::Directory,
+                &["NumRewriteThreads", "4"]
+            )
+        );
+        // The warn four apply at main, warn-and-ignore at server.
+        apply_directive_line(&mut options, &mut factory, Scope::ProcessStrict, &[
+            "ForceCaching",
+            "on",
+        ])
+        .unwrap();
+        assert!(factory.force_caching);
+        factory.force_caching = false;
+        let out = apply_directive_line(&mut options, &mut factory, Scope::Server, &[
+            "ForceCaching",
+            "on",
+        ])
+        .unwrap();
+        assert!(!factory.force_caching);
+        assert_eq!(
+            vec!["'ForceCaching' is global and is ignored at this scope".to_string()],
+            out.warnings
+        );
+        // ... and the gate rejects them at directory scope.
+        assert_eq!(
+            Err("\"ForceCaching\" cannot be set at this scope.".to_string()),
+            apply_directive_line(&mut options, &mut factory, Scope::Directory, &[
+                "ForceCaching",
+                "on"
+            ])
+        );
+        // Ranged detail, wrapped.
+        assert_eq!(
+            Err(
+                "\"MessageBufferSize -1\" MessageBufferSize must be between 0 and 1073741824."
+                    .to_string()
+            ),
+            apply_directive_line(
+                &mut options,
+                &mut factory,
+                Scope::ProcessStrict,
+                &["MessageBufferSize", "-1"]
+            )
+        );
+        // The `ModPagespeed` prefix strips for matching but survives
+        // in the wrapped line.
+        assert_eq!(
+            Err("\"ModPagespeedNumRewriteThreads many\" ".to_string()),
+            apply_directive_line(
+                &mut options,
+                &mut factory,
+                Scope::ProcessStrict,
+                &["ModPagespeedNumRewriteThreads", "many"]
+            )
+        );
+        // Non-factory unknowns keep their error.
+        assert_eq!(
+            Err("\"Bogus\" not recognized or too many arguments".to_string()),
+            apply_directive_line(&mut options, &mut factory, Scope::Server, &["Bogus", "x"])
+        );
+    }
+
+    #[test]
+    fn init_module_matrix() {
+        use crate::factory::PostConfigContext;
+        let factory = DriverFactory::default();
+        let plain = NgxOptions::new();
+        let contexts = [PostConfigContext { options: &plain }];
+        let plan = |factory: &DriverFactory,
+                    contexts: &[PostConfigContext],
+                    initial_cycle: bool,
+                    single_process: bool,
+                    test_config: bool,
+                    remotes: &[RemoteWarningInput]| {
+            init_module_plan(InitModuleInputs {
+                factory,
+                contexts,
+                initial_cycle,
+                single_process,
+                test_config,
+                remotes,
+            })
+        };
+        // The reload guard fires before everything else.
+        let out = plan(&factory, &contexts, false, true, false, &[]);
+        assert!(out.reload_unsupported);
+        assert_eq!(None, out.error);
+        // PostConfig errors prefix and fail.
+        let out = plan(&factory, &contexts, true, false, false, &[]);
+        assert!(!out.reload_unsupported);
+        assert_eq!(
+            Some("ngx_pagespeed is enabled. FileCachePath must not be empty".to_string()),
+            out.error
+        );
+        assert!(out.has_contexts);
+        // Missing resolver fails only with the native fetcher.
+        let mut cached = NgxOptions::new();
+        cached.system.file_cache_path = "/cache".to_string();
+        let contexts = [PostConfigContext { options: &cached }];
+        let out = plan(&factory, &contexts, true, false, false, &[]);
+        assert_eq!(None, out.error);
+        assert!(out.has_contexts);
+        assert!(out.root_init);
+        let mut native = DriverFactory::default();
+        native.factory_options.use_native_fetcher = true;
+        let out = plan(&native, &contexts, true, false, false, &[]);
+        assert_eq!(Some(RESOLVER_REQUIRED.to_string()), out.error);
+        native.set_resolver(true);
+        let out = plan(&native, &contexts, true, false, true, &[]);
+        assert_eq!(None, out.error);
+        assert!(!out.root_init);
+        // Empty cycles delete the factory and skip the resolver
+        // block, stats init, and `RootInit` entirely (even a
+        // resolver-less native fetcher passes here).
+        native.set_resolver(false);
+        let out = plan(&native, &[], true, false, false, &[]);
+        assert!(!out.has_contexts);
+        assert_eq!(None, out.error);
+        assert!(!out.init_null_stats);
+        assert!(!out.root_init);
+        native.set_resolver(true);
+        // Stats follow PostConfig (`cached` stays borrowed below,
+        // so probe through a clone).
+        let mut probe = cached.clone();
+        probe.system.statistics_enabled = false;
+        let probe_contexts = [PostConfigContext { options: &probe }];
+        let out = plan(&factory, &probe_contexts, true, false, false, &[]);
+        assert!(out.init_null_stats);
+        probe.system.statistics_enabled = true;
+        let probe_contexts = [PostConfigContext { options: &probe }];
+        let out = plan(&factory, &probe_contexts, true, false, false, &[]);
+        assert!(!out.init_null_stats);
+        // Remote warnings, one per affected server.
+        let remotes = [
+            RemoteWarningInput { url: "http://x/rc".to_string(), external_cache: true },
+            RemoteWarningInput { url: String::new(), external_cache: false },
+        ];
+        let out = plan(&native, &contexts, true, false, false, &remotes);
+        assert_eq!(1, out.warnings.len());
+        assert!(out.warnings[0].contains("may stall up to RemoteConfigurationTimeoutMs"));
+        let out = plan(&factory, &contexts, true, false, false, &remotes);
+        assert!(out.warnings.is_empty());
+        // Child init proceeds unless the factory was deleted.
+        assert!(child_process_proceeds(false));
+        assert!(!child_process_proceeds(true));
     }
 
     #[test]
     fn dir_prep_line_reports_path() {
-        let mut factory = NginxFactoryOptions::default();
+        let mut factory = DriverFactory::default();
         let mut options: Option<NgxOptions> = None;
         let base = std::env::temp_dir().join(format!("ps-nginx-line-{}", std::process::id()));
         let path = base.join("cache").to_str().unwrap().to_string();

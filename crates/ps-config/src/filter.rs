@@ -790,6 +790,118 @@ pub fn compound_alias(name: &str) -> Option<&'static [Filter]> {
     }
 }
 
+/// Filters whose options a URL segment may enable
+/// (`ImageRewriteFilter::kRelatedFilters`, enum order).
+pub const IMAGE_RELATED_FILTERS: &[Filter] = &[
+    Filter::ConvertGifToPng,
+    Filter::ConvertJpegToProgressive,
+    Filter::ConvertJpegToWebp,
+    Filter::ConvertToAvif,
+    Filter::ConvertPngToJpeg,
+    Filter::ConvertToWebpAnimated,
+    Filter::ConvertToWebpLossless,
+    Filter::JpegSubsampling,
+    Filter::RecompressJpeg,
+    Filter::RecompressPng,
+    Filter::RecompressWebp,
+    Filter::ResizeImages,
+    Filter::ResizeMobileImages,
+    Filter::StripImageColorProfile,
+    Filter::StripImageMetaData,
+];
+
+/// Options a URL segment may set for images
+/// (`kRelatedOptions` after the `Initialize()` sort).
+pub const IMAGE_RELATED_OPTIONS: &[&str] = &[
+    "ImageJpegNumProgressiveScans",
+    "ImageJpegNumProgressiveScansForSmallScreens",
+    "ImageLimitOptimizedPercent",
+    "ImageLimitResizeAreaPercent",
+    "ImagePreserveURLs",
+    "ImageRecompressionQuality",
+    "JpegQualityForSaveData",
+    "JpegRecompressionQuality",
+    "JpegRecompressionQualityForSmallScreens",
+    "ProgressiveJpegMinBytes",
+    "WebpAnimatedRecompressionQuality",
+    "WebpQualityForSaveData",
+    "WebpRecompressionQuality",
+    "WebpRecompressionQualityForSmallScreens",
+];
+
+/// Filters whose options a CSS URL segment may enable (the
+/// `MergeArrays` union of the image and CSS lists, enum order).
+pub const CSS_RELATED_FILTERS: &[Filter] = &[
+    Filter::ConvertGifToPng,
+    Filter::ConvertJpegToProgressive,
+    Filter::ConvertJpegToWebp,
+    Filter::ConvertToAvif,
+    Filter::ConvertPngToJpeg,
+    Filter::ConvertToWebpAnimated,
+    Filter::ConvertToWebpLossless,
+    Filter::ExtendCacheCss,
+    Filter::ExtendCacheImages,
+    Filter::FallbackRewriteCssUrls,
+    Filter::FlattenCssImports,
+    Filter::InlineImages,
+    Filter::JpegSubsampling,
+    Filter::LeftTrimUrls,
+    Filter::RecompressJpeg,
+    Filter::RecompressPng,
+    Filter::RecompressWebp,
+    Filter::ResizeImages,
+    Filter::ResizeMobileImages,
+    Filter::RewriteDomains,
+    Filter::SpriteImages,
+    Filter::StripImageColorProfile,
+    Filter::StripImageMetaData,
+];
+
+/// Options a CSS URL segment may set (image list plus the CSS
+/// three, after the `Initialize()` sort — note `ImagePreserveURLs`
+/// appears twice, verbatim: the concatenation is not deduplicated).
+pub const CSS_RELATED_OPTIONS: &[&str] = &[
+    "CssImageInlineMaxBytes",
+    "CssPreserveURLs",
+    "ImageJpegNumProgressiveScans",
+    "ImageJpegNumProgressiveScansForSmallScreens",
+    "ImageLimitOptimizedPercent",
+    "ImageLimitResizeAreaPercent",
+    "ImagePreserveURLs",
+    "ImagePreserveURLs",
+    "ImageRecompressionQuality",
+    "JpegQualityForSaveData",
+    "JpegRecompressionQuality",
+    "JpegRecompressionQualityForSmallScreens",
+    "ProgressiveJpegMinBytes",
+    "WebpAnimatedRecompressionQuality",
+    "WebpQualityForSaveData",
+    "WebpRecompressionQuality",
+    "WebpRecompressionQualityForSmallScreens",
+];
+
+/// Empty related sets (base `RewriteFilter` defaults).
+pub const NO_RELATED_FILTERS: &[Filter] = &[];
+/// Empty related options (base `RewriteFilter` default).
+pub const NO_RELATED_OPTIONS: &[&str] = &[];
+
+/// Related sets for a decoding filter id
+/// (`FindFilterForDecoding` + `RelatedFilters`/`RelatedOptions`):
+/// the nine ids registered on every decoding driver
+/// (`SetServerContext`), of which only `cf` and `ic` carry
+/// non-empty tables. Unknown ids yield `None` (no filter).
+#[must_use]
+pub fn related_tables_for_decoding_id(id: &str) -> Option<(&'static [Filter], &'static [&'static str])> {
+    match id {
+        "cf" => Some((CSS_RELATED_FILTERS, CSS_RELATED_OPTIONS)),
+        "ic" => Some((IMAGE_RELATED_FILTERS, IMAGE_RELATED_OPTIONS)),
+        "ce" | "cc" | "jc" | "jm" | "is" | "ls" | "sm" => {
+            Some((NO_RELATED_FILTERS, NO_RELATED_OPTIONS))
+        }
+        _ => None,
+    }
+}
+
 /// A set of filters as a 95-bit bitset (mirrors `FilterSet`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct FilterSet {
@@ -1252,6 +1364,49 @@ mod tests {
         // Boundary sentinels from C++ (`kFirstFilter`, last filter).
         assert_eq!(Filter::ALL[0], Filter::AddBaseTag);
         assert_eq!(Filter::ALL[94], Filter::StripScripts);
+    }
+
+    #[test]
+    fn related_tables_shape() {
+        // Filter lists are enum-ordered (C++ `CHECK`s this).
+        assert_enum_ordered("image", IMAGE_RELATED_FILTERS);
+        assert_enum_ordered("css", CSS_RELATED_FILTERS);
+        assert_eq!(15, IMAGE_RELATED_FILTERS.len());
+        assert_eq!(23, CSS_RELATED_FILTERS.len());
+        // CSS filters are the image+css union.
+        for f in IMAGE_RELATED_FILTERS {
+            assert!(CSS_RELATED_FILTERS.contains(f));
+        }
+        // Option lists are sorted (`Initialize()` sorts after
+        // concatenating), so every listed option is found.
+        assert_eq!(14, IMAGE_RELATED_OPTIONS.len());
+        assert_eq!(17, CSS_RELATED_OPTIONS.len());
+        for name in IMAGE_RELATED_OPTIONS {
+            assert!(IMAGE_RELATED_OPTIONS.binary_search(name).is_ok(), "{name}");
+        }
+        for name in CSS_RELATED_OPTIONS {
+            assert!(CSS_RELATED_OPTIONS.binary_search(name).is_ok(), "{name}");
+        }
+        assert!(IMAGE_RELATED_OPTIONS.binary_search(&"CssInlineMaxBytes").is_err());
+        // Filter lists search correctly.
+        assert!(IMAGE_RELATED_FILTERS.binary_search(&Filter::RecompressJpeg).is_ok());
+        assert!(IMAGE_RELATED_FILTERS.binary_search(&Filter::CombineCss).is_err());
+        // Decoding ids: cf/ic carry tables, the other seven are
+        // registered-but-empty, the rest unknown.
+        let (filters, options) = related_tables_for_decoding_id("cf").unwrap();
+        assert_eq!(23, filters.len());
+        assert_eq!(17, options.len());
+        let (filters, options) = related_tables_for_decoding_id("ic").unwrap();
+        assert_eq!(15, filters.len());
+        assert_eq!(14, options.len());
+        for id in ["ce", "cc", "jc", "jm", "is", "ls", "sm"] {
+            let (filters, options) = related_tables_for_decoding_id(id).unwrap();
+            assert!(filters.is_empty(), "{id}");
+            assert!(options.is_empty(), "{id}");
+        }
+        assert_eq!(None, related_tables_for_decoding_id("if"));
+        assert_eq!(None, related_tables_for_decoding_id("zz"));
+        assert_eq!(None, related_tables_for_decoding_id(""));
     }
 
     /// Ports `CheckFilterSetOrdering`: the audited set arrays must list

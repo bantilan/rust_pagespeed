@@ -13,7 +13,9 @@
 //! (filters-6), and `Signature()`/`OptionSignature` computation.
 #![forbid(unsafe_code)]
 
-use crate::filter::{Filter, FilterState, RewriteLevel, REQUIRES_SCRIPT_EXECUTION};
+use crate::filter::{
+    Filter, FilterState, RewriteLevel, ADD_HEAD_FILTERS, REQUIRES_SCRIPT_EXECUTION,
+};
 use crate::property::{
     lookup_by_id, lookup_by_name, nginx_option_scope, strip_mod_pagespeed_prefix, PropDefault,
     PropKind, Property, PROPERTIES,
@@ -256,6 +258,23 @@ pub fn parse_int64(text: &str) -> Option<i64> {
     text.parse::<i64>().ok()
 }
 
+/// Parses a full-string 32-bit integer (no surrounding whitespace, as with
+/// `StringToInt`).
+#[must_use]
+pub fn parse_int32(text: &str) -> Option<i32> {
+    if text.is_empty() {
+        return None;
+    }
+    // Reject whitespace and partial parses: the whole token must be numeric.
+    if !text
+        .bytes()
+        .all(|b| b.is_ascii_digit() || b == b'+' || b == b'-')
+    {
+        return None;
+    }
+    text.parse::<i32>().ok()
+}
+
 /// Parses comma-separated positive doubles, sorted ascending
 /// (responsive-densities grammar; empty input invalid).
 #[must_use]
@@ -472,15 +491,156 @@ impl Default for NginxFactoryOptions {
 }
 
 /// Nginx system options, stored per options object
-/// (`SystemRewriteOptions` subset: the nginx step ports path-type
-/// system options on demand; the rest land with their owners).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+/// (`SystemRewriteOptions` + `NgxRewriteOptions` subset: the nginx
+/// step ports options on demand; the rest land with their owners).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NginxSystemOptions {
     /// `FileCachePath` (empty when unset). ps-nginx validates
     /// presence at server-merge time.
     pub file_cache_path: String,
     /// `LogDir` (empty when unset).
     pub log_dir: String,
+    /// `StatisticsPath` (empty when unset: no statistics route).
+    pub statistics_path: String,
+    /// `GlobalStatisticsPath` (empty when unset).
+    pub global_statistics_path: String,
+    /// `ConsolePath` (empty when unset).
+    pub console_path: String,
+    /// `MessagesPath` (empty when unset).
+    pub messages_path: String,
+    /// `AdminPath` (empty when unset: no admin route).
+    pub admin_path: String,
+    /// `GlobalAdminPath` (empty when unset).
+    pub global_admin_path: String,
+    /// `PurgeMethod` (empty when unset: no purge route).
+    pub purge_method: String,
+    /// `StatisticsDomains` allow/disallow rules.
+    pub statistics_domains: WildcardGroup,
+    /// `GlobalStatisticsDomains` rules.
+    pub global_statistics_domains: WildcardGroup,
+    /// `MessagesDomains` rules.
+    pub messages_domains: WildcardGroup,
+    /// `ConsoleDomains` rules.
+    pub console_domains: WildcardGroup,
+    /// `AdminDomains` rules.
+    pub admin_domains: WildcardGroup,
+    /// `GlobalAdminDomains` rules.
+    pub global_admin_domains: WildcardGroup,
+    /// `FileCacheInodeLimit` target inode count (0: no limit;
+    /// the factory ctor raises it to 500000).
+    pub file_cache_clean_inode_limit: i64,
+    /// `Statistics` collection switch (default on).
+    pub statistics_enabled: bool,
+    /// `MemcachedServers` cluster (empty when unset).
+    pub memcached_servers: Vec<ExternalServerSpec>,
+    /// `RedisServer` endpoint (`None` when unset).
+    pub redis_server: Option<ExternalServerSpec>,
+}
+
+impl Default for NginxSystemOptions {
+    fn default() -> Self {
+        NginxSystemOptions {
+            file_cache_path: String::new(),
+            log_dir: String::new(),
+            statistics_path: String::new(),
+            global_statistics_path: String::new(),
+            console_path: String::new(),
+            messages_path: String::new(),
+            admin_path: String::new(),
+            global_admin_path: String::new(),
+            purge_method: String::new(),
+            statistics_domains: WildcardGroup::default(),
+            global_statistics_domains: WildcardGroup::default(),
+            messages_domains: WildcardGroup::default(),
+            console_domains: WildcardGroup::default(),
+            admin_domains: WildcardGroup::default(),
+            global_admin_domains: WildcardGroup::default(),
+            file_cache_clean_inode_limit: 0,
+            statistics_enabled: true,
+            memcached_servers: Vec::new(),
+            redis_server: None,
+        }
+    }
+}
+
+/// Default memcached port (`kMemcachedDefaultPort`).
+pub const MEMCACHED_DEFAULT_PORT: u16 = 11211;
+
+/// Default redis port (`kRedisDefaultPort`).
+pub const REDIS_DEFAULT_PORT: u16 = 6379;
+
+/// Parsed external cache server (`ExternalServerSpec`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExternalServerSpec {
+    /// Server host (never empty).
+    pub host: String,
+    /// Server port (1-65535).
+    pub port: u16,
+}
+
+/// Parses `<host>[:<port>]` (`ExternalServerSpec::SetFromString`,
+/// verbatim errors).
+pub fn parse_external_server(text: &str, default_port: u16) -> Result<ExternalServerSpec, String> {
+    let parts: Vec<&str> = text.split(':').collect();
+    if parts.len() != 1 && parts.len() != 2 {
+        return Err("Expected single server in format <host>[:<port>]".to_string());
+    }
+    if parts[0].is_empty() {
+        return Err("Server host cannot be empty".to_string());
+    }
+    let mut port = default_port;
+    if parts.len() == 2 {
+        let parsed = match parse_int32(parts[1]) {
+            Some(parsed) => parsed,
+            None => {
+                return Err(format!(
+                    "Port specified is not a valid number: '{}'",
+                    parts[1]
+                ));
+            }
+        };
+        if !(1..=65535).contains(&parsed) {
+            return Err(format!("Invalid port: {parsed}"));
+        }
+        port = parsed as u16;
+    }
+    Ok(ExternalServerSpec {
+        host: parts[0].to_string(),
+        port,
+    })
+}
+
+/// Parses a comma-separated server list
+/// (`ExternalClusterSpec::SetFromString`, verbatim errors).
+pub fn parse_external_cluster(
+    text: &str,
+    default_port: u16,
+) -> Result<Vec<ExternalServerSpec>, String> {
+    if text.is_empty() {
+        return Ok(Vec::new());
+    }
+    let parts: Vec<&str> = text.split(',').collect();
+    let mut detail = String::new();
+    let mut servers = Vec::with_capacity(parts.len());
+    for part in &parts {
+        match parse_external_server(part, default_port) {
+            Ok(server) => servers.push(server),
+            Err(current) => {
+                if parts.len() > 1 {
+                    if !detail.is_empty() {
+                        detail.push_str(". ");
+                    }
+                    detail.push_str(&format!("In server '{part}': "));
+                }
+                detail.push_str(&current);
+            }
+        }
+    }
+    if detail.is_empty() {
+        Ok(servers)
+    } else {
+        Err(detail)
+    }
 }
 
 /// Query-param scan outcome (`RewriteQuery::Status`).
@@ -502,6 +662,9 @@ pub enum QueryStatus {
 pub struct RewriteOptions {
     filters: FilterState,
     enabled_state: EnabledState,
+    /// `was_set` bit for the master switch (`enabled_` is an
+    /// `Option` in C++, so merge propagates it).
+    enabled_set: bool,
     values: HashMap<&'static str, Value>,
     allow_resources: WildcardGroup,
     retain_comments: WildcardGroup,
@@ -557,6 +720,7 @@ impl RewriteOptions {
     /// Sets the master enabled state (`set_enabled`).
     pub fn set_enabled_state(&mut self, state: EnabledState) {
         self.enabled_state = state;
+        self.enabled_set = true;
         self.modified = true;
     }
 
@@ -677,8 +841,12 @@ impl RewriteOptions {
             }
             // "e" EnableRewriting.
             "e" => {
-                if let Some(Value::Enabled(state)) = self.values.get("e") {
-                    self.enabled_state = *state;
+                let state = match self.values.get("e") {
+                    Some(Value::Enabled(state)) => Some(*state),
+                    _ => None,
+                };
+                if let Some(state) = state {
+                    self.set_enabled_state(state);
                 }
             }
             // Preserve-urls flags.
@@ -1020,6 +1188,18 @@ impl RewriteOptions {
             }
         }
 
+        // Master switch (`Option::MergeHelper`, verbatim): src wins
+        // when set, and an unset self takes src's value (default
+        // transfer). The twin values write fires only when src is
+        // set, so merging two unset switches leaves `values["e"]`
+        // absent exactly like the C++ `was_set_` bit.
+        if src.enabled_set || !self.enabled_set {
+            self.enabled_state = src.enabled_state;
+            self.enabled_set = src.enabled_set;
+            if src.enabled_set {
+                self.values.insert("e", Value::Enabled(src.enabled_state));
+            }
+        }
         // Scalars override when set in src.
         for (id, value) in &src.values {
             self.values.insert(id, value.clone());
@@ -1140,6 +1320,21 @@ impl RewriteOptions {
             self.filters.disable(*f);
         }
         self.modified = true;
+    }
+
+    /// Disables filters that cannot run on Ajax responses
+    /// (`DisableFiltersThatCantRunInAjax`): script-execution
+    /// filters, head-element filters, critical-CSS selection, and
+    /// URL modification (relative URLs may break).
+    pub fn disable_filters_that_cant_run_in_ajax(&mut self) {
+        self.disable_filters_requiring_script_execution();
+        for f in ADD_HEAD_FILTERS {
+            self.filters.disable(*f);
+        }
+        self.filters.disable(Filter::PrioritizeCriticalCss);
+        self.set_css_preserve_urls(true);
+        self.set_image_preserve_urls(true);
+        self.set_js_preserve_urls(true);
     }
 
     /// Scans one query/header name+value pair (`RewriteQuery::ScanNameValue`).
@@ -1436,6 +1631,137 @@ impl RewriteOptions {
             self.get_by_name("EnableCachePurge"),
             Some(Value::Bool(true))
         )
+    }
+
+    /// Reads the flush-following flag (`follow_flushes`, default true).
+    #[must_use]
+    pub fn follow_flushes(&self) -> bool {
+        !matches!(self.get_by_name("FollowFlushes"), Some(Value::Bool(false)))
+    }
+
+    /// Reads the forwarded-proto flag (`respect_x_forwarded_proto`).
+    #[must_use]
+    pub fn respect_x_forwarded_proto(&self) -> bool {
+        matches!(
+            self.get_by_name("RespectXForwardedProto"),
+            Some(Value::Bool(true))
+        )
+    }
+
+    /// Reads the remote-configuration URL (`remote_configuration_url`,
+    /// empty when unset).
+    #[must_use]
+    pub fn remote_configuration_url(&self) -> String {
+        match self.get_by_name("RemoteConfigurationUrl") {
+            Some(Value::Str(url)) => url,
+            _ => String::new(),
+        }
+    }
+
+    /// Reads the remote-configuration timeout
+    /// (`remote_configuration_timeout_ms`, ms).
+    #[must_use]
+    pub fn remote_configuration_timeout_ms(&self) -> i64 {
+        match self.get_by_name("RemoteConfigurationTimeoutMs") {
+            Some(Value::Int(ms)) => ms,
+            _ => 1000,
+        }
+    }
+
+    /// Reads the experiment-cookie lifetime
+    /// (`experiment_cookie_duration_ms`, ms).
+    #[must_use]
+    pub fn experiment_cookie_duration_ms(&self) -> i64 {
+        match self.get_by_name("ExperimentCookieDurationMs") {
+            Some(Value::Int(ms)) => ms,
+            _ => 604800000,
+        }
+    }
+
+    /// Effective in-place `s-maxage` (`EffectiveInPlaceSMaxAgeSec`):
+    /// the configured seconds when caching headers are modified,
+    /// else -1 (disabled).
+    #[must_use]
+    pub fn effective_in_place_s_max_age_sec(&self) -> i32 {
+        if !self.modify_caching_headers() {
+            return -1;
+        }
+        self.in_place_s_maxage_sec() as i32
+    }
+
+    /// Reads the option-override token (`request_option_override`,
+    /// empty when unset).
+    #[must_use]
+    pub fn request_option_override(&self) -> String {
+        match self.get_by_name("RequestOptionOverride") {
+            Some(Value::Str(token)) => token,
+            _ => String::new(),
+        }
+    }
+
+    /// Whether cookies may carry options
+    /// (`allow_options_to_be_set_by_cookies`, default true).
+    #[must_use]
+    pub fn allow_options_to_be_set_by_cookies(&self) -> bool {
+        !matches!(
+            self.get_by_name("AllowOptionsToBeSetByCookies"),
+            Some(Value::Bool(false))
+        )
+    }
+
+    /// Whether an experiment is running (`running_experiment()`).
+    #[must_use]
+    pub fn running_experiment(&self) -> bool {
+        matches!(self.get_by_name("RunExperiment"), Some(Value::Bool(true)))
+    }
+
+    /// Whether to enroll despite request options (`enroll_experiment()`:
+    /// the enrolled id differs from "force no experiment").
+    #[must_use]
+    pub fn enroll_experiment(&self) -> bool {
+        !matches!(self.get_by_name("EnrollExperiment"), Some(Value::Int(-2)))
+    }
+
+    /// Reads the rebeaconing key (`downstream_cache_rebeaconing_key`,
+    /// empty when unset).
+    #[must_use]
+    pub fn downstream_cache_rebeaconing_key(&self) -> String {
+        match self.get_by_name("DownstreamCacheRebeaconingKey") {
+            Some(Value::Str(key)) => key,
+            _ => String::new(),
+        }
+    }
+
+    /// Whether downstream cache integration is configured
+    /// (`IsDownstreamCacheIntegrationEnabled`: a purge location
+    /// prefix is set).
+    #[must_use]
+    pub fn is_downstream_cache_integration_enabled(&self) -> bool {
+        !self.downstream_cache_purge_location_prefix().is_empty()
+    }
+
+    /// Whether a key matches the configured rebeaconing key
+    /// (`MatchesDownstreamCacheRebeaconingKey`): configured and
+    /// case-insensitively equal.
+    #[must_use]
+    pub fn matches_downstream_cache_rebeaconing_key(&self, key: &str) -> bool {
+        let configured = self.downstream_cache_rebeaconing_key();
+        !configured.is_empty() && key.eq_ignore_ascii_case(&configured)
+    }
+
+    /// Reads the configured beacon endpoints (`beacon_url()`), if
+    /// the directive was explicitly set. The host default (nginx:
+    /// `/ngx_pagespeed_beacon`) is factory behavior, so unset
+    /// reads back `None` and the caller supplies it.
+    #[must_use]
+    pub fn beacon_url(&self) -> Option<BeaconUrl> {
+        if !self.was_set("bu") {
+            return None;
+        }
+        match self.get_by_id("bu") {
+            Some(Value::Composite { text, .. }) => BeaconUrl::parse(&text),
+            _ => None,
+        }
     }
 
     /// Reads the vary flag (`respect_vary`).
@@ -2843,6 +3169,42 @@ impl RewriteOptions {
         self.modified = true;
     }
 
+    /// Sets the default rewrite level (`SetDefaultRewriteLevel`):
+    /// applies only when no level was explicitly set, and never
+    /// marks the options modified.
+    pub fn set_default_rewrite_level(&mut self, level: RewriteLevel) {
+        if !self.values.contains_key("l") {
+            self.filters.set_level(level);
+        }
+    }
+
+    /// Caps request-built size thresholds at configured values
+    /// (`LimitSizeThresholdsTo`): a set threshold above the
+    /// ceiling (or negative, or zero where zero means unlimited)
+    /// takes the ceiling's value.
+    pub fn limit_size_thresholds_to(&mut self, ceiling: &RewriteOptions) {
+        for (id, zero_is_unlimited) in [
+            ("ii", false),
+            ("cii", false),
+            ("ci", false),
+            ("ji", false),
+            ("gfci", false),
+            ("cf", true),
+        ] {
+            let mine = match self.values.get(id) {
+                Some(Value::Int(value)) => *value,
+                _ => continue,
+            };
+            let cap = match ceiling.get_by_id(id) {
+                Some(Value::Int(value)) => value,
+                _ => continue,
+            };
+            if mine > cap || mine < 0 || (zero_is_unlimited && mine == 0 && cap > 0) {
+                self.values.insert(id, Value::Int(cap));
+            }
+        }
+    }
+
     /// Sets the css-preserve-urls flag.
     pub fn set_css_preserve_urls(&mut self, value: bool) {
         self.values.insert("cpu", Value::Bool(value));
@@ -3286,7 +3648,8 @@ fn spec_has_alternate_origin(spec: &str) -> bool {
 }
 
 /// Strips excess URL quotes (`TrimUrlQuotes`).
-fn trim_url_quotes(value: &str) -> &str {
+#[must_use]
+pub fn trim_url_quotes(value: &str) -> &str {
     value.trim().trim_matches('"').trim_matches('\'')
 }
 
@@ -3383,6 +3746,89 @@ fn canonical_categories(set: &HashSet<Category>) -> String {
 /// System/factory `ParseAndSetOption{1,2}` fallbacks (FileCachePath,
 /// MemcachedServers, …) and script-variable compilation land with the
 /// system-options and nginx steps; such names report `NameUnknown` here.
+///
+/// Enforces the nginx scope gate for names dispatched outside the
+/// option parser (factory directives): strips any `ModPagespeed`
+/// prefix, then the name must resolve at or below the scope.
+// NOTE: `apply_nginx_directive` shares this pre-check verbatim.
+pub fn check_nginx_scope(directive: &str, scope: Scope) -> Result<(), SetError> {
+    let directive = strip_mod_pagespeed_prefix(directive);
+    if nginx_option_scope(directive) > scope {
+        return Err(SetError {
+            outcome: SetOutcome::NameUnknown,
+            message: nginx_config_error(directive, "cannot be set at this scope."),
+        });
+    }
+    Ok(())
+}
+
+/// Formats an nginx config error (`ps_error_string_for_option`):
+/// the directive (or full line) in double quotes, a space, then
+/// the detail. An empty detail keeps its trailing space, as in
+/// C++ (bool/int parse failures leave `msg` empty).
+#[must_use]
+pub fn nginx_config_error(quoted: &str, detail: &str) -> String {
+    format!("\"{quoted}\" {detail}")
+}
+
+/// Applies the result-switch formats to an option-table error:
+/// unknown names quote the directive, bad values wrap the full
+/// line around the table's own detail.
+fn wrap_nginx_table_error(directive: &str, full_line: &str, err: &mut SetError) {
+    if err.outcome == SetOutcome::NameUnknown {
+        err.message = nginx_config_error(directive, "not recognized or too many arguments");
+    } else {
+        let detail = std::mem::take(&mut err.message);
+        err.message = nginx_config_error(full_line, &detail);
+    }
+}
+
+/// Admin-path storage slot (`NgxRewriteOptions` string properties),
+/// matched case-insensitively like any property parse.
+fn admin_path_slot<'a>(
+    system: &'a mut NginxSystemOptions,
+    directive: &str,
+) -> Option<&'a mut String> {
+    if directive.eq_ignore_ascii_case("StatisticsPath") {
+        Some(&mut system.statistics_path)
+    } else if directive.eq_ignore_ascii_case("GlobalStatisticsPath") {
+        Some(&mut system.global_statistics_path)
+    } else if directive.eq_ignore_ascii_case("ConsolePath") {
+        Some(&mut system.console_path)
+    } else if directive.eq_ignore_ascii_case("MessagesPath") {
+        Some(&mut system.messages_path)
+    } else if directive.eq_ignore_ascii_case("AdminPath") {
+        Some(&mut system.admin_path)
+    } else if directive.eq_ignore_ascii_case("GlobalAdminPath") {
+        Some(&mut system.global_admin_path)
+    } else {
+        None
+    }
+}
+
+/// Admin-domain group slot (`SystemRewriteOptions` wildcard groups),
+/// matched case-insensitively.
+fn admin_domain_slot<'a>(
+    system: &'a mut NginxSystemOptions,
+    directive: &str,
+) -> Option<&'a mut WildcardGroup> {
+    if directive.eq_ignore_ascii_case("StatisticsDomains") {
+        Some(&mut system.statistics_domains)
+    } else if directive.eq_ignore_ascii_case("GlobalStatisticsDomains") {
+        Some(&mut system.global_statistics_domains)
+    } else if directive.eq_ignore_ascii_case("MessagesDomains") {
+        Some(&mut system.messages_domains)
+    } else if directive.eq_ignore_ascii_case("ConsoleDomains") {
+        Some(&mut system.console_domains)
+    } else if directive.eq_ignore_ascii_case("AdminDomains") {
+        Some(&mut system.admin_domains)
+    } else if directive.eq_ignore_ascii_case("GlobalAdminDomains") {
+        Some(&mut system.global_admin_domains)
+    } else {
+        None
+    }
+}
+
 pub fn apply_nginx_directive(
     options: &mut RewriteOptions,
     factory: &mut NginxFactoryOptions,
@@ -3391,17 +3837,25 @@ pub fn apply_nginx_directive(
     args: &[&str],
     scope: Scope,
 ) -> Result<(), SetError> {
-    if args.len() > 4 {
-        return Err(SetError {
-            outcome: SetOutcome::NameUnknown,
-            message: format!("pagespeed {directive}: not recognized or too many arguments"),
-        });
-    }
+    // The gate runs before the arity switch in C++, so an
+    // over-long mis-scoped line reports the scope error.
+    check_nginx_scope(directive, scope)?;
+    // The strip mutates a copy: the gate and the dispatch match
+    // the stripped name, but the invalid-wrap joins the raw
+    // words (a `ModPagespeed` prefix survives in it).
+    let raw_directive = directive;
     let directive = strip_mod_pagespeed_prefix(directive);
-    if nginx_option_scope(directive) > scope {
+    let full_line = if args.is_empty() {
+        raw_directive.to_string()
+    } else {
+        format!("{raw_directive} {}", args.join(" "))
+    };
+    if args.len() > 4 {
+        // C++ `CHECK`-aborts past five words; the port reports
+        // the `n_args == 5` unknown-name error instead.
         return Err(SetError {
             outcome: SetOutcome::NameUnknown,
-            message: format!("pagespeed {directive}: cannot be set at this scope."),
+            message: nginx_config_error(directive, "not recognized or too many arguments"),
         });
     }
     // One-word lines: master switch, ClearInheritedScripts, or gzip state.
@@ -3425,7 +3879,7 @@ pub fn apply_nginx_directive(
             }
             None => Err(SetError {
                 outcome: SetOutcome::NameUnknown,
-                message: format!("pagespeed {directive}: not recognized or too many arguments"),
+                message: nginx_config_error(directive, "not recognized or too many arguments"),
             }),
         };
     }
@@ -3437,12 +3891,13 @@ pub fn apply_nginx_directive(
             // `NgxRewriteOptions::ParseAndSetOptionFromName1`: FileCachePath
             // needs the leading slash (ps-nginx runs the directory prep
             // first, so this is near-dead defense); LogDir stores as-is.
-            // Error text is verbatim (`ps_error_string_for_option`).
+            // The detail is verbatim; the switch wraps it with the
+            // full line.
             if directive.eq_ignore_ascii_case("FileCachePath") {
                 if !args[0].starts_with('/') {
                     return Err(SetError {
                         outcome: SetOutcome::ValueInvalid,
-                        message: "\"FileCachePath\" must start with a slash".to_string(),
+                        message: nginx_config_error(&full_line, "must start with a slash"),
                     });
                 }
                 system.file_cache_path = args[0].to_string();
@@ -3452,31 +3907,99 @@ pub fn apply_nginx_directive(
                 system.log_dir = args[0].to_string();
                 return Ok(());
             }
+            // The six admin paths (`NgxRewriteOptions::AddProperties`)
+            // plus `PurgeMethod` (`SystemRewriteOptions`): stored
+            // verbatim, like any string property (parsing is
+            // case-insensitive; only the scope gate is exact-case).
+            if let Some(slot) = admin_path_slot(system, directive) {
+                *slot = args[0].to_string();
+                return Ok(());
+            }
+            if directive.eq_ignore_ascii_case("PurgeMethod") {
+                system.purge_method = args[0].to_string();
+                return Ok(());
+            }
             if directive.eq_ignore_ascii_case("UseNativeFetcher") {
                 return match parse_bool(args[0]) {
                     Some(value) => {
                         factory.use_native_fetcher = value;
                         Ok(())
                     }
+                    // The helper failure leaves `msg` empty, so the
+                    // switch emits the quoted line plus a bare space.
                     None => Err(SetError {
                         outcome: SetOutcome::ValueInvalid,
-                        message: format!("pagespeed UseNativeFetcher {}: invalid value", args[0]),
+                        message: nginx_config_error(&full_line, ""),
                     }),
                 };
             }
             if directive.eq_ignore_ascii_case("NativeFetcherMaxKeepaliveRequests") {
-                return match args[0].parse::<i64>() {
-                    Ok(n) if n > 0 => {
-                        factory.native_fetcher_max_keepalive = n;
+                // `StringToInt` plus a positive check; the failure
+                // detail is empty, as above.
+                return match parse_int32(args[0]) {
+                    Some(n) if n > 0 => {
+                        factory.native_fetcher_max_keepalive = i64::from(n);
                         Ok(())
                     }
                     _ => Err(SetError {
                         outcome: SetOutcome::ValueInvalid,
-                        message: format!(
-                            "pagespeed NativeFetcherMaxKeepaliveRequests {}: \
-                             must be a positive integer",
-                            args[0]
-                        ),
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
+            // `Statistics` (`SystemRewriteOptions`, server scope,
+            // default on).
+            if directive.eq_ignore_ascii_case("Statistics") {
+                return match parse_bool(args[0]) {
+                    Some(value) => {
+                        system.statistics_enabled = value;
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
+            // `MemcachedServers` / `RedisServer`
+            // (`SystemRewriteOptions`, server scope): validated
+            // specs, verbatim details wrapped with the full line.
+            if directive.eq_ignore_ascii_case("MemcachedServers") {
+                return match parse_external_cluster(args[0], MEMCACHED_DEFAULT_PORT) {
+                    Ok(servers) => {
+                        system.memcached_servers = servers;
+                        Ok(())
+                    }
+                    Err(detail) => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, &detail),
+                    }),
+                };
+            }
+            if directive.eq_ignore_ascii_case("RedisServer") {
+                return match parse_external_server(args[0], REDIS_DEFAULT_PORT) {
+                    Ok(server) => {
+                        system.redis_server = Some(server);
+                        Ok(())
+                    }
+                    Err(detail) => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, &detail),
+                    }),
+                };
+            }
+            // `FileCacheInodeLimit` (`SystemRewriteOptions`, server
+            // scope, default 0): the factory ctor raises it to
+            // 500000; the config line stores a 64-bit value.
+            if directive.eq_ignore_ascii_case("FileCacheInodeLimit") {
+                return match parse_int64(args[0]) {
+                    Some(n) => {
+                        system.file_cache_clean_inode_limit = n;
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
                     }),
                 };
             }
@@ -3514,41 +4037,48 @@ pub fn apply_nginx_directive(
                 .parse_and_set_1(directive, args[0], Scope::ProcessStrict)
                 .map_err(|mut err| {
                     // Core scope checks use process scope here (nginx already
-                    // applied its own gate); unknown names keep C++ text.
-                    if err.outcome == SetOutcome::NameUnknown {
-                        err.message = format!(
-                            "pagespeed {directive}: not recognized or too many \
-                             arguments"
-                        );
-                    }
+                    // applied its own gate).
+                    wrap_nginx_table_error(directive, &full_line, &mut err);
                     err
                 })
         }
-        2 => options
-            .parse_and_set_2(directive, args[0], args[1])
-            .map_err(|mut err| {
-                if err.outcome == SetOutcome::NameUnknown {
-                    err.message = format!(
-                        "pagespeed {directive}: not recognized or too many \
-                         arguments"
-                    );
+        2 => {
+            // Admin-domain lists (`SystemRewriteOptions::
+            // ParseAndSetOptionFromName2`): `allow`/`disallow` plus a
+            // pattern, with verbatim error text.
+            if let Some(group) = admin_domain_slot(system, directive) {
+                if args[0].eq_ignore_ascii_case("allow") {
+                    group.allow(args[1]);
+                    return Ok(());
                 }
-                err
-            }),
+                if args[0].eq_ignore_ascii_case("disallow") {
+                    group.disallow(args[1]);
+                    return Ok(());
+                }
+                return Err(SetError {
+                    outcome: SetOutcome::ValueInvalid,
+                    message: nginx_config_error(
+                        &full_line,
+                        &format!("expected 'allow' or 'disallow', got '{}'", args[0]),
+                    ),
+                });
+            }
+            options
+                .parse_and_set_2(directive, args[0], args[1])
+                .map_err(|mut err| {
+                    wrap_nginx_table_error(directive, &full_line, &mut err);
+                    err
+                })
+        }
         3 => options
             .parse_and_set_3(directive, args[0], args[1], args[2])
             .map_err(|mut err| {
-                if err.outcome == SetOutcome::NameUnknown {
-                    err.message = format!(
-                        "pagespeed {directive}: not recognized or too many \
-                         arguments"
-                    );
-                }
+                wrap_nginx_table_error(directive, &full_line, &mut err);
                 err
             }),
         _ => Err(SetError {
             outcome: SetOutcome::NameUnknown,
-            message: format!("pagespeed {directive}: not recognized or too many arguments"),
+            message: nginx_config_error(directive, "not recognized or too many arguments"),
         }),
     }
 }
@@ -3594,6 +4124,13 @@ mod tests {
         assert_eq!(parse_int64(""), None);
         assert_eq!(parse_int64("12x"), None);
         assert_eq!(parse_int64(" 12"), None);
+        assert_eq!(parse_int32("8080"), Some(8080));
+        assert_eq!(parse_int32("-1"), Some(-1));
+        assert_eq!(parse_int32("+80"), Some(80));
+        assert_eq!(parse_int32(""), None);
+        assert_eq!(parse_int32("80 "), None);
+        assert_eq!(parse_int32("0x10"), None);
+        assert_eq!(parse_int32("99999999999"), None);
         assert_eq!(EnabledState::parse("standby"), Some(EnabledState::Standby));
         assert_eq!(
             EnabledState::parse("unplugged"),
@@ -3836,7 +4373,7 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err.outcome, SetOutcome::NameUnknown);
-        assert!(err.message.contains("cannot be set at this scope"));
+        assert_eq!(err.message, "\"FetchProxy\" cannot be set at this scope.");
         // Core option through nginx dispatch.
         apply_nginx_directive(
             &mut options,
@@ -3902,6 +4439,7 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err.outcome, SetOutcome::NameUnknown);
+        assert_eq!(err.message, "\"Bogus\" not recognized or too many arguments");
         let err = apply_nginx_directive(
             &mut options,
             &mut factory, &mut system,
@@ -3911,6 +4449,231 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err.outcome, SetOutcome::NameUnknown);
+        assert_eq!(
+            err.message,
+            "\"RewriteLevel\" not recognized or too many arguments"
+        );
+        // The gate runs before the arity check.
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "FetchProxy",
+            &["a", "b", "c", "d", "e"],
+            Scope::Directory,
+        )
+        .unwrap_err();
+        assert_eq!(err.message, "\"FetchProxy\" cannot be set at this scope.");
+    }
+
+    #[test]
+    fn nginx_switch_formats() {
+        let mut options = RewriteOptions::new();
+        let mut factory = NginxFactoryOptions::default();
+        let mut system = NginxSystemOptions::default();
+        // Empty-detail failures quote the full line plus a bare space.
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "UseNativeFetcher",
+            &["maybe"],
+            Scope::ProcessStrict,
+        )
+        .unwrap_err();
+        assert_eq!(err.outcome, SetOutcome::ValueInvalid);
+        assert_eq!(err.message, "\"UseNativeFetcher maybe\" ");
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "NativeFetcherMaxKeepaliveRequests",
+            &["0"],
+            Scope::ProcessStrict,
+        )
+        .unwrap_err();
+        assert_eq!(err.message, "\"NativeFetcherMaxKeepaliveRequests 0\" ");
+        // `StringToInt` width: fits `i64` but not `i32`.
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "NativeFetcherMaxKeepaliveRequests",
+            &["99999999999"],
+            Scope::ProcessStrict,
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.message,
+            "\"NativeFetcherMaxKeepaliveRequests 99999999999\" "
+        );
+        // Table value errors wrap the full line around the detail.
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "CssInlineMaxBytes",
+            &["lots"],
+            Scope::Directory,
+        )
+        .unwrap_err();
+        assert_eq!(err.outcome, SetOutcome::ValueInvalid);
+        assert!(
+            err.message.starts_with("\"CssInlineMaxBytes lots\" "),
+            "unexpected wrap: {err:?}"
+        );
+        // Admin-domain verb errors wrap the same way.
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "StatisticsDomains",
+            &["frobnicate", "x"],
+            Scope::Directory,
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.message,
+            "\"StatisticsDomains frobnicate x\" expected 'allow' or 'disallow', got 'frobnicate'"
+        );
+        // Inode limit: server scope, 64-bit store, wrapped failure.
+        apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "FileCacheInodeLimit",
+            &["1000"],
+            Scope::Server,
+        )
+        .unwrap();
+        assert_eq!(system.file_cache_clean_inode_limit, 1000);
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "FileCacheInodeLimit",
+            &["1000"],
+            Scope::Directory,
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.message,
+            "\"FileCacheInodeLimit\" cannot be set at this scope."
+        );
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "FileCacheInodeLimit",
+            &["lots"],
+            Scope::Server,
+        )
+        .unwrap_err();
+        assert_eq!(err.message, "\"FileCacheInodeLimit lots\" ");
+        // `Statistics`: default on, server scope, bool grammar.
+        assert!(system.statistics_enabled);
+        apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "Statistics",
+            &["off"],
+            Scope::Server,
+        )
+        .unwrap();
+        assert!(!system.statistics_enabled);
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "Statistics",
+            &["off"],
+            Scope::Directory,
+        )
+        .unwrap_err();
+        assert_eq!(err.message, "\"Statistics\" cannot be set at this scope.");
+    }
+
+    #[test]
+    fn external_server_specs() {
+        // Single server: default port, explicit port, errors.
+        assert_eq!(
+            parse_external_server("cache", REDIS_DEFAULT_PORT).unwrap(),
+            ExternalServerSpec { host: "cache".to_string(), port: 6379 }
+        );
+        assert_eq!(
+            parse_external_server("cache:6380", REDIS_DEFAULT_PORT).unwrap(),
+            ExternalServerSpec { host: "cache".to_string(), port: 6380 }
+        );
+        assert_eq!(
+            parse_external_server("a:b:c", 1).unwrap_err(),
+            "Expected single server in format <host>[:<port>]"
+        );
+        assert_eq!(
+            parse_external_server(":11211", 1).unwrap_err(),
+            "Server host cannot be empty"
+        );
+        assert_eq!(
+            parse_external_server("h:lots", 1).unwrap_err(),
+            "Port specified is not a valid number: 'lots'"
+        );
+        assert_eq!(
+            parse_external_server("h:0", 1).unwrap_err(),
+            "Invalid port: 0"
+        );
+        assert_eq!(
+            parse_external_server("h:-1", 1).unwrap_err(),
+            "Invalid port: -1"
+        );
+        // Clusters: empty clears, failures join with prefixes.
+        assert_eq!(
+            parse_external_cluster("", MEMCACHED_DEFAULT_PORT).unwrap(),
+            Vec::new()
+        );
+        let cluster = parse_external_cluster("a,b:11212", MEMCACHED_DEFAULT_PORT).unwrap();
+        assert_eq!(2, cluster.len());
+        assert_eq!(11211, cluster[0].port);
+        assert_eq!(11212, cluster[1].port);
+        assert_eq!(
+            parse_external_cluster("a,,:1", MEMCACHED_DEFAULT_PORT).unwrap_err(),
+            "In server '': Server host cannot be empty. In server ':1': Server host cannot be \
+             empty"
+        );
+        // Config arms store; failures wrap.
+        let mut options = RewriteOptions::new();
+        let mut factory = NginxFactoryOptions::default();
+        let mut system = NginxSystemOptions::default();
+        apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "MemcachedServers",
+            &["a:1,b"],
+            Scope::Server,
+        )
+        .unwrap();
+        assert_eq!(2, system.memcached_servers.len());
+        apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "RedisServer",
+            &["r"],
+            Scope::Server,
+        )
+        .unwrap();
+        assert_eq!(
+            Some(ExternalServerSpec { host: "r".to_string(), port: 6379 }),
+            system.redis_server
+        );
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "RedisServer",
+            &[":1"],
+            Scope::Server,
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.message,
+            "\"RedisServer :1\" Server host cannot be empty"
+        );
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory, &mut system,
+            "MemcachedServers",
+            &["h:0"],
+            Scope::Server,
+        )
+        .unwrap_err();
+        assert_eq!(err.message, "\"MemcachedServers h:0\" Invalid port: 0");
     }
 
     #[test]
@@ -3943,11 +4706,274 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err.outcome, SetOutcome::ValueInvalid);
-        assert_eq!(err.message, "\"FileCachePath\" must start with a slash");
+        assert_eq!(
+            err.message,
+            "\"FileCachePath relative/path\" must start with a slash"
+        );
         // LogDir stores as-is.
         apply_nginx_directive(&mut options, &mut factory, &mut system, "LogDir", &["/var/log/ps"], Scope::Server)
             .unwrap();
         assert_eq!(system.log_dir, "/var/log/ps");
+    }
+
+    #[test]
+    fn nginx_admin_paths_and_purge() {
+        let mut options = RewriteOptions::new();
+        let mut factory = NginxFactoryOptions::default();
+        let mut system = NginxSystemOptions::default();
+        let apply = |options: &mut RewriteOptions,
+                     factory: &mut NginxFactoryOptions,
+                     system: &mut NginxSystemOptions,
+                     directive: &str,
+                     args: &[&str],
+                     scope: Scope| {
+            apply_nginx_directive(options, factory, system, directive, args, scope)
+        };
+        // The six admin paths store verbatim (case-insensitive parse).
+        apply(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "statisticsPath",
+            &["/ngx_pagespeed_statistics"],
+            Scope::Server,
+        )
+        .unwrap();
+        assert_eq!(system.statistics_path, "/ngx_pagespeed_statistics");
+        for (directive, value) in [
+            ("GlobalStatisticsPath", "/ngx_pagespeed_global_statistics"),
+            ("ConsolePath", "/pagespeed_console"),
+            ("MessagesPath", "/ngx_pagespeed_message"),
+            ("AdminPath", "/pagespeed_admin"),
+            ("GlobalAdminPath", "/pagespeed_global_admin"),
+            ("PurgeMethod", "PURGE"),
+        ] {
+            apply(
+                &mut options,
+                &mut factory,
+                &mut system,
+                directive,
+                &[value],
+                Scope::ProcessStrict,
+            )
+            .unwrap();
+        }
+        assert_eq!(system.global_statistics_path, "/ngx_pagespeed_global_statistics");
+        assert_eq!(system.console_path, "/pagespeed_console");
+        assert_eq!(system.messages_path, "/ngx_pagespeed_message");
+        assert_eq!(system.admin_path, "/pagespeed_admin");
+        assert_eq!(system.global_admin_path, "/pagespeed_global_admin");
+        assert_eq!(system.purge_method, "PURGE");
+        // Scope gates: server paths rejected at directory scope, global
+        // paths rejected below http scope (exact-case gate: wrong case
+        // falls through to directory, like the C++ `all_options` loop).
+        let err = apply(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "AdminPath",
+            &["/admin"],
+            Scope::Directory,
+        )
+        .unwrap_err();
+        assert_eq!(err.outcome, SetOutcome::NameUnknown);
+        let err = apply(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "GlobalAdminPath",
+            &["/global"],
+            Scope::Server,
+        )
+        .unwrap_err();
+        assert_eq!(err.outcome, SetOutcome::NameUnknown);
+        apply(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "adminpath",
+            &["/lower"],
+            Scope::Directory,
+        )
+        .unwrap();
+        assert_eq!(system.admin_path, "/lower");
+        // Domain lists: allow/disallow append, bad verbs rejected verbatim.
+        apply(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "AdminDomains",
+            &["allow", "*.example.com"],
+            Scope::Directory,
+        )
+        .unwrap();
+        apply(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "AdminDomains",
+            &["disallow", "evil.example.com"],
+            Scope::Directory,
+        )
+        .unwrap();
+        assert!(system.admin_domains.is_match("www.example.com", false));
+        assert!(!system.admin_domains.is_match("evil.example.com", false));
+        assert!(!system.admin_domains.is_match("other.org", false));
+        assert!(system.statistics_domains.is_empty());
+        let err = apply(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "StatisticsDomains",
+            &["maybe", "x"],
+            Scope::Directory,
+        )
+        .unwrap_err();
+        assert_eq!(err.outcome, SetOutcome::ValueInvalid);
+        assert_eq!(
+            err.message,
+            "\"StatisticsDomains maybe x\" expected 'allow' or 'disallow', got 'maybe'"
+        );
+        // Beacon endpoints: unset reads None (host supplies its default),
+        // set reads the parsed pair.
+        assert_eq!(None, options.beacon_url());
+        apply(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "BeaconUrl",
+            &["http://a/b https://c/d"],
+            Scope::Directory,
+        )
+        .unwrap();
+        let beacon = options.beacon_url().unwrap();
+        assert_eq!(beacon.http, "http://a/b");
+        assert_eq!(beacon.https, "https://c/d");
+    }
+
+    #[test]
+    fn merge_propagates_master_switch() {
+        // Set src wins over unset self.
+        let mut base = RewriteOptions::new();
+        let mut child = RewriteOptions::new();
+        child.set_enabled_state(EnabledState::Unplugged);
+        base.merge(&child);
+        assert_eq!(base.enabled_state(), EnabledState::Unplugged);
+        // Unset src never clears a set self.
+        let mut other = RewriteOptions::new();
+        other.set_enabled_state(EnabledState::Standby);
+        other.merge(&RewriteOptions::new());
+        assert_eq!(other.enabled_state(), EnabledState::Standby);
+        // Two unset switches merge without observable change.
+        let mut fresh = RewriteOptions::new();
+        fresh.merge(&RewriteOptions::new());
+        assert_eq!(fresh.enabled_state(), EnabledState::On);
+        assert!(!fresh.was_set("e"));
+        // The table path (`EnableRewriting`) latches the bit too.
+        let mut via_table = RewriteOptions::new();
+        via_table
+            .set_option("EnableRewriting", "off", Scope::ProcessStrict)
+            .unwrap();
+        let mut target = RewriteOptions::new();
+        target.merge(&via_table);
+        assert_eq!(target.enabled_state(), EnabledState::Off);
+    }
+
+    #[test]
+    fn request_time_option_reads() {
+        let mut options = RewriteOptions::new();
+        // Defaults: flushes followed, nothing else on.
+        assert!(options.follow_flushes());
+        assert!(!options.respect_x_forwarded_proto());
+        assert!(options.remote_configuration_url().is_empty());
+        assert!(!options.running_experiment());
+        assert!(!options.enroll_experiment());
+        assert!(!options.is_downstream_cache_integration_enabled());
+        assert!(!options.matches_downstream_cache_rebeaconing_key("k"));
+        options
+            .set_option("FollowFlushes", "false", Scope::ProcessStrict)
+            .unwrap();
+        assert!(!options.follow_flushes());
+        options
+            .set_option("RespectXForwardedProto", "true", Scope::ProcessStrict)
+            .unwrap();
+        assert!(options.respect_x_forwarded_proto());
+        options
+            .set_option("RemoteConfigurationUrl", "http://x/rc", Scope::ProcessStrict)
+            .unwrap();
+        assert_eq!(options.remote_configuration_url(), "http://x/rc");
+        options
+            .set_option("RunExperiment", "true", Scope::ProcessStrict)
+            .unwrap();
+        assert!(options.running_experiment());
+        options
+            .set_option("EnrollExperiment", "3", Scope::ProcessStrict)
+            .unwrap();
+        assert!(options.enroll_experiment());
+        // Rebeaconing needs the key configured; matching ignores case.
+        options
+            .set_option("DownstreamCacheRebeaconingKey", "s3cret", Scope::ProcessStrict)
+            .unwrap();
+        assert!(options.matches_downstream_cache_rebeaconing_key("S3CRET"));
+        assert!(!options.matches_downstream_cache_rebeaconing_key("other"));
+        assert!(!options.is_downstream_cache_integration_enabled());
+        options.set_downstream_cache_purge_location_prefix("http://cdn/purge/");
+        assert!(options.is_downstream_cache_integration_enabled());
+    }
+
+    #[test]
+    fn ajax_default_level_and_thresholds() {
+        let mut options = RewriteOptions::new();
+        options.filters.enable(Filter::LazyloadImages);
+        options.filters.enable(Filter::AddHead);
+        options.filters.enable(Filter::PrioritizeCriticalCss);
+        options.filters.enable(Filter::RewriteCss);
+        options.disable_filters_that_cant_run_in_ajax();
+        assert!(!options.filters.enabled(Filter::LazyloadImages));
+        assert!(!options.filters.enabled(Filter::AddHead));
+        assert!(!options.filters.enabled(Filter::PrioritizeCriticalCss));
+        assert!(options.filters.enabled(Filter::RewriteCss));
+        assert!(options.css_preserve());
+        assert!(options.image_preserve());
+        assert!(options.js_preserve());
+        // Default level applies only when unset, without modifying.
+        let mut fresh = RewriteOptions::new();
+        assert!(!fresh.modified());
+        fresh.set_default_rewrite_level(RewriteLevel::CoreFilters);
+        assert_eq!(RewriteLevel::CoreFilters, fresh.filters().level());
+        assert!(!fresh.modified());
+        assert!(!fresh.was_set("l"));
+        let mut leveled = RewriteOptions::new();
+        leveled
+            .set_option("RewriteLevel", "PassThrough", Scope::ProcessStrict)
+            .unwrap();
+        leveled.set_default_rewrite_level(RewriteLevel::CoreFilters);
+        assert_eq!(RewriteLevel::PassThrough, leveled.filters().level());
+        // Thresholds cap at the ceiling.
+        let mut ceiling = RewriteOptions::new();
+        ceiling
+            .set_option("CssInlineMaxBytes", "100", Scope::ProcessStrict)
+            .unwrap();
+        let mut request = RewriteOptions::new();
+        request
+            .set_option("CssInlineMaxBytes", "999", Scope::ProcessStrict)
+            .unwrap();
+        request.limit_size_thresholds_to(&ceiling);
+        assert_eq!(
+            Some(Value::Int(100)),
+            request.get_by_name("CssInlineMaxBytes")
+        );
+        // Unset thresholds stay unset.
+        let mut bare = RewriteOptions::new();
+        bare.limit_size_thresholds_to(&ceiling);
+        assert!(!bare.was_set("ci"));
+        // Override token reads back.
+        assert!(options.request_option_override().is_empty());
+        assert_eq!(1000, options.remote_configuration_timeout_ms());
+        // Effective s-maxage gates on header modification.
+        assert_eq!(10, options.effective_in_place_s_max_age_sec());
+        options.set_modify_caching_headers(false);
+        assert_eq!(-1, options.effective_in_place_s_max_age_sec());
     }
 
     #[test]

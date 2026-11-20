@@ -3,13 +3,17 @@
 //! Ports the nginx configuration half of `ngx_pagespeed.cc`:
 //! the main/server/location conf shapes, `NgxRewriteOptions`
 //! (core options + system options + script lines), the
-//! order-sensitive option merge, server-context creation
-//! inputs, and the FileCachePath validation. Server-context
-//! construction is Slice 2 and the driver factory is Slice 6;
-//! both enter here as recorded inputs, never fabricated.
+//! order-sensitive option merge, the server context
+//! (`NgxServerContext`: identity, global options, http2 index,
+//! initialized latch), and the FileCachePath validation. The
+//! driver factory config half lives on the main conf; its
+//! threads, caches, and live services join in later Slice 6
+//! turns.
 
+use crate::factory::DriverFactory;
 use ngx::ffi::ngx_int_t;
-use ps_config::options::{NginxFactoryOptions, NginxSystemOptions, RewriteOptions};
+use ps_config::options::{NginxSystemOptions, RewriteOptions};
+use ps_config::scope::Scope;
 
 /// One script-variable line (`ScriptLine`): raw directive words
 /// plus the scope they were parsed at.
@@ -17,6 +21,8 @@ use ps_config::options::{NginxFactoryOptions, NginxSystemOptions, RewriteOptions
 pub struct ScriptLine {
     /// Directive words, e.g. `["RewriteLevel", "CoreFilters"]`.
     pub args: Vec<String>,
+    /// Scope the line was parsed at (request-time applies here).
+    pub scope: Scope,
 }
 
 /// Nginx options object (`NgxRewriteOptions`): core options plus
@@ -59,6 +65,45 @@ impl NgxOptions {
         cloned
     }
 
+    /// Absorbs another level's system options (`Option::Merge`
+    /// for scalars, `MergeOrShare` for domain groups): the source's
+    /// non-empty paths win and its domain rules append.
+    pub fn merge_system(&mut self, src: &NgxOptions) {
+        merge_system_str(&mut self.system.file_cache_path, &src.system.file_cache_path);
+        merge_system_str(&mut self.system.log_dir, &src.system.log_dir);
+        merge_system_str(&mut self.system.statistics_path, &src.system.statistics_path);
+        merge_system_str(
+            &mut self.system.global_statistics_path,
+            &src.system.global_statistics_path,
+        );
+        merge_system_str(&mut self.system.console_path, &src.system.console_path);
+        merge_system_str(&mut self.system.messages_path, &src.system.messages_path);
+        merge_system_str(&mut self.system.admin_path, &src.system.admin_path);
+        merge_system_str(
+            &mut self.system.global_admin_path,
+            &src.system.global_admin_path,
+        );
+        merge_system_str(&mut self.system.purge_method, &src.system.purge_method);
+        self.system
+            .statistics_domains
+            .append_from(&src.system.statistics_domains);
+        self.system
+            .global_statistics_domains
+            .append_from(&src.system.global_statistics_domains);
+        self.system
+            .messages_domains
+            .append_from(&src.system.messages_domains);
+        self.system
+            .console_domains
+            .append_from(&src.system.console_domains);
+        self.system
+            .admin_domains
+            .append_from(&src.system.admin_domains);
+        self.system
+            .global_admin_domains
+            .append_from(&src.system.global_admin_domains);
+    }
+
     /// Replaces the destination's script lines (`CopyScriptLinesTo`).
     pub fn copy_script_lines_to(&self, dest: &mut NgxOptions) {
         dest.script_lines = self.script_lines.clone();
@@ -82,6 +127,15 @@ impl NgxOptions {
     }
 }
 
+/// Scalar system-option merge (`Option<T>::Merge`): the source's
+/// non-empty value wins (explicit empty-to-clear is unrepresentable
+/// here, matching the Slice 1 convention for the path options).
+fn merge_system_str(dest: &mut String, src: &str) {
+    if !src.is_empty() {
+        *dest = src.to_string();
+    }
+}
+
 /// Order-sensitive option merge (`ps_merge_options`).
 ///
 /// Nothing when the parent is absent; a clone when the child is;
@@ -99,14 +153,7 @@ pub fn merge_options(parent: Option<&NgxOptions>, child: &mut Option<NgxOptions>
     let child_specific = child.take().expect("checked above");
     let mut rebased = parent.clone_with();
     rebased.core.merge(&child_specific.core);
-    // System options merge like scalars: the child's non-empty
-    // paths win (C++ `Option<T>::Merge` keeps the set value).
-    if !child_specific.system.file_cache_path.is_empty() {
-        rebased.system.file_cache_path = child_specific.system.file_cache_path.clone();
-    }
-    if !child_specific.system.log_dir.is_empty() {
-        rebased.system.log_dir = child_specific.system.log_dir.clone();
-    }
+    rebased.merge_system(&child_specific);
     if child_specific.clear_inherited_scripts {
         child_specific.copy_script_lines_to(&mut rebased);
     } else {
@@ -151,18 +198,57 @@ pub fn validate_file_cache_path(
     Ok(())
 }
 
-/// Seeded server context: the recorded `MakeNgxServerContext`
-/// inputs (`ps_merge_srv_conf`). Slice 2 builds the live
-/// context around this seed.
+/// Server context (`NgxServerContext` without its factory half).
+///
+/// Carries the config-time identity (dummy hostname/port from
+/// `MakeNgxServerContext`), the merged global options, the
+/// `http2` variable index, and the child-init latch the content
+/// handler gates on. Caches, statistics, timers, threads, and
+/// the request-context constructor are Slice 6 (driver factory).
 #[derive(Debug, Clone)]
-pub struct SeededContext {
+pub struct ServerContext {
     /// Dummy hostname (always `DUMMY_HOSTNAME`).
     pub hostname: String,
     /// Dummy port (negated context count).
     pub dummy_port: i32,
     /// Merged global options.
     pub options: NgxOptions,
+    /// `http2` variable index (`NGX_ERROR` when unknown).
+    pub http2_variable_index: ngx_int_t,
+    /// Child-initialized latch (`initialized()`).
+    pub initialized: bool,
 }
+
+impl ServerContext {
+    /// Nginx options (`config()`: the `NgxRewriteOptions` view;
+    /// the same object `global_options()` returns in C++).
+    #[must_use]
+    pub fn config(&self) -> &NgxOptions {
+        &self.options
+    }
+
+    /// Whether child init ran (`initialized()`): a context from a
+    /// refused reload cycle serves nothing, beacons included.
+    #[must_use]
+    pub fn initialized(&self) -> bool {
+        self.initialized
+    }
+
+    /// Polls for cache flush (`FlushCacheIfNecessary`): rate-limited
+    /// inside, so the content handler calls it on every request.
+    /// No-op until Slice 6 wires the cache state behind it.
+    pub fn poll_cache_flush(&self) {}
+
+    /// Formats an option line (`FormatOption`).
+    #[must_use]
+    pub fn format_option(option_name: &str, args: &str) -> String {
+        format!("pagespeed {option_name} {args};")
+    }
+}
+
+/// ProxyFetch never fetches HTML via mapped domains here
+/// (`ProxiesHtml()`, always false).
+pub const PROXIES_HTML: bool = false;
 
 /// Main conf (`ps_main_conf_t`).
 #[derive(Debug, Default)]
@@ -172,17 +258,26 @@ pub struct MainConf {
     pub factory: FactorySlot,
     /// Server-context counter (`server_context_count`).
     pub server_context_count: u32,
-    /// Factory-owned directive state.
-    pub factory_options: NginxFactoryOptions,
+    /// Driver factory (`driver_factory`, created eagerly).
+    pub driver_factory: DriverFactory,
 }
 
-/// Server conf (`ps_srv_conf_t`, Slice 1 fields).
+/// Server conf (`ps_srv_conf_t`).
 #[derive(Debug, Default)]
 pub struct SrvConf {
     /// Level options (moved into the context at merge).
     pub options: Option<NgxOptions>,
-    /// Seeded context after merge (`server_context` inputs).
-    pub context: Option<SeededContext>,
+    /// Server context after merge (`server_context`).
+    pub context: Option<ServerContext>,
+}
+
+impl SrvConf {
+    /// Fully passive server (`ps_disabled`): no context (pagespeed
+    /// configured elsewhere but not here), or an unplugged one.
+    #[must_use]
+    pub fn disabled(&self) -> bool {
+        self.context.as_ref().is_none_or(|ctx| ctx.options.unplugged())
+    }
 }
 
 /// Location conf (`ps_loc_conf_t`).
@@ -220,12 +315,12 @@ pub fn delete_cycle_factory(slot: &mut FactorySlot, active: &mut Option<u64>) {
 
 /// Merges main options into a server conf (`ps_merge_srv_conf`).
 ///
-/// Counts the server, rebases options, seeds the context with
+/// Counts the server, rebases options, builds the context with
 /// the dummy identity, and validates the cache path. `is_dir`
 /// answers the directory check (live filesystem at runtime).
-/// `http2_index` records the `http2` variable lookup (done
-/// conditionally in C++; the index travels with the context in
-/// Slice 2 — taken here to pin the call order).
+/// `http2_index` is the `http2` variable lookup the C++ runs
+/// conditionally at this call site; the index travels on the
+/// context for request-time use.
 pub fn merge_srv_conf(
     main: &mut MainConf,
     parent_options: Option<&NgxOptions>,
@@ -238,17 +333,14 @@ pub fn merge_srv_conf(
     let Some(options) = srv.options.take() else {
         return Ok(http2_index);
     };
+    // Process-scope main options propagate to the factory
+    // defaults (`SetMainConf`); a null parent skips.
+    main.driver_factory.set_main_conf(parent_options);
     // The context applies its own defaults before the file
-    // options merge in (Slice 2 owns the live context; the seed
-    // records the merge inputs and order).
+    // options merge in; then the file options are done.
     let mut global = NgxOptions::new();
     global.core.merge(&options.core);
-    if !options.system.file_cache_path.is_empty() {
-        global.system.file_cache_path = options.system.file_cache_path.clone();
-    }
-    if !options.system.log_dir.is_empty() {
-        global.system.log_dir = options.system.log_dir.clone();
-    }
+    global.merge_system(&options);
     options.copy_script_lines_to(&mut global);
     validate_file_cache_path(
         &global.system.file_cache_path,
@@ -256,10 +348,13 @@ pub fn merge_srv_conf(
         global.standby(),
         is_dir,
     )?;
-    srv.context = Some(SeededContext {
+    srv.context = Some(ServerContext {
         hostname: DUMMY_HOSTNAME.to_string(),
         dummy_port: dummy_port(main.server_context_count),
         options: global,
+        http2_variable_index: http2_index,
+        // Child init (Slice 6) latches this on.
+        initialized: false,
     });
     Ok(http2_index)
 }
@@ -296,7 +391,7 @@ pub fn merge_loc_conf(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ps_config::options::apply_nginx_directive;
+    use ps_config::options::{NginxFactoryOptions, apply_nginx_directive};
     use ps_config::scope::Scope;
 
     fn ngx(directives: &[(&str, &[&str])]) -> NgxOptions {
@@ -320,6 +415,7 @@ mod tests {
                     args: std::iter::once(directive.to_string())
                         .chain(args.iter().map(|s| s.to_string()))
                         .collect(),
+                    scope: Scope::Server,
                 });
             }
         }
@@ -420,11 +516,37 @@ mod tests {
         assert_eq!("dummy_hostname", ctx.hostname);
         assert_eq!(-1, ctx.dummy_port);
         assert_eq!("/cache", ctx.options.system.file_cache_path);
+        assert_eq!(7, ctx.http2_variable_index);
+        assert!(!ctx.initialized());
         // Without options: counted but untouched.
         let mut srv = SrvConf::default();
         merge_srv_conf(&mut main, None, &mut srv, 7, |_| true).unwrap();
         assert_eq!(2, main.server_context_count);
         assert!(srv.context.is_none());
+    }
+
+    #[test]
+    fn srv_merge_propagates_main_conf() {
+        use ps_config::scope::Scope;
+        let mut main = MainConf::default();
+        let mut parent = NgxOptions::new();
+        parent
+            .core
+            .set_option("ImageMaxRewritesAtOnce", "4", Scope::ProcessStrict)
+            .unwrap();
+        let mut srv = SrvConf {
+            options: Some(ngx(&[("FileCachePath", &["/cache"])])),
+            context: None,
+        };
+        merge_srv_conf(&mut main, Some(&parent), &mut srv, 0, |_| true).unwrap();
+        assert!(main.driver_factory.default_options.core.was_set("im"));
+        // A null parent skips without clearing.
+        let mut srv = SrvConf {
+            options: Some(ngx(&[("FileCachePath", &["/cache"])])),
+            context: None,
+        };
+        merge_srv_conf(&mut main, None, &mut srv, 0, |_| true).unwrap();
+        assert!(main.driver_factory.default_options.core.was_set("im"));
     }
 
     #[test]
@@ -471,6 +593,59 @@ mod tests {
         merge_loc_conf(None, &mut loc, Some(&server), false);
         let merged = loc.options.unwrap();
         assert_eq!("/srv-cache", merged.system.file_cache_path);
+    }
+
+    #[test]
+    fn system_merge_paths_and_domains() {
+        let mut parent = NgxOptions::new();
+        parent.system.admin_path = "/parent_admin".to_string();
+        parent.system.purge_method = "PURGE".to_string();
+        parent.system.admin_domains.allow("*.example.com");
+        let mut child = Some(NgxOptions::new());
+        child.as_mut().unwrap().system.admin_path = "/child_admin".to_string();
+        child.as_mut().unwrap().system.statistics_path = "/stats".to_string();
+        child.as_mut().unwrap().system.admin_domains.disallow("evil.example.com");
+        merge_options(Some(&parent), &mut child);
+        let merged = child.unwrap();
+        // Child paths win; parent-only values survive.
+        assert_eq!("/child_admin", merged.system.admin_path);
+        assert_eq!("/stats", merged.system.statistics_path);
+        assert_eq!("PURGE", merged.system.purge_method);
+        // Domain rules union: last-inserted matching rule wins.
+        assert!(merged.system.admin_domains.is_match("www.example.com", false));
+        assert!(!merged.system.admin_domains.is_match("evil.example.com", false));
+        assert!(!merged.system.admin_domains.is_match("other.org", false));
+    }
+
+    #[test]
+    fn server_disabled_and_format() {
+        // No context: disabled.
+        let srv = SrvConf::default();
+        assert!(srv.disabled());
+        // Live context: enabled.
+        let mut main = MainConf::default();
+        let mut srv = SrvConf {
+            options: Some(ngx(&[
+                ("RewriteLevel", &["CoreFilters"]),
+                ("FileCachePath", &["/cache"]),
+            ])),
+            context: None,
+        };
+        merge_srv_conf(&mut main, None, &mut srv, 0, |_| true).unwrap();
+        assert!(!srv.disabled());
+        let ctx = srv.context.as_ref().unwrap();
+        assert_eq!("/cache", ctx.config().system.file_cache_path);
+        assert_eq!(
+            "pagespeed RewriteLevel CoreFilters;",
+            ServerContext::format_option("RewriteLevel", "CoreFilters")
+        );
+        // Unplugged context: disabled.
+        let mut srv = SrvConf {
+            options: Some(ngx(&[("off", &[]), ("FileCachePath", &["/cache"])])),
+            context: None,
+        };
+        merge_srv_conf(&mut main, None, &mut srv, 0, |_| true).unwrap();
+        assert!(srv.disabled());
     }
 
     #[test]

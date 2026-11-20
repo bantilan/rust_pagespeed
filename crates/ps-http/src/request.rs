@@ -9,13 +9,14 @@
 use crate::headers::Headers;
 use crate::names::header;
 use crate::response::{HttpOptions, RequestProperties};
-use ps_config::options::{QueryStatus, RewriteOptions, Value};
+use ps_config::options::{QueryStatus, RewriteOptions};
 
-/// HTTP request methods (`RequestHeaders::Method`, request subset plus
-/// the purge method PageSpeed issues downstream).
+/// HTTP request methods (`RequestHeaders::Method` plus the purge
+/// method PageSpeed issues downstream; `Unknown` covers both unset
+/// and the C++ `kError` for unrecognized tokens).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Method {
-    /// Unset.
+    /// Unset or unrecognized.
     #[default]
     Unknown,
     /// `GET`.
@@ -30,6 +31,12 @@ pub enum Method {
     Delete,
     /// `OPTIONS`.
     Options,
+    /// `TRACE`.
+    Trace,
+    /// `CONNECT`.
+    Connect,
+    /// `PATCH`.
+    Patch,
     /// Downstream purge method.
     Purge,
 }
@@ -45,8 +52,40 @@ impl Method {
             "PUT" => Method::Put,
             "DELETE" => Method::Delete,
             "OPTIONS" => Method::Options,
+            "TRACE" => Method::Trace,
+            "CONNECT" => Method::Connect,
+            "PATCH" => Method::Patch,
             "PURGE" => Method::Purge,
             _ => Method::Unknown,
+        }
+    }
+
+    /// Parses a method name (`MethodFromString`): the ten known
+    /// tokens matched case-insensitively, anything else `Unknown`.
+    #[must_use]
+    pub fn from_string(name: &str) -> Method {
+        if name.eq_ignore_ascii_case("GET") {
+            Method::Get
+        } else if name.eq_ignore_ascii_case("HEAD") {
+            Method::Head
+        } else if name.eq_ignore_ascii_case("POST") {
+            Method::Post
+        } else if name.eq_ignore_ascii_case("PUT") {
+            Method::Put
+        } else if name.eq_ignore_ascii_case("DELETE") {
+            Method::Delete
+        } else if name.eq_ignore_ascii_case("OPTIONS") {
+            Method::Options
+        } else if name.eq_ignore_ascii_case("TRACE") {
+            Method::Trace
+        } else if name.eq_ignore_ascii_case("CONNECT") {
+            Method::Connect
+        } else if name.eq_ignore_ascii_case("PATCH") {
+            Method::Patch
+        } else if name.eq_ignore_ascii_case("PURGE") {
+            Method::Purge
+        } else {
+            Method::Unknown
         }
     }
 
@@ -61,6 +100,9 @@ impl Method {
             Method::Put => "PUT",
             Method::Delete => "DELETE",
             Method::Options => "OPTIONS",
+            Method::Trace => "TRACE",
+            Method::Connect => "CONNECT",
+            Method::Patch => "PATCH",
             Method::Purge => "PURGE",
         }
     }
@@ -77,6 +119,8 @@ impl Method {
 pub struct RequestHeaders {
     headers: Headers,
     method: Method,
+    major_version: Option<i32>,
+    minor_version: Option<i32>,
 }
 
 impl RequestHeaders {
@@ -108,6 +152,24 @@ impl RequestHeaders {
         self.method = method;
     }
 
+    /// Major version, 1 when unset.
+    #[must_use]
+    pub fn major_version(&self) -> i32 {
+        self.major_version.unwrap_or(1)
+    }
+
+    /// Minor version, 0 when unset.
+    #[must_use]
+    pub fn minor_version(&self) -> i32 {
+        self.minor_version.unwrap_or(0)
+    }
+
+    /// Sets major/minor versions.
+    pub fn set_version(&mut self, major: i32, minor: i32) {
+        self.major_version = Some(major);
+        self.minor_version = Some(minor);
+    }
+
     /// Derives caching properties (`GetProperties`).
     #[must_use]
     pub fn properties(&self) -> RequestProperties {
@@ -129,6 +191,38 @@ impl RequestHeaders {
                     .any(|value| value.eq_ignore_ascii_case("gzip"))
             })
     }
+
+    /// Whether the request is an Ajax call (`IsXmlHttpRequest`):
+    /// `X-Requested-With: XMLHttpRequest`, case-insensitively.
+    #[must_use]
+    pub fn is_xml_http_request(&self) -> bool {
+        self.headers
+            .lookup_first(header::X_REQUESTED_WITH)
+            .is_some_and(|value| value.eq_ignore_ascii_case(crate::names::XML_HTTP_REQUEST))
+    }
+
+    /// All cookies (`GetAllCookies`): every `Cookie` line split on
+    /// `;` (empties dropped), each pair split on the first `=`
+    /// with both sides trimmed, sorted by name like the
+    /// `CookieMultimap` (stable for repeats).
+    #[must_use]
+    pub fn get_all_cookies(&self) -> Vec<(String, String)> {
+        let mut cookies = Vec::new();
+        for (name, value) in self.headers.iter() {
+            if !name.eq_ignore_ascii_case(header::COOKIE) {
+                continue;
+            }
+            for pair in value.split(';').filter(|piece| !piece.is_empty()) {
+                let (cookie_name, cookie_value) = match pair.find('=') {
+                    Some(pos) => (pair[..pos].trim(), pair[pos + 1..].trim()),
+                    None => (pair.trim(), ""),
+                };
+                cookies.push((cookie_name.to_string(), cookie_value.to_string()));
+            }
+        }
+        cookies.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+        cookies
+    }
 }
 
 /// Scans request headers for PageSpeed options (`ScanHeader`).
@@ -136,61 +230,25 @@ impl RequestHeaders {
 /// Request headers carry options exactly like query parameters;
 /// `allow_options` gates everything after the bare `PageSpeed=`
 /// switch unless a `*RequestOptionOverride` header matches the
-/// configured token. Consumed `ModPagespeed*`/`PageSpeed*`
-/// headers and any `X-PSA-Client-Options` header are removed.
+/// token read off the options object. Consumed
+/// `ModPagespeed*`/`PageSpeed*` headers and any
+/// `X-PSA-Client-Options` header are removed.
 #[must_use]
 pub fn scan_headers_for_options(
     headers: &mut RequestHeaders,
     allow_options: bool,
     options: &mut RewriteOptions,
 ) -> QueryStatus {
-    let mut allow_options = allow_options;
-    let mut status = QueryStatus::NoneFound;
-
-    // Check to see if the override token exists.
-    let token = match options.get_by_name("RequestOptionOverride") {
-        Some(Value::Str(token)) => token,
-        _ => String::new(),
-    };
-    if !allow_options && !token.is_empty() {
-        for (name, value) in headers.headers().iter() {
-            if name == "ModPagespeedRequestOptionOverride"
-                || name == "PageSpeedRequestOptionOverride"
-            {
-                allow_options = value == token;
-                break;
-            }
-        }
-    }
-
-    // Tracks the headers that need to be removed.
-    let mut to_remove: Vec<(String, String)> = Vec::new();
-    // Snapshot the pairs: scanning may mutate options but not headers.
-    let pairs: Vec<(String, String)> = headers
-        .headers()
-        .iter()
-        .map(|(name, value)| (name.to_string(), value.to_string()))
-        .collect();
-    for (name, value) in &pairs {
-        match options.scan_query(name, value, allow_options) {
-            QueryStatus::NoneFound => {}
-            QueryStatus::Success => {
-                if name.starts_with("ModPagespeed") || name.starts_with("PageSpeed") {
-                    to_remove.push((name.clone(), value.clone()));
-                }
-                status = QueryStatus::Success;
-            }
-            QueryStatus::Invalid => return QueryStatus::Invalid,
-        }
-    }
-    for (name, value) in &to_remove {
-        headers.headers_mut().remove(name, value);
-    }
-    // kXPsaClientOptions is meant for proxy only. Remove it in any case.
-    headers
-        .headers_mut()
-        .remove_all(header::X_PSA_CLIENT_OPTIONS);
-    status
+    let token = options.request_option_override();
+    let mut context: Option<&mut RequestContext> = None;
+    crate::query::scan_header_list(
+        headers.headers_mut(),
+        allow_options,
+        &token,
+        &mut context,
+        options,
+        false,
+    )
 }
 
 /// Fetch timing record (the `TimingInfo` subset HTTPCache writes).
@@ -209,6 +267,7 @@ pub struct RequestContext {
     timing: FetchTiming,
     accepts_gzip: bool,
     session_authorized_origins: std::collections::HashSet<String>,
+    sticky_query_parameters: Option<String>,
 }
 
 impl RequestContext {
@@ -220,6 +279,7 @@ impl RequestContext {
             timing: FetchTiming::default(),
             accepts_gzip: false,
             session_authorized_origins: std::collections::HashSet::new(),
+            sticky_query_parameters: None,
         }
     }
 
@@ -268,12 +328,78 @@ impl RequestContext {
     pub const fn timing(&self) -> FetchTiming {
         self.timing
     }
+
+    /// Records the sticky query-parameters token
+    /// (`set_sticky_query_parameters_token`).
+    pub fn set_sticky_query_parameters_token(&mut self, token: &str) {
+        self.sticky_query_parameters = Some(token.to_string());
+    }
+
+    /// The sticky query-parameters token, if set.
+    #[must_use]
+    pub fn sticky_query_parameters_token(&self) -> Option<&str> {
+        self.sticky_query_parameters.as_deref()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use ps_config::filter::Filter;
+
+    #[test]
+    fn method_from_string_covers_table() {
+        for (token, method) in [
+            ("GET", Method::Get),
+            ("HEAD", Method::Head),
+            ("POST", Method::Post),
+            ("PUT", Method::Put),
+            ("DELETE", Method::Delete),
+            ("OPTIONS", Method::Options),
+            ("TRACE", Method::Trace),
+            ("CONNECT", Method::Connect),
+            ("PATCH", Method::Patch),
+            ("PURGE", Method::Purge),
+        ] {
+            assert_eq!(method, Method::from_string(token));
+            assert_eq!(method, Method::from_string(&token.to_ascii_lowercase()));
+            assert_eq!(token, method.token());
+        }
+        assert_eq!(Method::Unknown, Method::from_string("BREW"));
+        assert_eq!(Method::Unknown, Method::from_string(""));
+        let mut headers = RequestHeaders::new();
+        assert_eq!(1, headers.major_version());
+        assert_eq!(0, headers.minor_version());
+        headers.set_version(1, 1);
+        assert_eq!(1, headers.major_version());
+        assert_eq!(1, headers.minor_version());
+    }
+
+    #[test]
+    fn xhr_cookies_and_sticky() {
+        let mut headers = RequestHeaders::new();
+        assert!(!headers.is_xml_http_request());
+        headers.headers_mut().add("X-Requested-With", "xmlhttprequest");
+        assert!(headers.is_xml_http_request());
+        headers.headers_mut().add("Cookie", "b=2; a=1");
+        headers.headers_mut().add("cookie", "a=3; novalue; c=");
+        let cookies = headers.get_all_cookies();
+        // Sorted by name (stable for repeats), values trimmed.
+        assert_eq!(
+            cookies,
+            vec![
+                ("a".to_string(), "1".to_string()),
+                ("a".to_string(), "3".to_string()),
+                ("b".to_string(), "2".to_string()),
+                ("c".to_string(), "".to_string()),
+                ("novalue".to_string(), "".to_string()),
+            ]
+        );
+        let mut ctx = RequestContext::new(HttpOptions::default_for_tests());
+        assert_eq!(None, ctx.sticky_query_parameters_token());
+        ctx.set_sticky_query_parameters_token("tok");
+        assert_eq!(Some("tok"), ctx.sticky_query_parameters_token());
+    }
 
     #[test]
     fn header_scan_consumes_option_headers() {

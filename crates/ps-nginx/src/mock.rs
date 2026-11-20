@@ -42,8 +42,8 @@ pub const REST_BODY: usize = 100;
 #[cfg(test)]
 pub mod abi_stubs {
     use ngx::ffi::{
-        ngx_array_t, ngx_conf_t, ngx_http_request_t, ngx_int_t, ngx_log_t, ngx_pool_cleanup_t,
-        ngx_pool_t, ngx_str_t, ngx_uint_t,
+        ngx_array_t, ngx_conf_t, ngx_connection_t, ngx_http_request_t, ngx_int_t, ngx_list_t,
+        ngx_log_t, ngx_pool_cleanup_t, ngx_pool_t, ngx_str_t, ngx_uint_t,
     };
     use std::ffi::{c_char, c_int, c_void};
 
@@ -95,7 +95,16 @@ pub mod abi_stubs {
     ) -> *mut c_void);
     stub_fn!(ngx_http_finalize_request(r: *mut ngx_http_request_t, rc: ngx_int_t));
     stub_fn!(ngx_http_request_empty_handler(r: *mut ngx_http_request_t));
+    stub_fn!(ngx_http_test_reading(r: *mut ngx_http_request_t));
+    stub_fn!(ngx_http_block_reading(r: *mut ngx_http_request_t));
+    stub_fn!(ngx_http_run_posted_requests(c: *mut ngx_connection_t));
     stub_fn!(ngx_http_core_run_phases(r: *mut ngx_http_request_t));
+    stub_fn!(ngx_list_push(l: *mut ngx_list_t) -> *mut c_void);
+    stub_fn!(ngx_connection_local_sockaddr(
+        c: *mut ngx_connection_t,
+        s: *mut ngx_str_t,
+        port: ngx_uint_t
+    ) -> ngx_int_t);
 
     // Referenced globals. Kept uninhabited: tests read only our
     // own statics, never these.
@@ -114,6 +123,21 @@ pub mod abi_stubs {
     #[no_mangle]
     #[allow(non_upper_case_globals)]
     pub static mut ngx_cycle: usize = 0;
+    #[no_mangle]
+    #[allow(non_upper_case_globals)]
+    pub static mut ngx_terminate: c_int = 0;
+    #[no_mangle]
+    #[allow(non_upper_case_globals)]
+    pub static mut ngx_exiting: ngx_uint_t = 0;
+    #[no_mangle]
+    #[allow(non_upper_case_globals)]
+    pub static mut ngx_http_module: usize = 0;
+    #[no_mangle]
+    #[allow(non_upper_case_globals)]
+    pub static mut ngx_process: usize = 0;
+    #[no_mangle]
+    #[allow(non_upper_case_globals)]
+    pub static mut ngx_test_config: usize = 0;
 }
 
 /// Simulates the four inits over fake tops, returning each

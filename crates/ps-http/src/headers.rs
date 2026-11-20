@@ -129,6 +129,14 @@ impl Headers {
         }
     }
 
+    /// First value, if any (C++ `Headers::Lookup1` semantics: the
+    /// first match wins even when several exist).
+    #[must_use]
+    pub fn lookup_first(&self, name: &str) -> Option<String> {
+        self.lookup(name)
+            .and_then(|mut values| values.drain(..).next())
+    }
+
     /// Whether any attribute has the name (`Has`).
     #[must_use]
     pub fn has(&self, name: &str) -> bool {

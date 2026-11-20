@@ -25,6 +25,54 @@ pub struct SelfFetchLabel {
     pub text: [u8; 10],
 }
 
+/// Post-read handler decision (`ps_self_fetch_post_read_handler`
+/// past extraction).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelfFetchAction {
+    /// Not a relabel candidate (`NGX_DECLINED`, no state change).
+    Decline,
+    /// Relabel the peer, restore at cleanup (`NGX_DECLINED` after
+    /// relabeling).
+    Relabel,
+    /// Cleanup allocation failed (`NGX_HTTP_INTERNAL_SERVER_ERROR`).
+    Error,
+}
+
+/// Plans the post-read self-fetch step: main requests carrying the
+/// subrequest marker whose peer is this server relabel; everything
+/// else declines; a failed cleanup allocation errors. The FFI
+/// wrapper mirrors this table branch-for-branch (it must allocate
+/// between the peer check and the relabel, so it cannot call this
+/// directly — see `insert_phase_step` for the same pattern).
+#[must_use]
+pub const fn plan_self_fetch(
+    is_main: bool,
+    subrequest: bool,
+    peer_is_this_server: bool,
+    cleanup_ok: bool,
+) -> SelfFetchAction {
+    if !is_main || !subrequest {
+        return SelfFetchAction::Decline;
+    }
+    if !peer_is_this_server {
+        return SelfFetchAction::Decline;
+    }
+    if !cleanup_ok {
+        return SelfFetchAction::Error;
+    }
+    SelfFetchAction::Relabel
+}
+
+/// Relabel scratch plus saved peer (`ps_self_fetch_relabel_t`),
+/// pool-allocated per relabeled request.
+#[derive(Debug, Clone, Copy)]
+pub struct SelfFetchRelabel {
+    /// Replacement address scratch.
+    pub label: SelfFetchLabel,
+    /// Saved peer address for cleanup-time restore.
+    pub saved: SavedPeer,
+}
+
 /// Saved peer address (`NgxSelfFetchSaved<ngx_connection_t>`).
 #[derive(Debug, Clone, Copy)]
 pub struct SavedPeer {
@@ -199,6 +247,18 @@ mod tests {
         addr.sin6_family = libc::AF_INET6 as u16;
         addr.sin6_addr.s6_addr[15] = last;
         addr
+    }
+
+    #[test]
+    fn self_fetch_plan_table() {
+        use SelfFetchAction::{Decline, Error, Relabel};
+        // Subrequests and peer checks gate before allocation.
+        assert_eq!(Decline, plan_self_fetch(false, true, true, true));
+        assert_eq!(Decline, plan_self_fetch(true, false, true, true));
+        assert_eq!(Decline, plan_self_fetch(true, true, false, true));
+        assert_eq!(Decline, plan_self_fetch(true, true, false, false));
+        assert_eq!(Error, plan_self_fetch(true, true, true, false));
+        assert_eq!(Relabel, plan_self_fetch(true, true, true, true));
     }
 
     #[test]

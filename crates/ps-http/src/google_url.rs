@@ -300,6 +300,15 @@ impl GoogleUrl {
         }
     }
 
+    /// Fragment with its `#` (`AllAfterQuery`; empty when absent).
+    #[must_use]
+    pub fn all_after_query(&self) -> &str {
+        match self.canonical().find('#') {
+            Some(pos) => &self.canonical()[pos..],
+            None => "",
+        }
+    }
+
     /// Spec through the last path slash (`AllExceptLeaf`).
     #[must_use]
     pub fn all_except_leaf(&self) -> &str {
@@ -505,7 +514,8 @@ fn decode_unreserved(segment: &str) -> String {
 
 /// Escapes a query name/value (`EscapeQueryParam`): alphanumerics plus
 /// `._~-` verbatim, space as `+`, everything else lowercase `%xx`.
-fn escape_query_param(text: &str) -> String {
+#[must_use]
+pub fn escape_query_param(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for byte in text.bytes() {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'~' | b'_' | b'-') {
@@ -572,6 +582,7 @@ mod tests {
         let url = GoogleUrl::new("http://test.com/a/b/?p=3#frag");
         assert_eq!(url.path_and_leaf(), "/a/b/?p=3#frag");
         assert_eq!(url.query(), "p=3");
+        assert_eq!(url.all_after_query(), "#frag");
         assert_eq!(url.all_except_query(), "http://test.com/a/b/");
         assert_eq!(url.all_except_leaf(), "http://test.com/a/b/");
         assert_eq!(url.leaf_with_query(), "?p=3#frag");
@@ -580,7 +591,9 @@ mod tests {
 
         let url = GoogleUrl::new("http://test.com/a.html");
         assert_eq!(url.query(), "");
+        assert_eq!(url.all_after_query(), "");
         assert_eq!(url.all_except_query(), "http://test.com/a.html");
+        assert_eq!(escape_query_param("a b/c"), "a+b%2fc");
         assert_eq!(url.all_except_leaf(), "http://test.com/");
         assert_eq!(url.leaf_with_query(), "a.html");
         assert_eq!(url.path_sans_leaf(), "/");
