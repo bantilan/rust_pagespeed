@@ -190,21 +190,22 @@ fn image_pixels_equal(expected: &[u8], actual: &[u8]) -> AssertionResult {
             actual_frame.height()
         ));
     }
-    if expected_frame.format() != actual_frame.format() {
+    // Normalize layouts (encoders choose RGB vs RGBA freely).
+    let expected_rgba = match expected_frame.expand(ps_image::frame::PixelFormat::Rgba8888) {
+        Ok(frame) => frame,
+        Err(error) => return fail(format!("expected: expand failed: {error:?}")),
+    };
+    let actual_rgba = match actual_frame.expand(ps_image::frame::PixelFormat::Rgba8888) {
+        Ok(frame) => frame,
+        Err(error) => return fail(format!("actual: expand failed: {error:?}")),
+    };
+    if expected_rgba.pixels() != actual_rgba.pixels() {
         return fail(format!(
-            "pixel format: expected {:?}, got {:?}",
-            expected_frame.format(),
-            actual_frame.format()
-        ));
-    }
-    if expected_frame.pixels() != actual_frame.pixels() {
-        return fail(format!(
-            "pixels differ: {}x{} {:?}, first bytes {:02x?} vs {:02x?}",
+            "pixels differ: {}x{} ({} vs {} bytes)",
             expected_frame.width(),
             expected_frame.height(),
-            expected_frame.format(),
-            &expected_frame.pixels()[..expected_frame.pixels().len().min(16)],
-            &actual_frame.pixels()[..actual_frame.pixels().len().min(16)],
+            expected_rgba.pixels().len(),
+            actual_rgba.pixels().len(),
         ));
     }
     AssertionResult {

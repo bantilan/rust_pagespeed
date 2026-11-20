@@ -1900,15 +1900,20 @@ impl crate::rewrite_filter::RewriteFilter for ImageRewriteFilter {
         content_type: &ps_http::content_type::ContentType,
     ) -> Option<crate::rewrite_filter::InPlaceOutput> {
         // IPRO origin serve: the same transcode core as the
-        // `.pagespeed.` path, without resize or UA-derived
-        // formats (conservative: webp/avif need the request
-        // Accept header, unavailable here). Larger outputs
-        // fail back to the original.
+        // `.pagespeed.` path, without resize. UA-derived
+        // formats (webp/avif) need `InPlaceOptimizeForBrowser`
+        // (bandwidth set): without it the context stays
+        // default, like C++'s early return in
+        // `EncodeUserAgentIntoResourceContext`. Larger
+        // outputs fail back to the original.
         let analysis = ps_image::image::analyze(input).ok()?;
         if analysis.width < 1 || analysis.height < 1 {
             return None;
         }
-        let resource_context = ImageResourceContext::default();
+        let mut resource_context = ImageResourceContext::default();
+        if crate::ipro::in_place_optimize_for_browser_enabled(driver) {
+            encode_user_agent_into_resource_context(driver, &mut resource_context);
+        }
         let options = driver.options().clone();
         let image_options =
             image_options_for_loaded_resource(&resource_context, input.len() as i64, &options);

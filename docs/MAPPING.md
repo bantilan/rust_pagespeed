@@ -400,3 +400,8 @@ Known gaps (suite reports, never fails):
   green with pixel comparison. Gaps: webp/avif
   servants (need request Accept); lossy JPEG corpus
   coverage (needs tolerance).
+- Fetch epic F5 DONE: request headers + UA plumbed to
+  every driver; image servants UA-aware with the C++
+  `InPlaceOptimizeForBrowser` gate (CoreFilters:
+  same-format recompress; flag on: webp/avif).
+  Pixel comparison normalizes RGB/RGBA layouts.

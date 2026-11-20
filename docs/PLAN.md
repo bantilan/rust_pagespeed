@@ -1509,3 +1509,15 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   (`rewrite_stats::init_stats`, transcribed verbatim
   from every C++ `InitStats`). Workspace: 2580 passed,
   0 failed.
+- Fetch epic F5 (this session): DONE. Request-context
+  plumbing: live request headers + UA install on every
+  driver (terminal resource paths and the HTML branch),
+  so capabilities and UA cache keys derive from the
+  real request. Image servants go UA-aware through the
+  shared encoder, gated on `InPlaceOptimizeForBrowser`
+  exactly like C++ (CoreFilters serves recompressed
+  same-format; the flag unlocks webp/avif — verified
+  live both ways against C++). Pixel comparison
+  normalizes layouts (encoders choose RGB vs RGBA
+  freely). Suite: 9/9 page + 7/7 config green.
+  Workspace: 2581 passed, 0 failed.

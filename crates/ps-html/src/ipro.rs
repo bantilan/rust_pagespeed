@@ -211,7 +211,7 @@ fn encode_for_type(
 
 /// Whether browser-dependent IPRO applies
 /// (`InPlaceOptimizeForBrowserEnabled`).
-fn in_place_optimize_for_browser_enabled(driver: &Rc<ResourceDriver>) -> bool {
+pub(crate) fn in_place_optimize_for_browser_enabled(driver: &Rc<ResourceDriver>) -> bool {
     use ps_config::filter::Filter;
     let options = driver.options();
     options.enabled(Filter::InPlaceOptimizeForBrowser)

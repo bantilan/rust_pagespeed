@@ -4923,3 +4923,36 @@ fn serve_webp_from_cold_cache() {
             .unwrap()
     );
 }
+
+#[test]
+fn servant_recompresses_without_browser_flag() {
+    use ps_html::rewrite_filter::RewriteFilter;
+    let fixture = Fixture::new();
+    fixture
+        .options
+        .borrow_mut()
+        .filters_mut()
+        .set_level(ps_config::filter::RewriteLevel::CoreFilters);
+    let driver = fixture.driver_for(&format!("{TEST_DOMAIN}r.png"));
+    let servant = ImageRewriteFilter::new(driver.clone());
+    let input = read_image(CUPPA_PNG);
+    let content_type = ps_http::content_type::mime_to_content_type("image/png").expect("png known");
+    let output = servant.rewrite_in_place(&driver, &input, &content_type);
+    // CoreFilters lacks InPlaceOptimizeForBrowser: same-format
+    // recompress at most (None when nothing is saved).
+    let output = output.expect("cuppa recompresses");
+    {
+        use ps_image::frame::PixelFormat;
+        assert_eq!("image/png", output.content_type.mime_type());
+        assert!(output.bytes.len() < input.len());
+        let frame = ps_image::png::decode(&output.bytes).expect("valid png");
+        let orig = ps_image::png::decode(&input).expect("valid input");
+        assert_eq!(
+            (orig.width(), orig.height()),
+            (frame.width(), frame.height())
+        );
+        let rgba = frame.expand(PixelFormat::Rgba8888).expect("expand out");
+        let orig_rgba = orig.expand(PixelFormat::Rgba8888).expect("expand in");
+        assert_eq!(orig_rgba.pixels(), rgba.pixels());
+    }
+}

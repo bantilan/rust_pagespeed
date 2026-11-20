@@ -2499,6 +2499,7 @@ unsafe fn resource_response(
                     &resolved.core,
                     &url_string,
                     now_ms,
+                    &request_headers,
                 );
                 // Unfinished and error fetches decline: nginx
                 // renders its default error page, as with C++'s
@@ -2634,6 +2635,7 @@ unsafe fn resource_response(
                     // (`MimeTypeXhtmlStatus`): inline scripts skip
                     // CDATA wrapping on plain HTML.
                     driver.set_is_xhtml(content_type_is_xml_like(&content_type));
+                    crate::terminal::install_request_context(&driver, &request_headers);
                     driver
                 });
                 let sink = crate::send::HtmlSink::new(
@@ -2673,6 +2675,7 @@ unsafe fn resource_response(
                     &resolved.core,
                     &url_string,
                     now_ms,
+                    &request_headers,
                 );
                 // Misses arm the recorder, then decline to the
                 // origin: the sync bridge answers the lookup

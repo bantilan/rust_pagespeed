@@ -112,18 +112,37 @@ pub fn fetch_resource_body(
     options: &ps_config::options::RewriteOptions,
     url: &str,
     now_ms: i64,
+    request_headers: &ps_http::request::RequestHeaders,
 ) -> ResourceResponse {
     use std::cell::RefCell;
     use std::rc::Rc;
     crate::rewrite::reset_context_clock(html, now_ms);
     let mut fetch = BufferingFetch::new(url, RequestContext::new(HttpOptions::default()));
+    *fetch.request_headers_mut() = request_headers.clone();
     let driver = Rc::new(ps_html::server_context::ResourceDriver::new(
         Rc::clone(html),
         Rc::new(RefCell::new(options.clone())),
         url,
     ));
+    install_request_context(&driver, request_headers);
     ps_html::server_context::ResourceDriver::fetch_resource(&driver, url, &mut fetch);
     collect_fetch(&fetch)
+}
+
+/// Installs request headers + UA on a driver (`SetRequestHeaders`
+/// shape): capabilities (webp/avif/mobile) and UA cache keys
+/// derive from the live request.
+pub fn install_request_context(
+    driver: &std::rc::Rc<ps_html::server_context::ResourceDriver>,
+    request_headers: &ps_http::request::RequestHeaders,
+) {
+    driver.set_request_headers(request_headers.clone());
+    if let Some(user_agent) = request_headers
+        .headers()
+        .lookup1(ps_http::names::header::USER_AGENT)
+    {
+        driver.set_user_agent(&user_agent);
+    }
 }
 
 /// Serves an origin URL in place through the sync bridge
@@ -135,16 +154,19 @@ pub fn fetch_in_place_body(
     options: &ps_config::options::RewriteOptions,
     url: &str,
     now_ms: i64,
+    request_headers: &ps_http::request::RequestHeaders,
 ) -> ResourceResponse {
     use std::cell::RefCell;
     use std::rc::Rc;
     crate::rewrite::reset_context_clock(html, now_ms);
     let mut fetch = BufferingFetch::new(url, RequestContext::new(HttpOptions::default()));
+    *fetch.request_headers_mut() = request_headers.clone();
     let driver = Rc::new(ps_html::server_context::ResourceDriver::new(
         Rc::clone(html),
         Rc::new(RefCell::new(options.clone())),
         url,
     ));
+    install_request_context(&driver, request_headers);
     ps_html::ipro::fetch_in_place_resource(&driver, url, &mut fetch, false);
     collect_fetch(&fetch)
 }
@@ -444,7 +466,14 @@ mod tests {
             std::rc::Rc::new(crate::rewrite::UnavailableFetcher),
         );
         let options = ps_config::options::RewriteOptions::new();
-        let response = fetch_resource_body(&html, &options, "http://h/not-a-resource", 0);
+        let request_headers = ps_http::request::RequestHeaders::new();
+        let response = fetch_resource_body(
+            &html,
+            &options,
+            "http://h/not-a-resource",
+            0,
+            &request_headers,
+        );
         assert_eq!(response.status, 0);
         assert!(response.body.is_empty());
     }
