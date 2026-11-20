@@ -324,6 +324,13 @@ impl ServerContext {
         self.statistics.as_ref()
     }
 
+    /// Clones the statistics registry handle (for backends that
+    /// outlive the borrow, like the IPRO recording backend).
+    #[must_use]
+    pub fn statistics_shared(&self) -> Arc<Statistics> {
+        Arc::clone(&self.statistics)
+    }
+
     /// Shares a statistics registry (worker-global aggregation;
     /// contexts otherwise keep their own).
     pub fn set_statistics(&mut self, statistics: Arc<Statistics>) {

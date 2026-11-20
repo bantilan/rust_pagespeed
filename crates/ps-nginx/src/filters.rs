@@ -71,8 +71,9 @@ pub mod in_place {
         /// Cache hit: clear the lookup flag (+ stats/log in the FFI),
         /// then pass on.
         ServeFromCache,
-        /// Cache miss on a body-bearing request: start recording
-        /// (Slice 6 creates the recorder), flag in-memory, decline.
+        /// Cache miss on a body-bearing request (the sync
+        /// bridge arms at the miss site instead): flag
+        /// in-memory, decline.
         StartRecording,
         /// Anything else (finalized connection, unrecordable
         /// status): decline.
@@ -160,9 +161,10 @@ pub mod in_place {
                     pass_to_next()
                 }
                 InPlaceHeaderAction::StartRecording => {
-                    // Slice 6 creates the recorder (driver options,
-                    // cache fragment, request context, cache and
-                    // statistics) and bumps `ipro_not_in_cache`.
+                    // Unreachable in the sync bridge: the content
+                    // phase arms the recorder at the miss site
+                    // (the lookup never pends), so this keeps the
+                    // plan shape and declines without creating.
                     (*r).set_filter_need_in_memory(1);
                     decline_request(r, None)
                 }
@@ -834,6 +836,76 @@ pub mod html_rewrite {
             || (name.eq_ignore_ascii_case("Vary") && value.eq_ignore_ascii_case("Accept-Encoding"))
     }
 
+    /// Fresh rewritten-HTML lifetime (`ProxyFetch::SetupForHtml`
+    /// caching half): ttl 0 unless the HTML cache time allows more
+    /// and the origin line lacks whole-value `no-cache` /
+    /// `must-revalidate`; the suffix preserves `no-transform`,
+    /// `no-store`, and standalone `s-maxage` values. Replaces
+    /// `Cache-Control` and stamps `Expires` (`SetDateAndCaching`),
+    /// so an in-place `s-maxage` stamp never survives on a
+    /// rewritten page (the fix-up filter drops the recombined
+    /// line's tail below).
+    fn setup_for_html_caching(
+        headers: &mut ps_http::response::ResponseHeaders,
+        max_html_cache_time_ms: i64,
+    ) {
+        use crate::caching::{read_lifetime_directive, LifetimeName};
+        use ps_http::names::header;
+        let values = headers
+            .headers()
+            .lookup(header::CACHE_CONTROL)
+            .unwrap_or_default();
+        let whole_value = |want: &str| values.iter().any(|v| v.eq_ignore_ascii_case(want));
+        let (ttl_ms, suffix) = if max_html_cache_time_ms == 0
+            || whole_value("no-cache")
+            || whole_value("must-revalidate")
+        {
+            let mut suffix = String::from(", no-cache");
+            if headers.has_cache_control_directive("no-transform") {
+                suffix.push_str(", no-transform");
+            }
+            if headers.has_cache_control_directive("no-store") {
+                suffix.push_str(", no-store");
+            }
+            for value in &values {
+                let lifetime = read_lifetime_directive(value);
+                if lifetime.name == LifetimeName::SMaxAge && !value.contains(';') {
+                    suffix.push_str(", ");
+                    suffix.push_str(value);
+                }
+            }
+            (0, suffix)
+        } else {
+            (
+                max_html_cache_time_ms.min(headers.cache_ttl_ms()),
+                String::from(", private"),
+            )
+        };
+        let date_ms = headers.date_ms();
+        headers.set_time_header(header::EXPIRES, date_ms + ttl_ms);
+        headers.headers_mut().replace(
+            header::CACHE_CONTROL,
+            &format!("max-age={}{suffix}", ttl_ms / 1000),
+        );
+    }
+
+    /// `html_cache` diagnostics tail (`SetupForHtml`):
+    /// per-request diagnostics must never freeze in a
+    /// browser/CDN cache (`show_cache_timestamp` stays unported,
+    /// so `html_cache` alone gates this).
+    fn setup_for_html_cache_diagnostics(headers: &mut ps_http::response::ResponseHeaders) {
+        use ps_http::names::header;
+        let date_ms = headers.date_ms();
+        headers.set_time_header(header::EXPIRES, date_ms);
+        headers
+            .headers_mut()
+            .replace(header::CACHE_CONTROL, "max-age=0, private, no-store");
+        for name in ["Content-MD5", "Digest", "Content-Digest", "Repr-Digest"] {
+            headers.headers_mut().remove_all(name);
+        }
+        headers.compute_caching();
+    }
+
     /// AVIF `Vary` additions: rewritten HTML can carry
     /// User-Agent/Accept-selected AVIF URLs, so both vary keys are
     /// ensured present.
@@ -1008,12 +1080,28 @@ pub mod html_rewrite {
                 .context
                 .as_ref()
                 .is_some_and(|ctx| ctx.options.core.filters().enabled(Filter::ConvertToAvif));
+            let (max_html_cache_time_ms, html_cache) = cfg_s
+                .context
+                .as_ref()
+                .map(|ctx| {
+                    (
+                        ctx.options.core.max_html_cache_time_ms(),
+                        ctx.options.core.html_cache(),
+                    )
+                })
+                .unwrap_or((0, false));
             for (name, value) in avif_vary_additions(
                 avif,
                 base_headers.has_value(header::VARY, header::USER_AGENT),
                 base_headers.has_value(header::VARY, header::ACCEPT),
             ) {
                 base_headers.headers_mut().add(name, value);
+            }
+            // Fresh rewritten-HTML lifetime
+            // (`ProxyFetch::SetupForHtml` caching).
+            setup_for_html_caching(base_headers, max_html_cache_time_ms);
+            if html_cache {
+                setup_for_html_cache_diagnostics(base_headers);
             }
             // Rewritten bytes invalidate the origin's validators
             // (`ProxyFetch::SetupForHtml`).
@@ -1350,6 +1438,64 @@ pub mod html_rewrite {
                 avif_vary_additions(true, true, false)
             );
             assert!(avif_vary_additions(true, true, true).is_empty());
+        }
+
+        #[test]
+        fn setup_for_html_caching_replaces_lifetime() {
+            use ps_http::names::header;
+            use ps_http::response::{HttpOptions, ResponseHeaders};
+            fn headers_with(cache_control: Option<&str>) -> ResponseHeaders {
+                let mut headers = ResponseHeaders::new(HttpOptions::default_for_tests());
+                headers.set_status_code(200);
+                headers
+                    .headers_mut()
+                    .add(header::DATE, "Thu, 01 Jan 1970 00:00:00 GMT");
+                if let Some(value) = cache_control {
+                    headers.headers_mut().add(header::CACHE_CONTROL, value);
+                }
+                headers
+            }
+            fn cache_control(headers: &ResponseHeaders) -> String {
+                headers.headers().lookup_joined(header::CACHE_CONTROL)
+            }
+            // The in-place stamp recombines into the fresh line (the
+            // fix-up filter drops its tail below).
+            let mut headers = headers_with(Some("s-maxage=10"));
+            setup_for_html_caching(&mut headers, 0);
+            assert_eq!("max-age=0, no-cache, s-maxage=10", cache_control(&headers));
+            assert_eq!(
+                "Thu, 01 Jan 1970 00:00:00 GMT",
+                headers.headers().lookup_joined(header::EXPIRES)
+            );
+            // No origin line: bare disabled lifetime.
+            let mut headers = headers_with(None);
+            setup_for_html_caching(&mut headers, 0);
+            assert_eq!("max-age=0, no-cache", cache_control(&headers));
+            // Whole-value `no-cache` forces ttl 0 even with headroom.
+            let mut headers = headers_with(Some("no-cache"));
+            setup_for_html_caching(&mut headers, 60_000);
+            assert_eq!("max-age=0, no-cache", cache_control(&headers));
+            // A combined line is not a whole-value match: the min
+            // of the cap and the origin ttl wins, privately (the
+            // engage copy computes caching first, like production).
+            let mut headers = headers_with(Some("max-age=60"));
+            headers.compute_caching();
+            setup_for_html_caching(&mut headers, 60_000);
+            assert_eq!("max-age=60, private", cache_control(&headers));
+            let mut headers = headers_with(Some("max-age=60"));
+            headers.compute_caching();
+            setup_for_html_caching(&mut headers, 30_000);
+            assert_eq!("max-age=30, private", cache_control(&headers));
+            // Preserved suffixes ride along.
+            let mut headers = headers_with(Some("no-store"));
+            setup_for_html_caching(&mut headers, 0);
+            assert_eq!("max-age=0, no-cache, no-store", cache_control(&headers));
+            // Diagnostics tail freezes nothing.
+            let mut headers = headers_with(Some("max-age=60"));
+            headers.headers_mut().add("Digest", "md5=abc");
+            setup_for_html_cache_diagnostics(&mut headers);
+            assert_eq!("max-age=0, private, no-store", cache_control(&headers));
+            assert!(headers.headers().lookup_joined("Digest").is_empty());
         }
 
         /// Recording sink for the finish test.

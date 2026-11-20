@@ -554,6 +554,10 @@ pub struct NginxSystemOptions {
     pub cache_flush_filename: String,
     /// `CompressMetadataCache` (default on).
     pub compress_metadata_cache: bool,
+    /// `IproMaxResponseBytes` (default 10 MiB; 0 unlimited).
+    pub ipro_max_response_bytes: i64,
+    /// `IproMaxConcurrentRecordings` (default 10; 0 unlimited).
+    pub ipro_max_concurrent_recordings: i64,
     /// Explicitly-set flags (`was_set`, driving merges).
     pub was_set: SystemWasSet,
 }
@@ -583,6 +587,10 @@ pub struct SystemWasSet {
     pub flush_filename: bool,
     /// `CompressMetadataCache` set.
     pub compress_metadata: bool,
+    /// `IproMaxResponseBytes` set.
+    pub ipro_max_response_bytes: bool,
+    /// `IproMaxConcurrentRecordings` set.
+    pub ipro_max_concurrent_recordings: bool,
 }
 
 impl Default for NginxSystemOptions {
@@ -616,6 +624,8 @@ impl Default for NginxSystemOptions {
             lru_cache_kb_per_process: 0,
             cache_flush_filename: String::new(),
             compress_metadata_cache: true,
+            ipro_max_response_bytes: 10 * 1024 * 1024,
+            ipro_max_concurrent_recordings: 10,
             was_set: SystemWasSet::default(),
         }
     }
@@ -1683,6 +1693,22 @@ impl RewriteOptions {
             Some(Value::Int(ms)) => ms,
             _ => 0,
         }
+    }
+
+    /// Reads the rewritten-HTML cache cap (`max_html_cache_time_ms`,
+    /// default 0: rewritten pages are never cacheable).
+    #[must_use]
+    pub fn max_html_cache_time_ms(&self) -> i64 {
+        match self.get_by_name("MaxHtmlCacheTimeMs") {
+            Some(Value::Int(ms)) => ms,
+            _ => 0,
+        }
+    }
+
+    /// Sets the rewritten-HTML cache cap.
+    pub fn set_max_html_cache_time_ms(&mut self, value: i64) {
+        self.values.insert("hc", Value::Int(value));
+        self.modified = true;
     }
 
     /// Reads the purge flag (`enable_cache_purge`).
@@ -4198,6 +4224,36 @@ pub fn apply_nginx_directive(
                     }),
                 };
             }
+            // In-place recording caps (`SystemRewriteOptions`,
+            // legacy process scope): response size (10 MiB
+            // default, 0 unlimited) and concurrent recordings
+            // (10 default, 0 unlimited).
+            if directive == "IproMaxResponseBytes" {
+                return match parse_int64(args[0]) {
+                    Some(n) => {
+                        system.ipro_max_response_bytes = n;
+                        system.was_set.ipro_max_response_bytes = true;
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
+            if directive == "IproMaxConcurrentRecordings" {
+                return match parse_int64(args[0]) {
+                    Some(n) => {
+                        system.ipro_max_concurrent_recordings = n;
+                        system.was_set.ipro_max_concurrent_recordings = true;
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
             if directive.eq_ignore_ascii_case("ProcessScriptVariables") {
                 if scope != Scope::ProcessStrict {
                     return Err(SetError {
@@ -4294,9 +4350,12 @@ mod tests {
 
     #[test]
     fn defaults_and_html_writer() {
-        let options = RewriteOptions::new();
+        let mut options = RewriteOptions::new();
         assert!(!options.modified());
         assert_eq!(options.enabled_state(), EnabledState::On);
+        assert_eq!(0, options.max_html_cache_time_ms());
+        options.set_max_html_cache_time_ms(60_000);
+        assert_eq!(60_000, options.max_html_cache_time_ms());
         // HtmlWriterFilter is enabled by default, as in C++ Initialize().
         assert!(options.filters().enabled(Filter::HtmlWriterFilter));
         assert_eq!(
@@ -4993,6 +5052,61 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err.message, "\"FileCacheSizeKb lots\" ");
+    }
+
+    #[test]
+    fn ipro_recording_caps() {
+        let mut options = RewriteOptions::new();
+        let mut factory = NginxFactoryOptions::default();
+        let mut system = NginxSystemOptions::default();
+        assert_eq!(10 * 1024 * 1024, system.ipro_max_response_bytes);
+        assert_eq!(10, system.ipro_max_concurrent_recordings);
+        apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "IproMaxResponseBytes",
+            &["1024"],
+            Scope::ProcessStrict,
+        )
+        .unwrap();
+        apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "IproMaxConcurrentRecordings",
+            &["3"],
+            Scope::ProcessStrict,
+        )
+        .unwrap();
+        assert_eq!(1024, system.ipro_max_response_bytes);
+        assert!(system.was_set.ipro_max_response_bytes);
+        assert_eq!(3, system.ipro_max_concurrent_recordings);
+        assert!(system.was_set.ipro_max_concurrent_recordings);
+        // Server scope rejects; bad values wrap empty.
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "IproMaxResponseBytes",
+            &["1024"],
+            Scope::Server,
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.message,
+            "\"IproMaxResponseBytes\" cannot be set at this scope."
+        );
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "IproMaxConcurrentRecordings",
+            &["many"],
+            Scope::ProcessStrict,
+        )
+        .unwrap_err();
+        assert_eq!(err.message, "\"IproMaxConcurrentRecordings many\" ");
     }
 
     #[test]

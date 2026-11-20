@@ -351,11 +351,19 @@ Fixed by the suite (were divergences, now match):
   Ported into `finish_html_header_filter`.
 
 Known gaps (suite reports, never fails):
-- compat-1: inline CSS/JS minify wiring unported
-  (`CssInline`/`Javascript`/`JsInline` slots skipped; the
-  `ps-css` and `ps-js` minify crates exist but no chain
-  adapter feeds them). Affects `core-rich`,
-  `elide-attributes` bodies.
-- compat-2: error `s-maxage` rides unported recorder arming
-  (C++ IPRO-miss recording path stamps it; our recorder is
-  never armed). Affects `missing-file` headers.
+- compat-1 CLOSED: inline CSS/JS minify wired as
+  `CssMinifyFilter`/`JsMinifyFilter` on the `CssFilter`/
+  `Javascript` slots (inline `<style>`/`<script>` only;
+  external resources still need the driver-bound filters
+  and fetch machinery). `core-rich` and `elide-attributes`
+  now match C++ byte-exact.
+- compat-2 CLOSED: recorder armed on IPRO miss with
+  `StatsRecordingBackend` (stats + logs real; cache writes
+  no-ops until the fetch machinery lands), plus the
+  `SetupForHtml` caching half (fresh rewritten-HTML
+  lifetime; the fix-up filter's line-level drop removes
+  the recombined stamp tail). `missing-file` now matches
+  C++ byte-exact. Remaining: recording cache writes
+  (fetch-machinery epic); `set_date_and_caching` ttl=0
+  and `cache_control_values_to_preserve` divergences
+  (pre-existing, other suites pin them).

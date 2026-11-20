@@ -14,6 +14,7 @@ use ps_http::content_type::ContentType;
 use ps_http::inflate::{GzipInflater, InflateType};
 use ps_http::names::header;
 use ps_http::response::{RequestProperties, ResponseHeaders, ValidatorOption, VaryOption};
+use std::sync::Arc;
 
 /// Not-in-cache marker status
 /// (`CacheUrlAsyncFetcher::kNotInCacheStatus`, 501).
@@ -49,6 +50,75 @@ pub enum RecorderStat {
     DroppedDueToLoad,
     /// Dropped due to size.
     DroppedDueToSize,
+}
+
+/// Statistics-and-logging recording backend: the sync bridge's
+/// stand-in for `HTTPCache` until the fetch machinery lands. Stat
+/// bumps and log lines execute for real; `put` and
+/// `remember_failure` stay no-ops, so recordings never warm the
+/// cache and misses re-record every time.
+pub struct StatsRecordingBackend {
+    statistics: Arc<ps_stats::core::Statistics>,
+    handler: Option<crate::message::NgxMessageHandler>,
+}
+
+impl StatsRecordingBackend {
+    /// Wraps the shared statistics registry plus the request log
+    /// handler (`None` drops log lines).
+    #[must_use]
+    pub fn new(
+        statistics: Arc<ps_stats::core::Statistics>,
+        handler: Option<crate::message::NgxMessageHandler>,
+    ) -> Self {
+        StatsRecordingBackend {
+            statistics,
+            handler,
+        }
+    }
+
+    /// Maps a stat to its console variable (`kNum*`).
+    fn stat_name(stat: RecorderStat) -> &'static str {
+        match stat {
+            RecorderStat::Resources => "ipro_recorder_resources",
+            RecorderStat::InsertedIntoCache => "ipro_recorder_inserted_into_cache",
+            RecorderStat::NotCacheable => "ipro_recorder_not_cacheable",
+            RecorderStat::Failed => "ipro_recorder_failed",
+            RecorderStat::DroppedDueToLoad => "ipro_recorder_dropped_due_to_load",
+            RecorderStat::DroppedDueToSize => "ipro_recorder_dropped_due_to_size",
+        }
+    }
+}
+
+impl RecordingBackend for StatsRecordingBackend {
+    fn remember_failure(&mut self, _url: &str, _fragment: &str, _kind: RecordingFailure) {
+        // No cache to poison until the fetch machinery lands.
+    }
+
+    fn put(
+        &mut self,
+        _url: &str,
+        _fragment: &str,
+        _properties: RequestProperties,
+        _headers: &ResponseHeaders,
+        _body: &[u8],
+    ) {
+        // No cache to warm until the fetch machinery lands.
+    }
+
+    fn note_stat(&mut self, stat: RecorderStat) {
+        self.statistics.add_variable(Self::stat_name(stat)).add(1);
+    }
+
+    fn log_info(&mut self, text: String) {
+        if let Some(handler) = self.handler.as_ref() {
+            // SAFETY: the backend lives in the request context,
+            // dropped with the request, so the handler's log
+            // (when set) still points at the live request log.
+            unsafe {
+                handler.message(ps_config::message_handler::MessageLevel::Info, &text);
+            }
+        }
+    }
 }
 
 /// Cache, statistics, and logging backend (Slice 6 provides the
@@ -997,5 +1067,29 @@ mod tests {
         let cache_control = full.headers().lookup_joined(header::CACHE_CONTROL);
         assert!(cache_control.contains("max-age=100"), "{cache_control}");
         assert!(!cache_control.contains("s-maxage"), "{cache_control}");
+    }
+
+    #[test]
+    fn stats_backend_bumps_console_variables() {
+        let statistics = Arc::new(ps_stats::core::Statistics::new());
+        let mut backend = StatsRecordingBackend::new(Arc::clone(&statistics), None);
+        backend.note_stat(RecorderStat::Resources);
+        backend.note_stat(RecorderStat::Resources);
+        backend.note_stat(RecorderStat::NotCacheable);
+        // Cache writes stay no-ops (nothing observable to assert).
+        backend.remember_failure("http://h/a", "", RecordingFailure::Error4xx);
+        backend.put("http://h/a", "", properties(), &responses(), b"data");
+        backend.log_info("dropped without a handler".to_string());
+        let resources = statistics
+            .get_variable("ipro_recorder_resources")
+            .expect("resources variable");
+        assert_eq!(2, resources.get());
+        let not_cacheable = statistics
+            .get_variable("ipro_recorder_not_cacheable")
+            .expect("not-cacheable variable");
+        assert_eq!(1, not_cacheable.get());
+        assert!(statistics
+            .get_variable("ipro_recorder_inserted_into_cache")
+            .is_none());
     }
 }

@@ -64,7 +64,7 @@ pub const CASES: &[CaseDef] = &[
         path: "/rich.html",
         html: Some(RICH_HTML),
         directives: &[("on", ""), ("FileCachePath", CACHE_PLACEHOLDER)],
-        known_gap: Some("inline CSS/JS minify wiring unported (slots skipped)"),
+        known_gap: None,
     },
     CaseDef {
         name: "elide-attributes",
@@ -75,7 +75,7 @@ pub const CASES: &[CaseDef] = &[
             ("FileCachePath", CACHE_PLACEHOLDER),
             ("EnableFilters", "elide_attributes"),
         ],
-        known_gap: Some("inline CSS/JS minify wiring unported (slots skipped)"),
+        known_gap: None,
     },
     CaseDef {
         name: "missing-file",

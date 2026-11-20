@@ -1386,3 +1386,40 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   Status: 2 page cases byte-exact, 3 xfailed gaps, 7/7
   config cases green. Workspace: 2563 passed, 0 failed
   (live suite excluded without the env gate).
+- compat-1 follow-up (this session): DONE. Inline CSS/JS
+  minify wired: new `CssMinifyFilter` (`<style>` text via
+  `ps-css`, fail-closed) and `JsMinifyFilter` (inline
+  JavaScript via `ps-js`, with the verbatim end-tag guard
+  plus noscript/non-JS/src skips) on the `CssFilter`/
+  `Javascript` slots; the full driver-bound filters stay
+  for the fetch-machinery epic. Unit goldens incl.
+  C++-observed outputs; instantiate + driver skipped-slot
+  tests updated. Compat suite reports GAP CLOSED on
+  `core-rich` and `elide-attributes` (byte-exact);
+  `missing-file` (compat-2) still xfailed. Workspace:
+  2565 passed, 0 failed.
+- compat-2 follow-up (this session): DONE. Recorder armed on
+  IPRO miss (sync equivalent of C++'s header-filter arm on
+  the synthetic 501): new `IproMaxResponseBytes` (10 MiB) /
+  `IproMaxConcurrentRecordings` (10) system options with
+  parse/scope/merge, new `max_html_cache_time_ms` core
+  accessor (table entry already existed), `ServerContext::
+  statistics_shared`, and `StatsRecordingBackend` (real
+  `ipro_recorder_*` bumps + log lines; cache writes stay
+  no-ops until the fetch machinery lands, so misses
+  re-record). Arming the recorder exposed a second
+  divergence: rewritten 200s transiently carried the stamp
+  because our `SetupForHtml` port had only the strips —
+  C++ replaces the fetch's `Cache-Control` there
+  (`SetDateAndCaching` + preserved no-transform/no-store/
+  s-maxage), and the fix-up filter's line-level drop then
+  removes the recombined tail. Ported as
+  `setup_for_html_caching` + the `html_cache` diagnostics
+  tail (`show_cache_timestamp` stays unported). Compat suite
+  reports GAP CLOSED on `missing-file`; all 5 page + 7
+  config cases green. Workspace: 2568 passed, 0 failed.
+  Follow-ups filed: IPRO cache-write backend
+  (fetch-machinery epic); `set_date_and_caching` ttl=0
+  branch diverges from C++ (drops suffix/Expires);
+  `cache_control_values_to_preserve` keeps the wrong
+  directive list.

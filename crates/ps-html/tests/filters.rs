@@ -7,11 +7,11 @@ use ps_html::filter::HtmlFilter;
 use ps_html::filters::js_disable::JsDisableConfig;
 use ps_html::filters::{
     instantiate, should_insert_noscript, AddHeadFilter, AddIdsFilter, BaseTagFilter,
-    CollapseWhitespaceFilter, DeferIframeFilter, DeterministicJsFilter, ElideAttributesFilter,
-    FixReflowFilter, FlushHtmlFilter, HandleNoscriptRedirectFilter, InsertAmpLinkFilter,
-    JsDisableFilter, PedanticFilter, QuoteRemovalFilter, RemoveCommentsFilter,
-    StripLegacyPolyfillsFilter, StripScriptsFilter, SupportNoscriptFilter, XhtmlStatus,
-    DEFER_IFRAME_IFRAME_JS, ELEMENT_ONLOAD_CODE,
+    CollapseWhitespaceFilter, CssMinifyFilter, DeferIframeFilter, DeterministicJsFilter,
+    ElideAttributesFilter, FixReflowFilter, FlushHtmlFilter, HandleNoscriptRedirectFilter,
+    InsertAmpLinkFilter, JsDisableFilter, JsMinifyFilter, PedanticFilter, QuoteRemovalFilter,
+    RemoveCommentsFilter, StripLegacyPolyfillsFilter, StripScriptsFilter, SupportNoscriptFilter,
+    XhtmlStatus, DEFER_IFRAME_IFRAME_JS, ELEMENT_ONLOAD_CODE,
 };
 use ps_html::parser::Parser;
 use ps_html::static_assets::{get_asset, StaticAsset};
@@ -1447,7 +1447,82 @@ fn registry_maps_implemented_slots() {
     assert!(instantiate(ChainFilter::JsDisable).is_none());
     assert!(instantiate(ChainFilter::AddIds).is_some());
     assert!(instantiate(ChainFilter::HandleNoscriptRedirect).is_none());
-    assert!(instantiate(ChainFilter::CssFilter).is_none());
+    // Minify subsets stand in until the driver-bound filters land.
+    assert!(instantiate(ChainFilter::CssFilter).is_some());
+    assert!(instantiate(ChainFilter::Javascript).is_some());
     assert!(instantiate(ChainFilter::ImageRewrite).is_none());
     assert!(instantiate(ChainFilter::HtmlWriter).is_none());
+}
+
+#[test]
+fn css_minify_cases() {
+    use ps_html::filters::CssMinifyFilter;
+    // Goldens observed from C++ (`core-rich` compat case).
+    let plain: &[(&str, &[u8], &[u8])] = &[
+        (
+            "minify_style_block",
+            b"<head><style>body { color: red; }</style></head>",
+            b"<head><style>body{color:red}</style></head>",
+        ),
+        (
+            "minify_declarations",
+            b"<head><style>p { margin: 0 auto; padding : 4px ; }</style></head>",
+            b"<head><style>p{margin:0 auto;padding:4px}</style></head>",
+        ),
+        (
+            "leaves_unparseable_css",
+            b"<head><style>{</style></head>",
+            b"<head><style>{</style></head>",
+        ),
+        (
+            "ignores_non_style_text",
+            b"<body><p>a  b</p></body>",
+            b"<body><p>a  b</p></body>",
+        ),
+    ];
+    for (id, input, expected) in plain {
+        let output = run_with_filters(input, |parser| {
+            parser.add_pre_render_filter(Box::new(CssMinifyFilter::default()));
+        });
+        assert_eq!(output, *expected, "case {id}");
+    }
+}
+
+#[test]
+fn js_minify_cases() {
+    use ps_html::filters::JsMinifyFilter;
+    // Goldens observed from C++ (`core-rich` compat case).
+    let plain: &[(&str, &[u8], &[u8])] = &[
+        (
+            "minify_script_block",
+            b"<body><script>function f() { return 1 + 2; }</script></body>",
+            b"<body><script>function f(){return 1+2;}</script></body>",
+        ),
+        (
+            "skips_external_script",
+            b"<body><script src=\"a.js\">var  x  =  1;</script></body>",
+            b"<body><script src=\"a.js\">var  x  =  1;</script></body>",
+        ),
+        (
+            "skips_non_javascript_type",
+            b"<body><script type=\"application/json\">{\"a\" : 1 }</script></body>",
+            b"<body><script type=\"application/json\">{\"a\" : 1 }</script></body>",
+        ),
+        (
+            "keeps_end_tag_unsafe_minification",
+            b"<body><script>var  s  =  \"</script>\";</script></body>",
+            b"<body><script>var  s  =  \"</script>\";</script></body>",
+        ),
+        (
+            "skips_noscript_contents",
+            b"<body><noscript><script>var  x  =  1;</script></noscript></body>",
+            b"<body><noscript><script>var  x  =  1;</script></noscript></body>",
+        ),
+    ];
+    for (id, input, expected) in plain {
+        let output = run_with_filters(input, |parser| {
+            parser.add_pre_render_filter(Box::new(JsMinifyFilter::default()));
+        });
+        assert_eq!(output, *expected, "case {id}");
+    }
 }

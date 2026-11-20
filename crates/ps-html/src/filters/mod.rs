@@ -20,6 +20,7 @@ pub mod css_hierarchy;
 pub mod css_image_rewriter;
 pub mod css_inline;
 pub mod css_inline_import_to_link;
+pub mod css_minify;
 pub mod debug;
 pub mod decode_rewritten_urls;
 pub mod dedup_inlined_images;
@@ -44,6 +45,7 @@ pub mod js_combine;
 pub mod js_defer_disabled;
 pub mod js_disable;
 pub mod js_inline;
+pub mod js_minify;
 pub mod js_outline;
 pub mod lazyload_images;
 pub mod local_storage_cache;
@@ -71,6 +73,7 @@ pub use collapse_whitespace::CollapseWhitespaceFilter;
 pub use common::{BodyEndTracker, XhtmlStatus};
 pub use css_inline::{CssInlineFilter, FILTER_ID as CSS_INLINE_ID, NUM_CSS_INLINED};
 pub use css_inline_import_to_link::{CssInlineImportToLinkConfig, CssInlineImportToLinkFilter};
+pub use css_minify::CssMinifyFilter;
 pub use debug::{DebugConfig, DebugFilter};
 pub use decode_rewritten_urls::{DecodeRewrittenUrlsConfig, DecodeRewrittenUrlsFilter};
 pub use dedup_inlined_images::{
@@ -105,6 +108,7 @@ pub use js_disable::{JsDisableConfig, JsDisableFilter, ELEMENT_ONLOAD_CODE};
 pub use js_inline::{
     escape_text_element_tags, JsInlineFilter, FILTER_ID as JS_INLINE_ID, NUM_JS_INLINED,
 };
+pub use js_minify::JsMinifyFilter;
 pub use lazyload_images::{
     FinderAvailability, LazyloadHtmlStatus, LazyloadImagesConfig, LazyloadImagesFilter,
     LazyloadLogRecord, LazyloadStatus, BEACON_IMAGE_ONLOAD_CODE, IMAGE_ONLOAD_CODE,
@@ -138,6 +142,10 @@ use crate::filter::HtmlFilter;
 pub fn instantiate(slot: ChainFilter) -> Option<Box<dyn HtmlFilter>> {
     match slot {
         ChainFilter::CollapseWhitespace => Some(Box::new(CollapseWhitespaceFilter::default())),
+        // Minify subsets stand in for the driver-bound filters
+        // (external resources need fetch machinery).
+        ChainFilter::CssFilter => Some(Box::new(CssMinifyFilter::default())),
+        ChainFilter::Javascript => Some(Box::new(JsMinifyFilter::default())),
         ChainFilter::ElideAttributes => Some(Box::new(ElideAttributesFilter)),
         ChainFilter::RemoveQuotes => Some(Box::new(QuoteRemovalFilter::default())),
         ChainFilter::RemoveComments => Some(Box::new(RemoveCommentsFilter::default())),

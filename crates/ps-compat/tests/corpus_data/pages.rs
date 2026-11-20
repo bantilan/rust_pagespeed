@@ -121,7 +121,7 @@ vec![
         103, 34, 32, 119, 105, 100, 116, 104, 61, 34, 49, 48, 34, 32, 104, 101, 
         105, 103, 104, 116, 61, 34, 49, 48, 34, 62, 60, 47, 100, 105, 118, 62, 
         60, 47, 98, 111, 100, 121, 62, 60, 47, 104, 116, 109, 108, 62],
-            known_gap: Some("inline CSS/JS minify wiring unported (slots skipped)".to_string()),
+            known_gap: None,
         },
         RecordedCase {
             name: "elide-attributes".to_string(),
@@ -183,7 +183,7 @@ vec![
         103, 34, 32, 119, 105, 100, 116, 104, 61, 34, 49, 48, 34, 32, 104, 101, 
         105, 103, 104, 116, 61, 34, 49, 48, 34, 62, 60, 47, 100, 105, 118, 62, 
         60, 47, 98, 111, 100, 121, 62, 60, 47, 104, 116, 109, 108, 62],
-            known_gap: Some("inline CSS/JS minify wiring unported (slots skipped)".to_string()),
+            known_gap: None,
         },
         RecordedCase {
             name: "missing-file".to_string(),
@@ -210,7 +210,7 @@ vec![
         51, 54, 98, 48, 60, 47, 99, 101, 110, 116, 101, 114, 62, 13, 10, 60, 
         47, 98, 111, 100, 121, 62, 13, 10, 60, 47, 104, 116, 109, 108, 62, 13, 
         10],
-            known_gap: Some("error s-maxage rides unported recorder arming".to_string()),
+            known_gap: None,
         },
     ]
 }

@@ -203,6 +203,8 @@ pub const NGINX_PROPERTY_SCOPES: &[(&str, Scope)] = &[
     ("CacheFlushFilename", Scope::Server),
     ("EnableCachePurge", Scope::Server),
     ("CompressMetadataCache", Scope::Server),
+    ("IproMaxResponseBytes", Scope::ProcessStrict),
+    ("IproMaxConcurrentRecordings", Scope::ProcessStrict),
 ];
 
 /// Full nginx scope resolution (`NgxRewriteOptions::GetOptionScope`).

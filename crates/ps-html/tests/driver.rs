@@ -82,12 +82,15 @@ fn core_plan_leaves_unplanned_content_alone() {
     options.filters_mut().set_level(RewriteLevel::CoreFilters);
     let sink = SharedSink::default();
     let mut driver = Driver::new(&options, &ctx(), sink.clone());
-    assert!(driver
+    // Minify subsets cover the CSS/JS slots now.
+    assert!(!driver
         .skipped_slots()
-        .contains(&(Phase::PreRender, ChainFilter::CssFilter)));
-    assert!(driver
+        .iter()
+        .any(|(_, slot)| *slot == ChainFilter::CssFilter));
+    assert!(!driver
         .skipped_slots()
-        .contains(&(Phase::PreRender, ChainFilter::Javascript)));
+        .iter()
+        .any(|(_, slot)| *slot == ChainFilter::Javascript));
     assert!(driver
         .skipped_slots()
         .contains(&(Phase::PreRender, ChainFilter::ImageRewrite)));

@@ -112,6 +112,11 @@ impl NgxOptions {
         flagged!(lru_cache_kb_per_process, lru_kb_per_process);
         flagged!(cache_flush_filename, flush_filename);
         flagged!(compress_metadata_cache, compress_metadata);
+        flagged!(ipro_max_response_bytes, ipro_max_response_bytes);
+        flagged!(
+            ipro_max_concurrent_recordings,
+            ipro_max_concurrent_recordings
+        );
         // Server lists replace when present (explicit-clear is
         // unrepresentable, matching the path convention).
         if !src.system.memcached_servers.is_empty() {
@@ -519,6 +524,17 @@ mod tests {
         child.system.was_set.clean_size = true;
         merged.merge_system(&child);
         assert_eq!(102_400, merged.system.file_cache_clean_size_kb);
+        // Recording caps transfer with their flags.
+        let mut child = NgxOptions::new();
+        child.system.ipro_max_response_bytes = 1024;
+        child.system.was_set.ipro_max_response_bytes = true;
+        child.system.ipro_max_concurrent_recordings = 3;
+        child.system.was_set.ipro_max_concurrent_recordings = true;
+        merged.merge_system(&child);
+        assert_eq!(1024, merged.system.ipro_max_response_bytes);
+        assert!(merged.system.was_set.ipro_max_response_bytes);
+        assert_eq!(3, merged.system.ipro_max_concurrent_recordings);
+        assert!(merged.system.was_set.ipro_max_concurrent_recordings);
     }
 
     #[test]

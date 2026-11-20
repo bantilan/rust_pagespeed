@@ -2175,6 +2175,7 @@ unsafe fn resource_response(
     use crate::fetch::{release_base_fetch, BaseFetchType, SharedBaseFetch};
     use crate::headers::{copy_request_headers, copy_response_headers, for_each_header};
     use crate::options::{determine_options, DetermineInputs};
+    use crate::recording::{InPlaceRecorder, StatsRecordingBackend};
     use crate::request::{attach_request_ctx, get_request_ctx, RequestCtx};
     use crate::resource::{decide_branch, is_admin_route, Branch, BranchInputs};
     use ngx::ffi::{
@@ -2585,15 +2586,62 @@ unsafe fn resource_response(
                     &url_string,
                     now_ms,
                 );
-                // Misses decline to the origin without recording:
-                // the recorder arming waits for the fetch
-                // machinery, so the cache only serves entries
-                // warmed elsewhere. The decline resets like C++'s
+                // Misses arm the recorder, then decline to the
+                // origin: the sync bridge answers the lookup
+                // inline, so the arm that C++ performs in the
+                // header filter on the synthetic 501 happens
+                // here, with header-only requests skipping it
+                // like C++. The backend only bumps statistics
+                // until the fetch machinery lands, so misses
+                // re-record every time; the preliminary feed,
+                // body feed, and `s-maxage` stamp still execute
+                // for real. The decline resets like C++'s
                 // (`ps_decline_request` ctx half): clearing
                 // `in_place` keeps the in-place header filter from
                 // re-declining after our header filter passed,
                 // which would arm HTML on an errored response.
                 if response.status == 0 || response.status >= 400 {
+                    if (*r).header_only() == 0 {
+                        let mut request_headers = RequestHeaders::new();
+                        {
+                            let mut raw: Vec<(String, String, bool)> = Vec::new();
+                            for_each_header(&mut (*r).headers_in.headers, |elt| {
+                                let key = ngx_str_text(&raw const (*elt).key);
+                                let value = ngx_str_text(&raw const (*elt).value);
+                                raw.push((key, value, (*elt).hash != 0));
+                                true
+                            });
+                            let refs: Vec<crate::headers::RawHeader<'_>> = raw
+                                .iter()
+                                .map(|(key, value, hashed)| (key.as_str(), value.as_str(), *hashed))
+                                .collect();
+                            let method_name = ngx_str_text(&raw const (*r).method_name);
+                            copy_request_headers(
+                                (*r).http_version,
+                                &method_name,
+                                &refs,
+                                &mut request_headers,
+                            );
+                        }
+                        let backend = StatsRecordingBackend::new(
+                            html.statistics_shared(),
+                            server.message_handler.clone(),
+                        );
+                        let max_concurrent =
+                            i32::try_from(resolved.system.ipro_max_concurrent_recordings)
+                                .unwrap_or(i32::MAX);
+                        (*ctx_ptr).recorder = Some(InPlaceRecorder::new(
+                            &url_string,
+                            "",
+                            request_headers.properties(),
+                            resolved.core.respect_vary(),
+                            resolved.system.ipro_max_response_bytes,
+                            max_concurrent,
+                            -1,
+                            Some(Box::new(backend)),
+                        ));
+                        (*r).set_filter_need_in_memory(1);
+                    }
                     decline_request_state(&mut *ctx_ptr, None);
                     return NGX_DECLINED as ngx_int_t;
                 }
