@@ -871,12 +871,10 @@ impl CssFilter {
         let mut our_charset = b"iso-8859-1".to_vec();
         let mut source = "the default";
         let mut headers_charset = Vec::new();
-        if let Some(headers) = self.driver.response_headers().as_ref() {
-            if let Some(charset) = headers.determine_charset() {
-                headers_charset = charset.into_bytes();
-                our_charset = headers_charset.clone();
-                source = "from headers";
-            }
+        if let Some(charset) = self.driver.response_headers().determine_charset() {
+            headers_charset = charset.into_bytes();
+            our_charset = headers_charset.clone();
+            source = "from headers";
         }
         if headers_charset.is_empty() && !self.meta_tag_charset.is_empty() {
             our_charset = self.meta_tag_charset.clone();

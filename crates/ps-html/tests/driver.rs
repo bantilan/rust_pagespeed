@@ -375,3 +375,110 @@ fn phases_run_early_pre_render_post() {
         ]
     );
 }
+
+/// Builds a resource driver over scratch caches (the live path hands
+/// both the plan options and the driver to `Driver::new`).
+fn resource_driver_for(
+    options: Rc<RefCell<RewriteOptions>>,
+    base_url: &str,
+) -> Rc<ps_html::server_context::ResourceDriver> {
+    use ps_cache::cache::MemoryCache;
+    use ps_html::server_context::ServerContext;
+    use ps_http::mock::MockUrlFetcher;
+    use std::sync::Arc;
+
+    let server = Rc::new(ServerContext::new_with_metadata(
+        Arc::new(MemoryCache::new()),
+        Arc::new(MemoryCache::new()),
+        Rc::new(MockUrlFetcher::new()),
+        1_700_000_000_000,
+    ));
+    Rc::new(ps_html::server_context::ResourceDriver::new(
+        server, options, base_url,
+    ))
+}
+
+#[test]
+fn driver_binds_meta_tag_to_shared_headers() {
+    use ps_http::response::{HttpOptions, ResponseHeaders};
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(Filter::ConvertMetaTags);
+    let resource_driver = resource_driver_for(options.clone(), "http://test.com/meta.html");
+    let mut staged = ResponseHeaders::new(HttpOptions::default_for_tests());
+    staged.headers_mut().replace("Content-Type", "text/html");
+    resource_driver.set_response_headers(staged);
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ctx(),
+        sink.clone(),
+        Some(resource_driver.clone()),
+    );
+    assert!(
+        !driver
+            .skipped_slots()
+            .contains(&(Phase::PostRender, ChainFilter::MetaTag)),
+        "MetaTag must bind, skipped: {:?}",
+        driver.skipped_slots()
+    );
+    let input = b"<html><head><meta http-equiv=\"Content-Type\" content=\"text/html;  charset=UTF-8\"></head><body></body></html>";
+    driver.start_parse(b"http://test.com/meta.html", false);
+    driver.write(input);
+    driver.finish();
+    assert_eq!(sink.bytes(), input);
+    // The filter mutated the driver's live headers through the share.
+    let values = resource_driver
+        .response_headers()
+        .headers()
+        .lookup("Content-Type")
+        .unwrap();
+    assert_eq!(values.len(), 1);
+    assert_eq!(values[0].to_ascii_lowercase(), "text/html; charset=utf-8");
+}
+
+#[test]
+fn driver_binds_support_noscript_with_driver_url() {
+    // A script-requiring filter plus a defer-capable desktop UA
+    // inserts the redirect; the URL is the driver's, with the
+    // `?PageSpeed=noscript` param (C++ `DetermineEnabled`).
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(Filter::DeferJavascript);
+    let resource_driver = resource_driver_for(options.clone(), "http://test.com/sn.html");
+    resource_driver.set_user_agent(concat!(
+        "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) ",
+        "AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13"
+    ));
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ctx(),
+        sink.clone(),
+        Some(resource_driver),
+    );
+    assert!(
+        !driver
+            .skipped_slots()
+            .contains(&(Phase::PostRender, ChainFilter::SupportNoscript)),
+        "SupportNoscript must bind, skipped: {:?}",
+        driver.skipped_slots()
+    );
+    let input = b"<head></head><body><p>x</p></body>";
+    driver.start_parse(b"http://test.com/sn.html", false);
+    driver.write(input);
+    driver.finish();
+    let url = b"http://test.com/sn.html?PageSpeed=noscript";
+    let mut expected =
+        b"<head></head><body><noscript><meta HTTP-EQUIV=\"refresh\" content=\"0;url='".to_vec();
+    expected.extend_from_slice(url);
+    expected.extend_from_slice(b"'\" /><style><!--table,div,span,font,p{display:none} --></style><div style=\"display:block\">Please click <a href=\"");
+    expected.extend_from_slice(url);
+    expected.extend_from_slice(b"\">here</a> if you are not redirected within a few seconds.</div></noscript><p>x</p></body>");
+    assert_eq!(sink.bytes(), expected);
+}

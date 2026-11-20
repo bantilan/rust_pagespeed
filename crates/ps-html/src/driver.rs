@@ -152,6 +152,28 @@ impl Driver {
                             )) as Box<dyn crate::filter::HtmlFilter>
                         })
                     }
+                    ChainFilter::MetaTag => resource_driver.clone().map(|driver| {
+                        Box::new(filters::MetaTagFilter::new(
+                            &driver.response_headers_shared(),
+                        )) as Box<dyn crate::filter::HtmlFilter>
+                    }),
+                    ChainFilter::SupportNoscript => resource_driver.clone().map(|driver| {
+                        let mut properties = driver.request_properties();
+                        let should_insert = filters::should_insert_noscript(
+                            options.filters(),
+                            properties.supports_js_defer(
+                                options.enable_aggressive_rewriters_for_mobile(),
+                            ),
+                            properties.supports_image_inlining(),
+                        );
+                        let with_param = driver
+                            .base_url()
+                            .copy_and_add_query_param("PageSpeed", "noscript");
+                        let mut escaped = Vec::new();
+                        crate::keywords::escape(with_param.spec().as_bytes(), &mut escaped);
+                        Box::new(filters::SupportNoscriptFilter::new(&escaped, should_insert))
+                            as Box<dyn crate::filter::HtmlFilter>
+                    }),
                     _ => None,
                 };
                 match bound.or_else(|| filters::instantiate(*slot)) {

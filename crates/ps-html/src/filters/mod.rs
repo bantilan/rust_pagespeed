@@ -137,7 +137,9 @@ use crate::filter::HtmlFilter;
 /// filter is still unported, or when it needs driver context — `BaseTag`
 /// takes the document base URL, `AddHead` the combine flag,
 /// `HandleNoscriptRedirect` the document URL, `AmpDocument` the discovery
-/// callback — which the driver supplies at construction).
+/// callback, `MetaTag` the shared response headers, `SupportNoscript`
+/// the escaped document URL plus the script-execution verdict — which
+/// the driver supplies at construction).
 #[must_use]
 pub fn instantiate(slot: ChainFilter) -> Option<Box<dyn HtmlFilter>> {
     match slot {

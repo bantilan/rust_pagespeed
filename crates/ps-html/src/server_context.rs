@@ -634,7 +634,7 @@ pub struct ResourceDriver {
     containing_charset: RefCell<String>,
     is_amp: RefCell<bool>,
     xhtml_status: RefCell<XhtmlStatus>,
-    response_headers: RefCell<Option<ResponseHeaders>>,
+    response_headers: Rc<RefCell<ResponseHeaders>>,
     user_agent: RefCell<String>,
     request_headers: RefCell<RequestHeaders>,
 }
@@ -684,7 +684,7 @@ impl ResourceDriver {
             containing_charset: RefCell::new(String::new()),
             is_amp: RefCell::new(false),
             xhtml_status: RefCell::new(XhtmlStatus::Unknown),
-            response_headers: RefCell::new(None),
+            response_headers: Rc::new(RefCell::new(ResponseHeaders::default())),
             user_agent: RefCell::new(String::new()),
             request_headers: RefCell::new(RequestHeaders::new()),
         };
@@ -728,14 +728,22 @@ impl ResourceDriver {
     /// Borrows the containing document headers (`response_headers`,
     /// set by the server layer or tests).
     #[must_use]
-    pub fn response_headers(&self) -> std::cell::Ref<'_, Option<ResponseHeaders>> {
+    pub fn response_headers(&self) -> std::cell::Ref<'_, ResponseHeaders> {
         self.response_headers.borrow()
     }
 
     /// Installs the containing document headers
     /// (`set_response_headers_ptr`, tests staging HTML charsets).
     pub fn set_response_headers(&self, headers: ResponseHeaders) {
-        *self.response_headers.borrow_mut() = Some(headers);
+        *self.response_headers.borrow_mut() = headers;
+    }
+
+    /// Shares the containing document headers with driver-bound
+    /// filters (`MetaTagFilter` mutates these mid-parse; the
+    /// handle keeps both sides live).
+    #[must_use]
+    pub fn response_headers_shared(&self) -> Rc<RefCell<ResponseHeaders>> {
+        self.response_headers.clone()
     }
 
     /// Rebuilds the domain lawyer from options (`domain_lawyer()`

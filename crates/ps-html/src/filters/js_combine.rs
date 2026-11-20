@@ -270,10 +270,8 @@ impl JsCombineFilter {
     /// Page charset at hand-off: headers, else first meta tag
     /// (`ScanFilter` order; HTML BOM waits for the scan filter).
     fn containing_charset(&self) -> Vec<u8> {
-        if let Some(headers) = self.driver.response_headers().as_ref() {
-            if let Some(charset) = headers.determine_charset() {
-                return charset.into_bytes();
-            }
+        if let Some(charset) = self.driver.response_headers().determine_charset() {
+            return charset.into_bytes();
         }
         self.meta_tag_charset.clone()
     }
