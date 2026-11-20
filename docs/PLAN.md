@@ -1423,3 +1423,16 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   branch diverges from C++ (drops suffix/Expires);
   `cache_control_values_to_preserve` keeps the wrong
   directive list.
+- Divergence slices (this session): DONE. The two
+  compat-2 follow-ups were mated (suffix format and
+  concat shape compensated each other), so they landed
+  together with `SetCacheControlMaxAge`, whose ms
+  argument the port had also misread as seconds (1000x
+  `max-age` on the 304-revalidate path): all three
+  writers are now C++-verbatim (`Expires` always
+  stamps; `, `-prefixed no-transform/no-store/
+  standalone-s-maxage preserve list; `,`-joined
+  non-max-age values). One pinning test added
+  (`caching_writers_match_cxx`); no existing test
+  flipped. Workspace: 2569 passed, 0 failed; live
+  suite still 5/5 + 7/7.

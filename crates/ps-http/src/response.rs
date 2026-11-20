@@ -867,55 +867,68 @@ impl ResponseHeaders {
         self.headers().has_cache_control_directive(directive)
     }
 
-    /// Replaces `max-age` while preserving listed directives
-    /// (`SetCacheControlMaxAge`).
-    pub fn set_cache_control_max_age(&mut self, max_age_sec: i64) -> bool {
-        let preserved = self.cache_control_values_to_preserve();
-        let mut directives: Vec<String> = if preserved.is_empty() {
-            Vec::new()
-        } else {
-            vec![preserved]
-        };
-        directives.push(format!("max-age={max_age_sec}"));
-        self.headers_mut()
-            .replace(header::CACHE_CONTROL, &directives.join(", "));
-        true
-    }
-
-    /// Keeps listed directives across max-age rewrites
-    /// (`CacheControlValuesToPreserve`).
-    #[must_use]
-    pub fn cache_control_values_to_preserve(&self) -> String {
-        let mut keep = Vec::new();
+    /// Replaces `max-age`, keeping the other values
+    /// (`SetCacheControlMaxAge`): `Expires` moves to
+    /// `date + ttl`, the line becomes `max-age` plus every
+    /// non-empty
+    /// value that does not start with `max-age` (`,`-joined,
+    /// no space), and caching recomputes when it was clean.
+    pub fn set_cache_control_max_age(&mut self, ttl_ms: i64) {
+        let recompute_caching = !self.dirty;
+        self.set_time_header(header::EXPIRES, self.date_ms() + ttl_ms);
+        let mut new_value = format!("max-age={}", ttl_ms / 1000);
         if let Some(values) = self.headers.lookup(header::CACHE_CONTROL) {
             for value in values {
-                for directive in ["public", "private", "must-revalidate", "proxy-revalidate"] {
-                    if element_has_directive(&value, directive) {
-                        keep.push(directive);
-                    }
+                if !value.is_empty() && !starts_with_fold(&value, "max-age") {
+                    new_value.push(',');
+                    new_value.push_str(&value);
                 }
             }
         }
-        keep.join(", ")
+        self.headers_mut()
+            .replace(header::CACHE_CONTROL, &new_value);
+        if recompute_caching {
+            self.compute_caching();
+        }
     }
 
-    /// Sets Date + Cache-Control in one step (`SetDateAndCaching`).
-    pub fn set_date_and_caching(&mut self, date_ms: i64, ttl_ms: i64, other_directives: &str) {
-        self.set_date(date_ms);
-        if ttl_ms == 0 {
-            self.headers_mut()
-                .replace(header::CACHE_CONTROL, header::NO_CACHE);
-            self.headers_mut().remove_all(header::EXPIRES);
-        } else {
-            let mut directives = format!("max-age={}", ttl_ms / 1000);
-            if !other_directives.is_empty() {
-                directives.push_str(", ");
-                directives.push_str(other_directives);
-            }
-            self.headers_mut()
-                .replace(header::CACHE_CONTROL, &directives);
-            self.set_time_header(header::EXPIRES, date_ms + ttl_ms);
+    /// Keeps listed directives across lifetime rewrites
+    /// (`CacheControlValuesToPreserve`): `no-transform`,
+    /// `no-store`, then every standalone (non-embedded)
+    /// `s-maxage` value, each `, `-prefixed (empty when none).
+    #[must_use]
+    pub fn cache_control_values_to_preserve(&self) -> String {
+        let mut to_preserve = String::new();
+        if self.has_cache_control_directive("no-transform") {
+            to_preserve = String::from(", no-transform");
         }
+        if self.has_cache_control_directive("no-store") {
+            to_preserve.push_str(", no-store");
+        }
+        if let Some(values) = self.headers.lookup(header::CACHE_CONTROL) {
+            for value in values {
+                let lifetime = read_lifetime_directive(&value);
+                if lifetime.name == LifetimeName::SMaxAge && !lifetime.embedded {
+                    to_preserve.push_str(", ");
+                    to_preserve.push_str(&value);
+                }
+            }
+        }
+        to_preserve
+    }
+
+    /// Sets Date + Cache-Control in one step
+    /// (`SetDateAndCaching`): `Expires` stamps `date + ttl`
+    /// (even at ttl 0) and the line becomes
+    /// `max-age` plus the caller suffix verbatim (callers
+    /// carry their own leading `, `).
+    pub fn set_date_and_caching(&mut self, date_ms: i64, ttl_ms: i64, cache_control_suffix: &str) {
+        self.set_date(date_ms);
+        self.set_time_header(header::EXPIRES, date_ms + ttl_ms);
+        self.headers_mut().replace(
+            header::CACHE_CONTROL,
+            &format!("max-age={}{}", ttl_ms / 1000, cache_control_suffix),
+        );
     }
 
     /// Sets Content-Length (`SetContentLength`).
@@ -1975,5 +1988,50 @@ mod tests {
         brief.set_date_and_caching(FIXTURE_NOW_MS, 60 * 1000, "");
         brief.compute_caching();
         assert!(!brief.is_imminently_expiring(FIXTURE_NOW_MS + 59 * 1000));
+    }
+
+    #[test]
+    fn caching_writers_match_cxx() {
+        fn cache_control(headers: &ResponseHeaders) -> String {
+            headers.headers().lookup_joined(header::CACHE_CONTROL)
+        }
+        // Raw stored line (lookup_joined would re-split comma fields).
+        fn cache_control_raw(headers: &ResponseHeaders) -> String {
+            headers
+                .headers()
+                .iter()
+                .find(|(name, _)| name.eq_ignore_ascii_case(header::CACHE_CONTROL))
+                .map(|(_, value)| value.to_string())
+                .unwrap_or_default()
+        }
+        // SetDateAndCaching: Expires always stamps (even at ttl 0)
+        // and the suffix appends verbatim.
+        let mut headers = plain_200();
+        headers.set_date_and_caching(FIXTURE_NOW_MS, 0, ", no-cache");
+        assert_eq!("max-age=0, no-cache", cache_control(&headers));
+        assert_eq!(
+            headers.headers().lookup1(header::DATE),
+            headers.headers().lookup1(header::EXPIRES)
+        );
+        let mut headers = plain_200();
+        headers.set_date_and_caching(FIXTURE_NOW_MS, 60_000, "");
+        assert_eq!("max-age=60", cache_control(&headers));
+        // CacheControlValuesToPreserve: no-transform/no-store plus
+        // standalone s-maxage values, `, `-prefixed.
+        let headers = headers_200(&[("Cache-Control", "no-store, s-maxage=10")]);
+        assert_eq!(
+            ", no-store, s-maxage=10",
+            headers.cache_control_values_to_preserve()
+        );
+        let headers = headers_200(&[("Cache-Control", "s-maxage=10")]);
+        assert_eq!(", s-maxage=10", headers.cache_control_values_to_preserve());
+        let headers = headers_200(&[("Cache-Control", "max-age=60")]);
+        assert!(headers.cache_control_values_to_preserve().is_empty());
+        // SetCacheControlMaxAge takes ms, keeps non-max-age values
+        // `,`-joined, and recomputes when clean.
+        let mut headers = headers_200(&[("Cache-Control", "public")]);
+        headers.set_cache_control_max_age(300_000);
+        assert_eq!("max-age=300,public", cache_control_raw(&headers));
+        assert_eq!(300_000, headers.cache_ttl_ms());
     }
 }

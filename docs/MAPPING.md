@@ -364,6 +364,7 @@ Known gaps (suite reports, never fails):
   lifetime; the fix-up filter's line-level drop removes
   the recombined stamp tail). `missing-file` now matches
   C++ byte-exact. Remaining: recording cache writes
-  (fetch-machinery epic); `set_date_and_caching` ttl=0
-  and `cache_control_values_to_preserve` divergences
-  (pre-existing, other suites pin them).
+  (fetch-machinery epic). (`set_date_and_caching`,
+  `cache_control_values_to_preserve`, and
+  `set_cache_control_max_age` divergences fixed this
+  session; all three writers now C++-verbatim.)
