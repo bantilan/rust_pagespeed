@@ -1598,3 +1598,18 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   `.pagespeed.<id>.<hash>.` mask (+etag strip).
   Suite: 11/11 page + 7/7 config green. Workspace:
   2586 passed, 0 failed.
+- JPEG gate triage (this session): INVESTIGATED, no
+  code change. Big-page A/B showed C++ emitting
+  `.ce.` (extend) for every JPEG while we emit
+  `.ic.` (recompress). Root cause is C++'s dead
+  MayConvert gate (the AVIF commit inserted a
+  first-operand `MayConvert()` burn ahead of the
+  webp check, so recompress never gets an attempt;
+  verified: estimates agree 89/95, C++ drops as
+  nosaving, all 16 page images `.ce.`). We follow
+  C++'s tests instead (options checked before
+  budget, per the port note in `image.rs`), so our
+  recompress works as designed. Deliberate
+  divergence, documented here. Open from the same
+  A/B: JS combine (C++ `.jc.`, we minify-only
+  `.jm.`) and debug-comment wording/dedup.
