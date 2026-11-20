@@ -165,12 +165,21 @@ fn image_pixels_equal(expected: &[u8], actual: &[u8]) -> AssertionResult {
             ImageType::Png => ps_image::png::decode(bytes),
             ImageType::Jpeg => ps_image::jpeg::decode(bytes),
             ImageType::Gif => ps_image::gif::first_frame(bytes),
+            ImageType::Webp | ImageType::WebpLosslessOrAlpha => ps_image::webp::decode(bytes),
             other => {
                 return Err(format!("{side}: unsupported format {other:?}"));
             }
         }
         .map_err(|error| format!("{side}: decode failed: {error:?}"))
     };
+    let expected_lossy = matches!(
+        sniff(expected),
+        ImageType::Jpeg | ImageType::Webp | ImageType::WebpLosslessOrAlpha
+    );
+    let actual_lossy = matches!(
+        sniff(actual),
+        ImageType::Jpeg | ImageType::Webp | ImageType::WebpLosslessOrAlpha
+    );
     let expected_frame = match decode(expected, "expected") {
         Ok(frame) => frame,
         Err(detail) => return fail(detail),
@@ -199,20 +208,54 @@ fn image_pixels_equal(expected: &[u8], actual: &[u8]) -> AssertionResult {
         Ok(frame) => frame,
         Err(error) => return fail(format!("actual: expand failed: {error:?}")),
     };
-    if expected_rgba.pixels() != actual_rgba.pixels() {
+    if expected_rgba.pixels() == actual_rgba.pixels() {
+        return AssertionResult {
+            kind: "image-pixels-equal",
+            passed: true,
+            detail: String::new(),
+        };
+    }
+    // Lossy formats never match exactly across encoders: require
+    // structural fidelity (PSNR floor) instead. Lossless pairs
+    // must match bit-exact after layout normalization.
+    if !expected_lossy && !actual_lossy {
         return fail(format!(
-            "pixels differ: {}x{} ({} vs {} bytes)",
+            "pixels differ: {}x{} lossless mismatch",
             expected_frame.width(),
             expected_frame.height(),
-            expected_rgba.pixels().len(),
-            actual_rgba.pixels().len(),
         ));
     }
-    AssertionResult {
-        kind: "image-pixels-equal",
-        passed: true,
-        detail: String::new(),
+    let psnr = psnr_db(expected_rgba.pixels(), actual_rgba.pixels());
+    if psnr >= 30.0 {
+        return AssertionResult {
+            kind: "image-pixels-equal",
+            passed: true,
+            detail: String::new(),
+        };
     }
+    fail(format!(
+        "pixels differ: {}x{} PSNR {psnr:.1} dB",
+        expected_frame.width(),
+        expected_frame.height(),
+    ))
+}
+
+/// Peak signal-to-noise ratio in dB (lossy cross-encoder
+/// fidelity; mirrors the ps-image codec floor).
+fn psnr_db(a: &[u8], b: &[u8]) -> f64 {
+    if a.len() != b.len() || a.is_empty() {
+        return 0.0;
+    }
+    let mut sum_squares: u64 = 0;
+    for (x, y) in a.iter().zip(b.iter()) {
+        let diff = (*x as i32 - *y as i32) as i64;
+        sum_squares += (diff * diff) as u64;
+    }
+    if sum_squares == 0 {
+        return f64::INFINITY;
+    }
+    let mse = sum_squares as f64 / a.len() as f64;
+    10.0 * (255.0 * 255.0 / mse).log10()
 }
 
 /// One page-corpus case: fetch `url`, rewrite `html` under
@@ -229,6 +272,8 @@ pub struct PageCase {
     pub extra: Vec<(String, Vec<u8>)>,
     /// Pin the origin mtime (stable ETag/Last-Modified).
     pub fixed_mtime: bool,
+    /// Extra request headers as (name, value) pairs.
+    pub request_headers: Vec<(String, String)>,
     /// Directives as (name, value) pairs.
     pub directives: Vec<(String, String)>,
     /// Expectations over the rewritten response.
@@ -311,14 +356,14 @@ impl Runner for NullRunner {
 mod tests {
     use super::*;
 
-    /// One-pixel PNG with the given red channel (via our own
+    /// One-pixel PNG with the given channels (via our own
     /// encoder, so fixtures never rot).
-    fn tiny_png(red: u8) -> Vec<u8> {
+    fn tiny_png(r: u8, g: u8, b: u8) -> Vec<u8> {
         let frame = ps_image::frame::Frame::from_parts(
             1,
             1,
             ps_image::frame::PixelFormat::Rgb888,
-            vec![red, 0, 0],
+            vec![r, g, b],
         )
         .expect("1x1 frame");
         ps_image::png::encode(&frame, &ps_image::png::PngEncodeOptions::default())
@@ -348,8 +393,8 @@ mod tests {
                 actual: "k".to_string(),
             },
             Assertion::ImagePixelsEqual {
-                expected: tiny_png(1),
-                actual: tiny_png(1),
+                expected: tiny_png(1, 0, 0),
+                actual: tiny_png(1, 0, 0),
             },
         ];
         for assertion in &passing {
@@ -369,8 +414,13 @@ mod tests {
                 expected_delta: 2,
             },
             Assertion::ImagePixelsEqual {
-                expected: tiny_png(1),
-                actual: tiny_png(2),
+                expected: tiny_png(255, 0, 0),
+                actual: tiny_png(0, 0, 255),
+            },
+            // Lossless pairs reject even one LSB of drift.
+            Assertion::ImagePixelsEqual {
+                expected: tiny_png(1, 0, 0),
+                actual: tiny_png(2, 0, 0),
             },
             Assertion::ImagePixelsEqual {
                 expected: vec![0, 1, 2],
@@ -393,6 +443,7 @@ mod tests {
             html: vec![],
             extra: vec![],
             fixed_mtime: true,
+            request_headers: vec![],
             directives: vec![],
             assertions: vec![Assertion::ByteEqual {
                 expected: vec![],
@@ -423,6 +474,7 @@ mod tests {
                 html: vec![],
                 extra: vec![],
                 fixed_mtime: true,
+                request_headers: vec![],
                 directives: vec![],
                 assertions: vec![byte],
             }],

@@ -1521,3 +1521,12 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   normalizes layouts (encoders choose RGB vs RGBA
   freely). Suite: 9/9 page + 7/7 config green.
   Workspace: 2581 passed, 0 failed.
+- Fetch epic F5b (this session): DONE. WebP corpus
+  coverage: harness request headers per case (UA +
+  Accept), `ImagePixelsEqual` extended to webp decode
+  with a PSNR floor for lossy pairs (lossless pairs
+  stay bit-exact after layout normalization), and a
+  `webp-resource` case (Chrome/80 UA, webp Accept,
+  `InPlaceOptimizeForBrowser`, poll-optimized). Both
+  stacks serve webp; pixels agree within tolerance.
+  Suite: 10/10 page + 7/7 config green.

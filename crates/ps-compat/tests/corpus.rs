@@ -40,6 +40,8 @@ pub struct CaseDef {
     /// Pin the origin mtime (stable ETag/Last-Modified); resource
     /// cases leave it fresh so C++ considers inputs rewritable.
     pub fixed_mtime: bool,
+    /// Extra request headers as (name, value) (per-case UA/Accept).
+    pub request_headers: &'static [(&'static str, &'static str)],
     /// Known divergence reason (reported, never fails).
     pub known_gap: Option<&'static str>,
 }
@@ -61,6 +63,7 @@ pub const CASES: &[CaseDef] = &[
         fetches: 1,
         poll_optimized: false,
         fixed_mtime: true,
+        request_headers: &[],
         known_gap: None,
     },
     CaseDef {
@@ -76,6 +79,7 @@ pub const CASES: &[CaseDef] = &[
         fetches: 1,
         poll_optimized: false,
         fixed_mtime: true,
+        request_headers: &[],
         known_gap: None,
     },
     CaseDef {
@@ -87,6 +91,7 @@ pub const CASES: &[CaseDef] = &[
         fetches: 1,
         poll_optimized: false,
         fixed_mtime: true,
+        request_headers: &[],
         known_gap: None,
     },
     CaseDef {
@@ -102,6 +107,7 @@ pub const CASES: &[CaseDef] = &[
         fetches: 1,
         poll_optimized: false,
         fixed_mtime: true,
+        request_headers: &[],
         known_gap: None,
     },
     CaseDef {
@@ -113,6 +119,7 @@ pub const CASES: &[CaseDef] = &[
         fetches: 1,
         poll_optimized: false,
         fixed_mtime: true,
+        request_headers: &[],
         known_gap: None,
     },
     CaseDef {
@@ -128,6 +135,7 @@ pub const CASES: &[CaseDef] = &[
         fetches: 2,
         poll_optimized: true,
         fixed_mtime: false,
+        request_headers: &[],
         known_gap: None,
     },
     CaseDef {
@@ -143,6 +151,7 @@ pub const CASES: &[CaseDef] = &[
         fetches: 2,
         poll_optimized: true,
         fixed_mtime: false,
+        request_headers: &[],
         known_gap: None,
     },
     CaseDef {
@@ -160,6 +169,32 @@ pub const CASES: &[CaseDef] = &[
         fetches: 2,
         poll_optimized: true,
         fixed_mtime: false,
+        request_headers: &[],
+        known_gap: None,
+    },
+    CaseDef {
+        name: "webp-resource",
+        path: "/w.png",
+        html: Some(include_bytes!(
+            "../../ps-image/tests/data/png/pagespeed-33x34.png"
+        )),
+        extra: &[],
+        directives: &[
+            ("on", ""),
+            ("FileCachePath", CACHE_PLACEHOLDER),
+            ("RewriteLevel", "CoreFilters"),
+            ("EnableFilters", "in_place_optimize_for_browser"),
+        ],
+        fetches: 2,
+        poll_optimized: true,
+        fixed_mtime: false,
+        request_headers: &[
+            (
+                "User-Agent",
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36",
+            ),
+            ("Accept", "image/webp,image/*,*/*;q=0.8"),
+        ],
         known_gap: None,
     },
     CaseDef {
@@ -180,6 +215,7 @@ pub const CASES: &[CaseDef] = &[
         fetches: 1,
         poll_optimized: false,
         fixed_mtime: true,
+        request_headers: &[],
         known_gap: None,
     },
 ];

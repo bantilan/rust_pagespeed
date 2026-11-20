@@ -405,3 +405,8 @@ Known gaps (suite reports, never fails):
   `InPlaceOptimizeForBrowser` gate (CoreFilters:
   same-format recompress; flag on: webp/avif).
   Pixel comparison normalizes RGB/RGBA layouts.
+- Fetch epic F5b DONE: webp corpus case (per-case
+  request headers, PSNR-tolerant pixel compare for
+  lossy pairs). Compat: 10 page + 7 config green.
+  AVIF stays manually verified (no decoder to
+  compare with).
