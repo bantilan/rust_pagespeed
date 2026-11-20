@@ -1,0 +1,33 @@
+# Pagespeed Rust nginx addon (dynamic only).
+#
+# Usage:
+#   ./configure --add-dynamic-module=/path/to/pagespeed-rust/ngx_module ...
+#   make modules
+#   load_module objs/ngx_pagespeed_rust.so;
+#
+# The module binary is a Rust cdylib built by cargo (see
+# config.make); nginx's make only refreshes the objs/ copy.
+# Bindgen targets the nginx tree being configured: export
+# NGINX_SOURCE_DIR (and NGINX_BUILD_DIR, once configured) to
+# point at it, or it defaults to the staged 1.31.8 tree the
+# workspace pins (../.nginx-build, see .cargo/config.toml).
+
+ngx_addon_name=ngx_http_pagespeed_rust_module
+
+if [ "$ngx_module_link" != DYNAMIC ]; then
+    echo "$0: error: pagespeed-rust builds as a dynamic module only;"
+    echo "use --add-dynamic-module instead of --add-module."
+    exit 1
+fi
+
+if [ "$HTTP" = NO ]; then
+    echo "$0: error: pagespeed-rust requires the http module."
+    exit 1
+fi
+
+# No C sources and no generated module tables: nginx's make
+# would link a hollow .so, so this addon declares nothing and
+# config.make owns the binary (cargo-built, tables included).
+ngx_module_type=HTTP
+ngx_module_name=
+ngx_module_srcs=

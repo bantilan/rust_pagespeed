@@ -891,7 +891,9 @@ pub const NO_RELATED_OPTIONS: &[&str] = &[];
 /// (`SetServerContext`), of which only `cf` and `ic` carry
 /// non-empty tables. Unknown ids yield `None` (no filter).
 #[must_use]
-pub fn related_tables_for_decoding_id(id: &str) -> Option<(&'static [Filter], &'static [&'static str])> {
+pub fn related_tables_for_decoding_id(
+    id: &str,
+) -> Option<(&'static [Filter], &'static [&'static str])> {
     match id {
         "cf" => Some((CSS_RELATED_FILTERS, CSS_RELATED_OPTIONS)),
         "ic" => Some((IMAGE_RELATED_FILTERS, IMAGE_RELATED_OPTIONS)),
@@ -1020,7 +1022,7 @@ impl RewriteLevel {
 /// Mirrors the corresponding `RewriteOptions` fields; `Enabled()` implements
 /// `RewriteOptions::Enabled` exactly, including the TestingCore→Core
 /// fallthrough.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct FilterState {
     level: RewriteLevel,
     enabled: FilterSet,
@@ -1030,6 +1032,26 @@ pub struct FilterState {
     js_preserve_urls: bool,
     image_preserve_urls: bool,
     forbid_all_disabled: bool,
+}
+
+impl Default for FilterState {
+    /// Fresh state at `PassThrough` level with the HTML writer
+    /// on (C++ enables `kHtmlWriterFilter` in the ctor, so
+    /// every options object carries it until disabled).
+    fn default() -> Self {
+        let mut enabled = FilterSet::new();
+        enabled.insert(Filter::HtmlWriterFilter);
+        FilterState {
+            level: RewriteLevel::PassThrough,
+            enabled,
+            disabled: FilterSet::new(),
+            forbidden: FilterSet::new(),
+            css_preserve_urls: false,
+            js_preserve_urls: false,
+            image_preserve_urls: false,
+            forbid_all_disabled: false,
+        }
+    }
 }
 
 impl FilterState {
@@ -1124,11 +1146,12 @@ impl FilterState {
         self.forbid_all_disabled = value;
     }
 
-    /// Clears all three sets (`ClearFilters`).
+    /// Clears enabled and disabled, keeping forbidden, and
+    /// re-enables the HTML writer (`ClearFilters`).
     pub fn clear(&mut self) {
         self.enabled = FilterSet::new();
         self.disabled = FilterSet::new();
-        self.forbidden = FilterSet::new();
+        self.enable(Filter::HtmlWriterFilter);
     }
 
     /// Borrows the enabled set (for merge).
@@ -1387,10 +1410,16 @@ mod tests {
         for name in CSS_RELATED_OPTIONS {
             assert!(CSS_RELATED_OPTIONS.binary_search(name).is_ok(), "{name}");
         }
-        assert!(IMAGE_RELATED_OPTIONS.binary_search(&"CssInlineMaxBytes").is_err());
+        assert!(IMAGE_RELATED_OPTIONS
+            .binary_search(&"CssInlineMaxBytes")
+            .is_err());
         // Filter lists search correctly.
-        assert!(IMAGE_RELATED_FILTERS.binary_search(&Filter::RecompressJpeg).is_ok());
-        assert!(IMAGE_RELATED_FILTERS.binary_search(&Filter::CombineCss).is_err());
+        assert!(IMAGE_RELATED_FILTERS
+            .binary_search(&Filter::RecompressJpeg)
+            .is_ok());
+        assert!(IMAGE_RELATED_FILTERS
+            .binary_search(&Filter::CombineCss)
+            .is_err());
         // Decoding ids: cf/ic carry tables, the other seven are
         // registered-but-empty, the rest unknown.
         let (filters, options) = related_tables_for_decoding_id("cf").unwrap();

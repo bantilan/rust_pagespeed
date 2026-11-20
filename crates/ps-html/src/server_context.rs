@@ -197,7 +197,7 @@ pub struct ServerContext {
     metadata_cache: Arc<dyn CacheBackend>,
     fetcher: Rc<dyn AsyncFetcher>,
     timer: Rc<RefCell<MockTimer>>,
-    statistics: Statistics,
+    statistics: Arc<Statistics>,
     contents_hasher: Md5Hasher,
     hasher: Rc<dyn Hasher>,
     lock_hasher: Md5Hasher,
@@ -234,7 +234,7 @@ impl ServerContext {
         fetcher: Rc<dyn AsyncFetcher>,
         start_ms: i64,
     ) -> Self {
-        let statistics = Statistics::new();
+        let statistics = Arc::new(Statistics::new());
         // Rewrite-wide fetch counters (`RewriteStats::InitStats`).
         statistics.add_variable("num_resource_fetch_successes");
         statistics.add_variable("num_resource_fetch_failures");
@@ -270,6 +270,11 @@ impl ServerContext {
     #[must_use]
     pub fn http_cache(&self) -> &HttpCache {
         &self.http_cache
+    }
+
+    /// Mutably borrows the HTTP cache (host applies its config).
+    pub fn http_cache_mut(&mut self) -> &mut HttpCache {
+        &mut self.http_cache
     }
 
     /// Borrows the UA normalizers (`user_agent_normalizers`).
@@ -316,7 +321,13 @@ impl ServerContext {
     /// Borrows the statistics registry.
     #[must_use]
     pub fn statistics(&self) -> &Statistics {
-        &self.statistics
+        self.statistics.as_ref()
+    }
+
+    /// Shares a statistics registry (worker-global aggregation;
+    /// contexts otherwise keep their own).
+    pub fn set_statistics(&mut self, statistics: Arc<Statistics>) {
+        self.statistics = statistics;
     }
 
     /// Looks up a counter, adding it when absent.

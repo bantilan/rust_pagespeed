@@ -90,13 +90,13 @@ pub fn parse_host_port(host: Option<&str>) -> i32 {
 /// suffix.
 #[must_use]
 pub fn build_url(https: bool, port: i32, host: &str, unparsed_uri: &str) -> String {
-    let port_string =
-        if (https && (port == 443 || port == NO_PORT)) || (!https && (port == 80 || port == NO_PORT))
-        {
-            String::new()
-        } else {
-            format!(":{port}")
-        };
+    let port_string = if (https && (port == 443 || port == NO_PORT))
+        || (!https && (port == 80 || port == NO_PORT))
+    {
+        String::new()
+    } else {
+        format!(":{port}")
+    };
     format!(
         "{}://{host}{port_string}{unparsed_uri}",
         if https { "https" } else { "http" }
@@ -106,7 +106,8 @@ pub fn build_url(https: bool, port: i32, host: &str, unparsed_uri: &str) -> Stri
 /// Case-insensitive prefix match (`StringCaseStartsWith`),
 /// byte-safe for non-ASCII text past the prefix.
 fn starts_with_ignore_case(text: &str, prefix: &str) -> bool {
-    text.len() >= prefix.len() && text.as_bytes()[..prefix.len()].eq_ignore_ascii_case(prefix.as_bytes())
+    text.len() >= prefix.len()
+        && text.as_bytes()[..prefix.len()].eq_ignore_ascii_case(prefix.as_bytes())
 }
 
 /// Endpoint families for the access check (`AllowDomain`).
@@ -317,7 +318,9 @@ mod tests {
         assert!(!is_pagespeed_subrequest(Some("Mozilla/5.0")));
         assert!(is_pagespeed_subrequest(Some("mod_pagespeed")));
         // The serf fetcher embeds it mid-token.
-        assert!(is_pagespeed_subrequest(Some("ngx-pagespeed (mod_pagespeed/1.0)")));
+        assert!(is_pagespeed_subrequest(Some(
+            "ngx-pagespeed (mod_pagespeed/1.0)"
+        )));
     }
 
     #[test]
@@ -340,10 +343,7 @@ mod tests {
 
     #[test]
     fn url_build_ports() {
-        assert_eq!(
-            "http://h/a?b",
-            build_url(false, NO_PORT, "h", "/a?b")
-        );
+        assert_eq!("http://h/a?b", build_url(false, NO_PORT, "h", "/a?b"));
         assert_eq!("http://h/a", build_url(false, 80, "h", "/a"));
         assert_eq!("http://h:8080/a", build_url(false, 8080, "h", "/a"));
         assert_eq!("https://h/a", build_url(true, NO_PORT, "h", "/a"));
@@ -429,7 +429,10 @@ mod tests {
         let mut options = NgxOptions::new();
         options.system.statistics_path = "/s".to_string();
         options.system.statistics_domains.allow("*.example.com");
-        options.system.statistics_domains.disallow("evil.example.com");
+        options
+            .system
+            .statistics_domains
+            .disallow("evil.example.com");
         assert_eq!(
             Route::Statistics,
             route_request(&inputs(&options, "http://www.example.com/s"))
@@ -494,9 +497,18 @@ mod tests {
     #[test]
     fn dispatch_table() {
         // Gates decline before routing.
-        assert_eq!(ContentAction::Decline, content_decision(true, true, Route::Beacon));
-        assert_eq!(ContentAction::Decline, content_decision(false, false, Route::Beacon));
-        assert_eq!(ContentAction::Decline, content_decision(true, false, Route::Error));
+        assert_eq!(
+            ContentAction::Decline,
+            content_decision(true, true, Route::Beacon)
+        );
+        assert_eq!(
+            ContentAction::Decline,
+            content_decision(false, false, Route::Beacon)
+        );
+        assert_eq!(
+            ContentAction::Decline,
+            content_decision(true, false, Route::Error)
+        );
         // The switch, all fifteen routes.
         for (route, action) in [
             (Route::Error, ContentAction::Error),

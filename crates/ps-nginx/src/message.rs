@@ -49,14 +49,17 @@ pub fn format_file_message(file: &str, line: u32, message: &str) -> String {
 /// A null log routes to stderr (the `GoogleMessageHandler`
 /// fallback); message-buffer accounting lives in ps-config's
 /// handler and is wired by the driver factory slice.
+#[derive(Clone)]
 pub struct NgxMessageHandler {
     log: *mut ngx_log_t,
+    buffer: Option<std::sync::Arc<std::sync::Mutex<ps_admin::log_buffer::LogBuffer>>>,
 }
 
 impl std::fmt::Debug for NgxMessageHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NgxMessageHandler")
             .field("log", &format_args!("{:p}", self.log))
+            .field("buffered", &self.buffer.is_some())
             .finish()
     }
 }
@@ -68,10 +71,42 @@ unsafe impl Send for NgxMessageHandler {}
 unsafe impl Sync for NgxMessageHandler {}
 
 impl NgxMessageHandler {
-    /// Creates a handler with no log (stderr fallback).
+    /// Creates a handler with no log (stderr fallback) and no
+    /// message buffer.
     #[must_use]
-    pub const fn new() -> Self {
-        NgxMessageHandler { log: ptr::null_mut() }
+    pub fn new() -> Self {
+        NgxMessageHandler {
+            log: ptr::null_mut(),
+            buffer: None,
+        }
+    }
+
+    /// Attaches the shared message buffer (ring fanout).
+    pub fn set_buffer(
+        &mut self,
+        buffer: std::sync::Arc<std::sync::Mutex<ps_admin::log_buffer::LogBuffer>>,
+    ) {
+        self.buffer = Some(buffer);
+    }
+
+    /// Dumps the buffered messages (`Dump`): `None` when no
+    /// buffer is attached or message buffering is disabled.
+    #[must_use]
+    pub fn dump_messages(&self) -> Option<String> {
+        let buffer = self.buffer.as_ref()?;
+        buffer
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .dump_checked()
+    }
+
+    /// Borrows the shared message buffer, when attached (the
+    /// per-request admin site renders history from this).
+    #[must_use]
+    pub fn message_buffer(
+        &self,
+    ) -> Option<&std::sync::Arc<std::sync::Mutex<ps_admin::log_buffer::LogBuffer>>> {
+        self.buffer.as_ref()
     }
 
     /// Points the handler at an nginx log (`set_log`).
@@ -106,6 +141,12 @@ impl NgxMessageHandler {
             // `ngx_log_error` with a stack buffer.
             ngx::ngx_log_error!(ngx_log_level_for(level), self.log, "{}", formatted);
         }
+        if let Some(buffer) = self.buffer.as_ref() {
+            buffer
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .message(level, formatted);
+        }
     }
 
     /// Emits a file:line message (`FileMessageSImpl`).
@@ -127,6 +168,32 @@ impl NgxMessageHandler {
 impl Default for NgxMessageHandler {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl ps_config::message_handler::MessageHandler for &NgxMessageHandler {
+    /// Forwards through a shared borrow (the inherent emit is
+    /// `&self` already): lets request paths pass the server
+    /// handler while holding other shared borrows.
+    fn message(&mut self, level: MessageLevel, text: String) {
+        // SAFETY: by the contract on the inherent method, which
+        // the server handler upholds as documented there.
+        unsafe {
+            (**self).message(level, &text);
+        }
+    }
+}
+
+impl ps_config::message_handler::MessageHandler for NgxMessageHandler {
+    /// Forwards option-time messages (`Message`): the server
+    /// handler's log is attached at child init and outlives
+    /// every request, so the caller's contract holds for the
+    /// handler the resource path passes here.
+    fn message(&mut self, level: MessageLevel, text: String) {
+        // SAFETY: by the documented construction above.
+        unsafe {
+            NgxMessageHandler::message(self, level, &text);
+        }
     }
 }
 
@@ -187,10 +254,22 @@ mod tests {
 
     #[test]
     fn levels_map_to_nginx() {
-        assert_eq!(NGX_LOG_INFO as ngx_uint_t, ngx_log_level_for(MessageLevel::Info));
-        assert_eq!(NGX_LOG_WARN as ngx_uint_t, ngx_log_level_for(MessageLevel::Warning));
-        assert_eq!(NGX_LOG_ERR as ngx_uint_t, ngx_log_level_for(MessageLevel::Error));
-        assert_eq!(NGX_LOG_ALERT as ngx_uint_t, ngx_log_level_for(MessageLevel::Fatal));
+        assert_eq!(
+            NGX_LOG_INFO as ngx_uint_t,
+            ngx_log_level_for(MessageLevel::Info)
+        );
+        assert_eq!(
+            NGX_LOG_WARN as ngx_uint_t,
+            ngx_log_level_for(MessageLevel::Warning)
+        );
+        assert_eq!(
+            NGX_LOG_ERR as ngx_uint_t,
+            ngx_log_level_for(MessageLevel::Error)
+        );
+        assert_eq!(
+            NGX_LOG_ALERT as ngx_uint_t,
+            ngx_log_level_for(MessageLevel::Fatal)
+        );
     }
 
     #[test]
@@ -217,6 +296,42 @@ mod tests {
     fn handler_defaults_to_null_log() {
         let handler = NgxMessageHandler::new();
         assert!(handler.log().is_null());
+    }
+
+    #[test]
+    fn messages_fan_out_to_buffer() {
+        use std::sync::{Arc, Mutex};
+        let buffer = Arc::new(Mutex::new(ps_admin::log_buffer::LogBuffer::new(1000)));
+        let mut handler = NgxMessageHandler::new();
+        // SAFETY: null log falls back to stderr; no live log needed.
+        unsafe {
+            handler.message(MessageLevel::Warning, "unbuffered");
+        }
+        assert!(buffer.lock().unwrap().dump().is_empty());
+        handler.set_buffer(Arc::clone(&buffer));
+        // SAFETY: as above.
+        unsafe {
+            handler.message(MessageLevel::Warning, "buffered");
+        }
+        assert!(buffer.lock().unwrap().dump().contains("buffered"));
+    }
+
+    #[test]
+    fn dump_needs_buffer_and_capacity() {
+        use std::sync::{Arc, Mutex};
+        assert_eq!(None, NgxMessageHandler::new().dump_messages());
+        let mut handler = NgxMessageHandler::new();
+        handler.set_buffer(Arc::new(Mutex::new(
+            ps_admin::log_buffer::LogBuffer::disabled(),
+        )));
+        assert_eq!(None, handler.dump_messages());
+        let buffer = Arc::new(Mutex::new(ps_admin::log_buffer::LogBuffer::new(1000)));
+        handler.set_buffer(Arc::clone(&buffer));
+        // SAFETY: null log falls back to stderr; no live log needed.
+        unsafe {
+            handler.message(MessageLevel::Warning, "buffered");
+        }
+        assert!(handler.dump_messages().unwrap().contains("buffered"));
     }
 
     #[test]

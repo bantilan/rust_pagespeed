@@ -60,6 +60,25 @@ impl Method {
         }
     }
 
+    /// Renders the method token (`method_string`): `Unknown`
+    /// renders `"ERROR"`, verbatim.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Method::Get => "GET",
+            Method::Head => "HEAD",
+            Method::Post => "POST",
+            Method::Put => "PUT",
+            Method::Delete => "DELETE",
+            Method::Options => "OPTIONS",
+            Method::Trace => "TRACE",
+            Method::Connect => "CONNECT",
+            Method::Patch => "PATCH",
+            Method::Purge => "PURGE",
+            Method::Unknown => "ERROR",
+        }
+    }
+
     /// Parses a method name (`MethodFromString`): the ten known
     /// tokens matched case-insensitively, anything else `Unknown`.
     #[must_use]
@@ -302,6 +321,12 @@ impl RequestContext {
         self.options
     }
 
+    /// Replaces the request options (`set_options`): the
+    /// resource path computes these after option determination.
+    pub fn set_options(&mut self, options: HttpOptions) {
+        self.options = options;
+    }
+
     /// Whether the client accepts gzip (`accepts_gzip`).
     #[must_use]
     pub const fn accepts_gzip(&self) -> bool {
@@ -379,7 +404,9 @@ mod tests {
     fn xhr_cookies_and_sticky() {
         let mut headers = RequestHeaders::new();
         assert!(!headers.is_xml_http_request());
-        headers.headers_mut().add("X-Requested-With", "xmlhttprequest");
+        headers
+            .headers_mut()
+            .add("X-Requested-With", "xmlhttprequest");
         assert!(headers.is_xml_http_request());
         headers.headers_mut().add("Cookie", "b=2; a=1");
         headers.headers_mut().add("cookie", "a=3; novalue; c=");
@@ -468,6 +495,8 @@ mod tests {
         assert_eq!(Method::parse("PURGE"), Method::Purge);
         assert_eq!(Method::parse("get"), Method::Unknown);
         assert_eq!(Method::Get.token(), "GET");
+        assert_eq!(Method::Get.as_str(), "GET");
+        assert_eq!(Method::Unknown.as_str(), "ERROR");
         assert!(Method::parse("HEAD").is_head());
 
         let mut request = RequestHeaders::new();

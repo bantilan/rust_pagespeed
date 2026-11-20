@@ -275,16 +275,11 @@ pub mod in_place {
                         "in-place body buffers stay in memory"
                     );
                 }
-                buffers.push((
-                    bytes.to_vec(),
-                    (*buf).flush() != 0,
-                    (*buf).last_buf() != 0,
-                ));
+                buffers.push((bytes.to_vec(), (*buf).flush() != 0, (*buf).last_buf() != 0));
                 link = (*link).next;
             }
-            let mut final_headers = ps_http::response::ResponseHeaders::new(
-                ps_http::response::HttpOptions::default(),
-            );
+            let mut final_headers =
+                ps_http::response::ResponseHeaders::new(ps_http::response::HttpOptions::default());
             copy_response_headers_from_request(r, &mut final_headers);
             if drive_recording(&buffers, recorder, &mut final_headers) {
                 ctx.recorder = None;
@@ -319,17 +314,49 @@ pub mod in_place {
 
         #[test]
         fn header_plan_matrix() {
-            use InPlaceHeaderAction::{Decline, Next, RecordPreliminary, ServeFromCache, StartRecording};
-            assert_eq!(Next, in_place_header_plan(false, false, false, false, 0, false));
-            assert_eq!(Next, in_place_header_plan(true, false, false, false, 200, false));
-            assert_eq!(RecordPreliminary, in_place_header_plan(true, true, false, false, 200, false));
-            assert_eq!(Decline, in_place_header_plan(true, false, true, true, 200, false));
-            assert_eq!(ServeFromCache, in_place_header_plan(true, false, true, false, 200, false));
-            assert_eq!(ServeFromCache, in_place_header_plan(true, false, true, false, 200, true));
-            assert_eq!(StartRecording, in_place_header_plan(true, false, true, false, 501, false));
-            assert_eq!(Decline, in_place_header_plan(true, false, true, false, 501, true));
-            assert_eq!(Decline, in_place_header_plan(true, false, true, false, 404, false));
-            assert_eq!(Decline, in_place_header_plan(true, false, true, false, 0, false));
+            use InPlaceHeaderAction::{
+                Decline, Next, RecordPreliminary, ServeFromCache, StartRecording,
+            };
+            assert_eq!(
+                Next,
+                in_place_header_plan(false, false, false, false, 0, false)
+            );
+            assert_eq!(
+                Next,
+                in_place_header_plan(true, false, false, false, 200, false)
+            );
+            assert_eq!(
+                RecordPreliminary,
+                in_place_header_plan(true, true, false, false, 200, false)
+            );
+            assert_eq!(
+                Decline,
+                in_place_header_plan(true, false, true, true, 200, false)
+            );
+            assert_eq!(
+                ServeFromCache,
+                in_place_header_plan(true, false, true, false, 200, false)
+            );
+            assert_eq!(
+                ServeFromCache,
+                in_place_header_plan(true, false, true, false, 200, true)
+            );
+            assert_eq!(
+                StartRecording,
+                in_place_header_plan(true, false, true, false, 501, false)
+            );
+            assert_eq!(
+                Decline,
+                in_place_header_plan(true, false, true, false, 501, true)
+            );
+            assert_eq!(
+                Decline,
+                in_place_header_plan(true, false, true, false, 404, false)
+            );
+            assert_eq!(
+                Decline,
+                in_place_header_plan(true, false, true, false, 0, false)
+            );
         }
 
         #[test]
@@ -342,7 +369,13 @@ pub mod in_place {
         struct NullBackend;
 
         impl RecordingBackend for NullBackend {
-            fn remember_failure(&mut self, _url: &str, _fragment: &str, _kind: crate::recording::RecordingFailure) {}
+            fn remember_failure(
+                &mut self,
+                _url: &str,
+                _fragment: &str,
+                _kind: crate::recording::RecordingFailure,
+            ) {
+            }
             fn put(
                 &mut self,
                 _url: &str,
@@ -362,7 +395,11 @@ pub mod in_place {
             let mut recorder = InPlaceRecorder::new(
                 "http://h/a.css",
                 "",
-                RequestProperties { has_cookie: false, has_cookie2: false, has_authorization: false },
+                RequestProperties {
+                    has_cookie: false,
+                    has_cookie2: false,
+                    has_authorization: false,
+                },
                 false,
                 1024,
                 0,
@@ -372,8 +409,12 @@ pub mod in_place {
             let mut prelim = ResponseHeaders::new(HttpOptions::default_for_tests());
             prelim.set_status_code(200);
             prelim.headers_mut().add(header::CONTENT_TYPE, "text/css");
-            prelim.headers_mut().add(header::CACHE_CONTROL, "max-age=60");
-            prelim.headers_mut().add(header::DATE, "Thu, 01 Jan 1970 00:00:00 GMT");
+            prelim
+                .headers_mut()
+                .add(header::CACHE_CONTROL, "max-age=60");
+            prelim
+                .headers_mut()
+                .add(header::DATE, "Thu, 01 Jan 1970 00:00:00 GMT");
             recorder.consider_response_headers(HeadersKind::Preliminary, &mut prelim);
             let mut final_headers = prelim.clone();
             // A flush-only buffer records nothing but completes nothing.
@@ -384,7 +425,10 @@ pub mod in_place {
             ));
             // Body bytes write; the last buffer completes and drops.
             assert!(drive_recording(
-                &[(b"data".to_vec(), false, false), (b"!".to_vec(), false, true)],
+                &[
+                    (b"data".to_vec(), false, false),
+                    (b"!".to_vec(), false, true)
+                ],
                 &mut recorder,
                 &mut final_headers
             ));
@@ -429,10 +473,7 @@ pub mod fix_headers {
         if !is_main {
             return FixHeadersAction::Next;
         }
-        if !has_ctx
-            || !html_rewrite
-            || matches!(preserve, PreserveCachingHeaders::PreserveAll)
-        {
+        if !has_ctx || !html_rewrite || matches!(preserve, PreserveCachingHeaders::PreserveAll) {
             return FixHeadersAction::StripTokenThenNext;
         }
         FixHeadersAction::FixThenNext {
@@ -459,9 +500,17 @@ pub mod fix_headers {
             };
             let ctx = crate::request::get_request_ctx(r);
             let (html_rewrite, preserve, limits) = if ctx.is_null() {
-                (false, PreserveCachingHeaders::DontPreserve, crate::caching::CacheControlLimits::default())
+                (
+                    false,
+                    PreserveCachingHeaders::DontPreserve,
+                    crate::caching::CacheControlLimits::default(),
+                )
             } else {
-                ((*ctx).html_rewrite, (*ctx).preserve_caching_headers, (*ctx).html_cache_control_limits)
+                (
+                    (*ctx).html_rewrite,
+                    (*ctx).preserve_caching_headers,
+                    (*ctx).html_cache_control_limits,
+                )
             };
             match fix_headers_plan(r == (*r).main, html_rewrite, !ctx.is_null(), preserve) {
                 FixHeadersAction::Next => pass_to_next(),
@@ -469,7 +518,9 @@ pub mod fix_headers {
                     strip_override_token(r);
                     pass_to_next()
                 }
-                FixHeadersAction::FixThenNext { rewrite_cache_control } => {
+                FixHeadersAction::FixThenNext {
+                    rewrite_cache_control,
+                } => {
                     strip_override_token(r);
                     if rewrite_cache_control {
                         // Collect the origin's Cache-Control lines
@@ -482,12 +533,9 @@ pub mod fix_headers {
                             }
                             true
                         });
-                        let refs: Vec<&str> =
-                            values.iter().map(String::as_str).collect();
-                        let merged = keep_cache_control_limits(
-                            &disabled_cache_control(&refs),
-                            &limits,
-                        );
+                        let refs: Vec<&str> = values.iter().map(String::as_str).collect();
+                        let merged =
+                            keep_cache_control_limits(&disabled_cache_control(&refs), &limits);
                         let pool = (*r).pool;
                         let rendered = crate::directives::pool_cstring(pool, &merged);
                         if rendered.is_null() {
@@ -584,15 +632,28 @@ pub mod fix_headers {
             use FixHeadersAction::{FixThenNext, Next, StripTokenThenNext};
             use PreserveCachingHeaders::{DontPreserve, PreserveAll, PreserveOnlyCacheControl};
             assert_eq!(Next, fix_headers_plan(false, true, true, DontPreserve));
-            assert_eq!(StripTokenThenNext, fix_headers_plan(true, true, false, DontPreserve));
-            assert_eq!(StripTokenThenNext, fix_headers_plan(true, false, true, DontPreserve));
-            assert_eq!(StripTokenThenNext, fix_headers_plan(true, true, true, PreserveAll));
             assert_eq!(
-                FixThenNext { rewrite_cache_control: true },
+                StripTokenThenNext,
+                fix_headers_plan(true, true, false, DontPreserve)
+            );
+            assert_eq!(
+                StripTokenThenNext,
+                fix_headers_plan(true, false, true, DontPreserve)
+            );
+            assert_eq!(
+                StripTokenThenNext,
+                fix_headers_plan(true, true, true, PreserveAll)
+            );
+            assert_eq!(
+                FixThenNext {
+                    rewrite_cache_control: true
+                },
                 fix_headers_plan(true, true, true, DontPreserve)
             );
             assert_eq!(
-                FixThenNext { rewrite_cache_control: false },
+                FixThenNext {
+                    rewrite_cache_control: false
+                },
                 fix_headers_plan(true, true, true, PreserveOnlyCacheControl)
             );
         }
@@ -603,8 +664,23 @@ pub mod fix_headers {
 pub mod base_fetch {
     use super::*;
     use crate::fetch::{base_fetch_gate, BaseFetchGate};
+    use crate::headers::ngx_str_text;
 
     static mut NEXT_BODY: ngx_http_output_body_filter_pt = None;
+    static mut NEXT_HEADER: ngx_http_output_header_filter_pt = None;
+
+    /// Runs the next header filter (`ngx_http_next_header_filter`).
+    ///
+    /// # Safety
+    ///
+    /// `r` must point at a live request; call after `init`.
+    pub unsafe fn next_header_filter(r: *mut ngx_http_request_t) -> ngx_int_t {
+        // SAFETY: caller guarantees a live request.
+        unsafe {
+            let next = NEXT_HEADER.expect("base-fetch chain not initialized");
+            next(r)
+        }
+    }
 
     /// Body filter (`ps_base_fetch_filter`): header-only requests
     /// complete; requests without an active fetch pass through;
@@ -633,6 +709,14 @@ pub mod base_fetch {
                 BaseFetchGate::Complete => NGX_OK as ngx_int_t,
                 BaseFetchGate::PassThrough => pass_to_next(chain),
                 BaseFetchGate::Serve => {
+                    let uri = ngx_str_text(&raw const (*r).uri);
+                    let log = (*(*r).connection).log;
+                    ngx::ngx_log_error!(
+                        ngx::ffi::NGX_LOG_DEBUG_HTTP,
+                        log,
+                        "http pagespeed write filter \"{}\"",
+                        uri
+                    );
                     if !chain.is_null() || (*(*r).connection).buffered() != 0 {
                         let rc = pass_to_next(chain);
                         if rc != NGX_OK as ngx_int_t {
@@ -647,17 +731,14 @@ pub mod base_fetch {
 
     /// Installs the filter (`ps_base_fetch_filter_init`).
     ///
-    /// Note the C++ saves the header top into its namespace's
-    /// next pointer but installs no header filter; the save is
-    /// dead, so the port keeps no header slot for this namespace.
-    ///
     /// # Safety
     ///
     /// Call once from postconfiguration.
     pub unsafe fn init() {
-        use ngx::ffi::ngx_http_top_body_filter;
+        use ngx::ffi::{ngx_http_top_body_filter, ngx_http_top_header_filter};
         // SAFETY: postconfiguration context.
         unsafe {
+            NEXT_HEADER = ngx_http_top_header_filter;
             NEXT_BODY = ngx_http_top_body_filter;
             ngx_http_top_body_filter = Some(body_filter);
         }
@@ -790,14 +871,17 @@ pub mod html_rewrite {
         // SAFETY: caller guarantees a live request.
         unsafe {
             let pass_to_next = move || {
-                let next =
-                    NEXT_HEADER.expect("html-rewrite header chain not initialized");
+                let next = NEXT_HEADER.expect("html-rewrite header chain not initialized");
                 // SAFETY: `r` is live per the caller contract.
                 next(r)
             };
             let cfg_s = &*srv_conf_of_request(r);
             let ctx = crate::request::get_request_ctx(r);
-            if header_early_gate(cfg_s.disabled(), r == (*r).main, !ctx.is_null() && (*ctx).html_rewrite) {
+            if header_early_gate(
+                cfg_s.disabled(),
+                r == (*r).main,
+                !ctx.is_null() && (*ctx).html_rewrite,
+            ) {
                 return pass_to_next();
             }
             if let Some(context) = cfg_s.context.as_ref() {
@@ -811,12 +895,29 @@ pub mod html_rewrite {
                 ctx.html_rewrite = false;
                 return pass_to_next();
             }
-            // Slice 6 calls `ps_resource_handler(r, true)` here and,
-            // on `NGX_OK`, `finish_html_header_filter`. Until then
-            // every request takes the decline path below, mutating
-            // nothing.
-            ctx.html_rewrite = false;
-            pass_to_next()
+            {
+                let uri = ngx_str_text(&raw const (*r).uri);
+                let log = (*(*r).connection).log;
+                ngx::ngx_log_error!(
+                    ngx::ffi::NGX_LOG_DEBUG_HTTP,
+                    log,
+                    "http pagespeed html rewrite header filter \"{}\"",
+                    uri
+                );
+            }
+            let rc = crate::module::resource_response_filtered(r);
+            if rc != ngx::ffi::NGX_OK as ngx::ffi::ngx_int_t {
+                ctx.html_rewrite = false;
+                return pass_to_next();
+            }
+            let ctx_ptr = crate::request::get_request_ctx(r);
+            let fetch = (*ctx_ptr)
+                .base_fetch
+                .as_ref()
+                .expect("html branch attaches a fetch");
+            fetch.with_state(|base| {
+                finish_html_header_filter(r, ctx_ptr, base.response_headers_mut())
+            })
         }
     }
 
@@ -855,8 +956,10 @@ pub mod html_rewrite {
                     pairs.push((name, value));
                     true
                 });
-                let refs: Vec<(&str, &str)> =
-                    pairs.iter().map(|(n, v)| (n.as_str(), v.as_str())).collect();
+                let refs: Vec<(&str, &str)> = pairs
+                    .iter()
+                    .map(|(n, v)| (n.as_str(), v.as_str()))
+                    .collect();
                 let stacked = has_stacked_content_encoding(&refs);
                 let value = ngx_str_text(&raw const (*encoding).value);
                 if let EncodingAction::Inflate(inflate_type) =
@@ -905,9 +1008,11 @@ pub mod html_rewrite {
                 .context
                 .as_ref()
                 .is_some_and(|ctx| ctx.options.core.filters().enabled(Filter::ConvertToAvif));
-            for (name, value) in
-                avif_vary_additions(avif, base_headers.has_value(header::VARY, header::USER_AGENT), base_headers.has_value(header::VARY, header::ACCEPT))
-            {
+            for (name, value) in avif_vary_additions(
+                avif,
+                base_headers.has_value(header::VARY, header::USER_AGENT),
+                base_headers.has_value(header::VARY, header::ACCEPT),
+            ) {
                 base_headers.headers_mut().add(name, value);
             }
             crate::request::set_buffered(r, true);
@@ -922,9 +1027,7 @@ pub mod html_rewrite {
     /// # Safety
     ///
     /// `r` must point at a live request.
-    unsafe fn collect_response_headers(
-        r: *mut ngx_http_request_t,
-    ) -> Vec<(String, String, bool)> {
+    unsafe fn collect_response_headers(r: *mut ngx_http_request_t) -> Vec<(String, String, bool)> {
         // SAFETY: caller guarantees a live request.
         unsafe {
             let mut pairs = Vec::new();
@@ -975,9 +1078,8 @@ pub mod html_rewrite {
 
     /// Body filter (`ps_html_rewrite_body_filter`).
     ///
-    /// Runs the live gates, then declines: no context exists until
-    /// Slice 6 creates them, so the armed path below is unreachable
-    /// until `finish_html_body_filter` lands with the fetch sink.
+    /// Runs the live gates; armed requests send the chain through
+    /// the fetch sink and pass NULL down.
     ///
     /// # Safety
     ///
@@ -991,8 +1093,7 @@ pub mod html_rewrite {
         // SAFETY: caller guarantees a live request.
         unsafe {
             let pass_to_next = move |chain: *mut ngx_chain_t| {
-                let next =
-                    NEXT_BODY.expect("html-rewrite body chain not initialized");
+                let next = NEXT_BODY.expect("html-rewrite body chain not initialized");
                 // SAFETY: `r`/`chain` per the caller contract.
                 next(r, chain)
             };
@@ -1007,11 +1108,29 @@ pub mod html_rewrite {
             if ctx.is_null() || !(*ctx).html_rewrite {
                 return pass_to_next(chain);
             }
-            assert_eq!(0, (*r).err_status, "errored request reached the body filter");
-            // Slice 6 sends the body via `finish_html_body_filter`
-            // and passes `NULL` down. Until its sink lands, decline
-            // with the chain intact (unreachable while unarmed).
-            pass_to_next(chain)
+            assert_eq!(
+                0,
+                (*r).err_status,
+                "errored request reached the body filter"
+            );
+            // Armed: send the chain through the fetch sink (a null
+            // chain sends nothing) and pass NULL down.
+            {
+                let uri = ngx_str_text(&raw const (*r).uri);
+                let log = (*(*r).connection).log;
+                ngx::ngx_log_error!(
+                    ngx::ffi::NGX_LOG_DEBUG_HTTP,
+                    log,
+                    "http pagespeed html rewrite body filter \"{}\"",
+                    uri
+                );
+            }
+            let sink = (*ctx)
+                .html_sink
+                .as_mut()
+                .expect("html branch attaches a sink");
+            let _outcome = finish_html_body_filter(ctx, chain, sink);
+            pass_to_next(std::ptr::null_mut())
         }
     }
 
@@ -1029,30 +1148,102 @@ pub mod html_rewrite {
         chain: *mut ngx_chain_t,
         sink: &mut dyn crate::send::BodySink,
     ) -> crate::send::SendOutcome {
-        use crate::send::{send_to_pagespeed, SendBuffer};
+        use crate::send::{send_to_pagespeed, SendBuffer, SendOutcome};
+        use ngx::ffi::ngx_read_file;
+        // File-backed buffers (static files) carry no memory
+        // bytes, and dynamic modules run above the copy filter
+        // that would convert them, so their ranges are read here
+        // in chunks. C++ never sees this case through its own
+        // choreography; the fed bytes are what matters.
+        const FILE_CHUNK_BYTES: usize = 65536;
         // SAFETY: caller guarantees as documented.
         unsafe {
-            let mut views = Vec::new();
+            let mut outcome = SendOutcome::default();
             let mut bufs = Vec::new();
             let mut link = chain;
             while !link.is_null() {
                 let buf = (*link).buf;
-                let data = std::slice::from_raw_parts((*buf).pos, (*buf).last.offset_from((*buf).pos) as usize);
-                views.push(SendBuffer {
-                    data,
-                    flush: (*buf).flush() != 0,
-                    last_buf: (*buf).last_buf() != 0,
-                });
+                let flush = (*buf).flush() != 0;
+                let last_buf = (*buf).last_buf() != 0;
+                if (*buf).in_file() != 0 && !(*buf).file.is_null() {
+                    let file = (*buf).file;
+                    let mut offset = (*buf).file_pos;
+                    let end = (*buf).file_last;
+                    let mut sent_any = false;
+                    while offset < end {
+                        #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
+                        let want = ((end - offset) as usize).min(FILE_CHUNK_BYTES);
+                        let mut chunk = vec![0u8; want];
+                        let got = ngx_read_file(file, chunk.as_mut_ptr(), want, offset);
+                        if got <= 0 {
+                            break;
+                        }
+                        #[allow(clippy::cast_sign_loss)]
+                        let got = got as usize;
+                        chunk.truncate(got);
+                        offset += got as i64;
+                        sent_any = true;
+                        let last_chunk = offset >= end;
+                        let partial = send_to_pagespeed(
+                            &[SendBuffer {
+                                data: &chunk,
+                                flush: flush && last_chunk,
+                                last_buf: last_buf && last_chunk,
+                            }],
+                            (*ctx).inflater.as_mut(),
+                            (*ctx).follow_flushes,
+                            sink,
+                        );
+                        outcome.buffers_sent += partial.buffers_sent;
+                        outcome.fetch_done |= partial.fetch_done;
+                        if outcome.inflate_error.is_none() {
+                            outcome.inflate_error = partial.inflate_error;
+                        }
+                    }
+                    if !sent_any {
+                        // Empty or unreadable range: still deliver
+                        // the flags so completion fires.
+                        let partial = send_to_pagespeed(
+                            &[SendBuffer {
+                                data: &[],
+                                flush,
+                                last_buf,
+                            }],
+                            (*ctx).inflater.as_mut(),
+                            (*ctx).follow_flushes,
+                            sink,
+                        );
+                        outcome.buffers_sent += partial.buffers_sent;
+                        outcome.fetch_done |= partial.fetch_done;
+                        if outcome.inflate_error.is_none() {
+                            outcome.inflate_error = partial.inflate_error;
+                        }
+                    }
+                } else {
+                    let data = std::slice::from_raw_parts(
+                        (*buf).pos,
+                        (*buf).last.offset_from((*buf).pos) as usize,
+                    );
+                    let partial = send_to_pagespeed(
+                        &[SendBuffer {
+                            data,
+                            flush,
+                            last_buf,
+                        }],
+                        (*ctx).inflater.as_mut(),
+                        (*ctx).follow_flushes,
+                        sink,
+                    );
+                    outcome.buffers_sent += partial.buffers_sent;
+                    outcome.fetch_done |= partial.fetch_done;
+                    if outcome.inflate_error.is_none() {
+                        outcome.inflate_error = partial.inflate_error;
+                    }
+                }
                 (*buf).set_last_buf(0);
                 bufs.push(buf);
                 link = (*link).next;
             }
-            let outcome = send_to_pagespeed(
-                &views,
-                (*ctx).inflater.as_mut(),
-                (*ctx).follow_flushes,
-                sink,
-            );
             for buf in bufs {
                 (*buf).pos = (*buf).last;
             }
@@ -1100,7 +1291,10 @@ pub mod html_rewrite {
         fn encoding_classification() {
             use EncodingAction::{Inflate, Pass};
             assert_eq!(Pass, classify_content_encoding(true, Some("gzip")));
-            assert_eq!(Inflate(InflateType::Gzip), classify_content_encoding(false, Some("gzip")));
+            assert_eq!(
+                Inflate(InflateType::Gzip),
+                classify_content_encoding(false, Some("gzip"))
+            );
             assert_eq!(
                 Inflate(InflateType::Gzip),
                 classify_content_encoding(false, Some("GZip"))
@@ -1114,8 +1308,14 @@ pub mod html_rewrite {
             assert_eq!(Pass, classify_content_encoding(false, None));
             // Stacking counts comma fields across every line.
             assert!(!has_stacked_content_encoding(&[]));
-            assert!(!has_stacked_content_encoding(&[("Content-Encoding", "gzip")]));
-            assert!(has_stacked_content_encoding(&[("Content-Encoding", "gzip, deflate")]));
+            assert!(!has_stacked_content_encoding(&[(
+                "Content-Encoding",
+                "gzip"
+            )]));
+            assert!(has_stacked_content_encoding(&[(
+                "Content-Encoding",
+                "gzip, deflate"
+            )]));
             assert!(has_stacked_content_encoding(&[
                 ("Content-Encoding", "gzip"),
                 ("Content-Encoding", "deflate"),
@@ -1183,7 +1383,10 @@ pub mod html_rewrite {
                     buf: &mut second_buf,
                     next: std::ptr::null_mut(),
                 };
-                let mut first_link = ngx_chain_t { buf: &mut first_buf, next: &mut second_link };
+                let mut first_link = ngx_chain_t {
+                    buf: &mut first_buf,
+                    next: &mut second_link,
+                };
                 let mut ctx = RequestCtx {
                     html_rewrite: true,
                     in_place: false,
@@ -1195,6 +1398,7 @@ pub mod html_rewrite {
                     follow_flushes: false,
                     inflater: None,
                     base_fetch: None,
+                    html_sink: None,
                     recorder: None,
                 };
                 let mut sink = FakeSink::default();
@@ -1226,7 +1430,8 @@ pub mod etag {
     /// case-insensitive.
     #[must_use]
     pub fn is_internal_etag_name(key: &[u8]) -> bool {
-        key.len() == INTERNAL_ETAG_NAME.len() && key.eq_ignore_ascii_case(INTERNAL_ETAG_NAME.as_bytes())
+        key.len() == INTERNAL_ETAG_NAME.len()
+            && key.eq_ignore_ascii_case(INTERNAL_ETAG_NAME.as_bytes())
     }
 
     /// Header filter (`ps_etag_header_filter`): renames the first
@@ -1368,6 +1573,9 @@ mod tests {
             ],
             EXECUTION_ORDER
         );
-        assert_eq!(["in_place", "fix_headers", "base_fetch", "html_rewrite"], INIT_ORDER);
+        assert_eq!(
+            ["in_place", "fix_headers", "base_fetch", "html_rewrite"],
+            INIT_ORDER
+        );
     }
 }

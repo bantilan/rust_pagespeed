@@ -82,11 +82,8 @@ const IMAGE_INLINING_BLOCKEDLIST: &[&str] = &[
 ];
 
 // Exclude BlackBerry OS 5.0 and older. Exclude all Opera Mini.
-const LAZYLOAD_IMAGES_BLOCKEDLIST: &[&str] = &[
-    "BlackBerry*CLDC*",
-    "*Opera Mini*",
-    GOOGLE_PLUS_USER_AGENT,
-];
+const LAZYLOAD_IMAGES_BLOCKEDLIST: &[&str] =
+    &["BlackBerry*CLDC*", "*Opera Mini*", GOOGLE_PLUS_USER_AGENT];
 
 // For defer js we only allow Firefox4+, IE8+, safari and Chrome.
 // Note: None of the following should match a mobile UA.
@@ -457,10 +454,7 @@ impl UserAgentMatcher {
     #[must_use]
     pub fn supports_js_defer(&self, user_agent: &str, allow_mobile: bool) -> bool {
         if self.device_type_for_ua(user_agent) != DeviceType::Desktop {
-            return allow_mobile
-                && self
-                    .defer_js_mobile_allowlist
-                    .is_match(user_agent, false);
+            return allow_mobile && self.defer_js_mobile_allowlist.is_match(user_agent, false);
         }
         user_agent.is_empty() || self.defer_js_allowlist.is_match(user_agent, false)
     }
@@ -768,7 +762,10 @@ impl UserAgentMatcher {
     /// `.*` prefix; a plain leftmost search would return the earlier
     /// `Chrome/` token instead.
     pub fn chrome_build_number(&self, user_agent: &str) -> Option<(i32, i32, i32, i32)> {
-        let caps = self.chrome_version_pattern.captures_iter(user_agent).last()?;
+        let caps = self
+            .chrome_version_pattern
+            .captures_iter(user_agent)
+            .last()?;
         let number = |index: usize| caps[index].parse::<i32>().unwrap_or(-1);
         Some((number(1), number(2), number(3), number(4)))
     }
@@ -823,11 +820,7 @@ impl UserAgentMatcher {
         if !self.is_ios_user_agent(user_agent) {
             return false;
         }
-        self.user_agent_exceeds_chrome_build_and_patch(
-            user_agent,
-            required_build,
-            required_patch,
-        )
+        self.user_agent_exceeds_chrome_build_and_patch(user_agent, required_build, required_patch)
     }
 
     /// Whether a Chrome-Android build clears build/patch floors.
@@ -842,11 +835,7 @@ impl UserAgentMatcher {
         if !self.is_android_user_agent(user_agent) {
             return false;
         }
-        self.user_agent_exceeds_chrome_build_and_patch(
-            user_agent,
-            required_build,
-            required_patch,
-        )
+        self.user_agent_exceeds_chrome_build_and_patch(user_agent, required_build, required_patch)
     }
 
     /// Whether a Chromium build clears build/patch floors.
@@ -861,9 +850,7 @@ impl UserAgentMatcher {
         if required_build == -1 && required_patch == -1 {
             return false;
         }
-        let Some((_, _, parsed_build, parsed_patch)) =
-            self.chrome_build_number(user_agent)
-        else {
+        let Some((_, _, parsed_build, parsed_patch)) = self.chrome_build_number(user_agent) else {
             return false;
         };
         if parsed_build < required_build {
@@ -943,134 +930,441 @@ mod tests {
 
     const ACCEPT_HEADER_VALUE_MOBILE: &str = "text/html,application/vnd.wap.xhtml+xml";
     const ACCEPT_HEADER_VALUE_NON_MOBILE: &str = "text/html";
-    const ALCATEL_MOBILE_USER_AGENT: &str = concat!("ALCATEL_one_touch_310A/1.0 Profile/MIDP-2.0 ", "Configuration/CLDC-1.1 ObigoInternetBrowser/Q03C");
+    const ALCATEL_MOBILE_USER_AGENT: &str = concat!(
+        "ALCATEL_one_touch_310A/1.0 Profile/MIDP-2.0 ",
+        "Configuration/CLDC-1.1 ObigoInternetBrowser/Q03C"
+    );
     const ALCATEL_USER_AGENT: &str = "Alcatel_one_touch_214/1.0 ObigoInternetBrowser/Q03C";
     const AMOI_USER_AGENT: &str = "Amoi 8512/R18.0 NF-Browser/3.3";
-    const ANDROID_CHROME18_USER_AGENT: &str = concat!("Mozilla/5.0 (Linux; Android 4.0.4; Galaxy Nexus Build/IMM76B) ", "AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.133 Mobile ", "Safari/535.19");
-    const ANDROID_CHROME21_USER_AGENT: &str = concat!("Mozilla/5.0 (Linux; Android 4.1.4; Galaxy Nexus Build/IMM76B) ", "AppleWebKit/535.19 (KHTML, like Gecko) Chrome/21.0.1025.133 Mobile ", "Safari/535.19");
-    const ANDROID_HC_USER_AGENT: &str = concat!("Mozilla/5.0 (Linux; U; Android 3.2; en-us; Sony Tablet S Build/THMAS11000)", " AppleWebKit/534.13 (KHTML, like Gecko) Version/4.0 Safari/534.13");
-    const ANDROID_ICS_USER_AGENT: &str = concat!("Mozilla/5.0 (Linux; U; Android 4.0.1; en-us; Galaxy Nexus Build/ICL27) ", "AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30");
-    const PAGESPEED_INSIGHTS_MOBILE_USER_AGENT: &str = concat!("Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) ", "AppleWebKit/537.36 (KHTML, like Gecko; Google Page Speed Insights) ", "Chrome/27.0.1453 Mobile Safari/537.36");
-    const PAGESPEED_INSIGHTS_DESKTOP_USER_AGENT: &str = concat!("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko; ", "Google Page Speed Insights) Chrome/27.0.1453 Safari/537.36");
-    const ANDROID_NEXUS_S_USER_AGENT: &str = concat!("Mozilla/5.0 (Linux; U; Android 2.3.3; en-gb; Nexus S Build/GRI20)", "AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
+    const ANDROID_CHROME18_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Linux; Android 4.0.4; Galaxy Nexus Build/IMM76B) ",
+        "AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.133 Mobile ",
+        "Safari/535.19"
+    );
+    const ANDROID_CHROME21_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Linux; Android 4.1.4; Galaxy Nexus Build/IMM76B) ",
+        "AppleWebKit/535.19 (KHTML, like Gecko) Chrome/21.0.1025.133 Mobile ",
+        "Safari/535.19"
+    );
+    const ANDROID_HC_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Linux; U; Android 3.2; en-us; Sony Tablet S Build/THMAS11000)",
+        " AppleWebKit/534.13 (KHTML, like Gecko) Version/4.0 Safari/534.13"
+    );
+    const ANDROID_ICS_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Linux; U; Android 4.0.1; en-us; Galaxy Nexus Build/ICL27) ",
+        "AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30"
+    );
+    const PAGESPEED_INSIGHTS_MOBILE_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) ",
+        "AppleWebKit/537.36 (KHTML, like Gecko; Google Page Speed Insights) ",
+        "Chrome/27.0.1453 Mobile Safari/537.36"
+    );
+    const PAGESPEED_INSIGHTS_DESKTOP_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko; ",
+        "Google Page Speed Insights) Chrome/27.0.1453 Safari/537.36"
+    );
+    const ANDROID_NEXUS_S_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Linux; U; Android 2.3.3; en-gb; Nexus S Build/GRI20)",
+        "AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1"
+    );
     const BENQ_USER_AGENT: &str = "BENQ-A500";
-    const BLACK_BERRY_OS5_USER_AGENT: &str = concat!("BlackBerry9000/5.0.0.93 Profile/MIDP-2.0 Configuration/CLDC-1.1 ", "VendorID/179");
-    const BLACK_BERRY_OS6_USER_AGENT: &str = concat!("Mozilla/5.0 (BlackBerry; U; BlackBerry 9800; en-US) AppleWebKit/534.11+ ", "(KHTML, like Gecko) Version/6.0.0.141 Mobile Safari/534.11+");
-    const CHROME12_USER_AGENT: &str = concat!("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_4) ", "AppleWebKit/534.30 (KHTML, like Gecko) Chrome/12.0.742.100 Safari/534.30");
-    const CHROME15_USER_AGENT: &str = concat!("Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) ", "AppleWebKit/534.13 (KHTML, like Gecko) Chrome/15.0.597.19 Safari/534.13");
-    const CHROME18_USER_AGENT: &str = concat!("Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) ", "AppleWebKit/534.13 (KHTML, like Gecko) Chrome/18.0.597.19 Safari/534.13");
-    const CHROME9_USER_AGENT: &str = concat!("Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) ", "AppleWebKit/534.13 (KHTML, like Gecko) Chrome/9.0.597.19 Safari/534.13");
-    const CHROME31_USER_AGENT: &str = concat!("Mozilla/5.0 (Windows NT 5.1) AppleWebKit/537.36 (KHTML, like Gecko) ", "Chrome/31.0.1650.16 Safari/537.36");
-    const CHROME32_USER_AGENT: &str = concat!("Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 ", "(KHTML, like Gecko) Chrome/32.0.1667.0 Safari/537.36");
-    const CHROME37_USER_AGENT: &str = concat!("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) ", "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.122 Safari/537.36");
-    const CHROME41_USER_AGENT: &str = concat!("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)", " Chrome/41.0.2227.0 Safari/537.36");
-    const CHROME42_USER_AGENT: &str = concat!("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)", " Chrome/42.0.2302.4 Safari/537.36");
-    const CHROME_USER_AGENT: &str = concat!("Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) ", "AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13");
+    const BLACK_BERRY_OS5_USER_AGENT: &str = concat!(
+        "BlackBerry9000/5.0.0.93 Profile/MIDP-2.0 Configuration/CLDC-1.1 ",
+        "VendorID/179"
+    );
+    const BLACK_BERRY_OS6_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (BlackBerry; U; BlackBerry 9800; en-US) AppleWebKit/534.11+ ",
+        "(KHTML, like Gecko) Version/6.0.0.141 Mobile Safari/534.11+"
+    );
+    const CHROME12_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_4) ",
+        "AppleWebKit/534.30 (KHTML, like Gecko) Chrome/12.0.742.100 Safari/534.30"
+    );
+    const CHROME15_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) ",
+        "AppleWebKit/534.13 (KHTML, like Gecko) Chrome/15.0.597.19 Safari/534.13"
+    );
+    const CHROME18_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) ",
+        "AppleWebKit/534.13 (KHTML, like Gecko) Chrome/18.0.597.19 Safari/534.13"
+    );
+    const CHROME9_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US) ",
+        "AppleWebKit/534.13 (KHTML, like Gecko) Chrome/9.0.597.19 Safari/534.13"
+    );
+    const CHROME31_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/537.36 (KHTML, like Gecko) ",
+        "Chrome/31.0.1650.16 Safari/537.36"
+    );
+    const CHROME32_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 ",
+        "(KHTML, like Gecko) Chrome/32.0.1667.0 Safari/537.36"
+    );
+    const CHROME37_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) ",
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.122 Safari/537.36"
+    );
+    const CHROME41_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)",
+        " Chrome/41.0.2227.0 Safari/537.36"
+    );
+    const CHROME42_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)",
+        " Chrome/42.0.2302.4 Safari/537.36"
+    );
+    const CHROME_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) ",
+        "AppleWebKit/525.13 (KHTML, like Gecko) Chrome/0.A.B.C Safari/525.13"
+    );
     const COMPAL_USER_AGENT: &str = "Compal-A618";
-    const CRI_OS31_USER_AGENT: &str = concat!("Mozilla/5.0 (iPhone; CPU iPhone OS 7_0_3 like Mac OS X) ", "AppleWebKit/537.51.1 (KHTML, like Gecko) CriOS/31.0.1650.18 Mobile/11B511 ", "Safari/8536.25 (37014222-1F1D-4117-89B3-699D5C10628A)");
-    const CRI_OS32_USER_AGENT: &str = concat!("Mozilla/5.0 (iPhone; CPU iPhone OS 7_0_4 like Mac OS X) ", "AppleWebKit/537.51.1 (KHTML, like Gecko) CriOS/32.0.1700.21 ", "Mobile/11B554a Safari/9537.53 (A7BED55D-B09E-484F-B2FE-5E4952E9B87E)");
-    const CRI_OS48_USER_AGENT: &str = concat!("Mozilla/5.0 (iPhone; CPU iPhone OS 9_2 like Mac OS X) ", "AppleWebKit/601.1 (KHTML, like Gecko) CriOS/48.0.2564.87 ", "Mobile/13C75 Safari/601.1.46");
+    const CRI_OS31_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 7_0_3 like Mac OS X) ",
+        "AppleWebKit/537.51.1 (KHTML, like Gecko) CriOS/31.0.1650.18 Mobile/11B511 ",
+        "Safari/8536.25 (37014222-1F1D-4117-89B3-699D5C10628A)"
+    );
+    const CRI_OS32_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 7_0_4 like Mac OS X) ",
+        "AppleWebKit/537.51.1 (KHTML, like Gecko) CriOS/32.0.1700.21 ",
+        "Mobile/11B554a Safari/9537.53 (A7BED55D-B09E-484F-B2FE-5E4952E9B87E)"
+    );
+    const CRI_OS48_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 9_2 like Mac OS X) ",
+        "AppleWebKit/601.1 (KHTML, like Gecko) CriOS/48.0.2564.87 ",
+        "Mobile/13C75 Safari/601.1.46"
+    );
     const DO_CO_MO_MOBILE_USER_AGENT: &str = "DoCoMo/1.0/D505iS/c20/TB/W20H10";
-    const FIREFOX1_USER_AGENT: &str = concat!("Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.8.0.7) ", "Gecko/20060909 Firefox/1.5.0.7 MG (Novarra-Vision/6.1)");
-    const FIREFOX3_USER_AGENT: &str = concat!("Mozilla/5.0 (X11; U; Linux x86_64; zh-CN; rv:1.9.2.10) ", "Gecko/20100922 Ubuntu/10.10 (maverick) Firefox/3.6.10");
-    const FIREFOX42_ANDROID_USER_AGENT: &str = "Mozilla/5.0 (Android 5.0.1; Mobile; rv:42.0) Gecko/42.0 Firefox/42.0";
-    const FIREFOX5_USER_AGENT: &str = "Mozilla/5.0 (X11; U; Linux i586; de; rv:5.0) Gecko/20100101 Firefox/5.0";
-    const FIREFOX_MOBILE_USER_AGENT: &str = "Mozilla/5.0 (Android; Mobile; rv:38.0) Gecko/38.0 Firefox/38.0";
-    const FIREFOX_NOKIA_N800: &str = concat!("Mozilla/5.0 (X11; U; Linux armv6l; en-US; rv:1.9a6pre) Gecko/20070810 ", "Firefox/3.0a1 Tablet browser 0.1.16 RX-34_2007SE_4.2007.38-2");
-    const FIREFOX_USER_AGENT: &str = concat!("Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:27.0) ", "Gecko/20100101 Firefox/27.0");
+    const FIREFOX1_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.8.0.7) ",
+        "Gecko/20060909 Firefox/1.5.0.7 MG (Novarra-Vision/6.1)"
+    );
+    const FIREFOX3_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (X11; U; Linux x86_64; zh-CN; rv:1.9.2.10) ",
+        "Gecko/20100922 Ubuntu/10.10 (maverick) Firefox/3.6.10"
+    );
+    const FIREFOX42_ANDROID_USER_AGENT: &str =
+        "Mozilla/5.0 (Android 5.0.1; Mobile; rv:42.0) Gecko/42.0 Firefox/42.0";
+    const FIREFOX5_USER_AGENT: &str =
+        "Mozilla/5.0 (X11; U; Linux i586; de; rv:5.0) Gecko/20100101 Firefox/5.0";
+    const FIREFOX_MOBILE_USER_AGENT: &str =
+        "Mozilla/5.0 (Android; Mobile; rv:38.0) Gecko/38.0 Firefox/38.0";
+    const FIREFOX_NOKIA_N800: &str = concat!(
+        "Mozilla/5.0 (X11; U; Linux armv6l; en-US; rv:1.9a6pre) Gecko/20070810 ",
+        "Firefox/3.0a1 Tablet browser 0.1.16 RX-34_2007SE_4.2007.38-2"
+    );
+    const FIREFOX_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:27.0) ",
+        "Gecko/20100101 Firefox/27.0"
+    );
     const FLY_USER_AGENT: &str = "FLY-2040i/BSI AU.Browser/2.0 QO3C1 MMP/1.0";
     const GENERIC_ANDROID_USER_AGENT: &str = "Android";
-    const GOOGLEBOT_USER_AGENT: &str = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
+    const GOOGLEBOT_USER_AGENT: &str =
+        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
     const GOOGLE_ADS_BOT_USER_AGENT: &str = "AdsBot-Google";
     const GOOGLE_ADS_BOT_MOBILE_USER_AGENT: &str = "AdsBot-Google-Mobile";
-    const GOOGLE_PLUS_USER_AGENT: &str = concat!("Mozilla/5.0 (Windows NT 6.1; rv:6.0) Gecko/20110814 Firefox/6.0 Google ", "(+https://developers.google.com/+/web/snippet/)");
-    const IE6_USER_AGENT: &str = concat!("Mozilla/5.0 (Windows; U; MSIE 6.0; Windows NT 5.1; SV1;", " .NET CLR 2.0.50727)");
+    const GOOGLE_PLUS_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Windows NT 6.1; rv:6.0) Gecko/20110814 Firefox/6.0 Google ",
+        "(+https://developers.google.com/+/web/snippet/)"
+    );
+    const IE6_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Windows; U; MSIE 6.0; Windows NT 5.1; SV1;",
+        " .NET CLR 2.0.50727)"
+    );
     const IE7_USER_AGENT: &str = "Mozilla/5.0 (Windows; U; MSIE 7.0; Windows NT 6.0; en-US)";
-    const IE8_USER_AGENT: &str = concat!("Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.1; WOW64;", " Trident/4.0; SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729;", " .NET CLR 3.0.30729; Media Center PC 6.0; InfoPath.2;", " .NET4.0C; .NET4.0E; FDM)");
+    const IE8_USER_AGENT: &str = concat!(
+        "Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.1; WOW64;",
+        " Trident/4.0; SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729;",
+        " .NET CLR 3.0.30729; Media Center PC 6.0; InfoPath.2;",
+        " .NET4.0C; .NET4.0E; FDM)"
+    );
     const IE9_USER_AGENT: &str = "Mozilla/5.0 (Windows; U; MSIE 9.0; WIndows NT 9.0; en-US))";
     const IE10_USER_AGENT: &str = "Mozilla/5.0 (Windows; U; MSIE 10.0; WIndows NT 9.0; en-US))";
-    const I_PAD_TABLET_USER_AGENT: &str = concat!("Mozilla/5.0 (iPad; CPU OS 6_1_3 like Mac OS X) AppleWebKit/536.26 (KHTML, ", "like Gecko) Version/6.0 Mobile/10B329 Safari/8536.25");
-    const I_PAD_USER_AGENT: &str = concat!("Mozilla/5.0 (iPad; U; CPU OS 3_2 like Mac OS X; en-us) ", "AppleWebKit/531.21.10 (KHTML, like Gecko) Version/4.0.4 ", "Mobile/7B334b Safari/531.21.10");
-    const I_PAD_CHROME28_USER_AGENT: &str = concat!("Mozilla/5.0 (iPad; CPU OS 613 like Mac OS X) AppleWebKit/536.26 (KHTML ", "like Gecko) CriOS/28.0.1500.12 Mobile/10B329 Safari/8536.25");
-    const I_PAD_CHROME29_USER_AGENT: &str = concat!("Mozilla/5.0 (iPad; CPU OS 613 like Mac OS X) AppleWebKit/536.26 (KHTML ", "like Gecko) CriOS/29.0.1547.11 Mobile/10B329 Safari/8536.25");
-    const I_PAD_CHROME36_USER_AGENT: &str = concat!("Mozilla/5.0 (iPad; CPU OS 7_1_1 like Mac OS X) AppleWebKit/537.51.2 ", "(KHTML, like Gecko) CriOS/36.0.1985.49 Mobile/11D201 Safari/9537.53");
-    const I_PHONE4_SAFARI: &str = concat!("Mozilla/5.0 (iPhone; CPU iPhone OS 5_0_1 like Mac OS X) AppleWebKit/534.46", " (KHTML, like Gecko) Version/5.1 Mobile/9A405 Safari/7534.48.3");
-    const I_PHONE_CHROME21_USER_AGENT: &str = concat!("Mozilla/5.0 (iPhone; CPU iPhone OS 6_0_1 like Mac OS X; en-us) ", "AppleWebKit/534.46.0 (KHTML, like Gecko) CriOS/21.0.1180.82 ", "Mobile/10A523 Safari/7534.48.3");
-    const I_PHONE_CHROME36_USER_AGENT: &str = concat!("Mozilla/5.0 (iPhone; CPU iPhone OS 7_1_2 like Mac OS X) ", "AppleWebKit/537.51.2 (KHTML, like Gecko) CriOS/36.0.1985.49 ", "Mobile/11D257 Safari/9537.53");
+    const I_PAD_TABLET_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (iPad; CPU OS 6_1_3 like Mac OS X) AppleWebKit/536.26 (KHTML, ",
+        "like Gecko) Version/6.0 Mobile/10B329 Safari/8536.25"
+    );
+    const I_PAD_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (iPad; U; CPU OS 3_2 like Mac OS X; en-us) ",
+        "AppleWebKit/531.21.10 (KHTML, like Gecko) Version/4.0.4 ",
+        "Mobile/7B334b Safari/531.21.10"
+    );
+    const I_PAD_CHROME28_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (iPad; CPU OS 613 like Mac OS X) AppleWebKit/536.26 (KHTML ",
+        "like Gecko) CriOS/28.0.1500.12 Mobile/10B329 Safari/8536.25"
+    );
+    const I_PAD_CHROME29_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (iPad; CPU OS 613 like Mac OS X) AppleWebKit/536.26 (KHTML ",
+        "like Gecko) CriOS/29.0.1547.11 Mobile/10B329 Safari/8536.25"
+    );
+    const I_PAD_CHROME36_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (iPad; CPU OS 7_1_1 like Mac OS X) AppleWebKit/537.51.2 ",
+        "(KHTML, like Gecko) CriOS/36.0.1985.49 Mobile/11D201 Safari/9537.53"
+    );
+    const I_PHONE4_SAFARI: &str = concat!(
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 5_0_1 like Mac OS X) AppleWebKit/534.46",
+        " (KHTML, like Gecko) Version/5.1 Mobile/9A405 Safari/7534.48.3"
+    );
+    const I_PHONE_CHROME21_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 6_0_1 like Mac OS X; en-us) ",
+        "AppleWebKit/534.46.0 (KHTML, like Gecko) CriOS/21.0.1180.82 ",
+        "Mobile/10A523 Safari/7534.48.3"
+    );
+    const I_PHONE_CHROME36_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 7_1_2 like Mac OS X) ",
+        "AppleWebKit/537.51.2 (KHTML, like Gecko) CriOS/36.0.1985.49 ",
+        "Mobile/11D257 Safari/9537.53"
+    );
     const I_PHONE_USER_AGENT: &str = "Apple iPhone OS v2.1.1 CoreMedia v1.0.0.5F138";
-    const I_POD_SAFARI: &str = concat!("Mozilla/5.0 (iPod; U; CPU iPhone OS 4_3_3 like Mac OS X; en-us)", " AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8J2", " Safari/6533.18.5");
+    const I_POD_SAFARI: &str = concat!(
+        "Mozilla/5.0 (iPod; U; CPU iPhone OS 4_3_3 like Mac OS X; en-us)",
+        " AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8J2",
+        " Safari/6533.18.5"
+    );
     const I_USER_AGENT: &str = "i-mobile318";
     const J_MOBILE_USER_AGENT: &str = "J-PHONE/3.0/J-SA05";
     const KDDI_MOBILE_USER_AGENT: &str = "KDDI-CA31 UP.Browser/6.2.0.7.3.129 (GUI) MMP/2.0";
-    const KINDLE_TABLET_USER_AGENT: &str = concat!("Mozilla/5.0 (Linux; U; Android 2.3.4; en-us; Kindle Fire ", "Build/GINGERBREAD) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 ", "Mobile Safari/533.1");
+    const KINDLE_TABLET_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Linux; U; Android 2.3.4; en-us; Kindle Fire ",
+        "Build/GINGERBREAD) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 ",
+        "Mobile Safari/533.1"
+    );
     const KWC_MOBILE_USER_AGENT: &str = "KWC-E2000/1003 UP.Browser/7.2.6.1.475 (GUI) MMP/2.0";
     const LENOVO_USER_AGENT: &str = "LENOVO-E307_ENG_RUS_FLY/(2006.05.10)S276/WAP1.2.1";
     const LGE_MOBILE_USER_AGENT: &str = "LGE-AX300/1.0 UP.Browser/6.2.3.8 (GUI) MMP/2.0";
     const LGE_USER_AGENT: &str = "LGE-CU8188";
-    const LGMIDP_MOBILE_USER_AGENT: &str = "LG-A225/V100 Obigo/WAP2.0 Profile/MIDP-2.1 Configuration/CLDC-1.1";
+    const LGMIDP_MOBILE_USER_AGENT: &str =
+        "LG-A225/V100 Obigo/WAP2.0 Profile/MIDP-2.1 Configuration/CLDC-1.1";
     const LGUP_BROWSER_MOBILE_USER_AGENT: &str = "LG8500/1.0 UP.Browser/6.2.3.9 (GUI) MMP/2.0";
     const LG_USER_AGENT: &str = "LG-B2000";
     const MOT_MOBILE_USER_AGENT: &str = "MOT-1.2.0/11.03 UP.Browser/4.1.27a";
-    const MOZILLA_MOBILE_USER_AGENT: &str = concat!("Mozilla/4.0 (compatible; MSIE 4.01; Windows CE; Smartphone; ", "SDA/2.0 Profile/MIDP-2.0 Configuration/CLDC-1.1)");
+    const MOZILLA_MOBILE_USER_AGENT: &str = concat!(
+        "Mozilla/4.0 (compatible; MSIE 4.01; Windows CE; Smartphone; ",
+        "SDA/2.0 Profile/MIDP-2.0 Configuration/CLDC-1.1)"
+    );
     const MOZILLA_USER_AGENT: &str = "Mozilla/1.22 (compatible; MMEF20; Cellphone; Sony CMD-Z5)";
     const NEC_USER_AGENT: &str = "NEC-E122/1.0 TMT-Mobile-Internet-Browser/1.1.14.20 (GUI)";
-    const NEXUS10_CHROME_USER_AGENT: &str = concat!("Mozilla/5.0 (Linux; Android 4.2.2; Nexus 10 Build/JDQ39) AppleWebKit/", "537.31 (KHTML, like Gecko) Chrome/26.0.1408.0 Safari/537.31");
-    const NEXUS6_CHROME44_USER_AGENT: &str = concat!("Mozilla/5.0 (Linux; Android 5.1.1; Nexus 6 Build/LVY48E) ", "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.133 Mobile ", "Safari/537.36");
-    const NEXUS7_CHROME_USER_AGENT: &str = concat!("Mozilla/5.0 (Linux; Android 4.2; Nexus 7 Build/JOP32C) AppleWebKit/535.19", "(KHTML, like Gecko) Chrome/18.0.1025.166 Safari/535.19");
-    const NOKIA_MOBILE_USER_AGENT: &str = concat!("Nokia6600/1.0 (2.33.0) SymbianOS/7.0s Series60/2.0 ", "Profile/MIDP-2.0 Configuration/CLDC-1.0");
-    const NOKIA_USER_AGENT: &str = "Nokia2355/1.0 (JN100V0200.nep) UP.Browser/6.2.2.1.c.1.108 (GUI) MMP/2.0";
-    const OPERA1101_USER_AGENT: &str = "Opera/9.80 (Windows NT 5.2; U; ru) Presto/2.7.62 Version/11.01";
-    const OPERA1110_USER_AGENT: &str = "Opera/9.80 (Windows NT 6.0; U; en) Presto/2.8.99 Version/11.10";
+    const NEXUS10_CHROME_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Linux; Android 4.2.2; Nexus 10 Build/JDQ39) AppleWebKit/",
+        "537.31 (KHTML, like Gecko) Chrome/26.0.1408.0 Safari/537.31"
+    );
+    const NEXUS6_CHROME44_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Linux; Android 5.1.1; Nexus 6 Build/LVY48E) ",
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.133 Mobile ",
+        "Safari/537.36"
+    );
+    const NEXUS7_CHROME_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Linux; Android 4.2; Nexus 7 Build/JOP32C) AppleWebKit/535.19",
+        "(KHTML, like Gecko) Chrome/18.0.1025.166 Safari/535.19"
+    );
+    const NOKIA_MOBILE_USER_AGENT: &str = concat!(
+        "Nokia6600/1.0 (2.33.0) SymbianOS/7.0s Series60/2.0 ",
+        "Profile/MIDP-2.0 Configuration/CLDC-1.0"
+    );
+    const NOKIA_USER_AGENT: &str =
+        "Nokia2355/1.0 (JN100V0200.nep) UP.Browser/6.2.2.1.c.1.108 (GUI) MMP/2.0";
+    const OPERA1101_USER_AGENT: &str =
+        "Opera/9.80 (Windows NT 5.2; U; ru) Presto/2.7.62 Version/11.01";
+    const OPERA1110_USER_AGENT: &str =
+        "Opera/9.80 (Windows NT 6.0; U; en) Presto/2.8.99 Version/11.10";
     const OPERA5_USER_AGENT: &str = "Opera/5.0 (SunOS 5.8 sun4u; U) [en]";
     const OPERA8_USER_AGENT: &str = "Opera/8.01 (J2ME/MIDP; Opera Mini/1.1.2666/1724; en; U; ssr)";
-    const OPERA18_USER_AGENT: &str = concat!("Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 ", "(KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36 OPR/18.0.1284.68");
-    const OPERA19_USER_AGENT: &str = concat!("Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 ", "(KHTML, like Gecko) Chrome/32.0.1700.76 Safari/537.36 OPR/19.0.1326.56");
-    const OPERA_MINI_MOBILE_USER_AGENT: &str = concat!("Opera/8.01 (J2ME/MIDP; Opera Mini/1.1.4821/hifi/tmobile/uk; ", "Motorola V3; en; U; ssr)");
+    const OPERA18_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 ",
+        "(KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36 OPR/18.0.1284.68"
+    );
+    const OPERA19_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 ",
+        "(KHTML, like Gecko) Chrome/32.0.1700.76 Safari/537.36 OPR/19.0.1326.56"
+    );
+    const OPERA_MINI_MOBILE_USER_AGENT: &str = concat!(
+        "Opera/8.01 (J2ME/MIDP; Opera Mini/1.1.4821/hifi/tmobile/uk; ",
+        "Motorola V3; en; U; ssr)"
+    );
     const OPERA_MOBI9: &str = "Opera/9.51 Beta (Microsoft Windows; PPC; Opera Mobi/1718; U; en)";
-    const OPERA_MOBIL_MOBILE_USER_AGENT: &str = concat!("Opera/9.80 (Android 4.0.4; Linux; Opera Mobi/ADR-1104201100; U; ru) ", "Presto/2.7.81 Version/11.00");
-    const OPERA_WITH_FIREFOX_USER_AGENT: &str = concat!("Mozilla/5.0 (Windows NT 6.0; rv:2.0) Gecko/20100101 Firefox/4.0 Opera ", "12.14");
-    const PANASONIC_MOBILE_USER_AGENT: &str = concat!("Panasonic-G60/1.0 UP.Browser/6.1.0.6 ", "MMP/1.0 UP.Browser/6.1.0.6 (GUI) MMP/1.0");
+    const OPERA_MOBIL_MOBILE_USER_AGENT: &str = concat!(
+        "Opera/9.80 (Android 4.0.4; Linux; Opera Mobi/ADR-1104201100; U; ru) ",
+        "Presto/2.7.81 Version/11.00"
+    );
+    const OPERA_WITH_FIREFOX_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Windows NT 6.0; rv:2.0) Gecko/20100101 Firefox/4.0 Opera ",
+        "12.14"
+    );
+    const PANASONIC_MOBILE_USER_AGENT: &str = concat!(
+        "Panasonic-G60/1.0 UP.Browser/6.1.0.6 ",
+        "MMP/1.0 UP.Browser/6.1.0.6 (GUI) MMP/1.0"
+    );
     const PG_USER_AGENT: &str = "PG-1610/R01";
     const PHILIPS_USER_AGENT: &str = "PHILIPS 330 / Obigo Internet Browser 2.0";
     const PORTALMMM_MOBILE_USER_AGENT: &str = "portalmmm/2.0 6120(c100;TB)";
     const PSP_USER_AGENT: &str = "Mozilla/4.0 (PSP (PlayStation Portable); 2.00)";
     const ROVER_USER_AGENT: &str = "Rover 3.5 (RIM Handheld; Mobitex; OS v. 2.1)";
-    const SAFARI_USER_AGENT: &str = concat!("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/534.51.22 ", "(KHTML, like Gecko) Version/5.1.1 Safari/534.51.22");
-    const SAFARI6_USER_AGENT: &str = concat!("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_4) AppleWebKit/536.25 ", "(KHTML, like Gecko) Version/6.0 Safari/536.25");
-    const SAFARI9_USER_AGENT: &str = concat!("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/601.6.17 ", "(KHTML, like Gecko) Version/9.1.1 Safari/601.6.17");
+    const SAFARI_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/534.51.22 ",
+        "(KHTML, like Gecko) Version/5.1.1 Safari/534.51.22"
+    );
+    const SAFARI6_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_4) AppleWebKit/536.25 ",
+        "(KHTML, like Gecko) Version/6.0 Safari/536.25"
+    );
+    const SAFARI9_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/601.6.17 ",
+        "(KHTML, like Gecko) Version/9.1.1 Safari/601.6.17"
+    );
     const SAGEM_MOBILE_USER_AGENT: &str = "SAGEM-my202C/Orange1.0 UP.Browser/5.0.5.6 (GUI)";
     const SAGEM_USER_AGENT: &str = "SAGEM-942";
-    const SAMSUNG_MOBILE_USER_AGENT: &str = concat!("SAMSUNG-B2700/SXIB1 SHP/VPP/R5 NetFront/3.4 SMM-MMS/1.2.0 ", "profile/MIDP-2.0 configuration/CLDC-1.1");
+    const SAMSUNG_MOBILE_USER_AGENT: &str = concat!(
+        "SAMSUNG-B2700/SXIB1 SHP/VPP/R5 NetFront/3.4 SMM-MMS/1.2.0 ",
+        "profile/MIDP-2.0 configuration/CLDC-1.1"
+    );
     const SCH_MOBILE_USER_AGENT: &str = "SCH-A850 UP.Browser/6.2.3.2 (GUI) MMP/2.0";
     const SCH_USER_AGENT: &str = "SCH-U350/1.0 NetFront/3.0.22.2.18 (GUI) MMP/2.0";
     const SEC_MOBILE_USER_AGENT: &str = "SEC-scha310 UP.Browser/4.1.26c3";
     const SGH_USER_AGENT: &str = "SGH-Z230";
-    const SHARP_MOBILE_USER_AGENT: &str = concat!("SHARP-TQ-GX10/0.0 Profile/MIDP-1.0 Configuration/CLDC-1.0 ", "UP.Browser/6.1.0.2.129 (GUI) MMP/1.0");
+    const SHARP_MOBILE_USER_AGENT: &str = concat!(
+        "SHARP-TQ-GX10/0.0 Profile/MIDP-1.0 Configuration/CLDC-1.0 ",
+        "UP.Browser/6.1.0.2.129 (GUI) MMP/1.0"
+    );
     const SHARP_USER_AGENT: &str = "SHARP-TQ-GX15";
     const SIE_MOBILE_USER_AGENT: &str = "SIE-2128/24 UP.Browser/5.0.3.3 (GUI)";
     const SIE_USER_AGENT: &str = "SIE-A40";
-    const SILK_DESKTOP_USER_AGENT: &str = concat!("Mozilla/5.0 (PlayStation Vita 2.10) AppleWebKit/536.26 (KHTML, ", "like Gecko) Silk/3.2");
-    const SILK_TABLET_USER_AGENT: &str = concat!("Mozilla/5.0 (Linux; U; Android 2.3.4; en-us; Silk/1.0.22.153_10033210) ", "AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1 ", "Silk-Accelerated=true");
-    const SOFT_BANK_MOBILE_USER_AGENT: &str = concat!("SoftBank/1.0/705NK/NKJ001 Series60/3.0 NokiaN73/3.0650 ", "Profile/MIDP-2.0 Configuration/CLDC-1.1");
-    const SPICE_USER_AGENT: &str = concat!("Spice M6800  Opera/9.80 (MTK; Nucleus; U; en-US) Presto/2.4.18 ", "Version/10.00");
+    const SILK_DESKTOP_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (PlayStation Vita 2.10) AppleWebKit/536.26 (KHTML, ",
+        "like Gecko) Silk/3.2"
+    );
+    const SILK_TABLET_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Linux; U; Android 2.3.4; en-us; Silk/1.0.22.153_10033210) ",
+        "AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1 ",
+        "Silk-Accelerated=true"
+    );
+    const SOFT_BANK_MOBILE_USER_AGENT: &str = concat!(
+        "SoftBank/1.0/705NK/NKJ001 Series60/3.0 NokiaN73/3.0650 ",
+        "Profile/MIDP-2.0 Configuration/CLDC-1.1"
+    );
+    const SPICE_USER_AGENT: &str = concat!(
+        "Spice M6800  Opera/9.80 (MTK; Nucleus; U; en-US) Presto/2.4.18 ",
+        "Version/10.00"
+    );
     const TIANYU_USER_AGENT: &str = "TIANYU-KTOUCH/B2012";
-    const VODAFONE_MOBILE_USER_AGENT: &str = concat!("Vodafone/1.0/0Vodafone710/B616 Browser/Obigo-Browser/Q04A ", "MMS/Obigo-MMS/Q04A SyncML/HW-SyncML/1.0 Java/QVM/4.1 Profile/MIDP-2.0 ", "Configuration/CLDC-1.1");
-    const WINDOWS_PHONE_USER_AGENT: &str = concat!("Mozilla/5.0 (Mobile; Windows Phone 8.1; Android 4.0; ARM; Trident/7.0; ", "Touch; rv:11.0; IEMobile/11.0; NOKIA; Lumia 928) like iPhone OS 7_0_3 ", "Mac OS X AppleWebKit/537 (KHTML, like Gecko) Mobile Safari/537");
+    const VODAFONE_MOBILE_USER_AGENT: &str = concat!(
+        "Vodafone/1.0/0Vodafone710/B616 Browser/Obigo-Browser/Q04A ",
+        "MMS/Obigo-MMS/Q04A SyncML/HW-SyncML/1.0 Java/QVM/4.1 Profile/MIDP-2.0 ",
+        "Configuration/CLDC-1.1"
+    );
+    const WINDOWS_PHONE_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Mobile; Windows Phone 8.1; Android 4.0; ARM; Trident/7.0; ",
+        "Touch; rv:11.0; IEMobile/11.0; NOKIA; Lumia 928) like iPhone OS 7_0_3 ",
+        "Mac OS X AppleWebKit/537 (KHTML, like Gecko) Mobile Safari/537"
+    );
     const WIN_WAP_USER_AGENT: &str = "WinWAP/1.3 (1.3.0.0;WinCE;PPC2003)";
     const X_WAP_PROFILE_HEADER_VALUE: &str = "http://foo.bar.xml";
     const X_WAP_PROFILE: &str = "x-wap-profile";
     const YOUR_WAP_USER_AGENT: &str = "YourWap Ericsson 380/2.63";
     const ZTE_MOBILE_USER_AGENT: &str = "ZTE-C705/1.0 UP.Browser/4.1.27a2";
-    const XT907_USER_AGENT: &str = concat!("Mozilla/5.0 (Linux; Android 4.1.1; XT907 Build/9.8.1Q_27-2) AppleWebKit", "/537.25 (KHTML, like Gecko) Chrome/26.0.1376.1 Mobile Safari/537.25");
+    const XT907_USER_AGENT: &str = concat!(
+        "Mozilla/5.0 (Linux; Android 4.1.1; XT907 Build/9.8.1Q_27-2) AppleWebKit",
+        "/537.25 (KHTML, like Gecko) Chrome/26.0.1376.1 Mobile Safari/537.25"
+    );
     const TESTING_WEBP: &str = "webp";
     const TESTING_WEBP_LOSSLESS_ALPHA: &str = "webp-la";
     const TESTING_WEBP_ANIMATED: &str = "webp-animated";
-    const IE11_USER_AGENTS: &[&str] = &["Windows-RSS-Platform/2.0 (IE 11.0; Windows NT 6.1)", "Mozilla/5.0 (compatible; IE 11.0; Win32; Trident/7.0)", "Mozilla/5.0 (Windows NT 6.1; WOW64; ***********; rv:11.0) like Gecko", "Mozilla/5.0 (Windows NT 6.1; Win64; x64; Trident/7.0; rv:11.0) like Gecko"];
-    const MOBILE_USER_AGENTS: &[&str] = &[ALCATEL_MOBILE_USER_AGENT, ALCATEL_USER_AGENT, ANDROID_CHROME21_USER_AGENT, ANDROID_ICS_USER_AGENT, ANDROID_ICS_USER_AGENT, ANDROID_NEXUS_S_USER_AGENT, DO_CO_MO_MOBILE_USER_AGENT, I_PHONE4_SAFARI, I_PHONE_CHROME21_USER_AGENT, I_PHONE_USER_AGENT, I_POD_SAFARI, J_MOBILE_USER_AGENT, KDDI_MOBILE_USER_AGENT, KWC_MOBILE_USER_AGENT, LGE_MOBILE_USER_AGENT, LGMIDP_MOBILE_USER_AGENT, LGUP_BROWSER_MOBILE_USER_AGENT, MOT_MOBILE_USER_AGENT, MOZILLA_MOBILE_USER_AGENT, NOKIA_MOBILE_USER_AGENT, OPERA_MINI_MOBILE_USER_AGENT, OPERA_MOBI9, OPERA_MOBIL_MOBILE_USER_AGENT, PANASONIC_MOBILE_USER_AGENT, PHILIPS_USER_AGENT, PORTALMMM_MOBILE_USER_AGENT, SAGEM_MOBILE_USER_AGENT, SAMSUNG_MOBILE_USER_AGENT, SCH_MOBILE_USER_AGENT, SEC_MOBILE_USER_AGENT, SHARP_MOBILE_USER_AGENT, SIE_MOBILE_USER_AGENT, SOFT_BANK_MOBILE_USER_AGENT, VODAFONE_MOBILE_USER_AGENT, ZTE_MOBILE_USER_AGENT, GOOGLE_ADS_BOT_MOBILE_USER_AGENT];
-    const DESKTOP_USER_AGENTS: &[&str] = &["not a mobile", AMOI_USER_AGENT, BENQ_USER_AGENT, COMPAL_USER_AGENT, FIREFOX_NOKIA_N800, FLY_USER_AGENT, I_USER_AGENT, LENOVO_USER_AGENT, LGE_USER_AGENT, LG_USER_AGENT, MOZILLA_USER_AGENT, NEC_USER_AGENT, OPERA1101_USER_AGENT, PG_USER_AGENT, ROVER_USER_AGENT, SAFARI_USER_AGENT, SAGEM_USER_AGENT, SCH_USER_AGENT, SGH_USER_AGENT, SHARP_USER_AGENT, SIE_USER_AGENT, SPICE_USER_AGENT, TIANYU_USER_AGENT, WIN_WAP_USER_AGENT, YOUR_WAP_USER_AGENT, GOOGLE_ADS_BOT_USER_AGENT];
-    const TABLET_USER_AGENTS: &[&str] = &[GENERIC_ANDROID_USER_AGENT, I_PAD_TABLET_USER_AGENT, I_PAD_USER_AGENT, KINDLE_TABLET_USER_AGENT, NEXUS7_CHROME_USER_AGENT, SILK_TABLET_USER_AGENT];
-    const IMAGE_INLINING_SUPPORTED_USER_AGENTS: &[&str] = &["", ANDROID_CHROME21_USER_AGENT, ANDROID_HC_USER_AGENT, ANDROID_ICS_USER_AGENT, CHROME_USER_AGENT, FIREFOX_USER_AGENT, IE9_USER_AGENT, IE10_USER_AGENT, I_PHONE_USER_AGENT, OPERA8_USER_AGENT, SAFARI_USER_AGENT, IE11_USER_AGENTS[0], IE11_USER_AGENTS[1], IE11_USER_AGENTS[2], IE11_USER_AGENTS[3], GOOGLE_ADS_BOT_USER_AGENT, GOOGLE_ADS_BOT_MOBILE_USER_AGENT];
-
+    const IE11_USER_AGENTS: &[&str] = &[
+        "Windows-RSS-Platform/2.0 (IE 11.0; Windows NT 6.1)",
+        "Mozilla/5.0 (compatible; IE 11.0; Win32; Trident/7.0)",
+        "Mozilla/5.0 (Windows NT 6.1; WOW64; ***********; rv:11.0) like Gecko",
+        "Mozilla/5.0 (Windows NT 6.1; Win64; x64; Trident/7.0; rv:11.0) like Gecko",
+    ];
+    const MOBILE_USER_AGENTS: &[&str] = &[
+        ALCATEL_MOBILE_USER_AGENT,
+        ALCATEL_USER_AGENT,
+        ANDROID_CHROME21_USER_AGENT,
+        ANDROID_ICS_USER_AGENT,
+        ANDROID_ICS_USER_AGENT,
+        ANDROID_NEXUS_S_USER_AGENT,
+        DO_CO_MO_MOBILE_USER_AGENT,
+        I_PHONE4_SAFARI,
+        I_PHONE_CHROME21_USER_AGENT,
+        I_PHONE_USER_AGENT,
+        I_POD_SAFARI,
+        J_MOBILE_USER_AGENT,
+        KDDI_MOBILE_USER_AGENT,
+        KWC_MOBILE_USER_AGENT,
+        LGE_MOBILE_USER_AGENT,
+        LGMIDP_MOBILE_USER_AGENT,
+        LGUP_BROWSER_MOBILE_USER_AGENT,
+        MOT_MOBILE_USER_AGENT,
+        MOZILLA_MOBILE_USER_AGENT,
+        NOKIA_MOBILE_USER_AGENT,
+        OPERA_MINI_MOBILE_USER_AGENT,
+        OPERA_MOBI9,
+        OPERA_MOBIL_MOBILE_USER_AGENT,
+        PANASONIC_MOBILE_USER_AGENT,
+        PHILIPS_USER_AGENT,
+        PORTALMMM_MOBILE_USER_AGENT,
+        SAGEM_MOBILE_USER_AGENT,
+        SAMSUNG_MOBILE_USER_AGENT,
+        SCH_MOBILE_USER_AGENT,
+        SEC_MOBILE_USER_AGENT,
+        SHARP_MOBILE_USER_AGENT,
+        SIE_MOBILE_USER_AGENT,
+        SOFT_BANK_MOBILE_USER_AGENT,
+        VODAFONE_MOBILE_USER_AGENT,
+        ZTE_MOBILE_USER_AGENT,
+        GOOGLE_ADS_BOT_MOBILE_USER_AGENT,
+    ];
+    const DESKTOP_USER_AGENTS: &[&str] = &[
+        "not a mobile",
+        AMOI_USER_AGENT,
+        BENQ_USER_AGENT,
+        COMPAL_USER_AGENT,
+        FIREFOX_NOKIA_N800,
+        FLY_USER_AGENT,
+        I_USER_AGENT,
+        LENOVO_USER_AGENT,
+        LGE_USER_AGENT,
+        LG_USER_AGENT,
+        MOZILLA_USER_AGENT,
+        NEC_USER_AGENT,
+        OPERA1101_USER_AGENT,
+        PG_USER_AGENT,
+        ROVER_USER_AGENT,
+        SAFARI_USER_AGENT,
+        SAGEM_USER_AGENT,
+        SCH_USER_AGENT,
+        SGH_USER_AGENT,
+        SHARP_USER_AGENT,
+        SIE_USER_AGENT,
+        SPICE_USER_AGENT,
+        TIANYU_USER_AGENT,
+        WIN_WAP_USER_AGENT,
+        YOUR_WAP_USER_AGENT,
+        GOOGLE_ADS_BOT_USER_AGENT,
+    ];
+    const TABLET_USER_AGENTS: &[&str] = &[
+        GENERIC_ANDROID_USER_AGENT,
+        I_PAD_TABLET_USER_AGENT,
+        I_PAD_USER_AGENT,
+        KINDLE_TABLET_USER_AGENT,
+        NEXUS7_CHROME_USER_AGENT,
+        SILK_TABLET_USER_AGENT,
+    ];
+    const IMAGE_INLINING_SUPPORTED_USER_AGENTS: &[&str] = &[
+        "",
+        ANDROID_CHROME21_USER_AGENT,
+        ANDROID_HC_USER_AGENT,
+        ANDROID_ICS_USER_AGENT,
+        CHROME_USER_AGENT,
+        FIREFOX_USER_AGENT,
+        IE9_USER_AGENT,
+        IE10_USER_AGENT,
+        I_PHONE_USER_AGENT,
+        OPERA8_USER_AGENT,
+        SAFARI_USER_AGENT,
+        IE11_USER_AGENTS[0],
+        IE11_USER_AGENTS[1],
+        IE11_USER_AGENTS[2],
+        IE11_USER_AGENTS[3],
+        GOOGLE_ADS_BOT_USER_AGENT,
+        GOOGLE_ADS_BOT_MOBILE_USER_AGENT,
+    ];
 
     fn verify_get_device_type_for_ua() {
         let matcher = UserAgentMatcher::new();
@@ -1222,8 +1516,7 @@ mod tests {
 
     // Googlebot for desktop generally does not includes a specific
     // browser UA.
-    const GOOGLEBOT_DESKTOP: &str =
-        "(compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
+    const GOOGLEBOT_DESKTOP: &str = "(compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
 
     #[test]
     fn desktop_bot_supports_js_defer() {
@@ -1587,10 +1880,7 @@ mod tests {
             "Edg/123.0.2420.81",
         );
 
-        assert_eq!(
-            DeviceType::Mobile,
-            matcher.device_type_for_ua(pixel_mobile)
-        );
+        assert_eq!(DeviceType::Mobile, matcher.device_type_for_ua(pixel_mobile));
         assert_eq!(
             DeviceType::Tablet,
             matcher.device_type_for_ua(galaxy_tablet)
@@ -1707,12 +1997,11 @@ mod tests {
         assert!(matcher.supports_avif_rewritten_urls(
             "Mozilla/5.0 (Linux; Android 10) UCBrowser/15.5.0.0 Chrome/120.0"
         ));
-        assert!(!matcher.supports_avif_rewritten_urls(
-            "Mozilla/5.0 BaiduBrowser/13.51 Chrome/120.0.0.0"
-        ));
-        assert!(matcher.supports_avif_rewritten_urls(
-            "Mozilla/5.0 BaiduBrowser/13.52 Chrome/120.0.0.0"
-        ));
+        assert!(!matcher
+            .supports_avif_rewritten_urls("Mozilla/5.0 BaiduBrowser/13.51 Chrome/120.0.0.0"));
+        assert!(
+            matcher.supports_avif_rewritten_urls("Mozilla/5.0 BaiduBrowser/13.52 Chrome/120.0.0.0")
+        );
         assert!(!matcher.supports_avif_rewritten_urls(
             "Mozilla/5.0 (Windows NT 10.0; Trident/7.0; rv:11.0) like Gecko"
         ));
@@ -1722,8 +2011,12 @@ mod tests {
         assert!(matcher.supports_avif_rewritten_urls(
             "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) EdgiOS/120.0"
         ));
-        assert!(!matcher.supports_avif_rewritten_urls("Opera/9.80 (Android; Opera Mobi/12.1; U; en)"));
-        assert!(matcher.supports_avif_rewritten_urls("Opera/9.80 (Android; Opera Mobi/80.0; U; en)"));
+        assert!(
+            !matcher.supports_avif_rewritten_urls("Opera/9.80 (Android; Opera Mobi/12.1; U; en)")
+        );
+        assert!(
+            matcher.supports_avif_rewritten_urls("Opera/9.80 (Android; Opera Mobi/80.0; U; en)")
+        );
         assert!(!matcher.supports_avif_rewritten_urls(
             "Mozilla/5.0 (Mobile; rv:3.0) Gecko/3.0 Firefox/3.0 KaiOS/2.5"
         ));
@@ -1758,8 +2051,7 @@ mod tests {
             "(KHTML, like Gecko) Chrome/84.0.4147.135 Safari/537.36 ",
             "Edg/84.0.522.63",
         );
-        let firefox92 =
-            "Mozilla/5.0 (X11; Linux x86_64; rv:92.0) Gecko/20100101 Firefox/92.0";
+        let firefox92 = "Mozilla/5.0 (X11; Linux x86_64; rv:92.0) Gecko/20100101 Firefox/92.0";
         let safari15 = concat!(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 ",
             "(KHTML, like Gecko) Version/15.6 Safari/605.1.15",

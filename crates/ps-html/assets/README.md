@@ -1,8 +1,10 @@
 # Vendored static JS assets
 
-Byte-exact copies of the Closure-compiled support scripts served by
-`StaticAssetManager::GetAsset` (`*_opt.js` unless `kDebug` selects
-`*_dbg.js`):
+Support scripts served by `StaticAssetManager::GetAsset`,
+both byte-exact Closure-compiled genfiles: `*_opt.js` is the
+minified build, `*_dbg.js` the whitespace pretty-print C++
+serves for `kDebug` (the data2c rule feeds on the Closure
+`closure_out` debug build, not the cleartext source):
 
 - `deterministic_opt.js` / `deterministic_dbg.js`
 - `defer_iframe_opt.js` / `defer_iframe_dbg.js`
@@ -15,6 +17,10 @@ Byte-exact copies of the Closure-compiled support scripts served by
 - `delay_images_inline_opt.js` / `delay_images_inline_dbg.js`
 - `local_storage_cache_opt.js` / `local_storage_cache_dbg.js`
 - `critical_css_loader_opt.js` / `critical_css_loader_dbg.js`
+- `critical_css_beacon_opt.js` / `critical_css_beacon_dbg.js`
+- `critical_images_beacon_opt.js` / `critical_images_beacon_dbg.js`
+- `js_defer_opt.js` / `js_defer_dbg.js`
+- `responsive_opt.js` / `responsive_dbg.js`
 
 Source: `mod_pagespeed/net/instaweb/genfiles/rewriter/` (checked-in build
 outputs of the Closure Compiler over `net/instaweb/rewriter/*.js`).

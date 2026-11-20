@@ -17,32 +17,35 @@
 use crate::conf::{self, FactorySlot, LocConf, MainConf, NgxOptions, SrvConf};
 use crate::directives::{self, Directive};
 use crate::factory::{
-    apply_factory_directive_1, apply_factory_directive_2, DriverFactory, FactoryDirectiveOutcome,
-    PostConfigContext, post_config, remote_config_warning,
+    apply_factory_directive_1, apply_factory_directive_2, post_config, remote_config_warning,
+    DriverFactory, FactoryDirectiveOutcome, PostConfigContext,
 };
 use crate::filters;
 use crate::routing::{self, ContentAction, RoutingInputs, STATIC_ASSET_PREFIX};
 use crate::self_fetch;
+use ngx::core::{NGX_CONF_ERROR, NGX_CONF_OK};
 use ngx::ffi::{
-    ngx_array_push, ngx_command_t, ngx_conf_t, ngx_connection_local_sockaddr, ngx_cycle_t,
-    ngx_http_conf_ctx_t, ngx_http_core_loc_conf_t, ngx_http_core_main_conf_t,
+    nginx_version, ngx_array_push, ngx_command_t, ngx_conf_t, ngx_connection_local_sockaddr,
+    ngx_cycle_t, ngx_http_conf_ctx_t, ngx_http_core_loc_conf_t, ngx_http_core_main_conf_t,
     ngx_http_core_srv_conf_t, ngx_http_handler_pt, ngx_http_module_t, ngx_http_phase_handler_t,
     ngx_http_phases_NGX_HTTP_POST_READ_PHASE, ngx_http_phases_NGX_HTTP_PRECONTENT_PHASE,
     ngx_http_request_t, ngx_int_t, ngx_module_t, ngx_pool_cleanup_add, ngx_str_t, ngx_table_elt_t,
     ngx_uint_t, NGX_AGAIN, NGX_CONF_TAKE1, NGX_CONF_TAKE2, NGX_CONF_TAKE3, NGX_CONF_TAKE4,
     NGX_CONF_TAKE5, NGX_DECLINED, NGX_DONE, NGX_ERROR, NGX_HTTP_INTERNAL_SERVER_ERROR,
     NGX_HTTP_LIF_CONF, NGX_HTTP_LOC_CONF, NGX_HTTP_MAIN_CONF, NGX_HTTP_MODULE, NGX_HTTP_SRV_CONF,
-    NGX_OK, nginx_version,
+    NGX_OK,
 };
-use ngx::core::{NGX_CONF_ERROR, NGX_CONF_OK};
 use ps_config::message_handler::MessageLevel;
-use ps_config::options::{apply_nginx_directive, check_nginx_scope, nginx_config_error, SetOutcome};
+use ps_config::options::{
+    apply_nginx_directive, check_nginx_scope, nginx_config_error, SetOutcome,
+};
 use ps_config::property::strip_mod_pagespeed_prefix;
 use ps_config::scope::Scope;
 use std::ffi::c_void;
 use std::mem;
 use std::ptr;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
 // Directive table (pure data)
@@ -56,8 +59,7 @@ pub const DIRECTIVE_NAME: &str = "pagespeed";
 pub const NGX_CONF_MULTI: ngx_uint_t = 0;
 
 /// Argument mask: `TAKE1..TAKE5 | MULTI`.
-pub const ARG_MASK: ngx_uint_t =
-    NGX_CONF_TAKE1 as ngx_uint_t
+pub const ARG_MASK: ngx_uint_t = NGX_CONF_TAKE1 as ngx_uint_t
     | NGX_CONF_TAKE2 as ngx_uint_t
     | NGX_CONF_TAKE3 as ngx_uint_t
     | NGX_CONF_TAKE4 as ngx_uint_t
@@ -171,8 +173,6 @@ pub struct InitModuleOutcome {
     pub error: Option<String>,
     /// Whether any server context exists (else delete factory).
     pub has_contexts: bool,
-    /// Whether to init null statistics (no shared-mem stats).
-    pub init_null_stats: bool,
     /// Whether to run `RootInit` (skipped for config tests).
     pub root_init: bool,
     /// Remote-config warnings, one per affected server.
@@ -192,7 +192,6 @@ pub fn init_module_plan(inputs: InitModuleInputs) -> InitModuleOutcome {
             reload_unsupported: true,
             error: None,
             has_contexts: false,
-            init_null_stats: false,
             root_init: false,
             warnings: Vec::new(),
         };
@@ -203,7 +202,6 @@ pub fn init_module_plan(inputs: InitModuleInputs) -> InitModuleOutcome {
             reload_unsupported: false,
             error: Some(format!("{POST_CONFIG_PREFIX}{message}")),
             has_contexts: !inputs.contexts.is_empty(),
-            init_null_stats: false,
             root_init: false,
             warnings: Vec::new(),
         };
@@ -215,7 +213,6 @@ pub fn init_module_plan(inputs: InitModuleInputs) -> InitModuleOutcome {
             reload_unsupported: false,
             error: None,
             has_contexts: false,
-            init_null_stats: false,
             root_init: false,
             warnings: Vec::new(),
         };
@@ -225,7 +222,6 @@ pub fn init_module_plan(inputs: InitModuleInputs) -> InitModuleOutcome {
             reload_unsupported: false,
             error: Some(RESOLVER_REQUIRED.to_string()),
             has_contexts: !inputs.contexts.is_empty(),
-            init_null_stats: false,
             root_init: false,
             warnings: Vec::new(),
         };
@@ -244,7 +240,6 @@ pub fn init_module_plan(inputs: InitModuleInputs) -> InitModuleOutcome {
         reload_unsupported: false,
         error: None,
         has_contexts: !inputs.contexts.is_empty(),
-        init_null_stats: !post.wants_global_statistics,
         root_init: !inputs.test_config,
         warnings,
     }
@@ -427,7 +422,11 @@ impl LineOutcome {
     }
 
     fn with_warnings(gzip: GzipCall, warnings: Vec<String>) -> Self {
-        LineOutcome { gzip, dir_prep: None, warnings }
+        LineOutcome {
+            gzip,
+            dir_prep: None,
+            warnings,
+        }
     }
 }
 
@@ -435,10 +434,17 @@ impl LineOutcome {
 // Module statics (FFI roots; live-tested in Slice 7)
 // ---------------------------------------------------------------------------
 
-/// Module signature for the staged 1.31.8 tree
-/// (`NGX_MODULE_SIGNATURE` = `8,4,8,` + the 34 config bits).
-pub const MODULE_SIGNATURE: &std::ffi::CStr =
-    c"8,4,8,0011111111010111011111111111111111";
+/// Module signature for the bound nginx tree
+/// (`NGX_MODULE_SIGNATURE`): probed from that tree's headers
+/// by `build.rs`, so it tracks whatever tree the bindings
+/// came from instead of a baked constant.
+pub const MODULE_SIGNATURE: &std::ffi::CStr = {
+    const BYTES: &[u8] = concat!(env!("PS_NGINX_MODULE_SIGNATURE"), "\0").as_bytes();
+    match std::ffi::CStr::from_bytes_with_nul(BYTES) {
+        Ok(signature) => signature,
+        Err(_) => panic!("probed signature is not a C string"),
+    }
+};
 
 /// `NGX_MODULE_UNSET_INDEX` (`(ngx_uint_t) -1`, cast macro).
 pub const MODULE_UNSET_INDEX: ngx_uint_t = ngx_uint_t::MAX;
@@ -448,7 +454,10 @@ static DIRECTIVE_WORD: &[u8; 10] = b"pagespeed\0";
 /// Directive table (`ps_commands`: 3 contexts + null).
 pub static mut PS_COMMANDS: [ngx_command_t; 4] = [
     ngx_command_t {
-        name: ngx_str_t { len: 9, data: DIRECTIVE_WORD.as_ptr() as *mut u8 },
+        name: ngx_str_t {
+            len: 9,
+            data: DIRECTIVE_WORD.as_ptr() as *mut u8,
+        },
         type_: NGX_HTTP_MAIN_CONF as ngx_uint_t | ARG_MASK,
         set: Some(ps_main_configure),
         conf: 0,
@@ -456,7 +465,10 @@ pub static mut PS_COMMANDS: [ngx_command_t; 4] = [
         post: ptr::null_mut(),
     },
     ngx_command_t {
-        name: ngx_str_t { len: 9, data: DIRECTIVE_WORD.as_ptr() as *mut u8 },
+        name: ngx_str_t {
+            len: 9,
+            data: DIRECTIVE_WORD.as_ptr() as *mut u8,
+        },
         type_: NGX_HTTP_SRV_CONF as ngx_uint_t | ARG_MASK,
         set: Some(ps_srv_configure),
         conf: 0,
@@ -464,7 +476,10 @@ pub static mut PS_COMMANDS: [ngx_command_t; 4] = [
         post: ptr::null_mut(),
     },
     ngx_command_t {
-        name: ngx_str_t { len: 9, data: DIRECTIVE_WORD.as_ptr() as *mut u8 },
+        name: ngx_str_t {
+            len: 9,
+            data: DIRECTIVE_WORD.as_ptr() as *mut u8,
+        },
         type_: NGX_HTTP_LOC_CONF as ngx_uint_t | NGX_HTTP_LIF_CONF as ngx_uint_t | ARG_MASK,
         set: Some(ps_loc_configure),
         conf: 0,
@@ -473,7 +488,10 @@ pub static mut PS_COMMANDS: [ngx_command_t; 4] = [
     },
     // `ngx_null_command`.
     ngx_command_t {
-        name: ngx_str_t { len: 0, data: ptr::null_mut() },
+        name: ngx_str_t {
+            len: 0,
+            data: ptr::null_mut(),
+        },
         type_: 0,
         set: None,
         conf: 0,
@@ -626,9 +644,11 @@ pub unsafe fn loc_conf_of(cf: *mut ngx_conf_t) -> *mut LocConf {
 /// # Safety
 ///
 /// `cf` must point at a live `ngx_conf_t`.
-pub unsafe extern "C" fn preconfiguration(_cf: *mut ngx_conf_t) -> ngx_int_t {
-    // Slice 7: `g_gzip_setter.Init(cf)` scans the live gzip
-    // module's commands (no unit-testable core).
+pub unsafe extern "C" fn preconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
+    // SAFETY: caller guarantees a live conf in preconfiguration.
+    unsafe {
+        crate::gzip_setter::init_gzip_setter(cf);
+    }
     NGX_OK as ngx_int_t
 }
 
@@ -645,9 +665,8 @@ unsafe fn push_phase_handler(
 ) -> ngx_int_t {
     // SAFETY: caller guarantees as documented.
     unsafe {
-        let slot = ngx_array_push(
-            &raw mut (*cmcf).phases[phase].handlers,
-        ) as *mut ngx_http_handler_pt;
+        let slot =
+            ngx_array_push(&raw mut (*cmcf).phases[phase].handlers) as *mut ngx_http_handler_pt;
         if slot.is_null() {
             return NGX_ERROR as ngx_int_t;
         }
@@ -812,7 +831,7 @@ unsafe fn is_initial_cycle(cycle: *mut ngx_cycle_t) -> bool {
 
 /// Whether nginx runs single-process (`master_process off`).
 fn is_single_process() -> bool {
-    use ngx::ffi::{NGX_PROCESS_SINGLE, ngx_process};
+    use ngx::ffi::{ngx_process, NGX_PROCESS_SINGLE};
     // SAFETY: nginx global, always readable.
     unsafe { ngx_process == NGX_PROCESS_SINGLE as ngx_uint_t }
 }
@@ -880,7 +899,9 @@ pub unsafe extern "C" fn init_module(cycle: *mut ngx_cycle_t) -> ngx_int_t {
                     external_cache: !context.options.system.memcached_servers.is_empty()
                         || context.options.system.redis_server.is_some(),
                 });
-                contexts.push(PostConfigContext { options: &context.options });
+                contexts.push(PostConfigContext {
+                    options: &context.options,
+                });
             }
         }
         // The resolver and the log sink install before the plan
@@ -891,7 +912,8 @@ pub unsafe extern "C" fn init_module(cycle: *mut ngx_cycle_t) -> ngx_int_t {
         {
             let main = &mut *cfg;
             if let Some(clcf) = first_clcf {
-                main.driver_factory.set_resolver(!(*clcf).resolver.is_null());
+                main.driver_factory
+                    .set_resolver(!(*clcf).resolver.is_null());
                 main.driver_factory
                     .set_resolver_timeout((*clcf).resolver_timeout as i64);
             }
@@ -930,11 +952,18 @@ pub unsafe extern "C" fn init_module(cycle: *mut ngx_cycle_t) -> ngx_int_t {
             return NGX_OK as ngx_int_t;
         }
         ignore_sigpipe();
-        if outcome.init_null_stats {
-            // Slice 7: `ps_stats::init_all` on the null registry.
-        }
+        // No shared-memory backend exists, so the null registry
+        // always initializes here (pre-fork, inherited by workers).
+        ps_stats::names::init_all(&(*cfg).driver_factory.statistics);
         if outcome.root_init {
-            // Slice 6d: `RootInit` (cache volumes).
+            let main = &mut *cfg;
+            let options: Vec<&NgxOptions> =
+                contexts.iter().map(|context| context.options).collect();
+            for message in main.driver_factory.root_init(&options) {
+                main.driver_factory
+                    .message_handler
+                    .message(MessageLevel::Info, &message);
+            }
         }
         set_active_generation((*cfg).factory.generation);
         for warning in &outcome.warnings {
@@ -963,13 +992,76 @@ pub unsafe extern "C" fn init_child_process(cycle: *mut ngx_cycle_t) -> ngx_int_
         if !child_process_proceeds(main.factory.deleted) {
             return NGX_OK as ngx_int_t;
         }
-        // Slice 6c: `NgxBaseFetch::Initialize(cycle)` fails the
-        // worker when it returns false.
+        let connection = crate::pipe::initialize_base_fetch_channel(cycle);
+        if connection.is_null() {
+            return NGX_ERROR as ngx_int_t;
+        }
+        main.base_fetch_read_conn = Some(connection);
         main.driver_factory.logging_init((*cycle).log, true);
-        // Slice 6d slots in here: `ChildInit`, then per-server
-        // proxy-fetch factories plus message handlers.
+        child_init_servers(cycle, &mut *cfg);
         main.driver_factory.start_threads();
         NGX_OK as ngx_int_t
+    }
+}
+
+/// Runs per-server child init: cache assembly plus the
+/// initialized latch (`ServerContext::ChildInit`), then the
+/// message handler (`SetServerContextMessageHandler`) over the
+/// shared message buffer. No proxy-fetch factories: the sync
+/// bridge serves from cache without origin machinery.
+///
+/// # Safety
+///
+/// `cycle` must point at a live `ngx_cycle_t` with built http
+/// config contexts; `main` must be its live main conf.
+unsafe fn child_init_servers(cycle: *mut ngx_cycle_t, main: &mut MainConf) {
+    // SAFETY: caller guarantees a live configured cycle.
+    unsafe {
+        for message in main.driver_factory.child_init_caches() {
+            main.driver_factory
+                .message_handler
+                .message(MessageLevel::Info, &message);
+        }
+        let ours = NGX_PAGE_SPEED.ctx_index;
+        let core = ngx::ffi::ngx_http_core_module.ctx_index;
+        for cscf in core_servers(cycle) {
+            if cscf.is_null() {
+                continue;
+            }
+            let sctx = (*cscf).ctx;
+            if sctx.is_null() {
+                continue;
+            }
+            let srv = *(*sctx).srv_conf.add(ours) as *mut SrvConf;
+            if srv.is_null() {
+                continue;
+            }
+            if let Some(context) = (*srv).context.as_mut() {
+                if let Some(assembled) = main.driver_factory.caches.setup_caches(&context.options) {
+                    let now_ms = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|age| age.as_millis() as i64)
+                        .unwrap_or(0);
+                    context.html_context = Some(crate::rewrite::html_context(
+                        assembled.http_backend,
+                        Arc::clone(&assembled.metadata_cache),
+                        Arc::clone(&main.driver_factory.statistics),
+                        now_ms,
+                    ));
+                    context.http_cache = Some(assembled.http_cache);
+                    context.metadata_cache = Some(assembled.metadata_cache);
+                }
+                context.initialized = true;
+                let clcf = *(*sctx).loc_conf.add(core) as *mut ngx_http_core_loc_conf_t;
+                if clcf.is_null() {
+                    continue;
+                }
+                let mut handler = crate::message::NgxMessageHandler::new();
+                handler.set_log((*clcf).error_log);
+                handler.set_buffer(Arc::clone(&main.driver_factory.message_buffer));
+                context.message_handler = Some(handler);
+            }
+        }
     }
 }
 
@@ -985,8 +1077,66 @@ pub unsafe extern "C" fn exit_child_process(cycle: *mut ngx_cycle_t) {
         if cfg.is_null() || (*cfg).factory.deleted {
             return;
         }
-        // Slice 6c: `NgxBaseFetch::Terminate()`.
-        (*cfg).driver_factory.shutdown();
+        terminate_base_fetches(cycle, &mut *cfg);
+        // Slice 7 fails each reported live task before dropping.
+        let _failed = (*cfg).driver_factory.shutdown();
+    }
+}
+
+/// Drains base fetches and tears the channel down
+/// (`NgxBaseFetch::Terminate`, which likewise ignores its cycle).
+///
+/// # Safety
+///
+/// `main` must be a live main conf.
+unsafe fn terminate_base_fetches(_cycle: *mut ngx_cycle_t, main: &mut MainConf) {
+    use crate::fetch::{active_base_fetches, reclaim_event_sender};
+    use crate::pipe::{
+        self, PipeEvent, TerminateStep, TERMINATE_ROUNDUP_SLEEP_US, TERMINATE_TIMEOUT_US,
+    };
+    // SAFETY: caller guarantees a live cycle; its log outlives
+    // the hook, backing every emit below.
+    unsafe {
+        let Some(read_fd) = pipe::base_fetch_read_fd() else {
+            return;
+        };
+        let factory = &main.driver_factory;
+        factory.message_handler.message(
+            MessageLevel::Info,
+            &pipe::terminate_roundup_message(active_base_fetches()),
+        );
+        let end_us = factory.scheduler.now_us() + TERMINATE_TIMEOUT_US;
+        loop {
+            match pipe::terminate_step(active_base_fetches(), factory.scheduler.now_us(), end_us) {
+                TerminateStep::Done => break,
+                TerminateStep::TimedOut => {
+                    factory.message_handler.message(
+                        MessageLevel::Warning,
+                        &pipe::terminate_timeout_message(active_base_fetches()),
+                    );
+                    break;
+                }
+                TerminateStep::KeepDraining => {
+                    let mut settle = |event: PipeEvent| {
+                        // Reclaim and release (exit settles counts;
+                        // output collection is moot on the way out).
+                        let fetch = reclaim_event_sender(event);
+                        fetch.decrement_ref_count();
+                        drop(fetch);
+                    };
+                    let _ = pipe::drain_fd(read_fd, &mut settle);
+                    std::thread::sleep(std::time::Duration::from_micros(
+                        TERMINATE_ROUNDUP_SLEEP_US,
+                    ));
+                }
+            }
+        }
+        if let Some(channel) = pipe::take_base_fetch_channel() {
+            channel.shutdown_write();
+        }
+        if let Some(connection) = main.base_fetch_read_conn.take() {
+            pipe::close_read_connection(connection);
+        }
     }
 }
 
@@ -1099,10 +1249,14 @@ pub unsafe extern "C" fn create_loc_conf(cf: *mut ngx_conf_t) -> *mut c_void {
 /// # Safety
 ///
 /// `cf` must point at a live `ngx_conf_t`.
+#[cfg(ngx_http_v2)]
 unsafe fn http2_variable_index(cf: *mut ngx_conf_t) -> ngx_int_t {
     use ngx::ffi::{ngx_http_get_variable_index, ngx_str_t};
     static NAME: &[u8; 6] = b"http2\0";
-    let mut name = ngx_str_t { len: 5, data: NAME.as_ptr() as *mut u8 };
+    let mut name = ngx_str_t {
+        len: 5,
+        data: NAME.as_ptr() as *mut u8,
+    };
     // SAFETY: live conf; static name outlives the call.
     unsafe { ngx_http_get_variable_index(cf, &mut name) }
 }
@@ -1123,7 +1277,12 @@ pub unsafe extern "C" fn merge_srv_conf(
         let cfg_m = &mut *main_conf_of(cf);
         let parent_opts = (*(parent as *mut SrvConf)).options.as_ref();
         let srv = &mut *(child as *mut SrvConf);
+        // Conditional like C++ (`#if (NGX_HTTP_V2)`): nginx
+        // emerg-errors unknown variable names.
+        #[cfg(ngx_http_v2)]
         let http2 = http2_variable_index(cf);
+        #[cfg(not(ngx_http_v2))]
+        let http2 = NGX_ERROR as ngx_int_t;
         match conf::merge_srv_conf(cfg_m, parent_opts, srv, http2, |p| {
             std::path::Path::new(p).is_dir()
         }) {
@@ -1263,10 +1422,19 @@ unsafe fn run_directive_line(
         };
         match outcome {
             Ok(applied) => {
-                // Slice 7 executes the gzip call (live gzip conf).
-                let _ = applied.gzip;
-                // Slice 7 logs these at warn level (live `ngx_log_t`).
-                let _ = applied.warnings;
+                match applied.gzip {
+                    GzipCall::None => {}
+                    GzipCall::EnableForLocation => {
+                        crate::gzip_setter::enable_gzip_for_location(cf);
+                    }
+                    GzipCall::SetForLocation(value) => {
+                        crate::gzip_setter::set_gzip_for_location(cf, value);
+                    }
+                }
+                for warning in &applied.warnings {
+                    let log = (*cf).log;
+                    ngx::ngx_log_error!(ngx::ffi::NGX_LOG_WARN, log, "{}", warning);
+                }
                 if let Some(prep) = applied.dir_prep {
                     let ccf = core_conf_of(cf);
                     if let Err(text) = crate::directives::fix_dir_ownership(
@@ -1284,7 +1452,10 @@ unsafe fn run_directive_line(
                     }
                 }
                 // `$ps_dollar` when script variables are on.
-                let mode = (*main_conf_of(cf)).driver_factory.factory_options.script_variables;
+                let mode = (*main_conf_of(cf))
+                    .driver_factory
+                    .factory_options
+                    .script_variables;
                 if directives::should_register_dollar(mode)
                     && register_dollar_variable(cf).is_null()
                 {
@@ -1335,7 +1506,10 @@ unsafe fn register_dollar_variable(cf: *mut ngx_conf_t) -> *mut ngx::ffi::ngx_ht
     static NAME: &[u8; 10] = b"ps_dollar\0";
     // SAFETY: caller guarantees a live conf.
     unsafe {
-        let mut name = ngx_str_t { len: 9, data: NAME.as_ptr() as *mut u8 };
+        let mut name = ngx_str_t {
+            len: 9,
+            data: NAME.as_ptr() as *mut u8,
+        };
         let var = ngx_http_add_variable(cf, &mut name, NGX_HTTP_VAR_CHANGEABLE as ngx_uint_t);
         if !var.is_null() {
             (*var).get_handler = Some(crate::directives::ps_dollar);
@@ -1376,6 +1550,34 @@ pub unsafe fn srv_conf_of_request(r: *mut ngx_http_request_t) -> *mut SrvConf {
     unsafe {
         let index = NGX_PAGE_SPEED.ctx_index as usize;
         *(*r).srv_conf.add(index) as *mut SrvConf
+    }
+}
+
+/// Reads our main conf from a live request.
+///
+/// # Safety
+///
+/// `r` must point at a live request; the module must be loaded
+/// (index set).
+pub unsafe fn main_conf_of_request(r: *mut ngx_http_request_t) -> *mut MainConf {
+    // SAFETY: caller guarantees as documented.
+    unsafe {
+        let index = NGX_PAGE_SPEED.ctx_index as usize;
+        *(*r).main_conf.add(index) as *mut MainConf
+    }
+}
+
+/// Reads our location conf from a live request.
+///
+/// # Safety
+///
+/// `r` must point at a live request; the module must be loaded
+/// (index set).
+pub unsafe fn loc_conf_of_request(r: *mut ngx_http_request_t) -> *mut LocConf {
+    // SAFETY: caller guarantees as documented.
+    unsafe {
+        let index = NGX_PAGE_SPEED.ctx_index as usize;
+        *(*r).loc_conf.add(index) as *mut LocConf
     }
 }
 
@@ -1428,7 +1630,7 @@ unsafe fn request_is_https(r: *mut ngx_http_request_t) -> bool {
 ///
 /// `r` must point at a live request with a connected socket.
 unsafe fn local_port(r: *mut ngx_http_request_t) -> i32 {
-    use ngx::ffi::{AF_INET6, sockaddr_in, sockaddr_in6};
+    use ngx::ffi::{sockaddr_in, sockaddr_in6, AF_INET6};
     // SAFETY: caller guarantees a live connected request; the
     // family selects the valid sockaddr view.
     unsafe {
@@ -1454,7 +1656,10 @@ unsafe fn local_address_text(connection: *mut ngx::ffi::ngx_connection_t) -> Vec
     // SAFETY: caller guarantees a live connection; the buffer
     // outlives the call.
     unsafe {
-        let mut s = ngx_str_t { len: buf.len(), data: buf.as_mut_ptr() };
+        let mut s = ngx_str_t {
+            len: buf.len(),
+            data: buf.as_mut_ptr(),
+        };
         if ngx_connection_local_sockaddr(connection, &mut s, 0) != NGX_OK as ngx_int_t {
             return Vec::new();
         }
@@ -1504,7 +1709,7 @@ unsafe fn request_host(r: *mut ngx_http_request_t) -> String {
 /// # Safety
 ///
 /// `r` must point at a live request with a connected socket.
-unsafe fn request_url_text(r: *mut ngx_http_request_t) -> String {
+pub(crate) unsafe fn request_url_text(r: *mut ngx_http_request_t) -> String {
     // SAFETY: caller guarantees a live request.
     unsafe {
         let https = request_is_https(r);
@@ -1552,13 +1757,876 @@ pub unsafe extern "C" fn content_handler(r: *mut ngx_http_request_t) -> ngx_int_
         match routing::content_decision(false, true, route) {
             ContentAction::Error => NGX_ERROR as ngx_int_t,
             ContentAction::Decline => NGX_DECLINED as ngx_int_t,
-            // Later slices install the beacon, simple, and
-            // resource bodies; decline until they land.
-            ContentAction::Beacon | ContentAction::Simple | ContentAction::Resource => {
+            ContentAction::Beacon => beacon_response(r),
+            ContentAction::Simple => simple_response(r, route),
+            ContentAction::Resource => resource_response(r, route, false),
+        }
+    }
+}
+
+/// Serves an in-memory response (`send_out_headers_and_body`).
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+unsafe fn serve_response(
+    r: *mut ngx_http_request_t,
+    status: u16,
+    headers: &[(String, String)],
+    body: &[u8],
+) -> ngx_int_t {
+    use ngx::ffi::{ngx_http_output_filter, ngx_http_send_header, NGX_ERROR, NGX_OK};
+    use ps_http::response::{HttpOptions, ResponseHeaders};
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        let mut response = ResponseHeaders::new(HttpOptions::default());
+        response.set_status_and_reason(status);
+        for (name, value) in headers {
+            response.headers_mut().add(name, value);
+        }
+        let mut set_psol_vary = false;
+        if !crate::headers::copy_response_headers_to_nginx(
+            r,
+            &response,
+            crate::caching::PreserveCachingHeaders::DontPreserve,
+            false,
+            &mut set_psol_vary,
+        ) {
+            return NGX_ERROR as ngx_int_t;
+        }
+        let rc = ngx_http_send_header(r);
+        if rc == NGX_ERROR as ngx_int_t || rc > NGX_OK as ngx_int_t || (*r).header_only() != 0 {
+            return rc;
+        }
+        let Some(chain) =
+            crate::headers::string_piece_to_buffer_chain((*r).pool, body, true, false)
+        else {
+            return NGX_ERROR as ngx_int_t;
+        };
+        ngx_http_output_filter(r, chain)
+    }
+}
+
+/// Serves a beacon (`ps_beacon_handler`): POST asks nginx to
+/// read the body and parks (`NGX_DONE`, resuming in
+/// `beacon_body_handler`); anything else answers from the query
+/// params inline with 204.
+unsafe fn beacon_response(r: *mut ngx_http_request_t) -> ngx_int_t {
+    use ngx::ffi::{
+        ngx_http_read_client_request_body, NGX_DONE, NGX_HTTP_NO_CONTENT, NGX_HTTP_POST,
+        NGX_HTTP_SPECIAL_RESPONSE,
+    };
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        if (*r).method == NGX_HTTP_POST as ngx_uint_t {
+            let rc = ngx_http_read_client_request_body(r, Some(beacon_body_handler));
+            if rc >= NGX_HTTP_SPECIAL_RESPONSE as ngx_int_t {
+                return rc;
+            }
+            return NGX_DONE as ngx_int_t;
+        }
+        let query = beacon_query_data(r);
+        answer_beacon(r, &query);
+        NGX_HTTP_NO_CONTENT as ngx_int_t
+    }
+}
+
+/// Reads beacon query data (`ps_query_params_handler`): the
+/// unparsed URI past the first `?`, empty when there is none.
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+unsafe fn beacon_query_data(r: *mut ngx_http_request_t) -> String {
+    // SAFETY: caller guarantees a live request.
+    let raw = unsafe { ngx_str_text(&raw const (*r).unparsed_uri) };
+    raw.split_once('?')
+        .map_or_else(String::new, |(_, query)| query.to_string())
+}
+
+/// Answers a beacon POST after its body arrives
+/// (`ps_beacon_body_handler`): the originating URL stays in the
+/// query params while the POST body appends after `&`. A body
+/// that cannot be loaded fails the beacon with a 500.
+unsafe extern "C" fn beacon_body_handler(r: *mut ngx_http_request_t) {
+    use ngx::ffi::{NGX_HTTP_INTERNAL_SERVER_ERROR, NGX_HTTP_NO_CONTENT};
+    // SAFETY: nginx guarantees a live request past body read.
+    unsafe {
+        let query = beacon_query_data(r);
+        match request_body_bytes(r) {
+            Some(body) => {
+                let data =
+                    crate::beacon::combine_beacon_data(&query, &String::from_utf8_lossy(&body));
+                answer_beacon(r, &data);
+                ngx::ffi::ngx_http_finalize_request(r, NGX_HTTP_NO_CONTENT as ngx_int_t);
+            }
+            None => {
+                ngx::ffi::ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR as ngx_int_t)
+            }
+        }
+    }
+}
+
+/// Loads the request body (`ps_request_body_to_string_piece`):
+/// spooled files stream through `ngx_read_file` under the byte
+/// budget, a lone buffer borrows in place, and chunked bodies
+/// concatenate. `None` (with a warning logged) fails the beacon.
+///
+/// # Safety
+///
+/// `r` must point at a live request whose body read finished.
+unsafe fn request_body_bytes(r: *mut ngx_http_request_t) -> Option<Vec<u8>> {
+    use ngx::ffi::{ngx_read_file, NGX_LOG_WARN};
+    // SAFETY: caller guarantees a live post-read request.
+    unsafe {
+        let log = (*(*r).connection).log;
+        let body = (*r).request_body;
+        if body.is_null() || (*body).bufs.is_null() {
+            ngx::ngx_log_error!(
+                NGX_LOG_WARN,
+                log,
+                "ps_request_body_to_string_piece: empty request body."
+            );
+            return None;
+        }
+        if !(*body).temp_file.is_null() {
+            let file = &raw mut (*(*body).temp_file).file;
+            let mut out = Vec::new();
+            let mut read = |buf: &mut [u8; 65536], offset: i64| {
+                ngx_read_file(file, buf.as_mut_ptr(), buf.len(), offset as ngx::ffi::off_t) as i64
+            };
+            match crate::request_body::read_request_body(
+                &mut read,
+                crate::request_body::MAX_REQUEST_BODY_BYTES,
+                &mut out,
+            ) {
+                crate::request_body::RequestBodyStatus::Ok => return Some(out),
+                crate::request_body::RequestBodyStatus::TooLarge => {
+                    ngx::ngx_log_error!(
+                        NGX_LOG_WARN,
+                        log,
+                        "ps_request_body_to_string_piece: post body too large."
+                    );
+                }
+                crate::request_body::RequestBodyStatus::ReadError => {
+                    ngx::ngx_log_error!(
+                        NGX_LOG_WARN,
+                        log,
+                        "ps_request_body_to_string_piece: error reading post body."
+                    );
+                }
+            }
+            return None;
+        }
+        // A `!in_file` buffer is a CHECK in C++; failing the
+        // beacon keeps the narrow catch observable.
+        let mut link = (*body).bufs;
+        if (*link).next.is_null() {
+            let buffer = (*link).buf;
+            if buffer.is_null() || (*buffer).in_file() != 0 {
+                return None;
+            }
+            let (start, end) = ((*buffer).pos, (*buffer).last);
+            if start.is_null() || end.is_null() || (end as usize) < start as usize {
+                return None;
+            }
+            return Some(std::slice::from_raw_parts(start, end as usize - start as usize).to_vec());
+        }
+        let mut out = Vec::new();
+        while !link.is_null() {
+            let buffer = (*link).buf;
+            if !buffer.is_null() && (*buffer).in_file() == 0 {
+                let (start, end) = ((*buffer).pos, (*buffer).last);
+                if !start.is_null() && !end.is_null() && (end as usize) >= start as usize {
+                    out.extend_from_slice(std::slice::from_raw_parts(
+                        start,
+                        end as usize - start as usize,
+                    ));
+                }
+            }
+            link = (*link).next;
+        }
+        Some(out)
+    }
+}
+
+/// Folds beacon data into the worker statistics and stamps the
+/// no-cache header (`ps_beacon_handler_helper`); the caller
+/// answers 204. The user agent feeds only the deferred pcache
+/// half, so it is read and held for that wiring.
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+unsafe fn answer_beacon(r: *mut ngx_http_request_t, data: &str) {
+    use ngx::ffi::NGX_LOG_WARN;
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        let main = &*main_conf_of_request(r);
+        let _user_agent = header_value((*r).headers_in.user_agent);
+        // The success flag is ignored, like C++.
+        let (_, warning) = crate::beacon::handle_beacon(data, &main.driver_factory.statistics);
+        if let Some(warning) = warning {
+            let log = (*(*r).connection).log;
+            ngx::ngx_log_error!(NGX_LOG_WARN, log, "{}", warning);
+        }
+        // C++ passes a string literal through `const_cast`; the
+        // static outlives the request the same way.
+        static CACHE_CONTROL: &[u8; 20] = b"max-age=0, no-cache\0";
+        crate::headers::set_cache_control(r, CACHE_CONTROL.as_ptr() as *mut std::ffi::c_char);
+    }
+}
+
+/// Serves static assets and message history
+/// (`ps_simple_handler`): unknown assets decline, anything else
+/// answers with the fixed header set (`nosniff`, Date,
+/// Last-Modified, cache control, and a weak ETag unless the
+/// control says private) after discarding the request body. The
+/// dead `error_message` branch in C++ always yields 200.
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+unsafe fn simple_response(r: *mut ngx_http_request_t, route: routing::Route) -> ngx_int_t {
+    use crate::terminal::SimpleOutcome;
+    use ngx::ffi::{NGX_DECLINED, NGX_ERROR, NGX_LOG_WARN};
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        let cfg_s = &*srv_conf_of_request(r);
+        let main = &*main_conf_of_request(r);
+        let response = match route {
+            routing::Route::StaticContent => {
+                let uri = ngx_str_text(&raw const (*r).uri);
+                let file_name = uri
+                    .strip_prefix(&main.driver_factory.static_asset_prefix)
+                    .unwrap_or("");
+                match crate::terminal::simple_asset(file_name) {
+                    SimpleOutcome::Serve(response) => response,
+                    SimpleOutcome::Decline => return NGX_DECLINED as ngx_int_t,
+                    SimpleOutcome::LogDecline(message) => {
+                        let log = (*(*r).connection).log;
+                        ngx::ngx_log_error!(NGX_LOG_WARN, log, "{}", message);
+                        return NGX_DECLINED as ngx_int_t;
+                    }
+                }
+            }
+            routing::Route::Messages => {
+                let dump = cfg_s
+                    .context
+                    .as_ref()
+                    .and_then(|ctx| ctx.message_handler.as_ref())
+                    .and_then(|handler| handler.dump_messages());
+                crate::terminal::simple_messages(dump.as_deref())
+            }
+            _ => {
+                let log = (*(*r).connection).log;
+                ngx::ngx_log_error!(
+                    NGX_LOG_WARN,
+                    log,
+                    "ps_simple_handler: unknown RequestRouting."
+                );
+                return NGX_ERROR as ngx_int_t;
+            }
+        };
+        // Pool allocation is assumed to succeed (the C++ null
+        // check guards pool exhaustion only).
+        let now_ms = main.driver_factory.scheduler.now_us() / 1000;
+        let date = ps_http::time::format_http_date(now_ms);
+        let mut headers = vec![
+            ("Content-Type".to_string(), response.content_type.clone()),
+            ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
+            ("Date".to_string(), date.clone()),
+            ("Last-Modified".to_string(), date),
+            ("Cache-Control".to_string(), response.cache_control.clone()),
+        ];
+        if !response
+            .cache_control
+            .to_ascii_lowercase()
+            .contains("private")
+        {
+            headers.push(("ETag".to_string(), "W/\"0\"".to_string()));
+        }
+        discard_request_body(r);
+        serve_response(r, response.status, &headers, &response.body)
+    }
+}
+
+/// Rebeaconing request header (`kPsaShouldBeacon`).
+const PSA_SHOULD_BEACON: &str = "PS-ShouldBeacon";
+/// Version header (`kPageSpeedHeader`), stamped on HTML and
+/// resource responses with the `XHeaderValue` option.
+const X_PAGE_SPEED: &str = "X-Page-Speed";
+
+/// Whether a content type parses as XML (`ContentType::IsXmlLike`).
+#[must_use]
+pub fn content_type_is_xml_like(content_type: &str) -> bool {
+    let mime = content_type.split(';').next().unwrap_or("").trim();
+    mime.eq_ignore_ascii_case("application/xhtml+xml")
+        || mime.eq_ignore_ascii_case("application/ce-html+xml")
+        || mime.eq_ignore_ascii_case("text/xml")
+        || mime.eq_ignore_ascii_case("application/xml")
+        || mime.eq_ignore_ascii_case("image/svg+xml")
+}
+
+/// Whether the URL names a `.pagespeed.` resource
+/// (`ServerContext::IsPagespeedResource` past the driver): the
+/// query-stripped leaf decodes with a non-empty hash. Filter
+/// and proxy-mode validation ride along with the fetch, which
+/// declines names no filter claims.
+fn is_pagespeed_resource(url: &ps_http::google_url::GoogleUrl) -> bool {
+    use ps_cache::namer::ResourceNamer;
+    let mut namer = ResourceNamer::new();
+    namer.decode_ignore_hash_and_signature(&url.leaf_sans_query()) && !namer.hash().is_empty()
+}
+
+/// Rewrites the URL scheme from `X-Forwarded-Proto`
+/// (`ps_apply_x_forwarded_proto`): first header wins, values
+/// outside http/https warn and keep the URL. (C++ logs the URL
+/// pointer here; the string is what was meant.)
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+unsafe fn apply_x_forwarded_proto(r: *mut ngx_http_request_t, url: &mut String) -> bool {
+    use crate::headers::for_each_header;
+    use ngx::ffi::NGX_LOG_WARN;
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        let mut proto: Option<String> = None;
+        for_each_header(&mut (*r).headers_in.headers, |elt| {
+            let key = ngx_str_text(&raw const (*elt).key);
+            if key.eq_ignore_ascii_case("X-Forwarded-Proto") {
+                proto = Some(ngx_str_text(&raw const (*elt).value));
+                return false;
+            }
+            true
+        });
+        let Some(proto) = proto else {
+            return false;
+        };
+        if !proto.eq_ignore_ascii_case("http") && !proto.eq_ignore_ascii_case("https") {
+            let log = (*(*r).connection).log;
+            ngx::ngx_log_error!(
+                NGX_LOG_WARN,
+                log,
+                "Unsupported X-Forwarded-Proto: {} for URL {} protocol not changed.",
+                proto,
+                url
+            );
+            return false;
+        }
+        let Some(colon) = url.find(':') else {
+            return false;
+        };
+        url.replace_range(..colon, &proto);
+        true
+    }
+}
+
+/// Pushes a `Set-Cookie` response header
+/// (`ps_set_experiment_state_and_cookie` write half): false
+/// when the pool gives nothing, which fails the request.
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+unsafe fn push_set_cookie(r: *mut ngx_http_request_t, value: &str) -> bool {
+    use ngx::ffi::ngx_list_push;
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        let pushed = ngx_list_push(&mut (*r).headers_out.headers);
+        if pushed.is_null() {
+            return false;
+        }
+        let cookie = &mut *pushed.cast::<ngx_table_elt_t>();
+        cookie.hash = 1;
+        static KEY: &[u8; 11] = b"Set-Cookie\0";
+        cookie.key = ngx_str_t {
+            len: 10,
+            data: KEY.as_ptr() as *mut u8,
+        };
+        let rendered = crate::directives::pool_cstring((*r).pool, value);
+        if rendered.is_null() {
+            return false;
+        }
+        cookie.value.len = libc::strlen(rendered);
+        cookie.value.data = rendered.cast();
+        true
+    }
+}
+
+/// Serves `.pagespeed.` resources and admin pages
+/// (`ps_resource_handler`): guards, option determination, the
+/// standby gate, then the resource / admin / HTML / in-place /
+/// pass-through branches. The proxy branch stays unreachable
+/// (no `DomainLawyer` to map with); resource and in-place
+/// misses decline, since the sync bridge cannot fetch origins.
+///
+/// # Safety
+///
+/// `r` must point at a live request; with `html_rewrite` set an
+/// armed context must already be attached.
+unsafe fn resource_response(
+    r: *mut ngx_http_request_t,
+    route: routing::Route,
+    html_rewrite: bool,
+) -> ngx_int_t {
+    use crate::caching::{preserve_caching_headers_for, CachingHeaderRequest};
+    use crate::fetch::{release_base_fetch, BaseFetchType, SharedBaseFetch};
+    use crate::headers::{copy_request_headers, copy_response_headers, for_each_header};
+    use crate::options::{determine_options, DetermineInputs};
+    use crate::request::{attach_request_ctx, get_request_ctx, RequestCtx};
+    use crate::resource::{decide_branch, is_admin_route, Branch, BranchInputs};
+    use ngx::ffi::{
+        NGX_DECLINED, NGX_ERROR, NGX_HTTP_GET, NGX_HTTP_HEAD, NGX_HTTP_POST, NGX_LOG_DEBUG,
+        NGX_LOG_ERR, NGX_LOG_WARN, NGX_OK,
+    };
+    use ps_config::message_handler::NullMessageHandler;
+    use ps_config::options::EnabledState;
+    use ps_http::google_url::GoogleUrl;
+    use ps_http::request::{Method, RequestContext, RequestHeaders};
+    use ps_http::response::{HttpOptions, ResponseHeaders};
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        if r != (*r).main {
+            return NGX_DECLINED as ngx_int_t;
+        }
+        let srv = srv_conf_of_request(r);
+        let Some(server) = (*srv).context.as_ref() else {
+            return NGX_DECLINED as ngx_int_t;
+        };
+        // The proxy fetch factory is born at child init, so an
+        // uninitialized context is exactly the C++ null check.
+        if !server.initialized() {
+            let log = (*(*r).connection).log;
+            ngx::ngx_log_error!(
+                NGX_LOG_WARN,
+                log,
+                "pagespeed: proxy fetch factory is not initialized for this configuration; serving request without optimization"
+            );
+            return NGX_DECLINED as ngx_int_t;
+        }
+        let ctx_ptr = get_request_ctx(r);
+        if shutting_down() {
+            if let Some(handler) = server.message_handler.as_ref() {
+                handler.message(
+                    MessageLevel::Info,
+                    "ps_resource_handler declining: nginx worker is shutting down",
+                );
+            }
+            if ctx_ptr.is_null() {
+                return NGX_DECLINED as ngx_int_t;
+            }
+            release_base_fetch(ctx_ptr);
+            return NGX_DECLINED as ngx_int_t;
+        }
+        debug_assert!(!html_rewrite || (!ctx_ptr.is_null() && (*ctx_ptr).html_rewrite));
+        let method_number = (*r).method;
+        if !html_rewrite
+            && method_number != NGX_HTTP_GET as ngx_uint_t
+            && method_number != NGX_HTTP_HEAD as ngx_uint_t
+            && method_number != NGX_HTTP_POST as ngx_uint_t
+            && route != routing::Route::CachePurge
+        {
+            return NGX_DECLINED as ngx_int_t;
+        }
+        let main_conf = &mut *main_conf_of_request(r);
+        let now_ms = main_conf.driver_factory.scheduler.now_us() / 1000;
+        let mut url = GoogleUrl::new(&request_url_text(r));
+        if !url.is_web_valid() {
+            let log = (*(*r).connection).log;
+            ngx::ngx_log_error!(NGX_LOG_ERR, log, "invalid url");
+            return NGX_DECLINED as ngx_int_t;
+        }
+        let mut request_headers = RequestHeaders::new();
+        let mut response_headers = ResponseHeaders::new(HttpOptions::default());
+        {
+            let mut raw: Vec<(String, String, bool)> = Vec::new();
+            for_each_header(&mut (*r).headers_in.headers, |elt| {
+                let key = ngx_str_text(&raw const (*elt).key);
+                let value = ngx_str_text(&raw const (*elt).value);
+                raw.push((key, value, (*elt).hash != 0));
+                true
+            });
+            let refs: Vec<crate::headers::RawHeader<'_>> = raw
+                .iter()
+                .map(|(key, value, hashed)| (key.as_str(), value.as_str(), *hashed))
+                .collect();
+            let method_name = ngx_str_text(&raw const (*r).method_name);
+            copy_request_headers((*r).http_version, &method_name, &refs, &mut request_headers);
+        }
+        {
+            let mut raw: Vec<(String, String, bool)> = Vec::new();
+            for_each_header(&mut (*r).headers_out.headers, |elt| {
+                let key = ngx_str_text(&raw const (*elt).key);
+                let value = ngx_str_text(&raw const (*elt).value);
+                raw.push((key, value, (*elt).hash != 0));
+                true
+            });
+            let refs: Vec<crate::headers::RawHeader<'_>> = raw
+                .iter()
+                .map(|(key, value, hashed)| (key.as_str(), value.as_str(), *hashed))
+                .collect();
+            let content_type = ngx_str_text(&raw const (*r).headers_out.content_type);
+            copy_response_headers(
+                (*r).http_version,
+                (*r).headers_out.status,
+                &content_type,
+                &refs,
+                now_ms,
+                &mut response_headers,
+            );
+        }
+        let mut request_context = RequestContext::new(HttpOptions::default());
+        let loc = loc_conf_of_request(r);
+        let host = url.host();
+        let mut live;
+        let mut null_sink = NullMessageHandler;
+        let handler: &mut dyn ps_config::message_handler::MessageHandler =
+            match server.message_handler.as_ref() {
+                Some(owned) => {
+                    live = owned;
+                    &mut live
+                }
+                None => &mut null_sink,
+            };
+        // Remote configuration has no fetch executor yet, so no
+        // remote base overlays globals (an empty fetch is a no-op
+        // in C++ too).
+        let determined = determine_options(
+            DetermineInputs {
+                global: &server.options,
+                directory: (*loc).options.as_ref(),
+                remote: None,
+                factory: &mut main_conf.driver_factory.factory_options,
+                request_context: Some(&mut request_context),
+                request_url: &mut url,
+                request_headers: Some(&mut request_headers),
+                response_headers: Some(&mut response_headers),
+                substitute: &|_, _, arg| (!arg.contains('$')).then(|| arg.to_string()),
+                experiment_verdict: None,
+                now_ms,
+                host: &host,
+                html_rewrite,
+            },
+            handler,
+        );
+        // A script variable evaluated to a value the
+        // configuration rejects: serve without optimization.
+        let Some(determined) = determined else {
+            return NGX_DECLINED as ngx_int_t;
+        };
+        let resolved = determined.options.as_ref().unwrap_or(&server.options);
+        // `ComputeHttpOptions`.
+        let http_options = HttpOptions {
+            respect_vary: resolved.core.respect_vary(),
+            implicit_cache_ttl_ms: resolved.core.implicit_cache_ttl_ms(),
+        };
+        request_context.set_options(http_options);
+        if let Some(cookie) = determined.experiment_cookie.as_ref() {
+            if !push_set_cookie(r, cookie) {
+                return NGX_DECLINED as ngx_int_t;
+            }
+        }
+        let mut url_string = url.spec().to_string();
+        if resolved.core.respect_x_forwarded_proto() && apply_x_forwarded_proto(r, &mut url_string)
+        {
+            url = GoogleUrl::new(&url_string);
+            debug_assert!(url.is_web_valid());
+        }
+        // Oblivious mode never serves `.pagespeed.` resources.
+        let pagespeed_resource = !html_rewrite
+            && !resolved.core.oblivious_pagespeed_urls()
+            && is_pagespeed_resource(&url);
+        let admin_handler = is_admin_route(route);
+        // Standby still serves `.pagespeed.` resources.
+        if resolved.core.unplugged()
+            || (resolved.core.enabled_state() != EnabledState::On && !pagespeed_resource)
+        {
+            return NGX_DECLINED as ngx_int_t;
+        }
+        let ctx_ptr = if html_rewrite {
+            ctx_ptr
+        } else {
+            debug_assert!(ctx_ptr.is_null());
+            let rebeacon = request_headers
+                .headers()
+                .lookup1(PSA_SHOULD_BEACON)
+                .unwrap_or_default();
+            let preserve = preserve_caching_headers_for(&CachingHeaderRequest {
+                modify_caching_headers: resolved.core.modify_caching_headers(),
+                downstream_cache_integration: resolved
+                    .core
+                    .is_downstream_cache_integration_enabled(),
+                pagespeed_resource,
+                admin_handler,
+                rebeaconing_key_matches: resolved
+                    .core
+                    .matches_downstream_cache_rebeaconing_key(&rebeacon),
+            });
+            let ctx =
+                RequestCtx::for_resource(&url_string, resolved.core.follow_flushes(), preserve);
+            if !attach_request_ctx(r, ctx) {
+                return NGX_ERROR as ngx_int_t;
+            }
+            get_request_ctx(r)
+        };
+        let method = match (*r).method as u32 {
+            NGX_HTTP_GET => Method::Get,
+            NGX_HTTP_HEAD => Method::Head,
+            NGX_HTTP_POST => Method::Post,
+            _ => Method::Unknown,
+        };
+        let merge_slashes = {
+            let core_index = ngx::ffi::ngx_http_core_module.ctx_index;
+            let cscf = *(*r).srv_conf.add(core_index) as *mut ngx::ffi::ngx_http_core_srv_conf_t;
+            (*cscf).merge_slashes != 0
+        };
+        let mut inputs = BranchInputs {
+            unplugged: false,
+            enabled: false,
+            pagespeed_resource,
+            html_rewrite,
+            route,
+            method,
+            proxy_mapped: false,
+            is_allowed: true,
+            in_place_enabled: false,
+            ipro_url_agrees: crate::inplace_url_agreement::url_agrees(
+                &ngx_str_text(&raw const (*r).uri),
+                &request_host(r),
+                url.path_sans_query(),
+                &url.host(),
+                merge_slashes,
+            ),
+        };
+        inputs.resolve_from(&resolved.core, &url_string);
+        match decide_branch(&inputs) {
+            // The standby gate above answers this; kept as a
+            // defensive decline.
+            Branch::Decline => NGX_DECLINED as ngx_int_t,
+            Branch::PagespeedResource => {
+                let (ps_side, ngx_side) = SharedBaseFetch::new_pair(
+                    &url_string,
+                    r,
+                    BaseFetchType::PagespeedResource,
+                    (*ctx_ptr).preserve_caching_headers,
+                    http_options,
+                );
+                (*ctx_ptr).base_fetch = Some(ngx_side);
+                drop(ps_side);
+                let Some(html) = server.html_context.clone() else {
+                    return NGX_DECLINED as ngx_int_t;
+                };
+                let response = crate::terminal::fetch_resource_body(
+                    &html,
+                    &resolved.core,
+                    &url_string,
+                    now_ms,
+                );
+                // Unfinished and error fetches decline: nginx
+                // renders its default error page, as with C++'s
+                // `filter_finalize` delegation for generated
+                // content.
+                if response.status == 0 || response.status >= 400 {
+                    return NGX_DECLINED as ngx_int_t;
+                }
+                let mut headers = response.headers;
+                headers.push((X_PAGE_SPEED.to_string(), resolved.core.x_header_value()));
+                serve_response(r, response.status, &headers, &response.body)
+            }
+            Branch::Admin => {
+                let (ps_side, ngx_side) = SharedBaseFetch::new_pair(
+                    &url_string,
+                    r,
+                    BaseFetchType::AdminPage,
+                    (*ctx_ptr).preserve_caching_headers,
+                    http_options,
+                );
+                (*ctx_ptr).base_fetch = Some(ngx_side);
+                drop(ps_side);
+                let log_buffer = match server
+                    .message_handler
+                    .as_ref()
+                    .and_then(|owned| owned.message_buffer())
+                {
+                    Some(buffer) => std::sync::Arc::clone(buffer),
+                    None => {
+                        let capacity = main_conf.driver_factory.message_buffer_size;
+                        std::sync::Arc::new(std::sync::Mutex::new(if capacity > 0 {
+                            ps_admin::log_buffer::LogBuffer::new(capacity as usize)
+                        } else {
+                            ps_admin::log_buffer::LogBuffer::disabled()
+                        }))
+                    }
+                };
+                let response = match route {
+                    routing::Route::Statistics | routing::Route::GlobalStatistics => {
+                        crate::terminal::statistics_response(crate::terminal::StatisticsInputs {
+                            options: &resolved.core,
+                            system: &resolved.system,
+                            statistics: &main_conf.driver_factory.statistics,
+                            log: &log_buffer,
+                            url: &url_string,
+                            is_global: route == routing::Route::GlobalStatistics,
+                            now_ms,
+                        })
+                    }
+                    routing::Route::Console => {
+                        crate::terminal::console_response(crate::terminal::StatisticsInputs {
+                            options: &resolved.core,
+                            system: &resolved.system,
+                            statistics: &main_conf.driver_factory.statistics,
+                            log: &log_buffer,
+                            url: &url_string,
+                            is_global: false,
+                            now_ms,
+                        })
+                    }
+                    routing::Route::Admin | routing::Route::GlobalAdmin => {
+                        let inventory = ps_admin::site::CacheInventory {
+                            http_cache_name: if server.http_cache.is_some() {
+                                "HTTPCache".to_string()
+                            } else {
+                                "disabled".to_string()
+                            },
+                            metadata_cache_name: server
+                                .metadata_cache
+                                .as_ref()
+                                .map(|cache| cache.name())
+                                .unwrap_or_else(|| "disabled".to_string()),
+                            property_store_name: "disabled".to_string(),
+                            filesystem_metadata_cache_name: None,
+                            backend_stats: None,
+                        };
+                        crate::terminal::admin_response(crate::terminal::AdminInputs {
+                            options: &resolved.core,
+                            system: &resolved.system,
+                            statistics: &main_conf.driver_factory.statistics,
+                            log: &log_buffer,
+                            purge_set: &mut main_conf.driver_factory.purge_set,
+                            inventory,
+                            url: &url_string,
+                            is_global: route == routing::Route::GlobalAdmin,
+                            now_ms,
+                        })
+                    }
+                    routing::Route::CachePurge => {
+                        crate::terminal::purge_response(crate::terminal::PurgeInputs {
+                            log: &log_buffer,
+                            purge_set: &mut main_conf.driver_factory.purge_set,
+                            url: &url_string,
+                            now_ms,
+                        })
+                    }
+                    _ => return NGX_DECLINED as ngx_int_t,
+                };
+                serve_response(r, response.status, &response.headers, &response.body)
+            }
+            // No origin fetch machinery; without a `DomainLawyer`
+            // nothing maps here anyway.
+            Branch::Proxy => NGX_DECLINED as ngx_int_t,
+            Branch::Html => {
+                if request_headers.method() == Method::Head {
+                    request_headers.set_method(Method::Get);
+                }
+                let (ps_side, ngx_side) = SharedBaseFetch::new_pair(
+                    &url_string,
+                    r,
+                    BaseFetchType::HtmlTransform,
+                    (*ctx_ptr).preserve_caching_headers,
+                    http_options,
+                );
+                (*ctx_ptr).base_fetch = Some(ngx_side);
+                ps_side.with_state(|fetch| {
+                    fetch
+                        .response_headers_mut()
+                        .headers_mut()
+                        .add(X_PAGE_SPEED, &resolved.core.x_header_value());
+                });
+                // Request headers, query params, and option
+                // cookies have no driver setters yet; the
+                // property-cache lookup waits for the store.
+                let content_type = ngx_str_text(&raw const (*r).headers_out.content_type);
+                let sink = crate::send::HtmlSink::new(
+                    &resolved.core,
+                    &url_string,
+                    content_type_is_xml_like(&content_type),
+                    &ps_side,
+                    crate::pipe::base_fetch_channel_slot(),
+                );
+                (*ctx_ptr).html_sink = Some(sink);
+                drop(ps_side);
+                NGX_OK as ngx_int_t
+            }
+            Branch::InPlace => {
+                let (ps_side, ngx_side) = SharedBaseFetch::new_pair(
+                    &url_string,
+                    r,
+                    BaseFetchType::IproLookup,
+                    (*ctx_ptr).preserve_caching_headers,
+                    http_options,
+                );
+                (*ctx_ptr).base_fetch = Some(ngx_side);
+                drop(ps_side);
+                if let Some(handler) = server.message_handler.as_ref() {
+                    handler.message(
+                        MessageLevel::Info,
+                        &format!("Trying to serve rewritten resource in-place: {url_string}"),
+                    );
+                }
+                let Some(html) = server.html_context.clone() else {
+                    return NGX_DECLINED as ngx_int_t;
+                };
+                (*ctx_ptr).in_place = true;
+                let response = crate::terminal::fetch_resource_body(
+                    &html,
+                    &resolved.core,
+                    &url_string,
+                    now_ms,
+                );
+                // Misses decline to the origin without recording:
+                // the recorder arming waits for the fetch
+                // machinery, so the cache only serves entries
+                // warmed elsewhere. The decline resets like C++'s
+                // (`ps_decline_request` ctx half): clearing
+                // `in_place` keeps the in-place header filter from
+                // re-declining after our header filter passed,
+                // which would arm HTML on an errored response.
+                if response.status == 0 || response.status >= 400 {
+                    decline_request_state(&mut *ctx_ptr, None);
+                    return NGX_DECLINED as ngx_int_t;
+                }
+                let mut headers = response.headers;
+                headers.push((X_PAGE_SPEED.to_string(), resolved.core.x_header_value()));
+                serve_response(r, response.status, &headers, &response.body)
+            }
+            Branch::PassThrough => {
+                // NOTE: system tests grep this message; keep it verbatim.
+                let log = (*(*r).connection).log;
+                ngx::ngx_log_error!(
+                    NGX_LOG_DEBUG,
+                    log,
+                    "Passing on content handling for non-pagespeed resource '{}'",
+                    url_string
+                );
+                debug_assert!((*ctx_ptr).base_fetch.is_none());
+                (*ctx_ptr).html_rewrite = true;
                 NGX_DECLINED as ngx_int_t
             }
         }
     }
+}
+
+/// Serves the HTML filter path (`ps_resource_handler` with
+/// `html rewrite`): an armed context must already be attached.
+///
+/// # Safety
+///
+/// `r` must point at a live request with an armed context.
+pub(crate) unsafe fn resource_response_filtered(r: *mut ngx_http_request_t) -> ngx_int_t {
+    // SAFETY: caller guarantees a live filtered request.
+    unsafe { resource_response(r, routing::Route::Resource, true) }
 }
 
 /// Phase step handler (`ps_phase_handler`).
@@ -1570,7 +2638,9 @@ pub unsafe extern "C" fn phase_handler(
     r: *mut ngx_http_request_t,
     _ph: *mut ngx_http_phase_handler_t,
 ) -> ngx_int_t {
-    use ngx::ffi::{ngx_http_core_run_phases, ngx_http_finalize_request, ngx_http_request_empty_handler};
+    use ngx::ffi::{
+        ngx_http_core_run_phases, ngx_http_finalize_request, ngx_http_request_empty_handler,
+    };
     // SAFETY: caller guarantees a live request.
     unsafe {
         (*r).write_event_handler = Some(ngx_http_request_empty_handler);
@@ -1688,7 +2758,7 @@ pub fn decline_request_state(
     ctx.psol_vary_accept_only = false;
     ctx.html_rewrite = true;
     ctx.in_place = false;
-    if let Some(mut fetch) = ctx.base_fetch.take() {
+    if let Some(fetch) = ctx.base_fetch.take() {
         fetch.detach();
     }
 }
@@ -1769,10 +2839,8 @@ pub unsafe extern "C" fn self_fetch_handler(r: *mut ngx_http_request_t) -> ngx_i
         if !self_fetch::peer_is_this_server(peer, local) {
             return NGX_DECLINED as ngx_int_t;
         }
-        let cleanup = ngx_pool_cleanup_add(
-            (*r).pool,
-            mem::size_of::<self_fetch::SelfFetchRelabel>(),
-        );
+        let cleanup =
+            ngx_pool_cleanup_add((*r).pool, mem::size_of::<self_fetch::SelfFetchRelabel>());
         if cleanup.is_null() {
             return NGX_HTTP_INTERNAL_SERVER_ERROR as ngx_int_t;
         }
@@ -1801,12 +2869,13 @@ pub static mut ngx_modules: [*const ngx_module_t; 3] = [
     ptr::null(),
 ];
 
-/// Exported module names, null-terminated.
+/// Exported module names, null-terminated (the C++ names, so
+/// the .so stays a drop-in for tooling that greps them).
 #[no_mangle]
 #[allow(non_upper_case_globals)]
 pub static mut ngx_module_names: [*const std::ffi::c_char; 3] = [
-    c"NGX_PAGE_SPEED".as_ptr(),
-    c"NGX_ETAG_FILTER".as_ptr(),
+    c"ngx_pagespeed".as_ptr(),
+    c"ngx_pagespeed_etag_filter".as_ptr(),
     ptr::null(),
 ];
 
@@ -1882,21 +2951,56 @@ mod tests {
     #[test]
     fn discard_failure_matrix() {
         assert_eq!(
-            DiscardFailureOutcome { keepalive: false, lingering_close: true },
+            DiscardFailureOutcome {
+                keepalive: false,
+                lingering_close: true
+            },
             discard_failure_outcome(10, false)
         );
         assert_eq!(
-            DiscardFailureOutcome { keepalive: false, lingering_close: true },
+            DiscardFailureOutcome {
+                keepalive: false,
+                lingering_close: true
+            },
             discard_failure_outcome(0, true)
         );
         assert_eq!(
-            DiscardFailureOutcome { keepalive: false, lingering_close: false },
+            DiscardFailureOutcome {
+                keepalive: false,
+                lingering_close: false
+            },
             discard_failure_outcome(0, false)
         );
         assert_eq!(
-            DiscardFailureOutcome { keepalive: false, lingering_close: false },
+            DiscardFailureOutcome {
+                keepalive: false,
+                lingering_close: false
+            },
             discard_failure_outcome(-1, false)
         );
+    }
+
+    #[test]
+    fn xml_like_matches_content_types() {
+        for mime in [
+            "application/xhtml+xml",
+            "application/ce-html+xml",
+            "text/xml",
+            "application/xml",
+            "image/svg+xml",
+            "APPLICATION/XML; charset=utf-8",
+        ] {
+            assert!(content_type_is_xml_like(mime), "{mime}");
+        }
+        for mime in [
+            "text/html",
+            "text/css",
+            "application/javascript",
+            "text/plain",
+            "",
+        ] {
+            assert!(!content_type_is_xml_like(mime), "{mime}");
+        }
     }
 
     /// Simulates module load for ctx-slot tests: nginx assigns the
@@ -1914,11 +3018,30 @@ mod tests {
     }
 
     #[test]
+    fn module_tables_export_both_modules() {
+        use std::ffi::CStr;
+        // SAFETY: read-only access to our own statics;
+        // single-threaded test with no writer.
+        #[allow(static_mut_refs)]
+        unsafe {
+            assert_eq!(3, ngx_modules.len());
+            assert!(!ngx_modules[0].is_null());
+            assert!(!ngx_modules[1].is_null());
+            assert!(ngx_modules[2].is_null());
+            let names: Vec<String> = ngx_module_names
+                .iter()
+                .take(2)
+                .map(|name| CStr::from_ptr(*name).to_string_lossy().into_owned())
+                .collect();
+            assert_eq!(vec!["ngx_pagespeed", "ngx_pagespeed_etag_filter"], names);
+            assert!(ngx_module_order[0].is_null());
+        }
+    }
+
+    #[test]
     fn async_wait_arms_and_holds() {
         use crate::request::RequestCtx;
-        use ngx::ffi::{
-            ngx_http_request_empty_handler, ngx_http_request_t, ngx_http_test_reading,
-        };
+        use ngx::ffi::{ngx_http_request_empty_handler, ngx_http_request_t, ngx_http_test_reading};
         use std::mem::MaybeUninit;
         simulate_module_load();
         // SAFETY: all structures are test-owned; stub addresses are
@@ -1940,7 +3063,10 @@ mod tests {
             let read = request.read_event_handler.expect("read handler armed");
             assert_eq!(read as *const (), ngx_http_test_reading as *const ());
             let write = request.write_event_handler.expect("write handler armed");
-            assert_eq!(write as *const (), ngx_http_request_empty_handler as *const ());
+            assert_eq!(
+                write as *const (),
+                ngx_http_request_empty_handler as *const ()
+            );
         }
     }
 
@@ -1965,22 +3091,27 @@ mod tests {
     #[test]
     fn decline_resets_and_advances() {
         use crate::caching::PreserveCachingHeaders;
-        use crate::fetch::{BaseFetch, BaseFetchType};
+        use crate::fetch::{BaseFetchType, SharedBaseFetch};
         use crate::request::RequestCtx;
         use ngx::ffi::{ngx_http_block_reading, ngx_http_core_run_phases, ngx_http_request_t};
         use ps_http::response::HttpOptions;
         use std::mem::MaybeUninit;
         // Context half: flags restored, fetch detached.
-        let mut ctx = RequestCtx::for_resource("http://h/a", true, PreserveCachingHeaders::DontPreserve);
+        let mut ctx =
+            RequestCtx::for_resource("http://h/a", true, PreserveCachingHeaders::DontPreserve);
         ctx.location_field_set = true;
         ctx.psol_vary_accept_only = true;
         ctx.in_place = true;
-        ctx.base_fetch = Some(BaseFetch::new(
-            "http://h/a",
-            BaseFetchType::IproLookup,
-            PreserveCachingHeaders::DontPreserve,
-            HttpOptions::default_for_tests(),
-        ));
+        ctx.base_fetch = Some(
+            SharedBaseFetch::new_pair(
+                "http://h/a",
+                std::ptr::null_mut(),
+                BaseFetchType::IproLookup,
+                PreserveCachingHeaders::DontPreserve,
+                HttpOptions::default_for_tests(),
+            )
+            .0,
+        );
         let mut released = false;
         decline_request_state(&mut ctx, Some(&mut || released = true));
         assert!(released);
@@ -2039,17 +3170,39 @@ mod tests {
             NGX_MODULE_SIGNATURE_9,
         };
         let bits = [
-            NGX_MODULE_SIGNATURE_1, NGX_MODULE_SIGNATURE_2, NGX_MODULE_SIGNATURE_3,
-            NGX_MODULE_SIGNATURE_4, NGX_MODULE_SIGNATURE_5, NGX_MODULE_SIGNATURE_6,
-            NGX_MODULE_SIGNATURE_7, NGX_MODULE_SIGNATURE_8, NGX_MODULE_SIGNATURE_9,
-            NGX_MODULE_SIGNATURE_10, NGX_MODULE_SIGNATURE_11, NGX_MODULE_SIGNATURE_12,
-            NGX_MODULE_SIGNATURE_13, NGX_MODULE_SIGNATURE_14, NGX_MODULE_SIGNATURE_15,
-            NGX_MODULE_SIGNATURE_16, NGX_MODULE_SIGNATURE_17, NGX_MODULE_SIGNATURE_18,
-            NGX_MODULE_SIGNATURE_19, NGX_MODULE_SIGNATURE_20, NGX_MODULE_SIGNATURE_21,
-            NGX_MODULE_SIGNATURE_22, NGX_MODULE_SIGNATURE_23, NGX_MODULE_SIGNATURE_24,
-            NGX_MODULE_SIGNATURE_25, NGX_MODULE_SIGNATURE_26, NGX_MODULE_SIGNATURE_27,
-            NGX_MODULE_SIGNATURE_28, NGX_MODULE_SIGNATURE_29, NGX_MODULE_SIGNATURE_30,
-            NGX_MODULE_SIGNATURE_31, NGX_MODULE_SIGNATURE_32, NGX_MODULE_SIGNATURE_33,
+            NGX_MODULE_SIGNATURE_1,
+            NGX_MODULE_SIGNATURE_2,
+            NGX_MODULE_SIGNATURE_3,
+            NGX_MODULE_SIGNATURE_4,
+            NGX_MODULE_SIGNATURE_5,
+            NGX_MODULE_SIGNATURE_6,
+            NGX_MODULE_SIGNATURE_7,
+            NGX_MODULE_SIGNATURE_8,
+            NGX_MODULE_SIGNATURE_9,
+            NGX_MODULE_SIGNATURE_10,
+            NGX_MODULE_SIGNATURE_11,
+            NGX_MODULE_SIGNATURE_12,
+            NGX_MODULE_SIGNATURE_13,
+            NGX_MODULE_SIGNATURE_14,
+            NGX_MODULE_SIGNATURE_15,
+            NGX_MODULE_SIGNATURE_16,
+            NGX_MODULE_SIGNATURE_17,
+            NGX_MODULE_SIGNATURE_18,
+            NGX_MODULE_SIGNATURE_19,
+            NGX_MODULE_SIGNATURE_20,
+            NGX_MODULE_SIGNATURE_21,
+            NGX_MODULE_SIGNATURE_22,
+            NGX_MODULE_SIGNATURE_23,
+            NGX_MODULE_SIGNATURE_24,
+            NGX_MODULE_SIGNATURE_25,
+            NGX_MODULE_SIGNATURE_26,
+            NGX_MODULE_SIGNATURE_27,
+            NGX_MODULE_SIGNATURE_28,
+            NGX_MODULE_SIGNATURE_29,
+            NGX_MODULE_SIGNATURE_30,
+            NGX_MODULE_SIGNATURE_31,
+            NGX_MODULE_SIGNATURE_32,
+            NGX_MODULE_SIGNATURE_33,
             NGX_MODULE_SIGNATURE_34,
         ];
         let mut expected = format!(
@@ -2073,7 +3226,10 @@ mod tests {
         let mut options: Option<NgxOptions> = None;
         let out = apply_directive_line(&mut options, &mut factory, Scope::Server, &["on"]).unwrap();
         assert_eq!(GzipCall::EnableForLocation, out.gzip);
-        assert_eq!(EnabledState::On, options.as_ref().unwrap().core.enabled_state());
+        assert_eq!(
+            EnabledState::On,
+            options.as_ref().unwrap().core.enabled_state()
+        );
         let out =
             apply_directive_line(&mut options, &mut factory, Scope::Server, &["off"]).unwrap();
         assert_eq!(GzipCall::SetForLocation(false), out.gzip);
@@ -2082,13 +3238,8 @@ mod tests {
             options.as_ref().unwrap().core.enabled_state()
         );
         // `gzip` returns after the setter call; options untouched.
-        let out = apply_directive_line(
-            &mut options,
-            &mut factory,
-            Scope::Server,
-            &["gzip", "off"],
-        )
-        .unwrap();
+        let out = apply_directive_line(&mut options, &mut factory, Scope::Server, &["gzip", "off"])
+            .unwrap();
         assert_eq!(GzipCall::SetForLocation(false), out.gzip);
         assert_eq!(
             EnabledState::Unplugged,
@@ -2096,7 +3247,12 @@ mod tests {
         );
         assert_eq!(
             Err("Invalid pagespeed gzip setting".to_string()),
-            apply_directive_line(&mut options, &mut factory, Scope::Server, &["gzip", "maybe"])
+            apply_directive_line(
+                &mut options,
+                &mut factory,
+                Scope::Server,
+                &["gzip", "maybe"]
+            )
         );
         // Option line creates options and parses.
         let out = apply_directive_line(
@@ -2110,8 +3266,13 @@ mod tests {
         assert!(out.dir_prep.is_none());
         assert!(options.is_some());
         // ClearInheritedScripts flags the level object.
-        apply_directive_line(&mut options, &mut factory, Scope::Server, &["ClearInheritedScripts"])
-            .unwrap();
+        apply_directive_line(
+            &mut options,
+            &mut factory,
+            Scope::Server,
+            &["ClearInheritedScripts"],
+        )
+        .unwrap();
         assert!(options.as_ref().unwrap().clear_inherited_scripts);
         // Over-arity reports the unknown-name error.
         let many = ["a"; 11];
@@ -2167,17 +3328,21 @@ mod tests {
             )
         );
         // The warn four apply at main, warn-and-ignore at server.
-        apply_directive_line(&mut options, &mut factory, Scope::ProcessStrict, &[
-            "ForceCaching",
-            "on",
-        ])
+        apply_directive_line(
+            &mut options,
+            &mut factory,
+            Scope::ProcessStrict,
+            &["ForceCaching", "on"],
+        )
         .unwrap();
         assert!(factory.force_caching);
         factory.force_caching = false;
-        let out = apply_directive_line(&mut options, &mut factory, Scope::Server, &[
-            "ForceCaching",
-            "on",
-        ])
+        let out = apply_directive_line(
+            &mut options,
+            &mut factory,
+            Scope::Server,
+            &["ForceCaching", "on"],
+        )
         .unwrap();
         assert!(!factory.force_caching);
         assert_eq!(
@@ -2187,10 +3352,12 @@ mod tests {
         // ... and the gate rejects them at directory scope.
         assert_eq!(
             Err("\"ForceCaching\" cannot be set at this scope.".to_string()),
-            apply_directive_line(&mut options, &mut factory, Scope::Directory, &[
-                "ForceCaching",
-                "on"
-            ])
+            apply_directive_line(
+                &mut options,
+                &mut factory,
+                Scope::Directory,
+                &["ForceCaching", "on"]
+            )
         );
         // Ranged detail, wrapped.
         assert_eq!(
@@ -2279,24 +3446,18 @@ mod tests {
         let out = plan(&native, &[], true, false, false, &[]);
         assert!(!out.has_contexts);
         assert_eq!(None, out.error);
-        assert!(!out.init_null_stats);
         assert!(!out.root_init);
         native.set_resolver(true);
-        // Stats follow PostConfig (`cached` stays borrowed below,
-        // so probe through a clone).
-        let mut probe = cached.clone();
-        probe.system.statistics_enabled = false;
-        let probe_contexts = [PostConfigContext { options: &probe }];
-        let out = plan(&factory, &probe_contexts, true, false, false, &[]);
-        assert!(out.init_null_stats);
-        probe.system.statistics_enabled = true;
-        let probe_contexts = [PostConfigContext { options: &probe }];
-        let out = plan(&factory, &probe_contexts, true, false, false, &[]);
-        assert!(!out.init_null_stats);
         // Remote warnings, one per affected server.
         let remotes = [
-            RemoteWarningInput { url: "http://x/rc".to_string(), external_cache: true },
-            RemoteWarningInput { url: String::new(), external_cache: false },
+            RemoteWarningInput {
+                url: "http://x/rc".to_string(),
+                external_cache: true,
+            },
+            RemoteWarningInput {
+                url: String::new(),
+                external_cache: false,
+            },
         ];
         let out = plan(&native, &contexts, true, false, false, &remotes);
         assert_eq!(1, out.warnings.len());
@@ -2322,7 +3483,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Some(DirPrepPath { directive: "FileCachePath".to_string(), path: path.clone() }),
+            Some(DirPrepPath {
+                directive: "FileCachePath".to_string(),
+                path: path.clone()
+            }),
             out.dir_prep
         );
         assert_eq!(path, options.unwrap().system.file_cache_path);
@@ -2332,11 +3496,15 @@ mod tests {
         let mut options: Option<NgxOptions> = None;
         assert_eq!(
             Err("FileCachePath relative must start with a slash".to_string()),
-            apply_directive_line(&mut options, &mut factory, Scope::Server, &["FileCachePath", "relative"])
+            apply_directive_line(
+                &mut options,
+                &mut factory,
+                Scope::Server,
+                &["FileCachePath", "relative"]
+            )
         );
     }
 }
-
 
 /// Ensures a level options object exists (`*options == NULL` → new).
 fn ensure_options(options: &mut Option<NgxOptions>) {

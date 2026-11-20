@@ -132,7 +132,9 @@ pub const OVERRIDE_TOKEN_NAMES: [&str; 2] = [
 /// (`IsRequestOptionOverrideName`, case-insensitive).
 #[must_use]
 pub fn is_request_option_override_name(name: &str) -> bool {
-    OVERRIDE_TOKEN_NAMES.iter().any(|token| name.eq_ignore_ascii_case(token))
+    OVERRIDE_TOKEN_NAMES
+        .iter()
+        .any(|token| name.eq_ignore_ascii_case(token))
 }
 
 /// Whether a response header must lose its hash
@@ -248,10 +250,14 @@ pub fn route_outbound_header(
         return OutboundDisposition::Skip;
     }
     if name == "Cache-Control" {
-        return OutboundDisposition::CacheControl { value: value.to_string() };
+        return OutboundDisposition::CacheControl {
+            value: value.to_string(),
+        };
     }
     if name == "Content-Type" {
-        return OutboundDisposition::ContentType { value: value.to_string() };
+        return OutboundDisposition::ContentType {
+            value: value.to_string(),
+        };
     }
     if name.eq_ignore_ascii_case("Connection")
         || name.eq_ignore_ascii_case("Keep-Alive")
@@ -259,7 +265,8 @@ pub fn route_outbound_header(
     {
         return OutboundDisposition::Skip;
     }
-    let (name, shortcut, psol_vary) = route_outbound_write(name, value, content_length, location_field_set);
+    let (name, shortcut, psol_vary) =
+        route_outbound_write(name, value, content_length, location_field_set);
     OutboundDisposition::Write {
         name: name.to_string(),
         value: value.to_string(),
@@ -326,6 +333,7 @@ pub unsafe fn copy_response_headers_to_nginx(
     use ngx::ffi::{ngx_list_push, ngx_str_t};
     // SAFETY: caller guarantees a live request.
     unsafe {
+        (*r).headers_out.status = headers.status_code() as ngx::ffi::ngx_uint_t;
         let content_length = headers.find_content_length();
         for (name, value) in headers.headers().iter() {
             match route_outbound_header(name, value, preserve, content_length, location_field_set) {
@@ -344,17 +352,22 @@ pub unsafe fn copy_response_headers_to_nginx(
                     if rendered.is_null() {
                         return false;
                     }
-                    let bytes = std::slice::from_raw_parts(
-                        rendered as *const u8,
-                        libc::strlen(rendered),
-                    );
-                    (*r).headers_out.content_type =
-                        ngx_str_t { len: bytes.len(), data: rendered.cast() };
+                    let bytes =
+                        std::slice::from_raw_parts(rendered as *const u8, libc::strlen(rendered));
+                    (*r).headers_out.content_type = ngx_str_t {
+                        len: bytes.len(),
+                        data: rendered.cast(),
+                    };
                     (*r).headers_out.content_type_len =
                         bytes.iter().position(|b| *b == b';').unwrap_or(bytes.len());
                     (*r).headers_out.content_type_lowcase = std::ptr::null_mut();
                 }
-                OutboundDisposition::Write { name, value, shortcut, set_psol_vary_accept_only } => {
+                OutboundDisposition::Write {
+                    name,
+                    value,
+                    shortcut,
+                    set_psol_vary_accept_only,
+                } => {
                     let pushed = ngx_list_push(&mut (*r).headers_out.headers);
                     if pushed.is_null() {
                         return false;
@@ -366,10 +379,14 @@ pub unsafe fn copy_response_headers_to_nginx(
                     }
                     let header = &mut *pushed.cast::<ngx::ffi::ngx_table_elt_t>();
                     header.hash = 1;
-                    header.key =
-                        ngx_str_t { len: name.len(), data: key.cast() };
-                    header.value =
-                        ngx_str_t { len: value.len(), data: val.cast() };
+                    header.key = ngx_str_t {
+                        len: name.len(),
+                        data: key.cast(),
+                    };
+                    header.value = ngx_str_t {
+                        len: value.len(),
+                        data: val.cast(),
+                    };
                     if set_psol_vary_accept_only {
                         *set_psol_vary = true;
                     }
@@ -476,8 +493,7 @@ pub unsafe fn get_cache_control(r: *mut ngx::ffi::ngx_http_request_t) -> String 
         while !cc.is_null() {
             let elt = &*cc.cast::<ngx_table_elt_t>();
             if elt.hash != 0 {
-                let bytes =
-                    std::slice::from_raw_parts(elt.value.data, elt.value.len);
+                let bytes = std::slice::from_raw_parts(elt.value.data, elt.value.len);
                 values.push(String::from_utf8_lossy(bytes).into_owned());
             }
             cc = elt.next;
@@ -515,7 +531,10 @@ pub unsafe fn set_cache_control(
             elt.next = std::ptr::null_mut();
             elt.hash = 1;
             static KEY: &[u8; 14] = b"Cache-Control\0";
-            elt.key = ngx_str_t { len: 13, data: KEY.as_ptr() as *mut u8 };
+            elt.key = ngx_str_t {
+                len: 13,
+                data: KEY.as_ptr() as *mut u8,
+            };
             elt
         } else {
             let mut follower = (*head.cast::<ngx::ffi::ngx_table_elt_t>()).next;
@@ -557,7 +576,11 @@ mod tests {
         copy_request_headers(
             1001,
             "post",
-            &[("Host", "h", true), ("X-Drop", "x", false), ("Cookie", "c", true)],
+            &[
+                ("Host", "h", true),
+                ("X-Drop", "x", false),
+                ("Cookie", "c", true),
+            ],
             &mut out,
         );
         assert_eq!(1, out.major_version());
@@ -595,7 +618,14 @@ mod tests {
         assert!(out.headers().has(header::DATE));
         // A present Date is left alone.
         let mut out = responses();
-        copy_response_headers(1001, 200, "text/html", &[("Date", "Thu, 01 Jan 1970 00:00:00 GMT", true)], 0, &mut out);
+        copy_response_headers(
+            1001,
+            200,
+            "text/html",
+            &[("Date", "Thu, 01 Jan 1970 00:00:00 GMT", true)],
+            0,
+            &mut out,
+        );
         assert_eq!(
             Some("Thu, 01 Jan 1970 00:00:00 GMT".to_string()),
             out.headers().lookup1(header::DATE)
@@ -604,12 +634,22 @@ mod tests {
 
     #[test]
     fn override_token_strips() {
-        assert!(is_request_option_override_name("ModPagespeedRequestOptionOverride"));
-        assert!(is_request_option_override_name("pagespeedrequestoptionoverride"));
+        assert!(is_request_option_override_name(
+            "ModPagespeedRequestOptionOverride"
+        ));
+        assert!(is_request_option_override_name(
+            "pagespeedrequestoptionoverride"
+        ));
         assert!(!is_request_option_override_name("X-Other"));
         assert!(!is_request_option_override_name("ModPagespeed"));
-        assert!(strips_override_token(true, "PageSpeedRequestOptionOverride"));
-        assert!(!strips_override_token(false, "PageSpeedRequestOptionOverride"));
+        assert!(strips_override_token(
+            true,
+            "PageSpeedRequestOptionOverride"
+        ));
+        assert!(!strips_override_token(
+            false,
+            "PageSpeedRequestOptionOverride"
+        ));
         assert!(!strips_override_token(true, "Cache-Control"));
     }
 
@@ -622,34 +662,54 @@ mod tests {
 
     #[test]
     fn outbound_routing_matrix() {
-        use crate::caching::PreserveCachingHeaders::{DontPreserve, PreserveAll, PreserveOnlyCacheControl};
+        use crate::caching::PreserveCachingHeaders::{
+            DontPreserve, PreserveAll, PreserveOnlyCacheControl,
+        };
         use OutboundDisposition::{CacheControl, ContentType, Skip, Write};
         let route = |name: &str, value: &str| {
             route_outbound_header(name, value, DontPreserve, Some(9), false)
         };
         // Preservation gates first.
-        assert_eq!(Skip, route_outbound_header("X-Custom", "v", PreserveOnlyCacheControl, None, false));
         assert_eq!(
-            CacheControl { value: "v".to_string() },
+            Skip,
+            route_outbound_header("X-Custom", "v", PreserveOnlyCacheControl, None, false)
+        );
+        assert_eq!(
+            CacheControl {
+                value: "v".to_string()
+            },
             route_outbound_header("Cache-Control", "v", PreserveOnlyCacheControl, None, false)
         );
-        assert_eq!(Skip, route_outbound_header("Content-Length", "9", PreserveAll, Some(9), false));
+        assert_eq!(
+            Skip,
+            route_outbound_header("Content-Length", "9", PreserveAll, Some(9), false)
+        );
         // NUL bytes never emit.
         assert_eq!(Skip, route("X-Custom", "a\0b"));
         // Length needs a known non-negative whole plus all digits.
         assert!(matches!(route("Content-Length", "9"), Write { .. }));
         assert_eq!(Skip, route("Content-Length", "+9"));
         assert_eq!(Skip, route("Content-Length", "9 "));
-        assert_eq!(Skip, route_outbound_header("Content-Length", "9", DontPreserve, None, false));
-        assert_eq!(Skip, route_outbound_header("Content-Length", "9", DontPreserve, Some(-1), false));
+        assert_eq!(
+            Skip,
+            route_outbound_header("Content-Length", "9", DontPreserve, None, false)
+        );
+        assert_eq!(
+            Skip,
+            route_outbound_header("Content-Length", "9", DontPreserve, Some(-1), false)
+        );
         // Exact-case shortcuts.
         assert_eq!(
-            CacheControl { value: "max-age=1".to_string() },
+            CacheControl {
+                value: "max-age=1".to_string()
+            },
             route("Cache-Control", "max-age=1")
         );
         assert!(matches!(route("cache-control", "max-age=1"), Write { .. }));
         assert_eq!(
-            ContentType { value: "text/html".to_string() },
+            ContentType {
+                value: "text/html".to_string()
+            },
             route("Content-Type", "text/html")
         );
         // Connection scaffolding always drops.
@@ -740,7 +800,10 @@ mod tests {
             let elt = |name: *mut u8, value: *mut u8| ngx_table_elt_t {
                 hash: 1,
                 key: ngx_str_t { len: 1, data: name },
-                value: ngx_str_t { len: 1, data: value },
+                value: ngx_str_t {
+                    len: 1,
+                    data: value,
+                },
                 lowcase_key: std::ptr::null_mut(),
                 next: std::ptr::null_mut(),
             };

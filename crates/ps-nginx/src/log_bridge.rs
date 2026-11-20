@@ -9,7 +9,9 @@
 //! message path consults them.
 
 use crate::message::{MODULE_TAG, MODULE_VERSION};
-use ngx::ffi::{ngx_log_t, ngx_uint_t, NGX_LOG_ALERT, NGX_LOG_DEBUG, NGX_LOG_ERR, NGX_LOG_INFO, NGX_LOG_WARN};
+use ngx::ffi::{
+    ngx_log_t, ngx_uint_t, NGX_LOG_ALERT, NGX_LOG_DEBUG, NGX_LOG_ERR, NGX_LOG_INFO, NGX_LOG_WARN,
+};
 use std::ptr;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 
@@ -41,7 +43,10 @@ pub fn trim_trailing_newline(message: &str) -> &str {
 /// Formats a bridged message: `[ngx_pagespeed <version>] body`.
 #[must_use]
 pub fn format_log_message(message: &str) -> String {
-    format!("[{MODULE_TAG} {MODULE_VERSION}] {}", trim_trailing_newline(message))
+    format!(
+        "[{MODULE_TAG} {MODULE_VERSION}] {}",
+        trim_trailing_newline(message)
+    )
 }
 
 /// Whether install enables verbose logging: the nginx log level
@@ -119,7 +124,10 @@ mod tests {
         assert_eq!(NGX_LOG_INFO as ngx_uint_t, severity_level(LOG_INFO));
         assert_eq!(NGX_LOG_WARN as ngx_uint_t, severity_level(LOG_WARNING));
         assert_eq!(NGX_LOG_ERR as ngx_uint_t, severity_level(LOG_ERROR));
-        assert_eq!(NGX_LOG_ALERT as ngx_uint_t, severity_level(LOG_ERROR_REPORT));
+        assert_eq!(
+            NGX_LOG_ALERT as ngx_uint_t,
+            severity_level(LOG_ERROR_REPORT)
+        );
         assert_eq!(NGX_LOG_ALERT as ngx_uint_t, severity_level(LOG_FATAL));
         assert_eq!(NGX_LOG_DEBUG as ngx_uint_t, severity_level(-1));
         assert_eq!(NGX_LOG_DEBUG as ngx_uint_t, severity_level(-2));

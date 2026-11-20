@@ -13,6 +13,8 @@
 
 use crate::caching::PreserveCachingHeaders;
 use ps_http::response::{HttpOptions, ResponseHeaders};
+use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::{Arc, Mutex};
 
 /// Fetch role (`NgxBaseFetchType`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,12 +67,8 @@ pub const fn event_byte(event: FetchEvent) -> u8 {
     }
 }
 
-/// Event channel (the Slice 6 pipe): posts an event for a fetch,
-/// reporting delivery. Slices 4–5 run against test doubles.
-pub trait EventChannel {
-    /// Posts an event; false when the channel is gone.
-    fn write_event(&mut self, event: FetchEvent) -> bool;
-}
+/// Event channel (re-exported: the trait lives with the pipe).
+pub use crate::pipe::EventChannel;
 
 /// Torn-down channel (post-`Terminate()` null): every write fails,
 /// so events are dropped with no reference change.
@@ -85,6 +83,7 @@ impl EventChannel for NullChannel {
 /// Base fetch (`NgxBaseFetch` state core).
 pub struct BaseFetch {
     url: String,
+    request: *mut ngx::ffi::ngx_http_request_t,
     fetch_type: BaseFetchType,
     preserve_caching_headers: PreserveCachingHeaders,
     response_headers: ResponseHeaders,
@@ -110,6 +109,7 @@ impl BaseFetch {
     ) -> Self {
         BaseFetch {
             url: url.to_string(),
+            request: std::ptr::null_mut(),
             fetch_type,
             preserve_caching_headers,
             response_headers: ResponseHeaders::new(http_options),
@@ -128,6 +128,17 @@ impl BaseFetch {
     #[must_use]
     pub fn url(&self) -> &str {
         &self.url
+    }
+
+    /// Attaches the owning request (`request_`; live only).
+    pub fn set_request(&mut self, r: *mut ngx::ffi::ngx_http_request_t) {
+        self.request = r;
+    }
+
+    /// Owning request, null when unset.
+    #[must_use]
+    pub fn request(&self) -> *mut ngx::ffi::ngx_http_request_t {
+        self.request
     }
 
     /// Fetch role.
@@ -339,7 +350,10 @@ impl BaseFetch {
             "CopyBufferToNginx() was called after the last buffer was sent"
         );
         if !self.done_called && self.buffer.is_empty() {
-            return CopyOutcome::Again { bytes: Vec::new(), flush: false };
+            return CopyOutcome::Again {
+                bytes: Vec::new(),
+                flush: false,
+            };
         }
         if !allocate {
             return CopyOutcome::Error;
@@ -353,6 +367,133 @@ impl BaseFetch {
         }
         CopyOutcome::Again { bytes, flush }
     }
+}
+
+/// Live base-fetch count (`active_base_fetches`).
+static ACTIVE_BASE_FETCHES: AtomicI32 = AtomicI32::new(0);
+
+/// Reads the live count (the Terminate drain loop).
+#[must_use]
+pub fn active_base_fetches() -> i32 {
+    ACTIVE_BASE_FETCHES.load(Ordering::SeqCst)
+}
+
+/// Reclaims an event sender (the reader half of the Arc pairing).
+///
+/// # Safety
+///
+/// `event.sender` must be a live `Arc::into_raw` holder from a
+/// post, reclaimed exactly once.
+#[must_use]
+pub unsafe fn reclaim_event_sender(event: crate::pipe::PipeEvent) -> Arc<SharedBaseFetch> {
+    // SAFETY: caller guarantees a live paired holder.
+    unsafe { Arc::from_raw(event.sender as *const SharedBaseFetch) }
+}
+
+/// Thread-shared base fetch: state under lock, lifetime by `Arc`
+/// (one clone per outstanding C++ reference: the two sides plus
+/// each in-flight event). `BaseFetch.references` shadows the
+/// count for the rule core; the two agree at every quiescent
+/// point (pinned below).
+pub struct SharedBaseFetch {
+    state: Mutex<BaseFetch>,
+}
+
+impl SharedBaseFetch {
+    /// Creates the two-sided fetch (`new NgxBaseFetch`): one
+    /// `Arc` per side, bumping the live count. The owning
+    /// request rides along so pipe events dispatch back to it
+    /// (null only in tests, whose events never dispatch).
+    #[must_use]
+    pub fn new_pair(
+        url: &str,
+        r: *mut ngx::ffi::ngx_http_request_t,
+        fetch_type: BaseFetchType,
+        preserve_caching_headers: PreserveCachingHeaders,
+        http_options: HttpOptions,
+    ) -> (Arc<Self>, Arc<Self>) {
+        ACTIVE_BASE_FETCHES.fetch_add(1, Ordering::SeqCst);
+        let mut state = BaseFetch::new(url, fetch_type, preserve_caching_headers, http_options);
+        state.set_request(r);
+        let fetch = Arc::new(SharedBaseFetch {
+            state: Mutex::new(state),
+        });
+        (Arc::clone(&fetch), fetch)
+    }
+
+    /// Runs a rule under the state lock (`Lock`/`Unlock`).
+    pub fn with_state<R>(&self, f: impl FnOnce(&mut BaseFetch) -> R) -> R {
+        f(&mut lock(&self.state))
+    }
+
+    /// Buffers output (`HandleWrite`), pairing one `Arc` with any
+    /// posted event.
+    pub fn handle_write(
+        self: &Arc<Self>,
+        bytes: &[u8],
+        slot: &Mutex<Option<crate::pipe::PipeChannel>>,
+    ) {
+        let mut post = crate::pipe::ArcPost::new(slot, self);
+        self.with_state(|fetch| fetch.handle_write(bytes, &mut post));
+    }
+
+    /// Latches a flush (`HandleFlush`), pairing one `Arc` with the
+    /// posted event.
+    pub fn handle_flush(self: &Arc<Self>, slot: &Mutex<Option<crate::pipe::PipeChannel>>) {
+        let mut post = crate::pipe::ArcPost::new(slot, self);
+        self.with_state(|fetch| fetch.handle_flush(&mut post));
+    }
+
+    /// Latches headers-complete (`HandleHeadersComplete`), pairing
+    /// one `Arc` with the posted event.
+    pub fn handle_headers_complete(
+        self: &Arc<Self>,
+        status_ok: bool,
+        slot: &Mutex<Option<crate::pipe::PipeChannel>>,
+    ) {
+        let mut post = crate::pipe::ArcPost::new(slot, self);
+        self.with_state(|fetch| fetch.handle_headers_complete(status_ok, &mut post));
+    }
+
+    /// Latches completion (`HandleDone`), pairing one `Arc` with
+    /// the posted event. Reports the shadow delete flag; the
+    /// caller drops its pagespeed-side `Arc` after.
+    pub fn handle_done(self: &Arc<Self>, slot: &Mutex<Option<crate::pipe::PipeChannel>>) -> bool {
+        let mut post = crate::pipe::ArcPost::new(slot, self);
+        self.with_state(|fetch| fetch.handle_done(&mut post))
+    }
+
+    /// Drops the nginx-side reference (`Detach`): reports the
+    /// shadow delete flag; the caller drops its `Arc` after.
+    pub fn detach(&self) -> bool {
+        self.with_state(|fetch| fetch.detach())
+    }
+
+    /// Releases one in-flight event (`DecrementRefCount`): reports
+    /// the shadow delete flag; the caller drops the event's
+    /// reclaimed `Arc` after.
+    pub fn decrement_ref_count(&self) -> bool {
+        self.with_state(|fetch| fetch.decrement_ref_count())
+    }
+
+    /// Shadow reference count (equals `Arc::strong_count` at rest).
+    #[must_use]
+    pub fn references(&self) -> i32 {
+        self.with_state(|fetch| fetch.references())
+    }
+}
+
+impl Drop for SharedBaseFetch {
+    /// Releases the live count (the C++ destructor's decrement).
+    fn drop(&mut self) {
+        ACTIVE_BASE_FETCHES.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// Locks fetch state (poison recovers: a panicked rule must not
+/// wedge the fetch forever).
+fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 /// Chain-copy outcome.
@@ -397,7 +538,10 @@ pub const fn base_fetch_gate(header_only: bool, fetch_active: bool) -> BaseFetch
 pub const fn handler_defers_error(status_code: i32, fetch_type: BaseFetchType) -> bool {
     let status_ok = status_code != 0 && status_code < 400;
     !status_ok
-        && !matches!(fetch_type, BaseFetchType::HtmlTransform | BaseFetchType::IproLookup)
+        && !matches!(
+            fetch_type,
+            BaseFetchType::HtmlTransform | BaseFetchType::IproLookup
+        )
 }
 
 /// Whether a response header survives the preserve pass: every
@@ -443,7 +587,10 @@ pub fn header_filter_outcome(rc: ngx::ffi::ngx_int_t) -> HeaderFilterOutcome {
     if rc == NGX_ERROR as ngx::ffi::ngx_int_t || rc > NGX_OK as ngx::ffi::ngx_int_t {
         HeaderFilterOutcome::Finalize(rc)
     } else if rc < NGX_OK as ngx::ffi::ngx_int_t && rc != NGX_AGAIN as ngx::ffi::ngx_int_t {
-        assert_eq!(rc, NGX_DONE as ngx::ffi::ngx_int_t, "unexpected header filter code");
+        assert_eq!(
+            rc, NGX_DONE as ngx::ffi::ngx_int_t,
+            "unexpected header filter code"
+        );
         HeaderFilterOutcome::Done
     } else {
         HeaderFilterOutcome::Continue
@@ -504,10 +651,163 @@ pub enum ReadCallbackAction {
     Skip,
     /// Finalize the request, holding an upstream reference while an
     /// upstream owns it, then running posted requests as decided.
-    Finalize { rc: ngx::ffi::ngx_int_t, hold_upstream_ref: bool, run_posted: bool },
+    Finalize {
+        rc: ngx::ffi::ngx_int_t,
+        hold_upstream_ref: bool,
+        run_posted: bool,
+    },
     /// Upstream-owned `NGX_AGAIN`: run posted requests as decided,
     /// leaving finalization to the upstream.
     UpstreamAgain { run_posted: bool },
+}
+
+/// Releases the ctx fetch (`ps_release_base_fetch`): detaches
+/// and clears (dropping nginx's reference).
+///
+/// # Safety
+///
+/// `ctx` must point at a live request context.
+pub unsafe fn release_base_fetch(ctx: *mut crate::request::RequestCtx) {
+    // SAFETY: caller guarantees a live context.
+    unsafe {
+        if let Some(fetch) = (*ctx).base_fetch.take() {
+            fetch.detach();
+            drop(fetch);
+        }
+    }
+}
+
+/// Serves one event's output (`ps_base_fetch_handler`): headers on
+/// first call, then body chains.
+///
+/// # Safety
+///
+/// `r` must point at a live request with an attached context
+/// holding a fetch.
+pub unsafe fn base_fetch_handler(r: *mut ngx::ffi::ngx_http_request_t) -> ngx::ffi::ngx_int_t {
+    use ngx::ffi::{
+        ngx_http_clean_header, ngx_http_filter_finalize_request, ngx_int_t, NGX_AGAIN, NGX_DONE,
+        NGX_ERROR, NGX_HTTP_INTERNAL_SERVER_ERROR, NGX_OK,
+    };
+    // SAFETY: caller guarantees a live request with context.
+    unsafe {
+        let ctx = crate::request::get_request_ctx(r);
+        {
+            let uri = crate::headers::ngx_str_text(&raw const (*r).uri);
+            let log = (*(*r).connection).log;
+            ngx::ngx_log_error!(
+                ngx::ffi::NGX_LOG_DEBUG_HTTP,
+                log,
+                "ps fetch handler: {}",
+                uri
+            );
+        }
+        if ngx::ffi::ngx_terminate != 0 || ngx::ffi::ngx_exiting != 0 {
+            crate::request::set_buffered(r, false);
+            release_base_fetch(ctx);
+            return NGX_ERROR as ngx_int_t;
+        }
+        if (*r).header_sent() == 0 {
+            let (status_code, fetch_type) = (*ctx)
+                .base_fetch
+                .as_ref()
+                .expect("handler needs fetch")
+                .with_state(|fetch| (fetch.response_headers().status_code(), fetch.fetch_type()));
+            let status_ok = status_code != 0 && status_code < 400;
+            // Error statuses on content-generator responses defer
+            // to nginx's default error handling.
+            if !status_ok
+                && !matches!(
+                    fetch_type,
+                    BaseFetchType::HtmlTransform | BaseFetchType::IproLookup
+                )
+            {
+                release_base_fetch(ctx);
+                return ngx_http_filter_finalize_request(
+                    r,
+                    std::ptr::null_mut(),
+                    status_code as ngx_int_t,
+                );
+            }
+            if (*ctx).preserve_caching_headers
+                != crate::caching::PreserveCachingHeaders::DontPreserve
+            {
+                let preserve_all = (*ctx).preserve_caching_headers
+                    == crate::caching::PreserveCachingHeaders::PreserveAll;
+                crate::headers::for_each_header(&mut (*r).headers_out.headers, |header| {
+                    let key = std::slice::from_raw_parts((*header).key.data, (*header).key.len);
+                    let is = |literal: &[u8]| key.eq_ignore_ascii_case(literal);
+                    if !(is(b"Cache-Control")
+                        || (preserve_all
+                            && (is(b"Etag")
+                                || is(b"Date")
+                                || is(b"Last-Modified")
+                                || is(b"Expires"))))
+                    {
+                        (*header).hash = 0;
+                        if is(b"Location") {
+                            (*r).headers_out.location = std::ptr::null_mut();
+                        }
+                    }
+                    true
+                });
+            } else {
+                ngx_http_clean_header(r);
+            }
+            // The module answers the request itself, so the body
+            // goes unless this is an in-place miss or an HTML
+            // transform (whose owner keeps the body).
+            let ipro_lookup_miss = fetch_type == BaseFetchType::IproLookup && !status_ok;
+            if !ipro_lookup_miss && fetch_type != BaseFetchType::HtmlTransform {
+                crate::module::discard_request_body(r);
+            }
+            let location_field_set = (*ctx).location_field_set;
+            let mut set_psol_vary = false;
+            let rc = (*ctx)
+                .base_fetch
+                .as_ref()
+                .expect("handler needs fetch")
+                .with_state(|fetch| {
+                    fetch.collect_headers(r, location_field_set, &mut set_psol_vary)
+                });
+            if !rc {
+                release_base_fetch(ctx);
+                return NGX_HTTP_INTERNAL_SERVER_ERROR as ngx_int_t;
+            }
+            (*ctx).psol_vary_accept_only = set_psol_vary;
+            let rc = crate::filters::base_fetch::next_header_filter(r);
+            if rc == NGX_ERROR as ngx_int_t || rc > NGX_OK as ngx_int_t {
+                release_base_fetch(ctx);
+                return ngx_http_filter_finalize_request(r, std::ptr::null_mut(), rc);
+            }
+            if rc < NGX_OK as ngx_int_t && rc != NGX_AGAIN as ngx_int_t {
+                assert!(
+                    rc == NGX_DONE as ngx_int_t,
+                    "unexpected header filter code: {rc}"
+                );
+                return NGX_DONE as ngx_int_t;
+            }
+            crate::request::set_buffered(r, true);
+        }
+        let (rc, chain) = (*ctx)
+            .base_fetch
+            .as_ref()
+            .expect("handler needs fetch")
+            .with_state(|fetch| fetch.collect_accumulated_writes((*r).pool));
+        if rc == NGX_ERROR as ngx_int_t {
+            crate::request::set_buffered(r, false);
+            release_base_fetch(ctx);
+            return NGX_HTTP_INTERNAL_SERVER_ERROR as ngx_int_t;
+        }
+        if rc == NGX_AGAIN as ngx_int_t && chain.is_null() {
+            return NGX_AGAIN as ngx_int_t;
+        }
+        if rc == NGX_OK as ngx_int_t {
+            crate::request::set_buffered(r, false);
+            release_base_fetch(ctx);
+        }
+        crate::filters::base_fetch::body_filter(r, chain)
+    }
 }
 
 /// Plans the event callback: stale events skip; a finalized
@@ -517,11 +817,7 @@ pub enum ReadCallbackAction {
 #[must_use]
 pub fn read_callback_plan(inputs: &ReadCallbackInputs) -> ReadCallbackAction {
     use ngx::ffi::{NGX_AGAIN, NGX_ERROR};
-    if inputs.refcount_reached_zero
-        || inputs.detached
-        || inputs.ctx_gone
-        || inputs.disassociated
-    {
+    if inputs.refcount_reached_zero || inputs.detached || inputs.ctx_gone || inputs.disassociated {
         return ReadCallbackAction::Skip;
     }
     let (rc, run_posted) = if inputs.connection_error_non_ipro {
@@ -571,11 +867,23 @@ mod tests {
 
     #[test]
     fn names_and_bytes() {
-        assert_eq!("ps resource", base_fetch_type_name(BaseFetchType::PagespeedResource));
-        assert_eq!("html transform", base_fetch_type_name(BaseFetchType::HtmlTransform));
+        assert_eq!(
+            "ps resource",
+            base_fetch_type_name(BaseFetchType::PagespeedResource)
+        );
+        assert_eq!(
+            "html transform",
+            base_fetch_type_name(BaseFetchType::HtmlTransform)
+        );
         assert_eq!("admin page", base_fetch_type_name(BaseFetchType::AdminPage));
-        assert_eq!("ipro lookup", base_fetch_type_name(BaseFetchType::IproLookup));
-        assert_eq!("pagespeed proxy", base_fetch_type_name(BaseFetchType::PagespeedProxy));
+        assert_eq!(
+            "ipro lookup",
+            base_fetch_type_name(BaseFetchType::IproLookup)
+        );
+        assert_eq!(
+            "pagespeed proxy",
+            base_fetch_type_name(BaseFetchType::PagespeedProxy)
+        );
         assert_eq!(b'H', event_byte(FetchEvent::HeadersComplete));
         assert_eq!(b'F', event_byte(FetchEvent::Flush));
         assert_eq!(b'D', event_byte(FetchEvent::Done));
@@ -641,7 +949,10 @@ mod tests {
         assert_eq!(refs, fetch.references());
         // Failed writes return the optimistic reference.
         let mut fetch = resource_fetch();
-        let mut failing = FakeChannel { events: Vec::new(), fail: true };
+        let mut failing = FakeChannel {
+            events: Vec::new(),
+            fail: true,
+        };
         fetch.handle_flush(&mut failing);
         assert!(failing.events.is_empty());
         assert_eq!(2, fetch.references());
@@ -657,7 +968,10 @@ mod tests {
         let mut fetch = resource_fetch();
         // Nothing buffered, not done: wait.
         assert_eq!(
-            CopyOutcome::Again { bytes: Vec::new(), flush: false },
+            CopyOutcome::Again {
+                bytes: Vec::new(),
+                flush: false
+            },
             fetch.copy_buffer_to_nginx(true)
         );
         // Buffered bytes ship with the flush latch, then clear it.
@@ -665,7 +979,10 @@ mod tests {
         fetch.handle_write(b"hello", &mut channel);
         fetch.handle_flush(&mut channel);
         assert_eq!(
-            CopyOutcome::Again { bytes: b"hello".to_vec(), flush: true },
+            CopyOutcome::Again {
+                bytes: b"hello".to_vec(),
+                flush: true
+            },
             fetch.copy_buffer_to_nginx(true)
         );
         assert_eq!(0, fetch.buffered_len());
@@ -673,7 +990,10 @@ mod tests {
         fetch.handle_write(b"bye", &mut channel);
         fetch.handle_done(&mut channel);
         assert_eq!(
-            CopyOutcome::Ok { bytes: b"bye".to_vec(), flush: false },
+            CopyOutcome::Ok {
+                bytes: b"bye".to_vec(),
+                flush: false
+            },
             fetch.copy_buffer_to_nginx(true)
         );
         // Allocation failure reports without consuming.
@@ -719,7 +1039,10 @@ mod tests {
         assert!(!preserve_header_kept("Location", PreserveAll));
         assert!(!preserve_header_kept("X-Custom", PreserveAll));
         // Body discard skips lookup misses and transforms.
-        assert!(discards_request_body(BaseFetchType::PagespeedResource, true));
+        assert!(discards_request_body(
+            BaseFetchType::PagespeedResource,
+            true
+        ));
         assert!(discards_request_body(BaseFetchType::AdminPage, false));
         assert!(discards_request_body(BaseFetchType::IproLookup, true));
         assert!(!discards_request_body(BaseFetchType::IproLookup, false));
@@ -735,9 +1058,18 @@ mod tests {
             header_filter_outcome(NGX_ERROR as isize)
         );
         assert_eq!(HeaderFilterOutcome::Finalize(1), header_filter_outcome(1));
-        assert_eq!(HeaderFilterOutcome::Done, header_filter_outcome(NGX_DONE as isize));
-        assert_eq!(HeaderFilterOutcome::Continue, header_filter_outcome(NGX_OK as isize));
-        assert_eq!(HeaderFilterOutcome::Continue, header_filter_outcome(NGX_AGAIN as isize));
+        assert_eq!(
+            HeaderFilterOutcome::Done,
+            header_filter_outcome(NGX_DONE as isize)
+        );
+        assert_eq!(
+            HeaderFilterOutcome::Continue,
+            header_filter_outcome(NGX_OK as isize)
+        );
+        assert_eq!(
+            HeaderFilterOutcome::Continue,
+            header_filter_outcome(NGX_AGAIN as isize)
+        );
         // Collect codes.
         assert_eq!(
             CollectOutcome::InternalError,
@@ -795,34 +1127,122 @@ mod tests {
         assert_eq!(Skip, read_callback_plan(&inputs));
         // Plain finalize.
         assert_eq!(
-            Finalize { rc: NGX_OK as isize, hold_upstream_ref: false, run_posted: true },
+            Finalize {
+                rc: NGX_OK as isize,
+                hold_upstream_ref: false,
+                run_posted: true
+            },
             read_callback_plan(&callback_inputs())
         );
         // Finalized connections abort with an error, skipping posted.
         let mut inputs = callback_inputs();
         inputs.connection_error_non_ipro = true;
         assert_eq!(
-            Finalize { rc: NGX_ERROR as isize, hold_upstream_ref: false, run_posted: false },
+            Finalize {
+                rc: NGX_ERROR as isize,
+                hold_upstream_ref: false,
+                run_posted: false
+            },
             read_callback_plan(&inputs)
         );
         // Upstream-owned AGAIN only runs what was posted.
         let mut inputs = callback_inputs();
         inputs.upstream_active = true;
         inputs.handler_rc = NGX_AGAIN as isize;
-        assert_eq!(UpstreamAgain { run_posted: true }, read_callback_plan(&inputs));
+        assert_eq!(
+            UpstreamAgain { run_posted: true },
+            read_callback_plan(&inputs)
+        );
         // Other upstream results hold a reference and always run posted.
         let mut inputs = callback_inputs();
         inputs.upstream_active = true;
         assert_eq!(
-            Finalize { rc: NGX_OK as isize, hold_upstream_ref: true, run_posted: true },
+            Finalize {
+                rc: NGX_OK as isize,
+                hold_upstream_ref: true,
+                run_posted: true
+            },
             read_callback_plan(&inputs)
         );
         let mut inputs = callback_inputs();
         inputs.upstream_active = true;
         inputs.connection_error_non_ipro = true;
         assert_eq!(
-            Finalize { rc: NGX_ERROR as isize, hold_upstream_ref: true, run_posted: true },
+            Finalize {
+                rc: NGX_ERROR as isize,
+                hold_upstream_ref: true,
+                run_posted: true
+            },
             read_callback_plan(&inputs)
         );
+    }
+
+    #[test]
+    fn shared_arc_protocol_matches_shadow() {
+        use crate::pipe::{self, PipeChannel};
+        // Local slot + real pipe (never touches the global).
+        let slot: Mutex<Option<PipeChannel>> = Mutex::new(None);
+        let before = active_base_fetches();
+        let (ps_side, ngx_side) = SharedBaseFetch::new_pair(
+            "http://h/a",
+            std::ptr::null_mut(),
+            BaseFetchType::PagespeedResource,
+            PreserveCachingHeaders::DontPreserve,
+            HttpOptions::default_for_tests(),
+        );
+        assert_eq!(before + 1, active_base_fetches());
+        assert_eq!(2, ps_side.references());
+        assert_eq!(2, Arc::strong_count(&ps_side));
+        // The owning request rides along for event dispatch.
+        {
+            let probe = 0x1234 as *mut ngx::ffi::ngx_http_request_t;
+            let (owned, owned_ngx) = SharedBaseFetch::new_pair(
+                "http://h/a",
+                probe,
+                BaseFetchType::PagespeedResource,
+                PreserveCachingHeaders::DontPreserve,
+                HttpOptions::default_for_tests(),
+            );
+            assert!(owned.with_state(|fetch| fetch.request()) == probe);
+            drop(owned);
+            drop(owned_ngx);
+        }
+        // Post through a live channel: shadow and strong move together.
+        let fds = pipe::open_pipe().expect("pipe");
+        assert!(pipe::make_nonblocking(fds.read_fd));
+        assert!(pipe::make_nonblocking(fds.write_fd));
+        pipe::install_channel_into(&slot, PipeChannel::new(fds));
+        ps_side.handle_flush(&slot);
+        assert_eq!(3, ps_side.references());
+        assert_eq!(3, Arc::strong_count(&ps_side));
+        // Read side: reclaim the event Arc, release, drop.
+        let channel = pipe::take_channel_from(&slot).expect("installed");
+        let mut reclaimed = None;
+        let outcome = channel.drain(&mut |event| {
+            assert_eq!(event_byte(FetchEvent::Flush), event.event_type);
+            // SAFETY: paired by the post above.
+            reclaimed = Some(unsafe { Arc::from_raw(event.sender as *const SharedBaseFetch) });
+        });
+        assert!(matches!(outcome, pipe::DrainOutcome::Dispatched(_)));
+        let event_arc = reclaimed.expect("reclaimed");
+        assert_eq!(3, Arc::strong_count(&ps_side));
+        assert!(!event_arc.decrement_ref_count());
+        assert_eq!(2, event_arc.references());
+        drop(event_arc);
+        assert_eq!(2, Arc::strong_count(&ps_side));
+        // Done posts nothing (channel gone) and drops a shadow;
+        // the caller drops its pagespeed-side Arc after.
+        assert!(!ps_side.handle_done(&slot));
+        drop(ps_side);
+        assert_eq!(1, ngx_side.references());
+        assert_eq!(1, Arc::strong_count(&ngx_side));
+        // Detach zeroes the shadow; dropping nginx's Arc releases
+        // the live count.
+        assert!(ngx_side.detach());
+        assert_eq!(0, ngx_side.references());
+        drop(ngx_side);
+        assert_eq!(before, active_base_fetches());
+        channel.shutdown_write();
+        pipe::close_fd(fds.read_fd);
     }
 }

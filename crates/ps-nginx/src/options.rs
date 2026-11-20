@@ -56,7 +56,11 @@ pub fn plan_remote_options(
             .set_option("RemoteConfigurationTimeoutMs", "0", Scope::ProcessStrict)
             .expect("literal parses");
     }
-    Some(RemoteConfig { options, fetch_url, timeout_ms })
+    Some(RemoteConfig {
+        options,
+        fetch_url,
+        timeout_ms,
+    })
 }
 
 /// Request-scan outcome (`ps_determine_request_options` outputs).
@@ -80,7 +84,7 @@ pub fn determine_request_options(
     request_url: &mut GoogleUrl,
     request_headers: Option<&mut RequestHeaders>,
     response_headers: Option<&mut ResponseHeaders>,
-    handler: &mut impl MessageHandler,
+    handler: &mut dyn MessageHandler,
 ) -> RequestOptionsOutcome {
     let mut query = RewriteQuery::new();
     if !get_query_options(
@@ -196,9 +200,12 @@ pub struct DetermineInputs<'a> {
 /// experiment application without a matcher verdict.
 pub fn determine_options(
     inputs: DetermineInputs<'_>,
-    handler: &mut impl MessageHandler,
+    handler: &mut dyn MessageHandler,
 ) -> Option<DeterminedOptions> {
-    let domain = inputs.directory.map(|d| &d.core).unwrap_or(&inputs.global.core);
+    let domain = inputs
+        .directory
+        .map(|d| &d.core)
+        .unwrap_or(&inputs.global.core);
     let scanned = determine_request_options(
         domain,
         inputs.request_context,
@@ -238,16 +245,14 @@ pub fn determine_options(
     // until Slice 6 owns cache state: there is nothing to inherit
     // from and no cache to invalidate against.
 
-    if !execute_script_lines(
-        &mut assembled,
-        inputs.factory,
-        inputs.substitute,
-    ) {
+    if !execute_script_lines(&mut assembled, inputs.factory, inputs.substitute) {
         return None;
     }
 
     if have_request_options {
-        assembled.core.merge(scanned.options.as_ref().expect("have options"));
+        assembled
+            .core
+            .merge(scanned.options.as_ref().expect("have options"));
     }
 
     let mut experiment_id = None;
@@ -327,10 +332,7 @@ mod tests {
         // Native fetcher on a blocking backend cannot wait.
         let planned = plan_remote_options(&global, true, true).unwrap();
         assert_eq!(0, planned.timeout_ms);
-        assert_eq!(
-            0,
-            planned.options.core.remote_configuration_timeout_ms()
-        );
+        assert_eq!(0, planned.options.core.remote_configuration_timeout_ms());
         // ...but a non-blocking backend keeps the wait.
         let planned = plan_remote_options(&global, true, false).unwrap();
         assert_eq!(1000, planned.timeout_ms);
@@ -499,7 +501,10 @@ mod tests {
                 request_headers: None,
                 response_headers: None,
                 substitute: &|_, _, raw| Some(raw.to_string()),
-                experiment_verdict: Some(ExperimentVerdict { experiment_id: 3, need_cookie: true }),
+                experiment_verdict: Some(ExperimentVerdict {
+                    experiment_id: 3,
+                    need_cookie: true,
+                }),
                 now_ms: 0,
                 host: "h",
                 html_rewrite: true,
@@ -518,14 +523,7 @@ mod tests {
         let domain = RewriteOptions::new();
         let mut url = GoogleUrl::new("http://h/a?ModPagespeed=bogus");
         let mut handler = MockMessageHandler::new();
-        let outcome = determine_request_options(
-            &domain,
-            None,
-            &mut url,
-            None,
-            None,
-            &mut handler,
-        );
+        let outcome = determine_request_options(&domain, None, &mut url, None, None, &mut handler);
         assert!(outcome.options.is_none());
         assert!(outcome.parse_failed);
         let mut context = RequestContext::new(HttpOptions::default_for_tests());

@@ -1241,3 +1241,112 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   No shared-state wrappers needed: only `Send` alarm
   callbacks cross threads. 165 ps-nginx tests green (timing
   tests stable 5/5). Workspace: 2507 passed, 0 failed.
+- Step 6 remainder, slice 6c (this session): DONE. Fetchers
+  (native async, per user choice; dormant until async drivers
+  exist). Serf is unportable (2111 lines + missing libs) and
+  the sync flow cannot drive nginx events, so serf-configured
+  fetchers route to native with a loud warning. New `pipe.rs`
+  (event struct, write/backoff/drop rules, single-event drain,
+  init texts, install/take globals, Terminate plan; nginx
+  registration + read handler transcribed live). New
+  `native_fetch.rs` (pending/active/completed lifecycle with
+  shutdown/cancel rules, byte/count accounting, verbatim
+  fetcher keys, request serialization, UA fixup, keepalive
+  protocol, message builders). `SharedBaseFetch` (Mutex state,
+  Arc-per-reference lifetime with a shadow-count invariant
+  test, atomic active count) plus the `ArcPost` pairing
+  adapter. Factory owns the collapsed fetcher map
+  (`get_fetcher`, warn-once) and reports shutdown task ids.
+  Child init/exit wire Initialize/Terminate, per-server
+  handlers, and thread start. Fixed two pre-existing
+  mistakes: option lookup is case-sensitive (core + arms,
+  fallout repaired) and table-invalid details read `Cannot
+  set option...`. New options: `FetchProxy` (secret),
+  `FetchWithGzip`, `FetcherTimeOutMs`. FOUND C++ BUG #2
+  (resolve with no IPv4 falls through to an OOB read plus a
+  double `CallbackDone`; the port will return after failing).
+  Known limits: https unsupported (no TLS), slurp/proxy-factory
+  unported, read-path actuation waits for 6d terminal bodies.
+  185 ps-nginx, 61 ps-config, 151 ps-http tests green.
+  Workspace: 2529 passed, 0 failed.
+- Step 6 remainder, slice 6d (this session): DONE. Caches,
+  terminal bodies, HTML sink-up, ring/stats wiring. Cache
+  composition: new options `FileCacheCleanIntervalMs`,
+  `FileCacheSizeKb`, `LRUCacheByteLimit`,
+  `LRUCacheKbPerProcess`, `CacheFlushFilename`,
+  `EnableCachePurge`, `CompressMetadataCache` plus
+  `SystemWasSet` flags with was-set merging;
+  `SystemCachePath`/`SystemCaches` with factory/root/child
+  wiring and the shared purge set. Terminal FFI: content
+  dispatch (beacon/simple/resource), beacon GET inline +
+  POST via body-read with temp-file/spooled/multi-buffer
+  bodies and 500-on-failure, simple assets off the live
+  factory prefix plus message-history dumps with the fixed
+  header set. Resource handler transcribed whole: guards
+  (main/factory/shutdown/method/URL/headers/options/standby),
+  `determine_options` over live headers/URL (directory
+  options, fail-closed script `$`, no remote executor, no
+  experiment verdict), `X-Forwarded-Proto`, rebeaconing
+  preserve computation, then resource/admin/HTML/in-place/
+  pass-through branches (proxy unreachable without a
+  `DomainLawyer`; resource/IPRO unfinished-or-error declines
+  so nginx renders error pages; misses decline without
+  recording). Admin renders via per-request sites
+  (statistics leaves incl. `?cache` notice, console, admin,
+  purge with route eviction rights). HTML branch attaches
+  `HtmlSink` and the filters call through (`NGX_OK` runs
+  `finish_html_header_filter`; the body filter feeds the
+  sink and passes NULL). New `RequestContext::set_options`;
+  handler params are `&mut dyn` for the server handler.
+  Corrected a same-session mistake along the way: debug
+  assets are the Closure pretty-print genfiles (the data2c
+  rule feeds on `closure_out`), not cleartext sources; all
+  30 vendored assets are now byte-exact. Child init attaches
+  the shared message buffer to per-server handlers.
+  Known limits: single worker statistics registry, no
+  origin fetching (caches serve hits only), IPRO never
+  self-warms, script variables decline, running experiments
+  decline. 209 ps-nginx tests green. Workspace: 2556
+  passed, 0 failed.
+- Step 6 remainder, slice 7 (this session): DONE. Loadable
+  module + live verification. `ps-nginx` ships cdylib
+  (`libps_nginx.so`, module tables under the C++ names) plus
+  `ngx_module/{config,config.make}` for
+  `--add-dynamic-module` (`make modules` rebuilds via cargo;
+  verified in a scratch tree). The module signature is
+  probed from the target tree by `build.rs` (no baked
+  constant), `.cargo/config.toml` env no longer forces over
+  real env, and target feature macros (`NGX_HTTP_V2`,
+  `NGX_HTTP_GZIP`) gate the `http2` lookup and gzip scan.
+  New `gzip_setter.rs`: command scan with signature checks,
+  redirect hooks, flag/enum/bitmask/types writers, enable/
+  set/rollback entry points, wired into preconfiguration and
+  directive lines (auto-gzip and explicit-config rollback
+  both verified live, incl. the global-disable semantics).
+  Live verification on staged nginx 1.31.8 found and fixed
+  real bugs: header copy never set `headers_out.status`
+  (all serves hung); base fetches never got their request
+  (every pipe event dropped); posted requests ran against
+  the pipe connection (SIGSEGV); file-backed response
+  buffers fed empty (dynamic modules run above the copy
+  filter, so the filter reads ranges itself in 64 KiB
+  chunks); server contexts used a blank instead of
+  `NewRewriteOptions` (PassThrough, no filters);
+  `HtmlWriterFilter` was default-on only via `new()`
+  (now in `FilterState::default`, and `clear()` keeps
+  forbidden like C++); `EnableCachePurge` lived as a system
+  shadow of the core property (removed; caches take the
+  core flag); IPRO miss left `in_place` set so the
+  in-place header filter re-declined after our header
+  filter passed, arming HTML on errored requests (SIGABRT
+  on 404s; now resets C++-style in the content phase).
+  `X-Page-Speed` stamped from `XHeaderValue` (new getter,
+  factory default). Final matrix 16/16 green against live
+  nginx (HTML incl. byte-identical filtered output vs C++,
+  beacon GET/POST, assets, messages, statistics leaves,
+  console, admin, purge, resource-decline 404); cross-tree
+  build (flipped signature bit) loads and serves. Known
+  limits: caches/IPRO/script/experiment limits from 6d
+  stand; no-TLS fetches; unknown-`http2`-variable trees use
+  the `NGX_ERROR` sentinel. 212 ps-nginx tests green.
+  Workspace: 2559 passed, 0 failed.

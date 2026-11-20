@@ -205,8 +205,8 @@ pub unsafe fn relabel_self_fetch(
         (*saved).addr_text_len = (*connection).addr_text.len;
         (*saved).addr_text_data = (*connection).addr_text.data;
         init_label(&mut *label);
-        (*connection).sockaddr = &mut (*label).addr as *mut libc::sockaddr_in
-            as *mut ngx::ffi::sockaddr;
+        (*connection).sockaddr =
+            &mut (*label).addr as *mut libc::sockaddr_in as *mut ngx::ffi::sockaddr;
         (*connection).socklen = mem::size_of::<libc::sockaddr_in>() as ngx::ffi::socklen_t;
         (*connection).addr_text.data = (*label).text.as_mut_ptr();
         (*connection).addr_text.len = (*label).text.len() - 1;
@@ -338,7 +338,10 @@ mod tests {
 
     #[test]
     fn socket_layouts_match_bindgen() {
-        assert_eq!(mem::size_of::<libc::sockaddr>(), mem::size_of::<ngx::ffi::sockaddr>());
+        assert_eq!(
+            mem::size_of::<libc::sockaddr>(),
+            mem::size_of::<ngx::ffi::sockaddr>()
+        );
         assert_eq!(
             mem::size_of::<libc::sockaddr_in>(),
             mem::size_of::<ngx::ffi::sockaddr_in>()

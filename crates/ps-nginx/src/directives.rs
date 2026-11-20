@@ -8,9 +8,7 @@
 //! (`apply_nginx_directive`); the nginx callback wiring that
 //! calls into this module is `module.rs`.
 
-use ngx::ffi::{
-    ngx_http_request_t, ngx_http_variable_value_t, ngx_int_t, ngx_pool_t, NGX_OK,
-};
+use ngx::ffi::{ngx_http_request_t, ngx_http_variable_value_t, ngx_int_t, ngx_pool_t, NGX_OK};
 use std::path::Path;
 
 /// Argument array size (`NGX_PAGESPEED_MAX_ARGS`); the
@@ -87,9 +85,11 @@ pub fn prepare_dir(directive: &str, path: &str) -> Result<DirPrep, String> {
     let fs_path = Path::new(path);
     match std::fs::metadata(fs_path) {
         Ok(meta) if meta.is_dir() => Ok(DirPrep::Exists),
-        _ => std::fs::create_dir_all(fs_path).map(|()| DirPrep::Created).map_err(|_| {
-            format!("{directive} path {path} does not exist and could not be created.")
-        }),
+        _ => std::fs::create_dir_all(fs_path)
+            .map(|()| DirPrep::Created)
+            .map_err(|_| {
+                format!("{directive} path {path} does not exist and could not be created.")
+            }),
     }
 }
 
@@ -134,13 +134,19 @@ pub const fn decide_ownership(facts: Ownership) -> OwnershipAction {
 /// Returns the pool-string error text on failure, exactly as the
 /// C++ reports it. Config-time only: never call on the request
 /// path.
-pub fn fix_dir_ownership(directive: &str, path: &str, worker_uid: u32, worker_gid: u32) -> Result<(), String> {
+pub fn fix_dir_ownership(
+    directive: &str,
+    path: &str,
+    worker_uid: u32,
+    worker_gid: u32,
+) -> Result<(), String> {
     // SAFETY: `geteuid` takes no arguments and always succeeds.
     let euid = unsafe { libc::geteuid() };
     if euid != 0 {
         return Ok(());
     }
-    let c_path = std::ffi::CString::new(path).map_err(|_| format!("{directive} {path} stat() failed"))?;
+    let c_path =
+        std::ffi::CString::new(path).map_err(|_| format!("{directive} {path} stat() failed"))?;
     // SAFETY: `stat` on a valid NUL-terminated path with a live
     // output struct.
     let mut st: libc::stat = unsafe { std::mem::zeroed() };
@@ -256,7 +262,10 @@ mod tests {
         assert_eq!(Directive::Options, classify(&["Gzip", "on"]));
         assert_eq!(Directive::DirPrep, classify(&["FileCachePath", "/x"]));
         assert_eq!(Directive::DirPrep, classify(&["logdir", "/x"]));
-        assert_eq!(Directive::Options, classify(&["RewriteLevel", "CoreFilters"]));
+        assert_eq!(
+            Directive::Options,
+            classify(&["RewriteLevel", "CoreFilters"])
+        );
         assert_eq!(Directive::Options, classify(&["RewriteLevel"]));
         assert_eq!(Directive::Options, classify(&[]));
         assert_eq!(Directive::Options, classify(&["a", "b", "c"]));
@@ -297,16 +306,31 @@ mod tests {
         // Non-root keeps ownership without even stating.
         assert_eq!(
             OwnershipAction::Keep,
-            decide_ownership(Ownership { euid: 1000, dir_uid: 0, worker_uid: 0, worker_gid: 0 })
+            decide_ownership(Ownership {
+                euid: 1000,
+                dir_uid: 0,
+                worker_uid: 0,
+                worker_gid: 0
+            })
         );
         // Root chowns only when the owner differs.
         assert_eq!(
             OwnershipAction::Chown(33, 33),
-            decide_ownership(Ownership { euid: 0, dir_uid: 0, worker_uid: 33, worker_gid: 33 })
+            decide_ownership(Ownership {
+                euid: 0,
+                dir_uid: 0,
+                worker_uid: 33,
+                worker_gid: 33
+            })
         );
         assert_eq!(
             OwnershipAction::AlreadyOwned,
-            decide_ownership(Ownership { euid: 0, dir_uid: 33, worker_uid: 33, worker_gid: 33 })
+            decide_ownership(Ownership {
+                euid: 0,
+                dir_uid: 33,
+                worker_uid: 33,
+                worker_gid: 33
+            })
         );
     }
 

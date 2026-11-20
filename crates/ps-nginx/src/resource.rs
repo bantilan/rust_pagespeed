@@ -342,7 +342,11 @@ mod tests {
         )
         .unwrap();
         let mut inputs = branches();
-        let resolved = determined.options.as_ref().map(|o| &o.core).unwrap_or(&global.core);
+        let resolved = determined
+            .options
+            .as_ref()
+            .map(|o| &o.core)
+            .unwrap_or(&global.core);
         inputs.resolve_from(resolved, "http://h/a");
         assert_eq!(Branch::Decline, decide_branch(&inputs));
         // Without the switch the same request passes through.

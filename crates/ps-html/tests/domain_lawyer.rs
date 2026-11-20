@@ -1889,7 +1889,10 @@ fn add_proxy_suffix() {
     let base = GoogleUrl::new("http://www.example.com.suffix");
     fixture.lawyer.set_proxy_suffix(".suffix");
     assert!(fixture.lawyer.can_rewrite_domains());
-    assert_eq!(fixture.lawyer.add_proxy_suffix(&base, "relative.html"), None);
+    assert_eq!(
+        fixture.lawyer.add_proxy_suffix(&base, "relative.html"),
+        None
+    );
     assert_eq!(
         fixture
             .lawyer
@@ -1905,7 +1908,9 @@ fn add_proxy_suffix() {
         Some("http://other.example.com.suffix/absolute.html")
     );
     assert_eq!(
-        fixture.lawyer.add_proxy_suffix(&base, "http://other.com/x.html"),
+        fixture
+            .lawyer
+            .add_proxy_suffix(&base, "http://other.com/x.html"),
         None
     );
     assert_eq!(

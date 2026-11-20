@@ -215,7 +215,10 @@ impl GzipInflater {
 
         // A zlib stream that fails on its first inflate is retried as
         // raw deflate ("deflate" is served both ways in the wild).
-        if self.format == StreamFormat::ZlibStream && first_inflate && status == InflateOutcome::DataError {
+        if self.format == StreamFormat::ZlibStream
+            && first_inflate
+            && status == InflateOutcome::DataError
+        {
             self.switch_to_raw_deflate();
             self.input_offset = snapshot_offset;
             self.total_in = snapshot_total;
@@ -391,7 +394,8 @@ mod tests {
     use flate2::Compression;
     use std::io::Write;
 
-    const BODY: &[u8] = b"<html><head><title>hello hello hello</title></head><body>hi</body></html>";
+    const BODY: &[u8] =
+        b"<html><head><title>hello hello hello</title></head><body>hi</body></html>";
 
     fn gzip_bytes() -> Vec<u8> {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
@@ -463,9 +467,10 @@ mod tests {
 
     #[test]
     fn zlib_and_raw_deflate() {
-        for (format, compressed) in
-            [(InflateType::Deflate, zlib_bytes()), (InflateType::Deflate, raw_bytes())]
-        {
+        for (format, compressed) in [
+            (InflateType::Deflate, zlib_bytes()),
+            (InflateType::Deflate, raw_bytes()),
+        ] {
             let mut inflater = GzipInflater::new(format);
             assert!(inflater.init());
             assert!(inflater.set_input(&compressed));

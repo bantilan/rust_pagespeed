@@ -11,6 +11,7 @@
 //! turns.
 
 use crate::factory::DriverFactory;
+use crate::message::NgxMessageHandler;
 use ngx::ffi::ngx_int_t;
 use ps_config::options::{NginxSystemOptions, RewriteOptions};
 use ps_config::scope::Scope;
@@ -67,11 +68,18 @@ impl NgxOptions {
 
     /// Absorbs another level's system options (`Option::Merge`
     /// for scalars, `MergeOrShare` for domain groups): the source's
-    /// non-empty paths win and its domain rules append.
+    /// non-empty paths win, explicitly-set scalars transfer with
+    /// their flags, and domain rules append.
     pub fn merge_system(&mut self, src: &NgxOptions) {
-        merge_system_str(&mut self.system.file_cache_path, &src.system.file_cache_path);
+        merge_system_str(
+            &mut self.system.file_cache_path,
+            &src.system.file_cache_path,
+        );
         merge_system_str(&mut self.system.log_dir, &src.system.log_dir);
-        merge_system_str(&mut self.system.statistics_path, &src.system.statistics_path);
+        merge_system_str(
+            &mut self.system.statistics_path,
+            &src.system.statistics_path,
+        );
         merge_system_str(
             &mut self.system.global_statistics_path,
             &src.system.global_statistics_path,
@@ -84,6 +92,38 @@ impl NgxOptions {
             &src.system.global_admin_path,
         );
         merge_system_str(&mut self.system.purge_method, &src.system.purge_method);
+        // Explicitly-set scalars transfer with their flags.
+        macro_rules! flagged {
+            ($field:ident, $flag:ident) => {
+                if src.system.was_set.$flag {
+                    self.system.$field = src.system.$field.clone();
+                    self.system.was_set.$flag = true;
+                }
+            };
+        }
+        flagged!(statistics_enabled, statistics_enabled);
+        flagged!(fetcher_proxy, fetcher_proxy);
+        flagged!(fetch_with_gzip, fetch_with_gzip);
+        flagged!(blocking_fetch_timeout_ms, blocking_fetch_timeout_ms);
+        flagged!(file_cache_clean_interval_ms, clean_interval);
+        flagged!(file_cache_clean_size_kb, clean_size);
+        flagged!(file_cache_clean_inode_limit, clean_inode);
+        flagged!(lru_cache_byte_limit, lru_byte_limit);
+        flagged!(lru_cache_kb_per_process, lru_kb_per_process);
+        flagged!(cache_flush_filename, flush_filename);
+        flagged!(compress_metadata_cache, compress_metadata);
+        // Server lists replace when present (explicit-clear is
+        // unrepresentable, matching the path convention).
+        if !src.system.memcached_servers.is_empty() {
+            self.system
+                .memcached_servers
+                .clone_from(&src.system.memcached_servers);
+        }
+        if src.system.redis_server.is_some() {
+            self.system
+                .redis_server
+                .clone_from(&src.system.redis_server);
+        }
         self.system
             .statistics_domains
             .append_from(&src.system.statistics_domains);
@@ -203,9 +243,9 @@ pub fn validate_file_cache_path(
 /// Carries the config-time identity (dummy hostname/port from
 /// `MakeNgxServerContext`), the merged global options, the
 /// `http2` variable index, and the child-init latch the content
-/// handler gates on. Caches, statistics, timers, threads, and
-/// the request-context constructor are Slice 6 (driver factory).
-#[derive(Debug, Clone)]
+/// handler gates on. Statistics, timers, and the request-context
+/// constructor ride the driver factory. Not `Clone`: contexts own
+/// live caches.
 pub struct ServerContext {
     /// Dummy hostname (always `DUMMY_HOSTNAME`).
     pub hostname: String,
@@ -217,6 +257,26 @@ pub struct ServerContext {
     pub http2_variable_index: ngx_int_t,
     /// Child-initialized latch (`initialized()`).
     pub initialized: bool,
+    /// Server message handler (`SetServerContextMessageHandler`;
+    /// attached at child init from the server's error log).
+    pub message_handler: Option<NgxMessageHandler>,
+    /// HTTP cache (`SetupCaches`; attached at child init).
+    pub http_cache: Option<ps_http::http_cache::HttpCache>,
+    /// Metadata cache (same source).
+    pub metadata_cache: Option<std::sync::Arc<dyn ps_cache::cache::Cache>>,
+    /// HTML rewrite context (same source; shares caches, clock
+    /// reset per request).
+    pub html_context: Option<std::rc::Rc<ps_html::server_context::ServerContext>>,
+}
+
+impl std::fmt::Debug for ServerContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ServerContext")
+            .field("hostname", &self.hostname)
+            .field("initialized", &self.initialized)
+            .field("html_context", &self.html_context.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl ServerContext {
@@ -260,6 +320,9 @@ pub struct MainConf {
     pub server_context_count: u32,
     /// Driver factory (`driver_factory`, created eagerly).
     pub driver_factory: DriverFactory,
+    /// Base-fetch pipe read connection (registered at child
+    /// init, closed through nginx at child exit).
+    pub base_fetch_read_conn: Option<*mut ngx::ffi::ngx_connection_t>,
 }
 
 /// Server conf (`ps_srv_conf_t`).
@@ -276,7 +339,9 @@ impl SrvConf {
     /// configured elsewhere but not here), or an unplugged one.
     #[must_use]
     pub fn disabled(&self) -> bool {
-        self.context.as_ref().is_none_or(|ctx| ctx.options.unplugged())
+        self.context
+            .as_ref()
+            .is_none_or(|ctx| ctx.options.unplugged())
     }
 }
 
@@ -337,8 +402,10 @@ pub fn merge_srv_conf(
     // defaults (`SetMainConf`); a null parent skips.
     main.driver_factory.set_main_conf(parent_options);
     // The context applies its own defaults before the file
-    // options merge in; then the file options are done.
-    let mut global = NgxOptions::new();
+    // options merge in; then the file options are done. The
+    // base comes from the factory (`NewRewriteOptions`, with
+    // its explicit CoreFilters level), not a blank.
+    let mut global = main.driver_factory.new_options();
     global.core.merge(&options.core);
     global.merge_system(&options);
     options.copy_script_lines_to(&mut global);
@@ -355,6 +422,12 @@ pub fn merge_srv_conf(
         http2_variable_index: http2_index,
         // Child init (Slice 6) latches this on.
         initialized: false,
+        // Attached at child init from the server's error log.
+        message_handler: None,
+        // Assembled at child init from the registered paths.
+        http_cache: None,
+        metadata_cache: None,
+        html_context: None,
     });
     Ok(http2_index)
 }
@@ -391,7 +464,7 @@ pub fn merge_loc_conf(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ps_config::options::{NginxFactoryOptions, apply_nginx_directive};
+    use ps_config::options::{apply_nginx_directive, NginxFactoryOptions};
     use ps_config::scope::Scope;
 
     fn ngx(directives: &[(&str, &[&str])]) -> NgxOptions {
@@ -420,6 +493,32 @@ mod tests {
             }
         }
         options
+    }
+
+    #[test]
+    fn system_scalars_merge_when_set() {
+        // The accumulator starts as the parent; the narrower
+        // child's explicitly-set values win.
+        let mut parent = NgxOptions::new();
+        parent.system.file_cache_clean_size_kb = 100;
+        parent.system.was_set.clean_size = true;
+        let child = NgxOptions::new();
+        let mut merged = parent.clone();
+        merged.merge_system(&child);
+        assert_eq!(100, merged.system.file_cache_clean_size_kb);
+        assert!(merged.system.was_set.clean_size);
+        // A flagged child value transfers...
+        let mut child = NgxOptions::new();
+        child.system.compress_metadata_cache = false;
+        child.system.was_set.compress_metadata = true;
+        merged.merge_system(&child);
+        assert!(!merged.system.compress_metadata_cache);
+        assert!(merged.system.was_set.compress_metadata);
+        // ... but an explicit child default does override.
+        let mut child = NgxOptions::new();
+        child.system.was_set.clean_size = true;
+        merged.merge_system(&child);
+        assert_eq!(102_400, merged.system.file_cache_clean_size_kb);
     }
 
     #[test]
@@ -604,7 +703,12 @@ mod tests {
         let mut child = Some(NgxOptions::new());
         child.as_mut().unwrap().system.admin_path = "/child_admin".to_string();
         child.as_mut().unwrap().system.statistics_path = "/stats".to_string();
-        child.as_mut().unwrap().system.admin_domains.disallow("evil.example.com");
+        child
+            .as_mut()
+            .unwrap()
+            .system
+            .admin_domains
+            .disallow("evil.example.com");
         merge_options(Some(&parent), &mut child);
         let merged = child.unwrap();
         // Child paths win; parent-only values survive.
@@ -612,8 +716,14 @@ mod tests {
         assert_eq!("/stats", merged.system.statistics_path);
         assert_eq!("PURGE", merged.system.purge_method);
         // Domain rules union: last-inserted matching rule wins.
-        assert!(merged.system.admin_domains.is_match("www.example.com", false));
-        assert!(!merged.system.admin_domains.is_match("evil.example.com", false));
+        assert!(merged
+            .system
+            .admin_domains
+            .is_match("www.example.com", false));
+        assert!(!merged
+            .system
+            .admin_domains
+            .is_match("evil.example.com", false));
         assert!(!merged.system.admin_domains.is_match("other.org", false));
     }
 
@@ -650,7 +760,10 @@ mod tests {
 
     #[test]
     fn factory_delete_guards() {
-        let mut slot = FactorySlot { generation: Some(3), deleted: false };
+        let mut slot = FactorySlot {
+            generation: Some(3),
+            deleted: false,
+        };
         let mut active = Some(3);
         delete_cycle_factory(&mut slot, &mut active);
         assert_eq!(None, slot.generation);
@@ -659,7 +772,10 @@ mod tests {
         // Second call is a no-op.
         delete_cycle_factory(&mut slot, &mut active);
         // A foreign active generation is never untracked.
-        let mut slot = FactorySlot { generation: Some(4), deleted: false };
+        let mut slot = FactorySlot {
+            generation: Some(4),
+            deleted: false,
+        };
         let mut active = Some(9);
         delete_cycle_factory(&mut slot, &mut active);
         assert_eq!(Some(9), active);

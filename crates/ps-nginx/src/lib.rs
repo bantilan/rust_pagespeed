@@ -21,6 +21,9 @@
 //! added here for anything other than NGINX FFI.
 #![deny(unsafe_op_in_unsafe_fn)]
 
+pub mod assets;
+pub mod beacon;
+pub mod caches;
 pub mod caching;
 pub mod conf;
 pub mod directives;
@@ -29,28 +32,36 @@ pub mod fetch;
 pub mod fetch_body;
 pub mod filters;
 pub mod gzip_rollback;
+pub mod gzip_setter;
 pub mod headers;
 pub mod inplace_url_agreement;
 pub mod log_bridge;
 pub mod message;
 pub mod mock;
 pub mod module;
+pub mod native_fetch;
 pub mod options;
-pub mod request;
+pub mod pipe;
 pub mod recording;
+pub mod request;
 pub mod request_body;
 pub mod resource;
-pub mod send;
+pub mod rewrite;
 pub mod routing;
 pub mod scheduler;
 pub mod script;
 pub mod self_fetch;
+pub mod send;
+pub mod terminal;
 
 /// Name under which this module registers itself with NGINX.
 #[must_use]
 pub fn module_name() -> &'static str {
     "ngx_pagespeed_rust"
 }
+
+// (Dynamic-module tables live in `module.rs`, next to the
+// structs they export.)
 
 /// Supported nginx range, as dotted versions (`nginx-gap-1`).
 pub const SUPPORTED_NGINX: &[&str] = &["1.31.8"];

@@ -50,7 +50,9 @@ impl Default for CachingHeaderRequest {
 /// Decides which caching headers to keep
 /// (`NgxPreserveCachingHeadersFor`).
 #[must_use]
-pub const fn preserve_caching_headers_for(request: &CachingHeaderRequest) -> PreserveCachingHeaders {
+pub const fn preserve_caching_headers_for(
+    request: &CachingHeaderRequest,
+) -> PreserveCachingHeaders {
     if request.pagespeed_resource {
         return PreserveCachingHeaders::DontPreserve;
     }
@@ -82,7 +84,10 @@ pub struct CacheControlLimits {
 /// Splits a field value on a delimiter, omitting empty pieces
 /// (`SplitStringPieceToVector` with `omit_empty_strings`).
 fn split_omitting_empty(value: &str, delimiter: char) -> Vec<&str> {
-    value.split(delimiter).filter(|piece| !piece.is_empty()).collect()
+    value
+        .split(delimiter)
+        .filter(|piece| !piece.is_empty())
+        .collect()
 }
 
 /// Notes the `private`/`no-store` directives of one `Cache-Control`
@@ -223,7 +228,11 @@ pub(crate) fn read_lifetime_directive(element: &str) -> Lifetime {
         None => element,
     };
     let trimmed_name = name.trim();
-    let mut result = Lifetime { name: LifetimeName::None, readable: false, seconds: 0 };
+    let mut result = Lifetime {
+        name: LifetimeName::None,
+        readable: false,
+        seconds: 0,
+    };
     let exact = if trimmed_name.len() >= 7
         && trimmed_name.as_bytes()[..7].eq_ignore_ascii_case(b"max-age")
     {
@@ -307,7 +316,11 @@ pub fn apply_s_max_age(s_maxage_sec: i32, existing_cache_control: &str) -> Optio
         rewritten.push(trimmed.to_string());
     }
     if found_s_maxage {
-        return if updated { Some(rewritten.join(", ")) } else { None };
+        return if updated {
+            Some(rewritten.join(", "))
+        } else {
+            None
+        };
     }
     // No s-maxage: add one only below the lowest max-age.
     let mut found_max_age = false;
@@ -333,23 +346,38 @@ mod tests {
     fn preserve_policy_matrix() {
         let base = CachingHeaderRequest::default();
         // Module resources always carry module headers.
-        let resource = CachingHeaderRequest { pagespeed_resource: true, ..base };
-        assert_eq!(PreserveCachingHeaders::DontPreserve, preserve_caching_headers_for(&resource));
+        let resource = CachingHeaderRequest {
+            pagespeed_resource: true,
+            ..base
+        };
+        assert_eq!(
+            PreserveCachingHeaders::DontPreserve,
+            preserve_caching_headers_for(&resource)
+        );
         // Operator headers stay when modification is off.
-        let frozen = CachingHeaderRequest { modify_caching_headers: false, ..base };
+        let frozen = CachingHeaderRequest {
+            modify_caching_headers: false,
+            ..base
+        };
         assert_eq!(
             PreserveCachingHeaders::PreserveAll,
             preserve_caching_headers_for(&frozen)
         );
         // No downstream integration: drop the originals.
-        assert_eq!(PreserveCachingHeaders::DontPreserve, preserve_caching_headers_for(&base));
+        assert_eq!(
+            PreserveCachingHeaders::DontPreserve,
+            preserve_caching_headers_for(&base)
+        );
         // Admin handlers drop even with integration on.
         let admin = CachingHeaderRequest {
             downstream_cache_integration: true,
             admin_handler: true,
             ..base
         };
-        assert_eq!(PreserveCachingHeaders::DontPreserve, preserve_caching_headers_for(&admin));
+        assert_eq!(
+            PreserveCachingHeaders::DontPreserve,
+            preserve_caching_headers_for(&admin)
+        );
         // Integration + rebeaconing key: drop for the no-cache serve.
         let rebeacon = CachingHeaderRequest {
             downstream_cache_integration: true,
@@ -389,12 +417,18 @@ mod tests {
         );
         assert_eq!(
             "private",
-            keep_cache_control_limits("private", &CacheControlLimits {
-                is_private: true,
-                no_store: false
-            })
+            keep_cache_control_limits(
+                "private",
+                &CacheControlLimits {
+                    is_private: true,
+                    no_store: false
+                }
+            )
         );
-        assert_eq!("x", keep_cache_control_limits("x", &CacheControlLimits::default()));
+        assert_eq!(
+            "x",
+            keep_cache_control_limits("x", &CacheControlLimits::default())
+        );
     }
 
     #[test]

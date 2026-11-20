@@ -11,5 +11,7 @@
 # without it.
 
 [env]
-NGINX_SOURCE_DIR = { value = "../.nginx-build/nginx-1.31.8", relative = true }
-BINDGEN_EXTRA_CLANG_ARGS = "-I/usr/lib/gcc/x86_64-linux-gnu/13/include"
+# `force = false`: real environment wins (the config shim's
+# target tree), these are development defaults.
+NGINX_SOURCE_DIR = { value = "../.nginx-build/nginx-1.31.8", relative = true, force = false }
+BINDGEN_EXTRA_CLANG_ARGS = { value = "-I/usr/lib/gcc/x86_64-linux-gnu/13/include", force = false }

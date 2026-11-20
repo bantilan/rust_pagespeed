@@ -50,6 +50,11 @@ impl MockTimer {
     pub fn advance_ms(&mut self, delta_ms: i64) {
         self.now_ms += delta_ms;
     }
+
+    /// Jumps the clock to an absolute time (request start).
+    pub fn set_ms(&mut self, now_ms: i64) {
+        self.now_ms = now_ms;
+    }
 }
 
 #[cfg(test)]

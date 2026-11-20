@@ -57,6 +57,21 @@ impl LogBuffer {
         }
     }
 
+    /// Resizes the budget (`MessageBufferSize` set): zero
+    /// disables, trimming oldest-first when shrinking.
+    pub fn set_max_bytes(&mut self, max_bytes: usize) {
+        self.max_bytes = max_bytes;
+        self.enabled = max_bytes > 0;
+        if max_bytes > 0 {
+            while !self.lines.is_empty() && self.used_bytes > max_bytes {
+                if let Some(old) = self.lines.first() {
+                    self.used_bytes -= old.len();
+                }
+                self.lines.remove(0);
+            }
+        }
+    }
+
     /// Records a message (`MessageSImpl`).
     pub fn message(&mut self, level: MessageLevel, text: String) {
         let line = Self::format_line(level, &text);
@@ -127,5 +142,25 @@ impl LogBuffer {
     #[must_use]
     pub fn reformat(message: &str) -> &str {
         message.get(1..).unwrap_or("")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resize_toggles_and_trims() {
+        let mut buffer = LogBuffer::disabled();
+        assert_eq!(None, buffer.dump_checked());
+        buffer.message(MessageLevel::Info, "aaa".to_string());
+        buffer.message(MessageLevel::Info, "bbb".to_string());
+        buffer.set_max_bytes(1000);
+        assert!(buffer.dump_checked().is_some());
+        // Shrinking below the used bytes drops oldest-first.
+        buffer.set_max_bytes(1);
+        assert!(buffer.dump_checked().is_some());
+        buffer.set_max_bytes(0);
+        assert_eq!(None, buffer.dump_checked());
     }
 }

@@ -8,13 +8,17 @@
 //! Fetchers, caches, the message ring, and the live statistics
 //! backend join in later Slice 6 turns.
 
+use crate::caches::SystemCaches;
 use crate::conf::NgxOptions;
 use crate::message::NgxMessageHandler;
+use crate::native_fetch::{allocate_fetcher, fetcher_key, FetchId, FetcherKeyInput, NativeFetcher};
 use crate::scheduler::Scheduler;
 use ngx::ffi::ngx_log_t;
 use ps_config::options::{parse_bool, parse_int32, parse_int64, NginxFactoryOptions};
 use ps_config::scope::Scope;
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::thread::JoinHandle;
 
 /// Unset resolver timeout (`NGX_CONF_UNSET_MSEC`).
@@ -102,6 +106,20 @@ pub struct DriverFactory {
     pub scheduler: Arc<Scheduler>,
     /// Scheduler-thread ownership.
     pub scheduler_thread: SchedulerThreadState,
+    /// Fetchers by config key (`fetcher_map_`/`base_fetcher_map_`
+    /// collapsed: slurping is unsupported so both keys agree).
+    pub fetchers: HashMap<String, NativeFetcher>,
+    /// Cache system (paths registered at init).
+    pub caches: SystemCaches,
+    /// Worker statistics registry (null-statistics stand-in for
+    /// the shared-memory backend; forked per worker).
+    pub statistics: Arc<ps_stats::core::Statistics>,
+    /// Shared message buffer (ring stand-in; disabled until
+    /// `MessageBufferSize` sets a budget).
+    pub message_buffer: Arc<Mutex<ps_admin::log_buffer::LogBuffer>>,
+    /// Shared purge set (admin writes land here; fetch-flow
+    /// validity checks are a follow-up).
+    pub purge_set: ps_cache::purge::PurgeSet,
 }
 
 impl DriverFactory {
@@ -118,6 +136,17 @@ impl DriverFactory {
         default_options
             .core
             .set_avoid_renaming_introspective_javascript(true);
+        // `set_default_x_header_value(kModPagespeedVersion)`: a
+        // base value here behaves as the default (file options
+        // merge over it).
+        default_options
+            .core
+            .set_option(
+                "XHeaderValue",
+                crate::message::MODULE_VERSION,
+                Scope::ProcessStrict,
+            )
+            .expect("literal version parses");
         default_options.system.file_cache_clean_inode_limit = DEFAULT_FILE_CACHE_CLEAN_INODE_LIMIT;
         DriverFactory {
             hostname: hostname.to_string(),
@@ -142,7 +171,67 @@ impl DriverFactory {
             html_parse_message_handler: NgxMessageHandler::new(),
             scheduler: Arc::new(Scheduler::new()),
             scheduler_thread: SchedulerThreadState::new(),
+            fetchers: HashMap::new(),
+            caches: SystemCaches::new(),
+            statistics: Arc::new(ps_stats::core::Statistics::new()),
+            message_buffer: Arc::new(Mutex::new(ps_admin::log_buffer::LogBuffer::disabled())),
+            purge_set: ps_cache::purge::PurgeSet::new(25_000),
         }
+    }
+
+    /// Registers every context's config and emits the root-phase
+    /// lines (`RootInit`: history archive, controller startup,
+    /// and shm setup skipped without their backends).
+    pub fn root_init(&mut self, contexts: &[&NgxOptions]) -> Vec<String> {
+        let now_ms = self.scheduler.now_us() / 1000;
+        let mut messages = Vec::new();
+        for options in contexts {
+            messages.extend(self.caches.register_config(
+                &options.system,
+                options.core.enable_cache_purge(),
+                options.unplugged(),
+                now_ms,
+            ));
+        }
+        messages.extend(self.caches.root_init_messages());
+        messages
+    }
+
+    /// Emits the child-phase lines (`ChildInit` cache half).
+    #[must_use]
+    pub fn child_init_caches(&self) -> Vec<String> {
+        self.caches.child_init_messages()
+    }
+
+    /// Looks up or creates the fetcher for a config
+    /// (`GetFetcher`/`GetBaseFetcher`): returns the map key plus
+    /// any fallback warning (warned once, on creation only).
+    pub fn get_fetcher(&mut self, options: &NgxOptions) -> (String, Option<String>) {
+        let key = fetcher_key(&FetcherKeyInput {
+            unplugged: options.unplugged(),
+            list_errors: self.list_outstanding_urls_on_error,
+            proxy: &options.system.fetcher_proxy,
+            gzip: options.system.fetch_with_gzip,
+            track_content_length: self.track_original_content_length,
+            timeout_ms: options.system.blocking_fetch_timeout_ms,
+        });
+        if self.fetchers.contains_key(&key) {
+            return (key, None);
+        }
+        let warning = allocate_fetcher(self.factory_options.use_native_fetcher);
+        self.fetchers.insert(key.clone(), NativeFetcher::new());
+        (key, warning)
+    }
+
+    /// Borrows a mapped fetcher.
+    #[must_use]
+    pub fn fetcher(&self, key: &str) -> Option<&NativeFetcher> {
+        self.fetchers.get(key)
+    }
+
+    /// Mutably borrows a mapped fetcher.
+    pub fn fetcher_mut(&mut self, key: &str) -> Option<&mut NativeFetcher> {
+        self.fetchers.get_mut(key)
     }
 
     /// Starts the scheduler thread (`StartThreads`, idempotent).
@@ -182,6 +271,14 @@ impl DriverFactory {
         options
             .core
             .set_rewrite_level(ps_config::filter::RewriteLevel::CoreFilters);
+        options
+            .core
+            .set_option(
+                "XHeaderValue",
+                crate::message::MODULE_VERSION,
+                ps_config::scope::Scope::ProcessStrict,
+            )
+            .expect("literal version parses");
         options
     }
 
@@ -253,8 +350,8 @@ impl DriverFactory {
     }
 
     /// Points logging at a cycle log (`LoggingInit`): installs the
-    /// log bridge, the crash handler per the gate, and both
-    /// factory message handlers.
+    /// log bridge, the crash handler per the gate, both factory
+    /// message handlers, and the shared message buffer.
     ///
     /// # Safety
     ///
@@ -278,16 +375,32 @@ impl DriverFactory {
             self.message_handler.set_log(log);
             self.html_parse_message_handler.set_log(log);
         }
+        self.message_handler
+            .set_buffer(Arc::clone(&self.message_buffer));
+        self.html_parse_message_handler
+            .set_buffer(Arc::clone(&self.message_buffer));
     }
 
-    /// Shuts down (`ShutDown`, idempotent): stops cache activity,
-    /// threads, and fetchers (later turns fill the teardown; the
-    /// latch and order land now).
-    pub fn shutdown(&mut self) {
+    /// Shuts down (`ShutDown`, idempotent): shuts every mapped
+    /// fetcher and reports their pending/active task ids for the
+    /// live driver to fail (Slice 7). Later turns slot cache,
+    /// worker, and central-controller teardown around this call,
+    /// in C++ order; the maps drop at factory destruction.
+    pub fn shutdown(&mut self) -> Vec<(String, FetchId)> {
         if self.shut_down {
-            return;
+            return Vec::new();
         }
         self.shut_down = true;
+        let mut fail = Vec::new();
+        for (key, fetcher) in self.fetchers.iter_mut() {
+            for task in fetcher.shutdown() {
+                fail.push((key.clone(), task.id));
+            }
+            for id in fetcher.cancel_active() {
+                fail.push((key.clone(), id));
+            }
+        }
+        fail
     }
 }
 
@@ -436,6 +549,11 @@ pub fn apply_factory_directive_1(
         return match parse_int32(arg) {
             Some(value) if (0..=MESSAGE_BUFFER_MAX).contains(&value) => {
                 factory.message_buffer_size = i64::from(value);
+                factory
+                    .message_buffer
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .set_max_bytes(value as usize);
                 FactoryDirectiveOutcome::Ok
             }
             Some(_) => FactoryDirectiveOutcome::Invalid(format!(
@@ -595,6 +713,14 @@ mod tests {
         assert_eq!(
             "/ngx_pagespeed_beacon",
             factory.default_options.core.beacon_url().unwrap().http
+        );
+        assert_eq!(
+            crate::message::MODULE_VERSION,
+            factory.default_options.core.x_header_value()
+        );
+        assert_eq!(
+            crate::message::MODULE_VERSION,
+            factory.new_options().core.x_header_value()
         );
         assert!(factory
             .default_options
@@ -906,10 +1032,60 @@ mod tests {
     #[test]
     fn shutdown_idempotent() {
         let mut factory = DriverFactory::new("", -1);
-        factory.shutdown();
+        assert!(factory.shutdown().is_empty());
         assert!(factory.shut_down);
-        factory.shutdown();
+        assert!(factory.shutdown().is_empty());
         assert!(factory.shut_down);
+    }
+
+    #[test]
+    fn root_init_registers_paths() {
+        let mut factory = DriverFactory::new("", -1);
+        let mut options = NgxOptions::new();
+        options.system.file_cache_path = "/c".to_string();
+        let messages = factory.root_init(&[&options]);
+        assert_eq!(
+            messages,
+            vec!["Initializing shared memory for path: /c.".to_string()]
+        );
+        assert!(factory.caches.path("/c flush ").is_some());
+        assert_eq!(
+            factory.child_init_caches(),
+            vec!["Reusing shared memory for path: /c.".to_string()]
+        );
+    }
+
+    #[test]
+    fn fetcher_map_caches_and_warns_once() {
+        use crate::native_fetch::{FetchSubmit, StartDecision, SERF_FALLBACK_WARNING};
+        let mut factory = DriverFactory::new("", -1);
+        let options = NgxOptions::new();
+        // Serf-configured (native off): warns once, on creation.
+        let (key, warning) = factory.get_fetcher(&options);
+        assert_eq!(Some(SERF_FALLBACK_WARNING.to_string()), warning);
+        let (key2, warning) = factory.get_fetcher(&options);
+        assert_eq!(key, key2);
+        assert_eq!(None, warning);
+        assert!(factory.fetcher(&key).is_some());
+        assert!(factory.fetcher("bogus").is_none());
+        // Distinct configs map distinctly.
+        let mut other = NgxOptions::new();
+        other.system.fetcher_proxy = "http://proxy/".to_string();
+        let (other_key, _) = factory.get_fetcher(&other);
+        assert_ne!(key, other_key);
+        // Shutdown reports pending + active ids per fetcher.
+        let fetcher = factory.fetcher_mut(&key).expect("mapped");
+        assert_eq!(FetchSubmit::Queued(1), fetcher.fetch("http://h/a"));
+        let drained = fetcher.drain_pending();
+        assert_eq!(
+            StartDecision::Proceed,
+            fetcher.start_fetch(drained[0].clone())
+        );
+        assert_eq!(FetchSubmit::Queued(2), fetcher.fetch("http://h/b"));
+        let mut failed = factory.shutdown();
+        failed.sort();
+        assert_eq!(failed, vec![(key.clone(), 1), (key.clone(), 2)]);
+        assert!(factory.fetcher(&key).expect("kept").is_shutdown());
     }
 
     #[test]

@@ -75,11 +75,15 @@ mod tests {
     #[test]
     fn executes_and_applies() {
         let mut options = NgxOptions::new();
-        options.script_lines.push(line(&["RewriteLevel", "CoreFilters"]));
+        options
+            .script_lines
+            .push(line(&["RewriteLevel", "CoreFilters"]));
         let mut factory = NginxFactoryOptions::default();
-        assert!(execute_script_lines(&mut options, &mut factory, &|_, _, raw| {
-            Some(raw.to_string())
-        }));
+        assert!(execute_script_lines(
+            &mut options,
+            &mut factory,
+            &|_, _, raw| { Some(raw.to_string()) }
+        ));
         assert_eq!(RewriteLevel::CoreFilters, options.core.filters().level());
     }
 
@@ -88,9 +92,17 @@ mod tests {
         let mut options = NgxOptions::new();
         options.script_lines.push(line(&["RewriteLevel", "$level"]));
         let mut factory = NginxFactoryOptions::default();
-        assert!(execute_script_lines(&mut options, &mut factory, &|_, index, raw| {
-            Some(if index == 1 { "PassThrough".to_string() } else { raw.to_string() })
-        }));
+        assert!(execute_script_lines(
+            &mut options,
+            &mut factory,
+            &|_, index, raw| {
+                Some(if index == 1 {
+                    "PassThrough".to_string()
+                } else {
+                    raw.to_string()
+                })
+            }
+        ));
         assert_eq!(RewriteLevel::PassThrough, options.core.filters().level());
     }
 
@@ -100,23 +112,33 @@ mod tests {
         let mut options = NgxOptions::new();
         options.script_lines.push(line(&["RewriteLevel", "$level"]));
         let mut factory = NginxFactoryOptions::default();
-        assert!(!execute_script_lines(&mut options, &mut factory, &|_, _, _| None));
+        assert!(!execute_script_lines(
+            &mut options,
+            &mut factory,
+            &|_, _, _| None
+        ));
         assert_eq!(EnabledState::Off, options.core.enabled_state());
         // Parse failure (bogus value for a known option).
         let mut options = NgxOptions::new();
-        options.script_lines.push(line(&["RewriteLevel", "BogusLevel"]));
+        options
+            .script_lines
+            .push(line(&["RewriteLevel", "BogusLevel"]));
         let mut factory = NginxFactoryOptions::default();
-        assert!(!execute_script_lines(&mut options, &mut factory, &|_, _, raw| {
-            Some(raw.to_string())
-        }));
+        assert!(!execute_script_lines(
+            &mut options,
+            &mut factory,
+            &|_, _, raw| { Some(raw.to_string()) }
+        ));
         assert_eq!(EnabledState::Off, options.core.enabled_state());
         // Unknown directives fail closed too.
         let mut options = NgxOptions::new();
         options.script_lines.push(line(&["BogusDirective", "x"]));
         let mut factory = NginxFactoryOptions::default();
-        assert!(!execute_script_lines(&mut options, &mut factory, &|_, _, raw| {
-            Some(raw.to_string())
-        }));
+        assert!(!execute_script_lines(
+            &mut options,
+            &mut factory,
+            &|_, _, raw| { Some(raw.to_string()) }
+        ));
         assert_eq!(EnabledState::Off, options.core.enabled_state());
     }
 }

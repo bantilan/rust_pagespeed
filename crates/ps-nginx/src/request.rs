@@ -7,9 +7,11 @@
 //! `release_request_ctx` in C++ order.
 
 use crate::caching::{CacheControlLimits, PreserveCachingHeaders};
-use crate::fetch::BaseFetch;
+use crate::fetch::SharedBaseFetch;
 use crate::recording::InPlaceRecorder;
+use crate::send::HtmlSink;
 use ps_http::inflate::GzipInflater;
+use std::sync::Arc;
 
 /// Per-request state (`ps_request_ctx_t`, plain-data half plus the
 /// response decoder, fetch bridge, and in-place recorder; factory
@@ -35,8 +37,10 @@ pub struct RequestCtx {
     /// content-encoding is stripped for rewriting.
     pub inflater: Option<GzipInflater>,
     /// Output bridge (`base_fetch`), active while PageSpeed owns
-    /// the response.
-    pub base_fetch: Option<BaseFetch>,
+    /// the response (nginx-side reference).
+    pub base_fetch: Option<Arc<SharedBaseFetch>>,
+    /// HTML rewrite sink (live while filtering a response).
+    pub html_sink: Option<HtmlSink<'static>>,
     /// In-place recorder (`recorder`), active while caching a
     /// missed resource for future optimization.
     pub recorder: Option<InPlaceRecorder>,
@@ -80,6 +84,7 @@ impl RequestCtx {
             follow_flushes,
             inflater: None,
             base_fetch: None,
+            html_sink: None,
             recorder: None,
         }
     }
@@ -97,7 +102,11 @@ pub unsafe fn set_buffered(r: *mut ngx::ffi::ngx_http_request_t, on: bool) {
     // SAFETY: caller guarantees a live request.
     unsafe {
         let buffered = (*r).buffered();
-        (*r).set_buffered(if on { buffered | PAGESPEED_BUFFERED } else { buffered & !PAGESPEED_BUFFERED });
+        (*r).set_buffered(if on {
+            buffered | PAGESPEED_BUFFERED
+        } else {
+            buffered & !PAGESPEED_BUFFERED
+        });
     }
 }
 
@@ -153,10 +162,7 @@ unsafe extern "C" fn release_request_ctx(data: *mut std::ffi::c_void) {
 /// # Safety
 ///
 /// `r` must point at a live request with no context attached yet.
-pub unsafe fn attach_request_ctx(
-    r: *mut ngx::ffi::ngx_http_request_t,
-    ctx: RequestCtx,
-) -> bool {
+pub unsafe fn attach_request_ctx(r: *mut ngx::ffi::ngx_http_request_t, ctx: RequestCtx) -> bool {
     use ngx::ffi::ngx_http_cleanup_add;
     let raw = Box::into_raw(Box::new(ctx));
     // SAFETY: caller guarantees a live request; the box outlives

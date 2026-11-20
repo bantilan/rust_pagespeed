@@ -3,8 +3,8 @@
 use std::collections::HashSet;
 
 use ps_html::image_url_encoder::{
-    ImageDim, ImageResourceContext, ImageUrlEncoder, LibWebpLevel, has_valid_dimension,
-    has_valid_dimensions,
+    has_valid_dimension, has_valid_dimensions, ImageDim, ImageResourceContext, ImageUrlEncoder,
+    LibWebpLevel,
 };
 use ps_http::google_url::GoogleUrl;
 

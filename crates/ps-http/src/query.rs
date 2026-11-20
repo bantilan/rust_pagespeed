@@ -95,8 +95,10 @@ fn parse_resource_option(
 ) -> QueryStatus {
     let mut status = QueryStatus::NoneFound;
     for segment in value.split(FILTER_SEPARATOR).filter(|s| !s.is_empty()) {
-        let parts: Vec<&str> =
-            segment.split(OPTION_VALUE_SEPARATOR).filter(|s| !s.is_empty()).collect();
+        let parts: Vec<&str> = segment
+            .split(OPTION_VALUE_SEPARATOR)
+            .filter(|s| !s.is_empty())
+            .collect();
         match parts.len() {
             1 => match Filter::from_id(parts[0]) {
                 Some(filter) if related_filters.binary_search(&filter).is_ok() => {
@@ -110,9 +112,7 @@ fn parse_resource_option(
                 match name {
                     Some(name)
                         if related_options.binary_search(&name).is_ok()
-                            && options
-                                .set_option(name, parts[1], Scope::Directory)
-                                .is_ok() =>
+                            && options.set_option(name, parts[1], Scope::Directory).is_ok() =>
                     {
                         status = QueryStatus::Success;
                     }
@@ -251,9 +251,12 @@ impl RewriteQuery {
                 return true;
             }
         }
-        for headers in [request_headers.map(|h| h.headers()), response_headers.map(|h| h.headers())]
-            .into_iter()
-            .flatten()
+        for headers in [
+            request_headers.map(|h| h.headers()),
+            response_headers.map(|h| h.headers()),
+        ]
+        .into_iter()
+        .flatten()
         {
             if headers.iter().any(|(name, _)| might_be_custom_option(name)) {
                 return true;
@@ -264,12 +267,16 @@ impl RewriteQuery {
         }
         if request_headers.is_some_and(|headers| {
             headers.headers().has(header::X_PSA_CLIENT_OPTIONS)
-                || headers.headers().has_cache_control_directive("no-transform")
+                || headers
+                    .headers()
+                    .has_cache_control_directive("no-transform")
         }) {
             return true;
         }
         if response_headers.is_some_and(|headers| {
-            headers.headers().has_cache_control_directive("no-transform")
+            headers
+                .headers()
+                .has_cache_control_directive("no-transform")
         }) {
             return true;
         }
@@ -287,7 +294,7 @@ impl RewriteQuery {
         request_url: &mut GoogleUrl,
         request_headers: Option<&mut RequestHeaders>,
         mut response_headers: Option<&mut ResponseHeaders>,
-        handler: &mut impl MessageHandler,
+        handler: &mut dyn MessageHandler,
     ) -> QueryStatus {
         let status = self.scan_inner(
             allow_related_options,
@@ -318,7 +325,7 @@ impl RewriteQuery {
         request_url: &mut GoogleUrl,
         request_headers: Option<&mut RequestHeaders>,
         response_headers: &mut Option<&mut ResponseHeaders>,
-        handler: &mut impl MessageHandler,
+        handler: &mut dyn MessageHandler,
     ) -> QueryStatus {
         let mut status = QueryStatus::NoneFound;
         self.query_params.clear();
@@ -413,7 +420,8 @@ impl RewriteQuery {
                 if options.scan_query(cookie_name, &unescaped, allow_options)
                     == QueryStatus::Success
                 {
-                    self.pagespeed_option_cookies.add_escaped(cookie_name, &unescaped);
+                    self.pagespeed_option_cookies
+                        .add_escaped(cookie_name, &unescaped);
                     status = QueryStatus::Success;
                 }
             } else {
@@ -438,13 +446,10 @@ impl RewriteQuery {
             // The unescaper turns `+` into a space, which headers
             // never do: turn spaces back before scanning.
             let fixed = unescaped.replace(' ', "+");
-            let sticky_without_context =
-                is_sticky_name(&name) && request_context.is_none();
+            let sticky_without_context = is_sticky_name(&name) && request_context.is_none();
             if sticky_without_context {
-                temp_query_params.add_escaped(
-                    &name,
-                    self.query_params.escaped_value(index).unwrap_or(""),
-                );
+                temp_query_params
+                    .add_escaped(&name, self.query_params.escaped_value(index).unwrap_or(""));
                 continue;
             }
             match self
@@ -454,10 +459,8 @@ impl RewriteQuery {
                 .scan_query(&name, &fixed, allow_options)
             {
                 QueryStatus::NoneFound => {
-                    temp_query_params.add_escaped(
-                        &name,
-                        self.query_params.escaped_value(index).unwrap_or(""),
-                    );
+                    temp_query_params
+                        .add_escaped(&name, self.query_params.escaped_value(index).unwrap_or(""));
                 }
                 QueryStatus::Success => {
                     if is_sticky_name(&name) {
@@ -465,10 +468,8 @@ impl RewriteQuery {
                             context.set_sticky_query_parameters_token(trim_url_quotes(&fixed));
                         }
                     }
-                    self.pagespeed_query_params.add_escaped(
-                        &name,
-                        self.query_params.escaped_value(index).unwrap_or(""),
-                    );
+                    self.pagespeed_query_params
+                        .add_escaped(&name, self.query_params.escaped_value(index).unwrap_or(""));
                     status = QueryStatus::Success;
                 }
                 QueryStatus::Invalid => {
@@ -560,7 +561,7 @@ pub fn get_query_options(
     request_headers: Option<&mut RequestHeaders>,
     response_headers: Option<&mut ResponseHeaders>,
     query: &mut RewriteQuery,
-    handler: &mut impl MessageHandler,
+    handler: &mut dyn MessageHandler,
 ) -> bool {
     if !request_url.is_web_valid() {
         handler.message(
@@ -608,7 +609,12 @@ mod tests {
         let mut url = GoogleUrl::new("http://h/a?x=1");
         let mut headers = RequestHeaders::new();
         let mut response = ResponseHeaders::new(crate::response::HttpOptions::default_for_tests());
-        let status = scan_all(&mut query, &mut url, Some(&mut headers), Some(&mut response));
+        let status = scan_all(
+            &mut query,
+            &mut url,
+            Some(&mut headers),
+            Some(&mut response),
+        );
         assert_eq!(QueryStatus::NoneFound, status);
         assert!(query.options().is_none());
         assert_eq!("http://h/a?x=1", url.spec());
@@ -669,7 +675,10 @@ mod tests {
         let status = scan_all(&mut query, &mut url, None, None);
         assert_eq!(QueryStatus::Success, status);
         assert_eq!("http://h/a?x=1&y=2#frag", url.spec());
-        assert_eq!("ModPagespeed=off", query.pagespeed_query_params().to_escaped_string());
+        assert_eq!(
+            "ModPagespeed=off",
+            query.pagespeed_query_params().to_escaped_string()
+        );
     }
 
     #[test]
@@ -692,7 +701,9 @@ mod tests {
         let mut query = RewriteQuery::new();
         let mut url = GoogleUrl::new("http://h/a?ModPagespeed=bogus");
         let mut headers = RequestHeaders::new();
-        headers.headers_mut().add("ModPagespeedFilters", "remove_quotes");
+        headers
+            .headers_mut()
+            .add("ModPagespeedFilters", "remove_quotes");
         let status = scan_all(&mut query, &mut url, Some(&mut headers), None);
         assert_eq!(QueryStatus::Invalid, status);
         assert!(query.options().is_none());
@@ -706,13 +717,31 @@ mod tests {
         let mut query = RewriteQuery::new();
         let mut url = GoogleUrl::new("http://h/a?PageSpeed=off");
         let mut handler = NullMessageHandler;
-        let status = query.scan(false, true, "sekret", None, &mut url, None, None, &mut handler);
+        let status = query.scan(
+            false,
+            true,
+            "sekret",
+            None,
+            &mut url,
+            None,
+            None,
+            &mut handler,
+        );
         assert_eq!(QueryStatus::Success, status);
         // ...but option params are ignored and left in place.
         let mut query = RewriteQuery::new();
         let mut url = GoogleUrl::new("http://h/a?PageSpeedFilters=remove_quotes");
         let mut handler = NullMessageHandler;
-        let status = query.scan(false, true, "sekret", None, &mut url, None, None, &mut handler);
+        let status = query.scan(
+            false,
+            true,
+            "sekret",
+            None,
+            &mut url,
+            None,
+            None,
+            &mut handler,
+        );
         assert_eq!(QueryStatus::NoneFound, status);
         assert!(query.options().is_none());
         assert_eq!("http://h/a?PageSpeedFilters=remove_quotes", url.spec());
@@ -722,7 +751,16 @@ mod tests {
             "http://h/a?ModPagespeedRequestOptionOverride=sekret&PageSpeedFilters=remove_quotes",
         );
         let mut handler = NullMessageHandler;
-        let status = query.scan(false, true, "sekret", None, &mut url, None, None, &mut handler);
+        let status = query.scan(
+            false,
+            true,
+            "sekret",
+            None,
+            &mut url,
+            None,
+            None,
+            &mut handler,
+        );
         assert_eq!(QueryStatus::Success, status);
         assert!(query.options().unwrap().enabled(Filter::RemoveQuotes));
         assert_eq!(
@@ -735,7 +773,16 @@ mod tests {
             "http://h/a?ModPagespeedRequestOptionOverride=nope&PageSpeedFilters=remove_quotes",
         );
         let mut handler = NullMessageHandler;
-        let status = query.scan(false, true, "sekret", None, &mut url, None, None, &mut handler);
+        let status = query.scan(
+            false,
+            true,
+            "sekret",
+            None,
+            &mut url,
+            None,
+            None,
+            &mut handler,
+        );
         assert_eq!(QueryStatus::NoneFound, status);
         // Repeated tokens deny (exactly-one lookup, like C++).
         let mut query = RewriteQuery::new();
@@ -743,7 +790,16 @@ mod tests {
             "http://h/a?ModPagespeedRequestOptionOverride=sekret&ModPagespeedRequestOptionOverride=sekret&PageSpeedFilters=remove_quotes",
         );
         let mut handler = NullMessageHandler;
-        let status = query.scan(false, true, "sekret", None, &mut url, None, None, &mut handler);
+        let status = query.scan(
+            false,
+            true,
+            "sekret",
+            None,
+            &mut url,
+            None,
+            None,
+            &mut handler,
+        );
         assert_eq!(QueryStatus::NoneFound, status);
     }
 
@@ -752,7 +808,9 @@ mod tests {
         let mut query = RewriteQuery::new();
         let mut url = GoogleUrl::new("http://h/a");
         let mut headers = RequestHeaders::new();
-        headers.headers_mut().add("X-Requested-With", "XMLHttpRequest");
+        headers
+            .headers_mut()
+            .add("X-Requested-With", "XMLHttpRequest");
         let status = scan_all(&mut query, &mut url, Some(&mut headers), None);
         assert_eq!(QueryStatus::Success, status);
         let options = query.options().unwrap();
@@ -768,18 +826,32 @@ mod tests {
         let mut query = RewriteQuery::new();
         let mut url = GoogleUrl::new("http://h/a");
         let mut headers = RequestHeaders::new();
-        headers.headers_mut().add("Cookie", "ModPagespeed=off; other=1");
+        headers
+            .headers_mut()
+            .add("Cookie", "ModPagespeed=off; other=1");
         let status = scan_all(&mut query, &mut url, Some(&mut headers), None);
         assert_eq!(QueryStatus::Success, status);
         assert_eq!(EnabledState::Off, query.options().unwrap().enabled_state());
-        assert_eq!("ModPagespeed=off", query.pagespeed_option_cookies().to_escaped_string());
+        assert_eq!(
+            "ModPagespeed=off",
+            query.pagespeed_option_cookies().to_escaped_string()
+        );
         // Mangled cookies are ignored with an informational message.
         let mut query = RewriteQuery::new();
         let mut url = GoogleUrl::new("http://h/a");
         let mut headers = RequestHeaders::new();
         headers.headers_mut().add("Cookie", "ModPagespeed=a b");
         let mut handler = MockMessageHandler::new();
-        let status = query.scan(false, true, "", None, &mut url, Some(&mut headers), None, &mut handler);
+        let status = query.scan(
+            false,
+            true,
+            "",
+            None,
+            &mut url,
+            Some(&mut headers),
+            None,
+            &mut handler,
+        );
         assert_eq!(QueryStatus::NoneFound, status);
         assert_eq!(1, handler.messages().len());
         assert_eq!(MessageLevel::Info, handler.messages()[0].0);
@@ -788,8 +860,7 @@ mod tests {
 
     #[test]
     fn sticky_needs_context() {
-        let mut context =
-            RequestContext::new(crate::response::HttpOptions::default_for_tests());
+        let mut context = RequestContext::new(crate::response::HttpOptions::default_for_tests());
         let mut query = RewriteQuery::new();
         let mut url = GoogleUrl::new("http://h/a?ModPagespeedStickyQueryParameters=tok");
         let mut handler = NullMessageHandler;
@@ -811,16 +882,20 @@ mod tests {
         let mut url = GoogleUrl::new("http://h/a?ModPagespeedStickyQueryParameters=tok");
         let status = scan_all(&mut query, &mut url, None, None);
         assert_eq!(QueryStatus::NoneFound, status);
-        assert_eq!("http://h/a?ModPagespeedStickyQueryParameters=tok", url.spec());
+        assert_eq!(
+            "http://h/a?ModPagespeedStickyQueryParameters=tok",
+            url.spec()
+        );
     }
 
     #[test]
     fn response_token_always_stripped() {
         let mut query = RewriteQuery::new();
         let mut url = GoogleUrl::new("http://h/a");
-        let mut response =
-            ResponseHeaders::new(crate::response::HttpOptions::default_for_tests());
-        response.headers_mut().add("PageSpeedRequestOptionOverride", "sekret");
+        let mut response = ResponseHeaders::new(crate::response::HttpOptions::default_for_tests());
+        response
+            .headers_mut()
+            .add("PageSpeedRequestOptionOverride", "sekret");
         let status = scan_all(&mut query, &mut url, None, Some(&mut response));
         assert_eq!(QueryStatus::NoneFound, status);
         assert!(!response.headers().has("PageSpeedRequestOptionOverride"));
@@ -852,7 +927,10 @@ mod tests {
         let options = query.options().unwrap();
         assert!(options.enabled(Filter::RecompressJpeg));
         assert!(!options.enabled(Filter::CombineCss));
-        assert_eq!(Some(Value::Int(70)), options.get_by_name("JpegRecompressionQuality"));
+        assert_eq!(
+            Some(Value::Int(70)),
+            options.get_by_name("JpegRecompressionQuality")
+        );
         // Query params override the embedded options.
         let mut query = RewriteQuery::new();
         let mut url = GoogleUrl::new(&format!(
@@ -864,7 +942,10 @@ mod tests {
         assert_eq!(QueryStatus::Success, status);
         assert_eq!(
             Some(Value::Int(71)),
-            query.options().unwrap().get_by_name("JpegRecompressionQuality")
+            query
+                .options()
+                .unwrap()
+                .get_by_name("JpegRecompressionQuality")
         );
     }
 
@@ -878,7 +959,10 @@ mod tests {
             parse_resource_option("rj+iq=70", &mut options, filters, related)
         );
         assert!(options.enabled(Filter::RecompressJpeg));
-        assert_eq!(Some(Value::Int(70)), options.get_by_name("JpegRecompressionQuality"));
+        assert_eq!(
+            Some(Value::Int(70)),
+            options.get_by_name("JpegRecompressionQuality")
+        );
         // Unknown filter / option / shape invalidate.
         for bad in ["zz", "rj+zz=1", "rj+iq=70+x", "a=b=c"] {
             let mut options = RewriteOptions::new();
@@ -903,16 +987,34 @@ mod tests {
         let mut url = GoogleUrl::new("not a url");
         let mut handler = MockMessageHandler::new();
         let domain = RewriteOptions::new();
-        assert!(!get_query_options(&domain, None, &mut url, None, None, &mut query, &mut handler));
+        assert!(!get_query_options(
+            &domain,
+            None,
+            &mut url,
+            None,
+            None,
+            &mut query,
+            &mut handler
+        ));
         assert_eq!(1, handler.messages().len());
         assert_eq!(MessageLevel::Error, handler.messages()[0].0);
         // Thresholds cap at the domain ceiling.
         let mut domain = RewriteOptions::new();
-        domain.set_option("CssInlineMaxBytes", "100", Scope::ProcessStrict).unwrap();
+        domain
+            .set_option("CssInlineMaxBytes", "100", Scope::ProcessStrict)
+            .unwrap();
         let mut query = RewriteQuery::new();
         let mut url = GoogleUrl::new("http://h/a?PageSpeedCssInlineMaxBytes=99999");
         let mut handler = NullMessageHandler;
-        assert!(get_query_options(&domain, None, &mut url, None, None, &mut query, &mut handler));
+        assert!(get_query_options(
+            &domain,
+            None,
+            &mut url,
+            None,
+            None,
+            &mut query,
+            &mut handler
+        ));
         assert_eq!(
             Some(Value::Int(100)),
             query.options().unwrap().get_by_name("CssInlineMaxBytes")

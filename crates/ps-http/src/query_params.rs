@@ -43,10 +43,9 @@ impl QueryParams {
         for pair in query.split('&') {
             match pair.find('=') {
                 None => self.entries.push((pair.to_string(), None)),
-                Some(pos) => self.entries.push((
-                    pair[..pos].to_string(),
-                    Some(pair[pos + 1..].to_string()),
-                )),
+                Some(pos) => self
+                    .entries
+                    .push((pair[..pos].to_string(), Some(pair[pos + 1..].to_string()))),
             }
         }
     }
@@ -236,9 +235,7 @@ fn unescape_query_value(value: &str) -> Option<String> {
                 if index + 2 >= bytes.len() {
                     return None;
                 }
-                let digit = |byte: u8| {
-                    (byte as char).to_digit(16).map(|digit| digit as u8)
-                };
+                let digit = |byte: u8| (byte as char).to_digit(16).map(|digit| digit as u8);
                 let high = digit(bytes[index + 1])?;
                 let low = digit(bytes[index + 2])?;
                 out.push(high * 16 + low);
@@ -289,7 +286,10 @@ mod tests {
 
     #[test]
     fn best_effort_passes_malformed_through() {
-        assert_eq!("Hello, World!", unescape_query_value_best_effort("Hello%2c+World%21"));
+        assert_eq!(
+            "Hello, World!",
+            unescape_query_value_best_effort("Hello%2c+World%21")
+        );
         assert_eq!("%zz", unescape_query_value_best_effort("%zz"));
         assert_eq!("a%2", unescape_query_value_best_effort("a%2"));
         assert_eq!("%A%", unescape_query_value_best_effort("%A%"));

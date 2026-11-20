@@ -197,6 +197,8 @@ pub trait AsyncFetcher: Send + Sync {
 pub struct InflatingFetch<'a> {
     base: &'a mut dyn AsyncFetch,
     inflated: Vec<u8>,
+    request_checked_for_accept_encoding: bool,
+    compression_desired: bool,
 }
 
 impl<'a> InflatingFetch<'a> {
@@ -205,7 +207,45 @@ impl<'a> InflatingFetch<'a> {
         InflatingFetch {
             base,
             inflated: Vec::new(),
+            request_checked_for_accept_encoding: false,
+            compression_desired: false,
         }
+    }
+
+    /// Requests gzipped content from the origin
+    /// (`EnableGzipFromBackend`): adds `Accept-Encoding: gzip`
+    /// unless gzip or deflate is already allowed.
+    pub fn enable_gzip_from_backend(&mut self) {
+        if !self.is_compression_allowed_in_request() {
+            self.base
+                .request_headers_mut()
+                .headers_mut()
+                .add(header::ACCEPT_ENCODING, header::GZIP);
+        }
+    }
+
+    /// Whether the request already allows a compressed response
+    /// (computed once, then latched).
+    fn is_compression_allowed_in_request(&mut self) -> bool {
+        if !self.request_checked_for_accept_encoding {
+            self.request_checked_for_accept_encoding = true;
+            if let Some(values) = self
+                .base
+                .request_headers()
+                .headers()
+                .lookup(header::ACCEPT_ENCODING)
+            {
+                for value in values {
+                    if value.eq_ignore_ascii_case(header::GZIP)
+                        || value.eq_ignore_ascii_case(header::DEFLATE)
+                    {
+                        self.compression_desired = true;
+                        break;
+                    }
+                }
+            }
+        }
+        self.compression_desired
     }
 }
 
@@ -534,5 +574,50 @@ mod tests {
         assert!(base.done() && base.success());
         assert_eq!(base.body(), b"body { color: red; }".repeat(20).as_slice());
         assert!(!base.response_headers().is_gzipped());
+    }
+
+    #[test]
+    fn gzip_from_backend_adds_accept_encoding_once() {
+        let mut base = fetch_at("http://x/a.css");
+        {
+            let mut wrapper = InflatingFetch::new(&mut base);
+            wrapper.enable_gzip_from_backend();
+        }
+        assert_eq!(
+            base.request_headers()
+                .headers()
+                .lookup(header::ACCEPT_ENCODING),
+            Some(vec!["gzip".to_string()])
+        );
+        // The latch caches the original answer: two calls on a
+        // fresh fetch add twice (unreachable in practice; called
+        // once per fetch).
+        let mut base = fetch_at("http://x/a.css");
+        {
+            let mut wrapper = InflatingFetch::new(&mut base);
+            wrapper.enable_gzip_from_backend();
+            wrapper.enable_gzip_from_backend();
+        }
+        assert_eq!(
+            base.request_headers()
+                .headers()
+                .lookup(header::ACCEPT_ENCODING),
+            Some(vec!["gzip".to_string(), "gzip".to_string()])
+        );
+        // Pre-existing deflate disables the add (case-insensitive).
+        let mut base = fetch_at("http://x/a.css");
+        base.request_headers_mut()
+            .headers_mut()
+            .add(header::ACCEPT_ENCODING, "Deflate");
+        {
+            let mut wrapper = InflatingFetch::new(&mut base);
+            wrapper.enable_gzip_from_backend();
+        }
+        assert_eq!(
+            base.request_headers()
+                .headers()
+                .lookup(header::ACCEPT_ENCODING),
+            Some(vec!["Deflate".to_string()])
+        );
     }
 }

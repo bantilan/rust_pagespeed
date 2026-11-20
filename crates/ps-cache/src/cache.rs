@@ -761,6 +761,18 @@ impl FileCache {
         *lock(&self.stats)
     }
 
+    /// Borrows the cleaning policy.
+    #[must_use]
+    pub fn policy(&self) -> &FileCachePolicy {
+        &self.policy
+    }
+
+    /// Replaces the cleaning policy (`mutable_cache_policy`;
+    /// config time only, before serving).
+    pub fn set_policy(&mut self, policy: FileCachePolicy) {
+        self.policy = policy;
+    }
+
     /// Maps a key to its filename (`EncodeFilename`).
     #[must_use]
     pub fn encode_filename(&self, key: &str) -> PathBuf {

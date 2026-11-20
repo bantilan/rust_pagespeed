@@ -217,15 +217,8 @@ impl InPlaceRecorder {
     }
 
     /// Considers response headers (`ConsiderResponseHeaders`).
-    pub fn consider_response_headers(
-        &mut self,
-        kind: HeadersKind,
-        headers: &mut ResponseHeaders,
-    ) {
-        debug_assert!(
-            !self.full_considered,
-            "full headers considered twice"
-        );
+    pub fn consider_response_headers(&mut self, kind: HeadersKind, headers: &mut ResponseHeaders) {
+        debug_assert!(!self.full_considered, "full headers considered twice");
         if !self.consider_called {
             self.consider_called = true;
             // A body in a coding the inflater cannot undo must not
@@ -264,11 +257,14 @@ impl InPlaceRecorder {
         }
 
         if headers.headers().has(header::CONTENT_TYPE) || kind == HeadersKind::Full {
-            let recordable = headers
-                .determine_content_type()
-                .is_some_and(|content_type: ContentType| {
-                    content_type.is_image() || content_type.is_css() || content_type.is_js_like()
-                });
+            let recordable =
+                headers
+                    .determine_content_type()
+                    .is_some_and(|content_type: ContentType| {
+                        content_type.is_image()
+                            || content_type.is_css()
+                            || content_type.is_js_like()
+                    });
             if !recordable {
                 if kind == HeadersKind::Full {
                     self.dropped_as_uncacheable();
@@ -307,14 +303,22 @@ impl InPlaceRecorder {
             VaryOption::IgnoreVaryOnResources
         };
         let server_allows_storing = self.origin_caching_headers.is_none()
-            || headers.is_proxy_cacheable(self.request_properties, vary, ValidatorOption::NoValidator);
+            || headers.is_proxy_cacheable(
+                self.request_properties,
+                vary,
+                ValidatorOption::NoValidator,
+            );
         Self::apply_origin_caching_headers(
             self.origin_caching_headers.as_ref(),
             self.cache_control.clone(),
             headers,
         );
         let is_cacheable = server_allows_storing
-            && headers.is_proxy_cacheable(self.request_properties, vary, ValidatorOption::NoValidator);
+            && headers.is_proxy_cacheable(
+                self.request_properties,
+                vary,
+                ValidatorOption::NoValidator,
+            );
         if !is_cacheable {
             self.dropped_as_uncacheable();
             self.note_stat(RecorderStat::NotCacheable);
@@ -375,9 +379,7 @@ impl InPlaceRecorder {
         } else {
             self.value.extend_from_slice(contents);
         }
-        if self.max_response_bytes <= 0
-            || (self.value.len() as i64) < self.max_response_bytes
-        {
+        if self.max_response_bytes <= 0 || (self.value.len() as i64) < self.max_response_bytes {
             return !self.failure;
         }
         self.dropped_due_to_size();
@@ -425,13 +427,21 @@ impl InPlaceRecorder {
             return;
         }
         if !has_gzip_magic_bytes(&self.value) {
-            response_headers.headers_mut().remove_all(header::CONTENT_ENCODING);
+            response_headers
+                .headers_mut()
+                .remove_all(header::CONTENT_ENCODING);
         }
-        response_headers.headers_mut().remove_all(header::CONTENT_LENGTH);
+        response_headers
+            .headers_mut()
+            .remove_all(header::CONTENT_LENGTH);
         if let Some(cache_control) = self.cache_control.clone() {
-            response_headers.headers_mut().remove_all(header::CACHE_CONTROL);
+            response_headers
+                .headers_mut()
+                .remove_all(header::CACHE_CONTROL);
             if !cache_control.is_empty() {
-                response_headers.headers_mut().add(header::CACHE_CONTROL, &cache_control);
+                response_headers
+                    .headers_mut()
+                    .add(header::CACHE_CONTROL, &cache_control);
             }
         }
         Self::apply_origin_caching_headers(
@@ -472,10 +482,7 @@ impl InPlaceRecorder {
 
     /// Captures origin caching headers (`SetOriginCachingHeaders`):
     /// kept only when some line states caching at all.
-    fn set_origin_caching_headers(
-        origin: &ResponseHeaders,
-        slot: &mut Option<ResponseHeaders>,
-    ) {
+    fn set_origin_caching_headers(origin: &ResponseHeaders, slot: &mut Option<ResponseHeaders>) {
         let mut copy = ResponseHeaders::new(origin.http_options());
         let mut states_caching = false;
         for (name, value) in origin.headers().iter() {
@@ -645,7 +652,11 @@ mod tests {
 
     impl RecordingBackend for FakeBackend {
         fn remember_failure(&mut self, url: &str, fragment: &str, kind: RecordingFailure) {
-            self.transcript.lock().unwrap().failures.push((url.to_string(), fragment.to_string(), kind));
+            self.transcript.lock().unwrap().failures.push((
+                url.to_string(),
+                fragment.to_string(),
+                kind,
+            ));
         }
 
         fn put(
@@ -656,7 +667,11 @@ mod tests {
             _headers: &ResponseHeaders,
             body: &[u8],
         ) {
-            self.transcript.lock().unwrap().puts.push((url.to_string(), body.to_vec()));
+            self.transcript
+                .lock()
+                .unwrap()
+                .puts
+                .push((url.to_string(), body.to_vec()));
         }
 
         fn note_stat(&mut self, stat: RecorderStat) {
@@ -669,7 +684,11 @@ mod tests {
     }
 
     fn properties() -> RequestProperties {
-        RequestProperties { has_cookie: false, has_cookie2: false, has_authorization: false }
+        RequestProperties {
+            has_cookie: false,
+            has_cookie2: false,
+            has_authorization: false,
+        }
     }
 
     fn responses() -> ResponseHeaders {
@@ -681,8 +700,12 @@ mod tests {
         let mut headers = responses();
         headers.set_status_code(200);
         headers.headers_mut().add(header::CONTENT_TYPE, "text/css");
-        headers.headers_mut().add(header::CACHE_CONTROL, "max-age=60");
-        headers.headers_mut().add(header::DATE, "Thu, 01 Jan 1970 00:00:00 GMT");
+        headers
+            .headers_mut()
+            .add(header::CACHE_CONTROL, "max-age=60");
+        headers
+            .headers_mut()
+            .add(header::DATE, "Thu, 01 Jan 1970 00:00:00 GMT");
         headers
     }
 
@@ -719,7 +742,11 @@ mod tests {
             assert_eq!(2, active_recordings_count());
         }
         assert_eq!(0, active_recordings_count());
-        assert!(transcript.lock().unwrap().stats.contains(&RecorderStat::Resources));
+        assert!(transcript
+            .lock()
+            .unwrap()
+            .stats
+            .contains(&RecorderStat::Resources));
         // Unlimited concurrency never counts.
         let _open = recorder_with(1024, 0, None);
         assert_eq!(0, active_recordings_count());
@@ -740,7 +767,9 @@ mod tests {
         // Stacked codings fail the same way.
         let mut recorder = recorder_with(1024, 0, None);
         let mut headers = cacheable_css();
-        headers.headers_mut().add(header::CONTENT_ENCODING, "gzip, br");
+        headers
+            .headers_mut()
+            .add(header::CONTENT_ENCODING, "gzip, br");
         recorder.consider_response_headers(HeadersKind::Preliminary, &mut headers);
         assert!(recorder.failed());
         // Uninteresting content types fail quietly (no poisoning).
@@ -760,7 +789,10 @@ mod tests {
     #[test]
     fn full_gating() {
         // Error statuses poison by class.
-        for (status, kind) in [(404, RecordingFailure::Error4xx), (500, RecordingFailure::OtherError)] {
+        for (status, kind) in [
+            (404, RecordingFailure::Error4xx),
+            (500, RecordingFailure::OtherError),
+        ] {
             let backend = FakeBackend::default();
             let transcript = backend.transcript.clone();
             let mut recorder = recorder_with(1024, 0, Some(backend));
@@ -768,7 +800,10 @@ mod tests {
             headers.set_status_code(status);
             recorder.consider_response_headers(HeadersKind::Full, &mut headers);
             assert!(recorder.failed());
-            assert_eq!(vec![("http://h/a.css".to_string(), "".to_string(), kind)], transcript.lock().unwrap().failures);
+            assert_eq!(
+                vec![("http://h/a.css".to_string(), "".to_string(), kind)],
+                transcript.lock().unwrap().failures
+            );
         }
         // Non-200 non-errors fail without poisoning.
         let mut recorder = recorder_with(1024, 0, None);
@@ -786,10 +821,18 @@ mod tests {
         recorder.consider_response_headers(HeadersKind::Full, &mut headers);
         assert!(recorder.failed());
         assert_eq!(
-            vec![("http://h/a.css".to_string(), "".to_string(), RecordingFailure::Uncacheable200)],
+            vec![(
+                "http://h/a.css".to_string(),
+                "".to_string(),
+                RecordingFailure::Uncacheable200
+            )],
             transcript.lock().unwrap().failures
         );
-        assert!(transcript.lock().unwrap().stats.contains(&RecorderStat::NotCacheable));
+        assert!(transcript
+            .lock()
+            .unwrap()
+            .stats
+            .contains(&RecorderStat::NotCacheable));
         // Cacheable 200s proceed.
         let mut recorder = recorder_with(1024, 0, None);
         let mut headers = cacheable_css();
@@ -808,8 +851,15 @@ mod tests {
         assert!(recorder.write(b"hey"));
         assert!(!recorder.write(b"toolong"));
         assert!(recorder.failed());
-        assert!(transcript.lock().unwrap().stats.contains(&RecorderStat::DroppedDueToSize));
-        assert_eq!(RecordingFailure::Uncacheable200, transcript.lock().unwrap().failures[0].2);
+        assert!(transcript
+            .lock()
+            .unwrap()
+            .stats
+            .contains(&RecorderStat::DroppedDueToSize));
+        assert_eq!(
+            RecordingFailure::Uncacheable200,
+            transcript.lock().unwrap().failures[0].2
+        );
         // NOTE the inverted shortcut, verbatim from C++: an
         // UNLIMITED cap plus a stated length drops (suspected
         // upstream bug: `<=` for `>`).
@@ -843,7 +893,10 @@ mod tests {
         recorder.consider_response_headers(HeadersKind::Preliminary, &mut headers);
         recorder.done_and_set_headers(&mut headers, true);
         assert!(recorder.failed());
-        assert_eq!(RecordingFailure::Empty, transcript.lock().unwrap().failures[0].2);
+        assert_eq!(
+            RecordingFailure::Empty,
+            transcript.lock().unwrap().failures[0].2
+        );
         // Complete cacheable bodies insert with fixed-up headers.
         let backend = FakeBackend::default();
         let transcript = backend.transcript.clone();
@@ -856,7 +909,11 @@ mod tests {
         assert!(!recorder.failed());
         assert_eq!(1, transcript.lock().unwrap().puts.len());
         assert_eq!(b"data".to_vec(), transcript.lock().unwrap().puts[0].1);
-        assert!(transcript.lock().unwrap().stats.contains(&RecorderStat::InsertedIntoCache));
+        assert!(transcript
+            .lock()
+            .unwrap()
+            .stats
+            .contains(&RecorderStat::InsertedIntoCache));
         assert!(!headers.headers().has(header::CONTENT_LENGTH));
     }
 
@@ -906,12 +963,15 @@ mod tests {
         let mut recorder = recorder_with(1024, 0, None);
         let mut prelim = cacheable_css();
         prelim.headers_mut().remove_all(header::CACHE_CONTROL);
-        prelim.headers_mut().add(header::CACHE_CONTROL, "max-age=100");
+        prelim
+            .headers_mut()
+            .add(header::CACHE_CONTROL, "max-age=100");
         recorder.consider_response_headers(HeadersKind::Preliminary, &mut prelim);
         assert!(recorder.write(b"data"));
         let mut full = cacheable_css();
         full.headers_mut().remove_all(header::CACHE_CONTROL);
-        full.headers_mut().add(header::CACHE_CONTROL, "max-age=1000");
+        full.headers_mut()
+            .add(header::CACHE_CONTROL, "max-age=1000");
         recorder.save_cache_control(Some("max-age=50"));
         recorder.done_and_set_headers(&mut full, true);
         assert!(!recorder.failed());
@@ -923,12 +983,15 @@ mod tests {
         let mut recorder = recorder_with(1024, 0, None);
         let mut prelim = cacheable_css();
         prelim.headers_mut().remove_all(header::CACHE_CONTROL);
-        prelim.headers_mut().add(header::CACHE_CONTROL, "max-age=100");
+        prelim
+            .headers_mut()
+            .add(header::CACHE_CONTROL, "max-age=100");
         recorder.consider_response_headers(HeadersKind::Preliminary, &mut prelim);
         assert!(recorder.write(b"data"));
         let mut full = cacheable_css();
         full.headers_mut().remove_all(header::CACHE_CONTROL);
-        full.headers_mut().add(header::CACHE_CONTROL, "max-age=1000");
+        full.headers_mut()
+            .add(header::CACHE_CONTROL, "max-age=1000");
         recorder.done_and_set_headers(&mut full, true);
         assert!(!recorder.failed());
         let cache_control = full.headers().lookup_joined(header::CACHE_CONTROL);

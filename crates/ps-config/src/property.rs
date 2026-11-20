@@ -116,8 +116,9 @@ pub fn strip_mod_pagespeed_prefix(name: &str) -> &str {
 
 /// Looks up a property by config-file name (`LookupOptionByName`).
 ///
-/// Applies the `ModPagespeed` prefix strip and the rename map, then matches
-/// ASCII case-insensitively. Request-only (nameless) properties never match.
+/// Applies the `ModPagespeed` prefix strip and the (case-insensitive)
+/// rename map, then matches the table case-**sensitively** like the
+/// C++ name map. Request-only (nameless) properties never match.
 #[must_use]
 pub fn lookup_by_name(name: &str) -> Option<&'static Property> {
     let name = strip_mod_pagespeed_prefix(name);
@@ -127,7 +128,7 @@ pub fn lookup_by_name(name: &str) -> Option<&'static Property> {
     let effective = effective_option_name(name);
     PROPERTIES
         .iter()
-        .find(|p| !p.name.is_empty() && p.name.eq_ignore_ascii_case(effective))
+        .find(|p| !p.name.is_empty() && p.name == effective)
 }
 
 /// Looks up a property by short id (`LookupOptionById`, case-sensitive).
@@ -194,6 +195,14 @@ pub const NGINX_PROPERTY_SCOPES: &[(&str, Scope)] = &[
     ("Statistics", Scope::Server),
     ("MemcachedServers", Scope::Server),
     ("RedisServer", Scope::Server),
+    ("FetchWithGzip", Scope::ProcessStrict),
+    ("FileCacheCleanIntervalMs", Scope::Server),
+    ("FileCacheSizeKb", Scope::Server),
+    ("LRUCacheByteLimit", Scope::Server),
+    ("LRUCacheKbPerProcess", Scope::Server),
+    ("CacheFlushFilename", Scope::Server),
+    ("EnableCachePurge", Scope::Server),
+    ("CompressMetadataCache", Scope::Server),
 ];
 
 /// Full nginx scope resolution (`NgxRewriteOptions::GetOptionScope`).
@@ -371,7 +380,9 @@ mod tests {
     #[test]
     fn name_lookup_prefix_rename_case() {
         assert_eq!(lookup_by_name("CssInlineMaxBytes").unwrap().id, "ci");
-        assert_eq!(lookup_by_name("cssinlinemaxbytes").unwrap().id, "ci");
+        // The table match is case-sensitive (only the rename map
+        // and the scope lists fold case).
+        assert_eq!(lookup_by_name("cssinlinemaxbytes"), None);
         assert_eq!(
             lookup_by_name("ModPagespeedCssInlineMaxBytes").unwrap().id,
             "ci"

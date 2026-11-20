@@ -535,6 +535,54 @@ pub struct NginxSystemOptions {
     pub memcached_servers: Vec<ExternalServerSpec>,
     /// `RedisServer` endpoint (`None` when unset).
     pub redis_server: Option<ExternalServerSpec>,
+    /// `FetchProxy` (empty when unset). May carry credentials:
+    /// never log this.
+    pub fetcher_proxy: String,
+    /// `FetchWithGzip` (default off).
+    pub fetch_with_gzip: bool,
+    /// `FetcherTimeOutMs` (default 5000).
+    pub blocking_fetch_timeout_ms: i64,
+    /// `FileCacheCleanIntervalMs` (default one hour; -1 disables).
+    pub file_cache_clean_interval_ms: i64,
+    /// `FileCacheSizeKb` (default 100 MiB).
+    pub file_cache_clean_size_kb: i64,
+    /// `LRUCacheByteLimit` (default 0: LRU disabled by size).
+    pub lru_cache_byte_limit: i64,
+    /// `LRUCacheKbPerProcess` (default 0: no per-process LRU).
+    pub lru_cache_kb_per_process: i64,
+    /// `CacheFlushFilename` (empty when unset).
+    pub cache_flush_filename: String,
+    /// `CompressMetadataCache` (default on).
+    pub compress_metadata_cache: bool,
+    /// Explicitly-set flags (`was_set`, driving merges).
+    pub was_set: SystemWasSet,
+}
+
+/// Explicitly-set flags for system options (`was_set` bits).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SystemWasSet {
+    /// `Statistics` set.
+    pub statistics_enabled: bool,
+    /// `FetchProxy` set.
+    pub fetcher_proxy: bool,
+    /// `FetchWithGzip` set.
+    pub fetch_with_gzip: bool,
+    /// `FetcherTimeOutMs` set.
+    pub blocking_fetch_timeout_ms: bool,
+    /// `FileCacheCleanIntervalMs` set.
+    pub clean_interval: bool,
+    /// `FileCacheSizeKb` set.
+    pub clean_size: bool,
+    /// `FileCacheInodeLimit` set.
+    pub clean_inode: bool,
+    /// `LRUCacheByteLimit` set.
+    pub lru_byte_limit: bool,
+    /// `LRUCacheKbPerProcess` set.
+    pub lru_kb_per_process: bool,
+    /// `CacheFlushFilename` set.
+    pub flush_filename: bool,
+    /// `CompressMetadataCache` set.
+    pub compress_metadata: bool,
 }
 
 impl Default for NginxSystemOptions {
@@ -559,6 +607,16 @@ impl Default for NginxSystemOptions {
             statistics_enabled: true,
             memcached_servers: Vec::new(),
             redis_server: None,
+            fetcher_proxy: String::new(),
+            fetch_with_gzip: false,
+            blocking_fetch_timeout_ms: 5000,
+            file_cache_clean_interval_ms: 3_600_000,
+            file_cache_clean_size_kb: 102_400,
+            lru_cache_byte_limit: 0,
+            lru_cache_kb_per_process: 0,
+            cache_flush_filename: String::new(),
+            compress_metadata_cache: true,
+            was_set: SystemWasSet::default(),
         }
     }
 }
@@ -795,9 +853,12 @@ impl RewriteOptions {
                 ),
             });
         }
+        // Failure detail (`FormatSetOptionMessage`): table parses
+        // leave the detail empty, so the text ends after the
+        // period plus the verbatim trailing space.
         let parsed = parse_value(prop, value).ok_or_else(|| SetError {
             outcome: SetOutcome::ValueInvalid,
-            message: format!("Invalid value for {name}: {value}"),
+            message: format!("Cannot set option {name} to {value}. "),
         })?;
         self.values.insert(prop.id, parsed);
         self.sync_special(prop.id);
@@ -1654,6 +1715,16 @@ impl RewriteOptions {
     pub fn remote_configuration_url(&self) -> String {
         match self.get_by_name("RemoteConfigurationUrl") {
             Some(Value::Str(url)) => url,
+            _ => String::new(),
+        }
+    }
+
+    /// Reads the version header value (`x_header_value`, the
+    /// `XHeaderValue` option nginx defaults to its version).
+    #[must_use]
+    pub fn x_header_value(&self) -> String {
+        match self.get_by_name("XHeaderValue") {
+            Some(Value::Str(value)) => value,
             _ => String::new(),
         }
     }
@@ -3784,22 +3855,22 @@ fn wrap_nginx_table_error(directive: &str, full_line: &str, err: &mut SetError) 
 }
 
 /// Admin-path storage slot (`NgxRewriteOptions` string properties),
-/// matched case-insensitively like any property parse.
+/// matched case-sensitively like the option table.
 fn admin_path_slot<'a>(
     system: &'a mut NginxSystemOptions,
     directive: &str,
 ) -> Option<&'a mut String> {
-    if directive.eq_ignore_ascii_case("StatisticsPath") {
+    if directive == "StatisticsPath" {
         Some(&mut system.statistics_path)
-    } else if directive.eq_ignore_ascii_case("GlobalStatisticsPath") {
+    } else if directive == "GlobalStatisticsPath" {
         Some(&mut system.global_statistics_path)
-    } else if directive.eq_ignore_ascii_case("ConsolePath") {
+    } else if directive == "ConsolePath" {
         Some(&mut system.console_path)
-    } else if directive.eq_ignore_ascii_case("MessagesPath") {
+    } else if directive == "MessagesPath" {
         Some(&mut system.messages_path)
-    } else if directive.eq_ignore_ascii_case("AdminPath") {
+    } else if directive == "AdminPath" {
         Some(&mut system.admin_path)
-    } else if directive.eq_ignore_ascii_case("GlobalAdminPath") {
+    } else if directive == "GlobalAdminPath" {
         Some(&mut system.global_admin_path)
     } else {
         None
@@ -3892,8 +3963,10 @@ pub fn apply_nginx_directive(
             // needs the leading slash (ps-nginx runs the directory prep
             // first, so this is near-dead defense); LogDir stores as-is.
             // The detail is verbatim; the switch wraps it with the
-            // full line.
-            if directive.eq_ignore_ascii_case("FileCachePath") {
+            // full line. Names match case-sensitively: past the
+            // slash check these fall through to the exact-case
+            // option table.
+            if directive == "FileCachePath" {
                 if !args[0].starts_with('/') {
                     return Err(SetError {
                         outcome: SetOutcome::ValueInvalid,
@@ -3903,19 +3976,19 @@ pub fn apply_nginx_directive(
                 system.file_cache_path = args[0].to_string();
                 return Ok(());
             }
-            if directive.eq_ignore_ascii_case("LogDir") {
+            if directive == "LogDir" {
                 system.log_dir = args[0].to_string();
                 return Ok(());
             }
             // The six admin paths (`NgxRewriteOptions::AddProperties`)
             // plus `PurgeMethod` (`SystemRewriteOptions`): stored
-            // verbatim, like any string property (parsing is
-            // case-insensitive; only the scope gate is exact-case).
+            // verbatim, like any string property (exact-case like
+            // the table they live in).
             if let Some(slot) = admin_path_slot(system, directive) {
                 *slot = args[0].to_string();
                 return Ok(());
             }
-            if directive.eq_ignore_ascii_case("PurgeMethod") {
+            if directive == "PurgeMethod" {
                 system.purge_method = args[0].to_string();
                 return Ok(());
             }
@@ -3949,10 +4022,11 @@ pub fn apply_nginx_directive(
             }
             // `Statistics` (`SystemRewriteOptions`, server scope,
             // default on).
-            if directive.eq_ignore_ascii_case("Statistics") {
+            if directive == "Statistics" {
                 return match parse_bool(args[0]) {
                     Some(value) => {
                         system.statistics_enabled = value;
+                        system.was_set.statistics_enabled = true;
                         Ok(())
                     }
                     None => Err(SetError {
@@ -3964,7 +4038,7 @@ pub fn apply_nginx_directive(
             // `MemcachedServers` / `RedisServer`
             // (`SystemRewriteOptions`, server scope): validated
             // specs, verbatim details wrapped with the full line.
-            if directive.eq_ignore_ascii_case("MemcachedServers") {
+            if directive == "MemcachedServers" {
                 return match parse_external_cluster(args[0], MEMCACHED_DEFAULT_PORT) {
                     Ok(servers) => {
                         system.memcached_servers = servers;
@@ -3976,7 +4050,7 @@ pub fn apply_nginx_directive(
                     }),
                 };
             }
-            if directive.eq_ignore_ascii_case("RedisServer") {
+            if directive == "RedisServer" {
                 return match parse_external_server(args[0], REDIS_DEFAULT_PORT) {
                     Ok(server) => {
                         system.redis_server = Some(server);
@@ -3988,13 +4062,134 @@ pub fn apply_nginx_directive(
                     }),
                 };
             }
+            // `FetchProxy` (`SystemRewriteOptions`, server scope):
+            // stored verbatim, like any string property.
+            if directive == "FetchProxy" {
+                system.fetcher_proxy = args[0].to_string();
+                system.was_set.fetcher_proxy = true;
+                return Ok(());
+            }
+            // `FetchWithGzip` (`SystemRewriteOptions`, legacy
+            // process scope, default off).
+            if directive == "FetchWithGzip" {
+                return match parse_bool(args[0]) {
+                    Some(value) => {
+                        system.fetch_with_gzip = value;
+                        system.was_set.fetch_with_gzip = true;
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
+            // `FetcherTimeOutMs` (`RewriteOptions`, directory
+            // scope in the table but server-gated for nginx,
+            // default 5000): note the capital O.
+            if directive == "FetcherTimeOutMs" {
+                return match parse_int64(args[0]) {
+                    Some(value) => {
+                        system.blocking_fetch_timeout_ms = value;
+                        system.was_set.blocking_fetch_timeout_ms = true;
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
+            // Cache-cleaning trio (`SystemRewriteOptions`, server
+            // scope): interval (hour default, -1 disables), size
+            // target (100 MiB default), inode limit (0 default;
+            // the factory ctor raises its own copy to 500000).
+            if directive == "FileCacheCleanIntervalMs" {
+                return match parse_int64(args[0]) {
+                    Some(value) => {
+                        system.file_cache_clean_interval_ms = value;
+                        system.was_set.clean_interval = true;
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
+            if directive == "FileCacheSizeKb" {
+                return match parse_int64(args[0]) {
+                    Some(value) => {
+                        system.file_cache_clean_size_kb = value;
+                        system.was_set.clean_size = true;
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
+            // LRU sizing (`SystemRewriteOptions`, server scope,
+            // both default 0).
+            if directive == "LRUCacheByteLimit" {
+                return match parse_int64(args[0]) {
+                    Some(value) => {
+                        system.lru_cache_byte_limit = value;
+                        system.was_set.lru_byte_limit = true;
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
+            if directive == "LRUCacheKbPerProcess" {
+                return match parse_int64(args[0]) {
+                    Some(value) => {
+                        system.lru_cache_kb_per_process = value;
+                        system.was_set.lru_kb_per_process = true;
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
+            // Flush/purge names (`SystemRewriteOptions`, server
+            // scope): empty filename and off by default.
+            if directive == "CacheFlushFilename" {
+                system.cache_flush_filename = args[0].to_string();
+                system.was_set.flush_filename = true;
+                return Ok(());
+            }
+            // `EnableCachePurge` is a core property (`euci`): it
+            // falls through to the table below.
+            // `CompressMetadataCache` (`SystemRewriteOptions`,
+            // server scope, default on).
+            if directive == "CompressMetadataCache" {
+                return match parse_bool(args[0]) {
+                    Some(value) => {
+                        system.compress_metadata_cache = value;
+                        system.was_set.compress_metadata = true;
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
             // `FileCacheInodeLimit` (`SystemRewriteOptions`, server
             // scope, default 0): the factory ctor raises it to
             // 500000; the config line stores a 64-bit value.
-            if directive.eq_ignore_ascii_case("FileCacheInodeLimit") {
+            if directive == "FileCacheInodeLimit" {
                 return match parse_int64(args[0]) {
                     Some(n) => {
                         system.file_cache_clean_inode_limit = n;
+                        system.was_set.clean_inode = true;
                         Ok(())
                     }
                     None => Err(SetError {
@@ -4359,14 +4554,31 @@ mod tests {
         let mut factory = NginxFactoryOptions::default();
         let mut system = NginxSystemOptions::default();
         // Bare switch with nginx off->unplugged mapping.
-        apply_nginx_directive(&mut options, &mut factory, &mut system, "on", &[], Scope::Directory).unwrap();
+        apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "on",
+            &[],
+            Scope::Directory,
+        )
+        .unwrap();
         assert_eq!(options.enabled_state(), EnabledState::On);
-        apply_nginx_directive(&mut options, &mut factory, &mut system, "off", &[], Scope::Directory).unwrap();
+        apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "off",
+            &[],
+            Scope::Directory,
+        )
+        .unwrap();
         assert_eq!(options.enabled_state(), EnabledState::Unplugged);
         // Scope gate: server-only names rejected at directory scope.
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "FetchProxy",
             &["http://proxy/"],
             Scope::Directory,
@@ -4377,7 +4589,8 @@ mod tests {
         // Core option through nginx dispatch.
         apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "ModPagespeedCssInlineMaxBytes",
             &["1024"],
             Scope::Directory,
@@ -4387,7 +4600,8 @@ mod tests {
         // Factory options.
         apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "UseNativeFetcher",
             &["on"],
             Scope::ProcessStrict,
@@ -4396,7 +4610,8 @@ mod tests {
         assert!(factory.use_native_fetcher);
         apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "NativeFetcherMaxKeepaliveRequests",
             &["50"],
             Scope::ProcessStrict,
@@ -4405,7 +4620,8 @@ mod tests {
         assert_eq!(factory.native_fetcher_max_keepalive, 50);
         assert!(apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "NativeFetcherMaxKeepaliveRequests",
             &["0"],
             Scope::ProcessStrict,
@@ -4413,7 +4629,8 @@ mod tests {
         .is_err());
         apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "ProcessScriptVariables",
             &["all"],
             Scope::ProcessStrict,
@@ -4423,7 +4640,8 @@ mod tests {
         // Set-once enforced.
         assert!(apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "ProcessScriptVariables",
             &["off"],
             Scope::ProcessStrict,
@@ -4432,17 +4650,22 @@ mod tests {
         // Unknown names and over-arity.
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "Bogus",
             &["x"],
             Scope::Directory,
         )
         .unwrap_err();
         assert_eq!(err.outcome, SetOutcome::NameUnknown);
-        assert_eq!(err.message, "\"Bogus\" not recognized or too many arguments");
+        assert_eq!(
+            err.message,
+            "\"Bogus\" not recognized or too many arguments"
+        );
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "RewriteLevel",
             &["a", "b", "c", "d", "e"],
             Scope::Directory,
@@ -4456,7 +4679,8 @@ mod tests {
         // The gate runs before the arity check.
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "FetchProxy",
             &["a", "b", "c", "d", "e"],
             Scope::Directory,
@@ -4473,7 +4697,8 @@ mod tests {
         // Empty-detail failures quote the full line plus a bare space.
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "UseNativeFetcher",
             &["maybe"],
             Scope::ProcessStrict,
@@ -4483,7 +4708,8 @@ mod tests {
         assert_eq!(err.message, "\"UseNativeFetcher maybe\" ");
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "NativeFetcherMaxKeepaliveRequests",
             &["0"],
             Scope::ProcessStrict,
@@ -4493,7 +4719,8 @@ mod tests {
         // `StringToInt` width: fits `i64` but not `i32`.
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "NativeFetcherMaxKeepaliveRequests",
             &["99999999999"],
             Scope::ProcessStrict,
@@ -4503,24 +4730,27 @@ mod tests {
             err.message,
             "\"NativeFetcherMaxKeepaliveRequests 99999999999\" "
         );
-        // Table value errors wrap the full line around the detail.
+        // Table value errors wrap the full line around the
+        // `FormatSetOptionMessage` detail.
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "CssInlineMaxBytes",
             &["lots"],
             Scope::Directory,
         )
         .unwrap_err();
         assert_eq!(err.outcome, SetOutcome::ValueInvalid);
-        assert!(
-            err.message.starts_with("\"CssInlineMaxBytes lots\" "),
-            "unexpected wrap: {err:?}"
+        assert_eq!(
+            err.message,
+            "\"CssInlineMaxBytes lots\" Cannot set option CssInlineMaxBytes to lots. "
         );
         // Admin-domain verb errors wrap the same way.
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "StatisticsDomains",
             &["frobnicate", "x"],
             Scope::Directory,
@@ -4533,7 +4763,8 @@ mod tests {
         // Inode limit: server scope, 64-bit store, wrapped failure.
         apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "FileCacheInodeLimit",
             &["1000"],
             Scope::Server,
@@ -4542,7 +4773,8 @@ mod tests {
         assert_eq!(system.file_cache_clean_inode_limit, 1000);
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "FileCacheInodeLimit",
             &["1000"],
             Scope::Directory,
@@ -4554,7 +4786,8 @@ mod tests {
         );
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "FileCacheInodeLimit",
             &["lots"],
             Scope::Server,
@@ -4565,7 +4798,8 @@ mod tests {
         assert!(system.statistics_enabled);
         apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "Statistics",
             &["off"],
             Scope::Server,
@@ -4574,7 +4808,8 @@ mod tests {
         assert!(!system.statistics_enabled);
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "Statistics",
             &["off"],
             Scope::Directory,
@@ -4584,15 +4819,198 @@ mod tests {
     }
 
     #[test]
+    fn fetcher_options() {
+        let mut options = RewriteOptions::new();
+        let mut factory = NginxFactoryOptions::default();
+        let mut system = NginxSystemOptions::default();
+        assert_eq!(5000, system.blocking_fetch_timeout_ms);
+        // Proxy stores verbatim at server scope.
+        apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "FetchProxy",
+            &["http://proxy:3128/"],
+            Scope::Server,
+        )
+        .unwrap();
+        assert_eq!(system.fetcher_proxy, "http://proxy:3128/");
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "FetchProxy",
+            &["http://proxy:3128/"],
+            Scope::Directory,
+        )
+        .unwrap_err();
+        assert_eq!(err.message, "\"FetchProxy\" cannot be set at this scope.");
+        // Gzip flag is main-only with bool grammar.
+        apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "FetchWithGzip",
+            &["on"],
+            Scope::ProcessStrict,
+        )
+        .unwrap();
+        assert!(system.fetch_with_gzip);
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "FetchWithGzip",
+            &["on"],
+            Scope::Server,
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.message,
+            "\"FetchWithGzip\" cannot be set at this scope."
+        );
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "FetchWithGzip",
+            &["sometimes"],
+            Scope::ProcessStrict,
+        )
+        .unwrap_err();
+        assert_eq!(err.message, "\"FetchWithGzip sometimes\" ");
+        // Timeout is a 64-bit value (note the capital O).
+        apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "FetcherTimeOutMs",
+            &["2500"],
+            Scope::Server,
+        )
+        .unwrap();
+        assert_eq!(2500, system.blocking_fetch_timeout_ms);
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "FetcherTimeOutMs",
+            &["soon"],
+            Scope::Server,
+        )
+        .unwrap_err();
+        assert_eq!(err.message, "\"FetcherTimeOutMs soon\" ");
+        // The lowercase-o spelling gates but never matches.
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "FetcherTimeoutMs",
+            &["2500"],
+            Scope::Directory,
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.message,
+            "\"FetcherTimeoutMs\" cannot be set at this scope."
+        );
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "FetcherTimeoutMs",
+            &["2500"],
+            Scope::Server,
+        )
+        .unwrap_err();
+        assert_eq!(err.outcome, SetOutcome::NameUnknown);
+    }
+
+    #[test]
+    fn cache_sizing_options() {
+        let mut options = RewriteOptions::new();
+        let mut factory = NginxFactoryOptions::default();
+        let mut system = NginxSystemOptions::default();
+        assert_eq!(3_600_000, system.file_cache_clean_interval_ms);
+        assert_eq!(102_400, system.file_cache_clean_size_kb);
+        let apply = |options: &mut RewriteOptions,
+                     factory: &mut NginxFactoryOptions,
+                     system: &mut NginxSystemOptions,
+                     directive: &str,
+                     args: &[&str],
+                     scope: Scope| {
+            apply_nginx_directive(options, factory, system, directive, args, scope)
+        };
+        for (directive, value) in [
+            ("FileCacheCleanIntervalMs", "-1"),
+            ("FileCacheSizeKb", "2048"),
+            ("LRUCacheByteLimit", "4096"),
+            ("LRUCacheKbPerProcess", "8192"),
+            ("CacheFlushFilename", "flush.me"),
+            ("EnableCachePurge", "on"),
+        ] {
+            apply(
+                &mut options,
+                &mut factory,
+                &mut system,
+                directive,
+                &[value],
+                Scope::Server,
+            )
+            .unwrap();
+        }
+        assert_eq!(-1, system.file_cache_clean_interval_ms);
+        assert!(system.was_set.clean_interval);
+        assert_eq!(2048, system.file_cache_clean_size_kb);
+        assert!(system.was_set.clean_size);
+        assert_eq!(4096, system.lru_cache_byte_limit);
+        assert_eq!(8192, system.lru_cache_kb_per_process);
+        assert_eq!("flush.me", system.cache_flush_filename);
+        assert!(system.was_set.flush_filename);
+        assert!(options.enable_cache_purge());
+        assert!(!system.was_set.statistics_enabled);
+        // Directory scope rejects; bad values wrap empty.
+        let err = apply(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "LRUCacheKbPerProcess",
+            &["1"],
+            Scope::Directory,
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.message,
+            "\"LRUCacheKbPerProcess\" cannot be set at this scope."
+        );
+        let err = apply(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "FileCacheSizeKb",
+            &["lots"],
+            Scope::Server,
+        )
+        .unwrap_err();
+        assert_eq!(err.message, "\"FileCacheSizeKb lots\" ");
+    }
+
+    #[test]
     fn external_server_specs() {
         // Single server: default port, explicit port, errors.
         assert_eq!(
             parse_external_server("cache", REDIS_DEFAULT_PORT).unwrap(),
-            ExternalServerSpec { host: "cache".to_string(), port: 6379 }
+            ExternalServerSpec {
+                host: "cache".to_string(),
+                port: 6379
+            }
         );
         assert_eq!(
             parse_external_server("cache:6380", REDIS_DEFAULT_PORT).unwrap(),
-            ExternalServerSpec { host: "cache".to_string(), port: 6380 }
+            ExternalServerSpec {
+                host: "cache".to_string(),
+                port: 6380
+            }
         );
         assert_eq!(
             parse_external_server("a:b:c", 1).unwrap_err(),
@@ -4634,7 +5052,8 @@ mod tests {
         let mut system = NginxSystemOptions::default();
         apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "MemcachedServers",
             &["a:1,b"],
             Scope::Server,
@@ -4643,19 +5062,24 @@ mod tests {
         assert_eq!(2, system.memcached_servers.len());
         apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "RedisServer",
             &["r"],
             Scope::Server,
         )
         .unwrap();
         assert_eq!(
-            Some(ExternalServerSpec { host: "r".to_string(), port: 6379 }),
+            Some(ExternalServerSpec {
+                host: "r".to_string(),
+                port: 6379
+            }),
             system.redis_server
         );
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "RedisServer",
             &[":1"],
             Scope::Server,
@@ -4667,7 +5091,8 @@ mod tests {
         );
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "MemcachedServers",
             &["h:0"],
             Scope::Server,
@@ -4690,7 +5115,8 @@ mod tests {
         // FileCachePath needs the leading slash, verbatim text.
         apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "FileCachePath",
             &["/var/cache/pagespeed"],
             Scope::Server,
@@ -4699,7 +5125,8 @@ mod tests {
         assert_eq!(system.file_cache_path, "/var/cache/pagespeed");
         let err = apply_nginx_directive(
             &mut options,
-            &mut factory, &mut system,
+            &mut factory,
+            &mut system,
             "FileCachePath",
             &["relative/path"],
             Scope::Server,
@@ -4711,8 +5138,15 @@ mod tests {
             "\"FileCachePath relative/path\" must start with a slash"
         );
         // LogDir stores as-is.
-        apply_nginx_directive(&mut options, &mut factory, &mut system, "LogDir", &["/var/log/ps"], Scope::Server)
-            .unwrap();
+        apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "LogDir",
+            &["/var/log/ps"],
+            Scope::Server,
+        )
+        .unwrap();
         assert_eq!(system.log_dir, "/var/log/ps");
     }
 
@@ -4729,17 +5163,28 @@ mod tests {
                      scope: Scope| {
             apply_nginx_directive(options, factory, system, directive, args, scope)
         };
-        // The six admin paths store verbatim (case-insensitive parse).
+        // The six admin paths store verbatim (exact-case names).
         apply(
             &mut options,
             &mut factory,
             &mut system,
-            "statisticsPath",
+            "StatisticsPath",
             &["/ngx_pagespeed_statistics"],
             Scope::Server,
         )
         .unwrap();
         assert_eq!(system.statistics_path, "/ngx_pagespeed_statistics");
+        // Mixed-case table names are not recognized.
+        let err = apply(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "statisticsPath",
+            &["/x"],
+            Scope::Server,
+        )
+        .unwrap_err();
+        assert_eq!(err.outcome, SetOutcome::NameUnknown);
         for (directive, value) in [
             ("GlobalStatisticsPath", "/ngx_pagespeed_global_statistics"),
             ("ConsolePath", "/pagespeed_console"),
@@ -4758,7 +5203,10 @@ mod tests {
             )
             .unwrap();
         }
-        assert_eq!(system.global_statistics_path, "/ngx_pagespeed_global_statistics");
+        assert_eq!(
+            system.global_statistics_path,
+            "/ngx_pagespeed_global_statistics"
+        );
         assert_eq!(system.console_path, "/pagespeed_console");
         assert_eq!(system.messages_path, "/ngx_pagespeed_message");
         assert_eq!(system.admin_path, "/pagespeed_admin");
@@ -4787,7 +5235,7 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err.outcome, SetOutcome::NameUnknown);
-        apply(
+        let err = apply(
             &mut options,
             &mut factory,
             &mut system,
@@ -4795,8 +5243,8 @@ mod tests {
             &["/lower"],
             Scope::Directory,
         )
-        .unwrap();
-        assert_eq!(system.admin_path, "/lower");
+        .unwrap_err();
+        assert_eq!(err.outcome, SetOutcome::NameUnknown);
         // Domain lists: allow/disallow append, bad verbs rejected verbatim.
         apply(
             &mut options,
@@ -4899,7 +5347,11 @@ mod tests {
             .unwrap();
         assert!(options.respect_x_forwarded_proto());
         options
-            .set_option("RemoteConfigurationUrl", "http://x/rc", Scope::ProcessStrict)
+            .set_option(
+                "RemoteConfigurationUrl",
+                "http://x/rc",
+                Scope::ProcessStrict,
+            )
             .unwrap();
         assert_eq!(options.remote_configuration_url(), "http://x/rc");
         options
@@ -4912,7 +5364,11 @@ mod tests {
         assert!(options.enroll_experiment());
         // Rebeaconing needs the key configured; matching ignores case.
         options
-            .set_option("DownstreamCacheRebeaconingKey", "s3cret", Scope::ProcessStrict)
+            .set_option(
+                "DownstreamCacheRebeaconingKey",
+                "s3cret",
+                Scope::ProcessStrict,
+            )
             .unwrap();
         assert!(options.matches_downstream_cache_rebeaconing_key("S3CRET"));
         assert!(!options.matches_downstream_cache_rebeaconing_key("other"));

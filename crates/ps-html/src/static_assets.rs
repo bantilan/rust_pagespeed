@@ -10,9 +10,13 @@
 pub enum StaticAsset {
     DeterministicJs,
     DeferIframe,
+    DeferJs,
+    ResponsiveJs,
     AddInstrumentation,
     ExtendedInstrumentation,
     ClientDomainRewriter,
+    CriticalCssBeaconJs,
+    CriticalImagesBeaconJs,
     DedupInlinedImages,
     LazyloadImages,
     DelayImages,
@@ -36,6 +40,26 @@ pub fn get_asset(asset: StaticAsset, debug: bool) -> &'static [u8] {
         }
         (StaticAsset::DeferIframe, true) => {
             include_bytes!("../assets/defer_iframe_dbg.js").as_slice()
+        }
+        (StaticAsset::DeferJs, false) => include_bytes!("../assets/js_defer_opt.js").as_slice(),
+        (StaticAsset::DeferJs, true) => include_bytes!("../assets/js_defer_dbg.js").as_slice(),
+        (StaticAsset::ResponsiveJs, false) => {
+            include_bytes!("../assets/responsive_opt.js").as_slice()
+        }
+        (StaticAsset::ResponsiveJs, true) => {
+            include_bytes!("../assets/responsive_dbg.js").as_slice()
+        }
+        (StaticAsset::CriticalCssBeaconJs, false) => {
+            include_bytes!("../assets/critical_css_beacon_opt.js").as_slice()
+        }
+        (StaticAsset::CriticalCssBeaconJs, true) => {
+            include_bytes!("../assets/critical_css_beacon_dbg.js").as_slice()
+        }
+        (StaticAsset::CriticalImagesBeaconJs, false) => {
+            include_bytes!("../assets/critical_images_beacon_opt.js").as_slice()
+        }
+        (StaticAsset::CriticalImagesBeaconJs, true) => {
+            include_bytes!("../assets/critical_images_beacon_dbg.js").as_slice()
         }
         (StaticAsset::AddInstrumentation, false) => {
             include_bytes!("../assets/add_instrumentation_opt.js").as_slice()
@@ -226,6 +250,35 @@ mod tests {
         assert_ne!(
             get_asset(StaticAsset::DedupInlinedImages, false),
             get_asset(StaticAsset::DedupInlinedImages, true)
+        );
+    }
+
+    #[test]
+    fn beacon_and_defer_markers() {
+        for debug in [false, true] {
+            assert!(contains(
+                get_asset(StaticAsset::CriticalCssBeaconJs, debug),
+                b"Beacon"
+            ));
+            assert!(contains(
+                get_asset(StaticAsset::CriticalImagesBeaconJs, debug),
+                b"Beacon"
+            ));
+            assert!(contains(
+                get_asset(StaticAsset::DeferJs, debug),
+                b"pagespeed"
+            ));
+            // The genuine Closure output renames every identifier,
+            // so no "responsive" string survives in the opt half;
+            // `srcset` is the shared distinguishing marker.
+            assert!(contains(
+                get_asset(StaticAsset::ResponsiveJs, debug),
+                b"srcset"
+            ));
+        }
+        assert_ne!(
+            get_asset(StaticAsset::DeferJs, false),
+            get_asset(StaticAsset::DeferJs, true)
         );
     }
 }
