@@ -627,6 +627,7 @@ pub struct ResourceDriver {
     lawyer: DomainLawyer,
     claimants: RefCell<Vec<Rc<dyn Fn(&GoogleUrl) -> bool>>>,
     slots: RefCell<HashMap<(NodeId, usize), Rc<RefCell<HtmlResourceSlot>>>>,
+    claimed_elements: RefCell<std::collections::HashSet<NodeId>>,
     filters: RefCell<HashMap<&'static str, Rc<dyn RewriteFilter>>>,
     debug_output_bytes: RefCell<i64>,
     debug_output_truncated: RefCell<bool>,
@@ -677,6 +678,7 @@ impl ResourceDriver {
             lawyer: DomainLawyer::new(),
             claimants: RefCell::new(Vec::new()),
             slots: RefCell::new(HashMap::new()),
+            claimed_elements: RefCell::new(std::collections::HashSet::new()),
             filters: RefCell::new(HashMap::new()),
             debug_output_bytes: RefCell::new(0),
             debug_output_truncated: RefCell::new(false),
@@ -1302,6 +1304,21 @@ impl ResourceDriver {
     #[must_use]
     pub fn find_filter(&self, id: &str) -> Option<Rc<dyn RewriteFilter>> {
         self.filters.borrow().get(id).cloned()
+    }
+
+    /// Marks an element claimed by its creating filter: C++
+    /// renders combinations at harvest, after inline decisions,
+    /// so its inline pass never sees them; our sync pre-pass
+    /// replays the combined element to inline filters, which
+    /// stand down on claimed elements instead.
+    pub fn claim_element(&self, id: NodeId) {
+        self.claimed_elements.borrow_mut().insert(id);
+    }
+
+    /// Whether a combiner claimed an element this parse.
+    #[must_use]
+    pub fn is_element_claimed(&self, id: NodeId) -> bool {
+        self.claimed_elements.borrow().contains(&id)
     }
 
     /// Whether debug comments emit (`DebugMode`).

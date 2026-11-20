@@ -440,6 +440,13 @@ impl JsCombineFilter {
         input: &InputResource,
         containing: &[u8],
     ) -> bool {
+        // Fresh runs drop stale sizes from a refused predecessor
+        // (C++ `if (num_urls() == 0) Reset()`): without this an
+        // oversized first file poisons every later addition. The
+        // partnership origin stays (base tags own it for CSS).
+        if partnership.num_urls() == 0 {
+            state.reset_sizes();
+        }
         if !resource_combinable(driver, patterns, state, script, input, containing) {
             return false;
         }
@@ -650,6 +657,7 @@ impl JsCombineFilter {
     ) {
         let first = &pieces[0].0;
         let element = dom.new_element(None, b"script");
+        driver.claim_element(element);
         dom.insert_node_before_node(first.element, element);
         let rendered = if driver.options().preserve_url_relativity() {
             GoogleUrl::new(combined_url).relativize(first.relativity, driver.base_url())

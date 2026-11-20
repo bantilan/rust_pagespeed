@@ -1613,3 +1613,20 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   divergence, documented here. Open from the same
   A/B: JS combine (C++ `.jc.`, we minify-only
   `.jm.`) and debug-comment wording/dedup.
+- JS combine (this session): DONE. Two defects, one
+  slice. (1) Inline ate combinations: our sync
+  pre-pass replays combine-created elements to
+  inline filters, while C++ renders combinations
+  at harvest, after inline decisions. Combiners
+  now claim their output elements on the driver
+  and inline filters stand down on claimed
+  elements (a first attempt — refusing all
+  `.pagespeed.` URLs in inline — broke legitimate
+  `.cf.` inlining and was reverted). (2) Stale
+  combiner sizes: an over-cap first file poisoned
+  the rest of the run; C++'s `if (num_urls() ==
+  0) Reset()` is now mirrored in both combiners.
+  Live: `.jc.` URLs byte-identical to C++ (same
+  hashes), `.jc.` serves byte-identical. Corpus
+  grows `js-combine`. Suite: 12/12 page + 7/7
+  config green.

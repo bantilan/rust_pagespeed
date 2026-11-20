@@ -239,6 +239,34 @@ pub const CASES: &[CaseDef] = &[
         known_gap: None,
     },
     CaseDef {
+        name: "js-combine",
+        path: "/combo.html",
+        html: Some(
+            b"<html><head><script src=\"s1.js\"></script><script src=\"s2.js\"></script></head><body>hi</body></html>",
+        ),
+        extra: &[
+            (
+                "/s1.js",
+                b"function one() { return 1; }\n" as &[u8],
+            ),
+            (
+                "/s2.js",
+                b"function two() { return 2; }\n" as &[u8],
+            ),
+        ],
+        directives: &[
+            ("on", ""),
+            ("FileCachePath", CACHE_PLACEHOLDER),
+            ("RewriteLevel", "CoreFilters"),
+        ],
+        fetches: 2,
+        poll_optimized: false,
+        fixed_mtime: true,
+        request_headers: &[],
+        normalize_pagespeed_hashes: false,
+        known_gap: None,
+    },
+    CaseDef {
         name: "page-with-links",
         path: "/links.html",
         html: Some(

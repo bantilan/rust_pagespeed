@@ -293,6 +293,9 @@ impl HtmlFilter for CssInlineFilter {
         if dom.has_children_in_window(id) {
             return;
         }
+        if self.driver.is_element_claimed(id) {
+            return;
+        }
         if self.driver.is_amp_document() {
             self.driver.insert_debug_comment(
                 dom,

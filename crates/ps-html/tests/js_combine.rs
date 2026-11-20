@@ -1577,3 +1577,65 @@ fn integrity_script_untouched() {
         String::from_utf8_lossy(&output)
     );
 }
+
+#[test]
+fn inline_stands_down_for_combinations() {
+    // Live order (combine, then inline): the combined `.jc.`
+    // script must survive as a URL. C++ renders combinations
+    // at harvest, after inline decisions, so its inline pass
+    // never sees them; our sync pre-pass replays the combined
+    // element to inline filters, which refuse rewritten URLs
+    // instead.
+    use ps_html::filters::js_inline::JsInlineFilter;
+    let fixture = Fixture::new(ExtraFilters::None, false);
+    fixture
+        .options
+        .borrow_mut()
+        .enable_filter(Filter::InlineJavascript);
+    let url = format!("{TEST_DOMAIN}combo-inline.html");
+    let driver = fixture.driver_for(&url);
+    let sink = SharedSink::default();
+    let mut parser = Parser::new();
+    parser.add_filter(Box::new(JsCombineFilter::new(driver.clone())) as Box<dyn HtmlFilter>);
+    parser.add_filter(Box::new(JsInlineFilter::new(driver)) as Box<dyn HtmlFilter>);
+    parser.add_filter(Box::new(WriterFilter::new(sink.clone())));
+    parser.start_parse(url.as_bytes(), false);
+    parser.write(&test_html());
+    parser.finish();
+    let output = String::from_utf8_lossy(&sink.bytes()).into_owned();
+    assert!(
+        output.contains(".pagespeed.jc."),
+        "combination kept as URL: {output}"
+    );
+    assert!(
+        !output.contains("var mod_pagespeed_"),
+        "combination body not inlined: {output}"
+    );
+}
+
+#[test]
+fn oversized_first_file_does_not_poison_rest() {
+    // An over-cap first file splits out; later files still
+    // combine (C++ `if (num_urls() == 0) Reset()` drops the
+    // stale accumulated size on the fresh run).
+    let fixture = Fixture::new(ExtraFilters::None, false);
+    fixture.options.borrow_mut().set_max_combined_js_bytes(50);
+    let big = format!("var big = '{}';\n", "x".repeat(90));
+    assert!(big.len() > 50);
+    fixture.simulate_js_resource("big.js", &big);
+    fixture.simulate_js_resource("s1.js", "var s1 = 1;\n");
+    fixture.simulate_js_resource("s2.js", "var s2 = 2;\n");
+    let output = fixture.parse_bytes(
+        &format!("{TEST_DOMAIN}oversize-first.html"),
+        b"<script src=\"big.js\"></script><script src=\"s1.js\"></script><script src=\"s2.js\"></script>",
+    );
+    let output = String::from_utf8_lossy(&output).into_owned();
+    assert!(
+        output.contains(".pagespeed.jc."),
+        "s1+s2 combine past big.js: {output}"
+    );
+    assert!(
+        output.contains("<script src=\"big.js\"></script>"),
+        "big.js stays single: {output}"
+    );
+}

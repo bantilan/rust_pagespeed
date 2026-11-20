@@ -185,6 +185,12 @@ impl CssCombineFilter {
         state: &mut CombinerState,
         link: &PendingLink,
     ) -> bool {
+        // Fresh runs drop stale sizes from a refused predecessor
+        // (C++ `if (num_urls() == 0) Reset()`). The partnership
+        // origin stays (base tags own it).
+        if partnership.num_urls() == 0 {
+            state.reset_sizes();
+        }
         if !Self::resource_combinable(driver, &link.input, partnership.num_urls() == 0) {
             return false;
         }
@@ -344,6 +350,7 @@ impl CssCombineFilter {
         };
         let (decoded, _) = dom.decoded_attribute(first.element, first.href_attr);
         let _ = decoded;
+        self.driver.claim_element(first.element);
         dom.element_attributes_mut(first.element)[first.href_attr].set_value(rendered.as_bytes());
         for link in pieces.iter().skip(1) {
             dom.delete_node(link.element);

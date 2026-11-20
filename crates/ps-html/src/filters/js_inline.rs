@@ -317,7 +317,7 @@ impl HtmlFilter for JsInlineFilter {
     }
 
     fn end_element(&mut self, dom: &mut Dom, _lexer: &Lexer, id: NodeId) {
-        if self.should_inline && dom.is_rewritable(id) {
+        if self.should_inline && dom.is_rewritable(id) && !self.driver.is_element_claimed(id) {
             if let Some(src) = dom.find_attribute(id, Keyword::Src) {
                 let (decoded, _) = dom.decoded_attribute(id, src);
                 let attrs_charset = dom
