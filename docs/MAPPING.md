@@ -332,3 +332,30 @@ Chain-order authority: `ps-html/src/chain.rs` (mirrors C++
 `AddPreRenderFilters`/`AddPostRenderFilters`). Order changes must also
 review `M:install/common/pagespeed.conf.template` + the config-filters docs,
 which mention filters in application order (illustratively, not exhaustively).
+
+## Phase 4 compat suite (`ps-compat/tests/`)
+
+Live runners boot real nginx with either `.so` (`Runner`
+impls), serve each corpus case fresh, and compare normalized
+responses (framing/clock/identity headers dropped,
+`X-Page-Speed` pinned, multiset header compare). Record mode
+(`PS_COMPAT_RECORD=1`) captures C++ expectations into
+`tests/corpus_data/{pages,configs}.rs`; compare mode asserts
+Rust equality. Page corpus: 5 cases; config corpus: 7 cases
+(boot parity included).
+
+Fixed by the suite (were divergences, now match):
+- Rewritten HTML kept the origin ETag/Last-Modified/
+  Content-Length; C++ strips them in
+  `ProxyFetch::SetupForHtml` (`proxy_fetch.cc:1113-1119`).
+  Ported into `finish_html_header_filter`.
+
+Known gaps (suite reports, never fails):
+- compat-1: inline CSS/JS minify wiring unported
+  (`CssInline`/`Javascript`/`JsInline` slots skipped; the
+  `ps-css` and `ps-js` minify crates exist but no chain
+  adapter feeds them). Affects `core-rich`,
+  `elide-attributes` bodies.
+- compat-2: error `s-maxage` rides unported recorder arming
+  (C++ IPRO-miss recording path stamps it; our recorder is
+  never armed). Affects `missing-file` headers.

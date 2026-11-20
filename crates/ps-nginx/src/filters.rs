@@ -1015,6 +1015,13 @@ pub mod html_rewrite {
             ) {
                 base_headers.headers_mut().add(name, value);
             }
+            // Rewritten bytes invalidate the origin's validators
+            // (`ProxyFetch::SetupForHtml`).
+            base_headers.headers_mut().remove_all(header::ETAG);
+            base_headers.headers_mut().remove_all(header::LAST_MODIFIED);
+            base_headers
+                .headers_mut()
+                .remove_all(header::CONTENT_LENGTH);
             crate::request::set_buffered(r, true);
             (*r).set_filter_need_in_memory(1);
             NGX_AGAIN as ngx_int_t

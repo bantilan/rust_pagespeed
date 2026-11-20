@@ -1350,3 +1350,39 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   stand; no-TLS fetches; unknown-`http2`-variable trees use
   the `NGX_ERROR` sentinel. 212 ps-nginx tests green.
   Workspace: 2559 passed, 0 failed.
+- Step 7, benchmarks gate re-run (this session): PASS. All
+  8 suites run green (`--quick`). Config/stats/cache/http/
+  css/js/image match recorded baselines within noise
+  (lookup ~7.2ns, merge ~768ns, MD5-4K ~5.7µs, put+find
+  ~13.9µs, counter add ~1.8ns). ps-html rewrite showed
+  +65-76% vs criterion's stale stored baseline, so it was
+  A/B'd against the parent commit on the same machine back
+  to back: identical (33.1 vs 33.3µs small, 2.86 vs
+  2.94ms medium, 47.6 vs 47.7µs all/small) — no
+  regression from slices 6d/7. Caveat recorded: this
+  machine's governor is `powersave` (1.7 vs 4.5 GHz max,
+  no sudo to pin), so absolute numbers dance between
+  sessions and `--quick` small-bench variance reaches ~2x;
+  future gates should A/B rather than trust stored
+  baselines. Pre-existing gap noted, not built here:
+  ps-nginx still has no in-nginx req/s + stall-detector
+  bench. Workspace: 2559 passed, 0 failed.
+- Phase 4, compat suite (this session): DONE. Live `Runner`
+  impls boot real nginx with either `.so`
+  (`ps-compat/tests/live.rs`, raw TCP + chunked reader, no
+  new deps; `PS_COMPAT_LIVE=1` gates, skips cleanly
+  otherwise). Page corpus (5 cases) and config corpus (7
+  cases incl. boot parity) record from C++ via
+  `PS_COMPAT_RECORD=1` into committed
+  `tests/corpus_data/{pages,configs}.rs` and compare
+  normalized responses (status, header multisets, bytes;
+  framing/clocks/identity dropped, version pinned, fixed
+  origin mtimes, unique ports, known-gap xfail reporting).
+  Suite found and fixed one real divergence (rewritten HTML
+  kept origin ETag/Last-Modified/Content-Length; C++ strips
+  them in `SetupForHtml`, now ported) and pins two known
+  gaps (compat-1 inline CSS/JS minify wiring, compat-2
+  error s-maxage via recorder arming) in `MAPPING.md`.
+  Status: 2 page cases byte-exact, 3 xfailed gaps, 7/7
+  config cases green. Workspace: 2563 passed, 0 failed
+  (live suite excluded without the env gate).

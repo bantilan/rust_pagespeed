@@ -38,6 +38,14 @@ pub enum Assertion {
         /// Actual key.
         actual: String,
     },
+    /// The response status must equal `expected` (Phase 4
+    /// extension for route smokes).
+    StatusEqual {
+        /// Expected status.
+        expected: u16,
+        /// Actual status.
+        actual: u16,
+    },
 }
 
 /// The verdict for one assertion.
@@ -116,6 +124,18 @@ pub fn evaluate(assertion: &Assertion) -> AssertionResult {
                     String::new()
                 } else {
                     format!("key: expected {expected:?}, got {actual:?}")
+                },
+            }
+        }
+        Assertion::StatusEqual { expected, actual } => {
+            let passed = expected == actual;
+            AssertionResult {
+                kind: "status-equal",
+                passed,
+                detail: if passed {
+                    String::new()
+                } else {
+                    format!("status: expected {expected}, got {actual}")
                 },
             }
         }

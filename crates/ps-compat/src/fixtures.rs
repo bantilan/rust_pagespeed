@@ -121,8 +121,14 @@ pub fn cache_key_vectors() -> Vec<&'static str> {
 /// Audited shapes from the `ResourceNamer` goldens
 /// (experiment, options incl. slash escapes, cache-extender).
 #[must_use]
-pub fn resource_namer_vectors(
-) -> Vec<(&'static str, &'static str, &'static str, &'static str, &'static str, &'static str)> {
+pub fn resource_namer_vectors() -> Vec<(
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+)> {
     vec![
         (
             "photo.jpg.pagespeed.q.ic.ABCDEF1234.jpg",
@@ -443,7 +449,14 @@ pub fn html_golden_vectors() -> Vec<(&'static str, &'static str, &'static str)> 
 /// `NgxInPlaceUrlAgrees`: decoded paths compared byte for byte,
 /// hosts case-insensitively.
 #[must_use]
-pub fn nginx_agreement_vectors() -> Vec<(&'static str, &'static str, &'static str, &'static str, bool, bool)> {
+pub fn nginx_agreement_vectors() -> Vec<(
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    bool,
+    bool,
+)> {
     vec![
         ("/", "h", "/", "h", true, true),
         ("/a+b/c.d.js", "h", "/a+b/c.d.js", "h", true, true),
@@ -503,7 +516,11 @@ mod tests {
     #[test]
     fn rewrite_levels_parse_canonically() {
         for (spelling, parses) in rewrite_level_vectors() {
-            assert_eq!(parses, RewriteLevel::parse(spelling).is_some(), "{spelling}");
+            assert_eq!(
+                parses,
+                RewriteLevel::parse(spelling).is_some(),
+                "{spelling}"
+            );
         }
         // Canonical names round-trip.
         for level in [
@@ -613,7 +630,10 @@ mod tests {
             );
         }
         // Multiple header values are all consulted.
-        assert!(accepts_image_format(&["text/html", "image/webp"], "image/webp"));
+        assert!(accepts_image_format(
+            &["text/html", "image/webp"],
+            "image/webp"
+        ));
     }
 
     #[test]
@@ -811,8 +831,8 @@ mod tests {
     fn nginx_vectors_match_helpers() {
         use ps_nginx::fetch_body::response_has_no_body;
         use ps_nginx::inplace_url_agreement::url_agrees;
-        for (server_uri, server_host, module_path, module_host, merge, agrees)
-            in nginx_agreement_vectors()
+        for (server_uri, server_host, module_path, module_host, merge, agrees) in
+            nginx_agreement_vectors()
         {
             assert_eq!(
                 agrees,
@@ -848,7 +868,10 @@ mod tests {
         assert_eq!(34, named_helpless);
         assert_eq!(5, synthetic);
         // filters-5: `RewriteLevel` is a regular base property.
-        let level = PROPERTIES.iter().find(|p| p.name == "RewriteLevel").unwrap();
+        let level = PROPERTIES
+            .iter()
+            .find(|p| p.name == "RewriteLevel")
+            .unwrap();
         assert_eq!("l", level.id);
         assert_eq!(Scope::Directory, level.scope);
     }
