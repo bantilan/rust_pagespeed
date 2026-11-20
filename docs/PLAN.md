@@ -1530,3 +1530,49 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   `InPlaceOptimizeForBrowser`, poll-optimized). Both
   stacks serve webp; pixels agree within tolerance.
   Suite: 10/10 page + 7/7 config green.
+- Request bitfields (this session): DONE. ROOT CAUSE
+  of the 60s close hang on every declined response:
+  bindgen packs the post-`port` run in 32-bit
+  containers but gcc uses 16-bit units here (run
+  starts 2-byte aligned), so every request field at
+  bindgen offset >= 46 sits 2 bits later at runtime
+  (C-probed per field). `set_filter_need_in_memory`
+  wrote `buffered |= 0x08`, deferring finalize into
+  `send_timeout`. Corrected accessors in `request.rs`
+  (+2 rule, C-verified map in the doc comment);
+  `buffered`/`need_in_memory`/`header_only`/
+  `header_sent`/`gzip_vary`/`keepalive`/
+  `lingering_close` all swapped (`buf`, connection,
+  `headers_in` runs verified aligned-correct). Live:
+  HTTP/1.0 EOF instant on static/html/404 +
+  keep-alive reuse works. Workspace: 2584 passed, 0
+  failed (incl. a round-trip unit test pinning the
+  corrected bits). Bonus fix in the same probe
+  session: `serve_response` emitted `Content-Length`
+  twice (pushed list entry plus `_n` generation) —
+  now skipped in the copy, single on both serve
+  paths. Old-mtime IPRO "refusal" debunked live: C++
+  optimizes 2023-mtime files fine (2 transient
+  originals, then byte-identical minified output +
+  identical PSA ETag) — sync-vs-async transient
+  model only, no gate exists.
+- Driver slots (this session): DONE. `MetaTag` and
+  `SupportNoscript` were planned but never
+  instantiated (`instantiate` returns `None` for
+  context-needing slots). `ResourceDriver` headers
+  are now shared (`Rc<RefCell<...>>`, mutations
+  visible both sides); the driver binds `MetaTag` to
+  the share and `SupportNoscript` to the escaped
+  `?PageSpeed=noscript` document URL plus the
+  script-execution verdict from live request
+  properties (C++ `DetermineEnabled` shape). Two
+  driver tests pin binding + end-to-end behavior.
+- Bench `ps-nginx/benches/nginx.rs` (this session):
+  DONE. Gated in-nginx A/B (`PS_NGINX_BENCH=1`):
+  CoreFilters HTML rewrite vs same-byte passthrough
+  through the staged nginx. Baselines (sequential
+  HTTP/1.0, powersave governor — read the A/B
+  ratio, not absolutes): rewrite-html ~22.4ms/iter
+  (~45 req/s), passthrough-text ~161us/iter
+  (~6.2k req/s), ~139x. First run caught the
+  bitfield hang above (60s/iter both arms).
