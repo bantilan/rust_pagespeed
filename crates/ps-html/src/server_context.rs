@@ -235,9 +235,9 @@ impl ServerContext {
         start_ms: i64,
     ) -> Self {
         let statistics = Arc::new(Statistics::new());
-        // Rewrite-wide fetch counters (`RewriteStats::InitStats`).
-        statistics.add_variable("num_resource_fetch_successes");
-        statistics.add_variable("num_resource_fetch_failures");
+        // Full console roster (`RewriteStats::InitStats` plus every
+        // filter/cache/fetcher `InitStats`).
+        super::rewrite_stats::init_stats(&statistics);
         let hasher: Rc<dyn Hasher> = Rc::new(Md5Hasher::new());
         let mut http_cache = HttpCache::new(backend);
         http_cache.set_hasher(hasher.clone());

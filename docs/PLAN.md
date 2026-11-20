@@ -1500,3 +1500,12 @@ CPU, memory (peak + per-request), allocations, cache hit rates.
   failed. Follow-ups: webp/avif servants (need
   request-headers plumbing); lossy JPEG corpus
   coverage (needs pixel tolerance).
+- Small items (this session): DONE. `ShowCacheTimestamp`
+  accessor (table entry existed) wired into the
+  `SetupForHtml` diagnostics gate; gap watch traced:
+  caching-gap-1 is proxy-flow page caching (HtmlCache,
+  default off — DOCUMENTED/BLOCKED like config-3) and
+  admin-gap-1 is closed by a 185-name console roster
+  (`rewrite_stats::init_stats`, transcribed verbatim
+  from every C++ `InitStats`). Workspace: 2580 passed,
+  0 failed.

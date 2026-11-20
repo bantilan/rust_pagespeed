@@ -889,10 +889,9 @@ pub mod html_rewrite {
         );
     }
 
-    /// `html_cache` diagnostics tail (`SetupForHtml`):
-    /// per-request diagnostics must never freeze in a
-    /// browser/CDN cache (`show_cache_timestamp` stays unported,
-    /// so `html_cache` alone gates this).
+    /// `html_cache` diagnostics tail (`SetupForHtml`, also
+    /// gated on `show_cache_timestamp`): per-request
+    /// diagnostics must never freeze in a browser/CDN cache.
     fn setup_for_html_cache_diagnostics(headers: &mut ps_http::response::ResponseHeaders) {
         use ps_http::names::header;
         let date_ms = headers.date_ms();
@@ -1080,13 +1079,13 @@ pub mod html_rewrite {
                 .context
                 .as_ref()
                 .is_some_and(|ctx| ctx.options.core.filters().enabled(Filter::ConvertToAvif));
-            let (max_html_cache_time_ms, html_cache) = cfg_s
+            let (max_html_cache_time_ms, cache_diagnostics) = cfg_s
                 .context
                 .as_ref()
                 .map(|ctx| {
                     (
                         ctx.options.core.max_html_cache_time_ms(),
-                        ctx.options.core.html_cache(),
+                        ctx.options.core.html_cache() || ctx.options.core.show_cache_timestamp(),
                     )
                 })
                 .unwrap_or((0, false));
@@ -1100,7 +1099,7 @@ pub mod html_rewrite {
             // Fresh rewritten-HTML lifetime
             // (`ProxyFetch::SetupForHtml` caching).
             setup_for_html_caching(base_headers, max_html_cache_time_ms);
-            if html_cache {
+            if cache_diagnostics {
                 setup_for_html_cache_diagnostics(base_headers);
             }
             // Rewritten bytes invalidate the origin's validators

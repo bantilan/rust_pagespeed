@@ -243,8 +243,16 @@ Prefixes: `M:` = mod_pagespeed, `N:` = ngx_pagespeed, `P:` = ngx_psol
 ## Gap watch (from AUDIT §9)
 
 Unverified wirings that may add rows here once traced:
-caching-gap-1 (HTML cache → ps-cache/ps-http), admin-gap-1 (27-filter stat
-fan-out → ps-stats).
+(none remain — see closures below).
+- caching-gap-1 DOCUMENTED/BLOCKED: the HTML page cache
+  (`HtmlCacheLookup` in `proxy_fetch.cc`, `HtmlCache`
+  option default off) serves the proxy flow only; the
+  sync bridge rewrites every hit. Needs the proxy epic.
+- admin-gap-1 CLOSED: 185-name console roster ported
+  (`ps-html/src/rewrite_stats.rs::init_stats`,
+  transcribed verbatim from every C++ `InitStats`
+  across rewriter/http/automatic/kernel-http/system),
+  pre-created in `ServerContext::new_with_metadata`.
 
 Traced during Step 8 (compat hooks):
 - filters-5 CLOSED: `RewriteLevel` is a regular base property

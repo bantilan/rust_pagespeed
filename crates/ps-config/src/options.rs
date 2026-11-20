@@ -1989,6 +1989,22 @@ impl RewriteOptions {
         self.modified = true;
     }
 
+    /// Whether per-request HTML cache diagnostics append
+    /// (`show_cache_timestamp`, default false).
+    #[must_use]
+    pub fn show_cache_timestamp(&self) -> bool {
+        match self.get_by_name("ShowCacheTimestamp") {
+            Some(Value::Bool(value)) => value,
+            _ => false,
+        }
+    }
+
+    /// Sets cache-timestamp diagnostics.
+    pub fn set_show_cache_timestamp(&mut self, value: bool) {
+        self.values.insert("fhcs", Value::Bool(value));
+        self.modified = true;
+    }
+
     /// HTML cache lifetime cap in seconds (`html_cache_ttl_sec`,
     /// default 300).
     #[must_use]
@@ -4356,6 +4372,9 @@ mod tests {
         assert_eq!(0, options.max_html_cache_time_ms());
         options.set_max_html_cache_time_ms(60_000);
         assert_eq!(60_000, options.max_html_cache_time_ms());
+        assert!(!options.show_cache_timestamp());
+        options.set_show_cache_timestamp(true);
+        assert!(options.show_cache_timestamp());
         // HtmlWriterFilter is enabled by default, as in C++ Initialize().
         assert!(options.filters().enabled(Filter::HtmlWriterFilter));
         assert_eq!(
