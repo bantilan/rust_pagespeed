@@ -707,7 +707,7 @@ pub unsafe fn base_fetch_handler(r: *mut ngx::ffi::ngx_http_request_t) -> ngx::f
             release_base_fetch(ctx);
             return NGX_ERROR as ngx_int_t;
         }
-        if (*r).header_sent() == 0 {
+        if crate::request::request_header_sent(r) == 0 {
             let (status_code, fetch_type) = (*ctx)
                 .base_fetch
                 .as_ref()

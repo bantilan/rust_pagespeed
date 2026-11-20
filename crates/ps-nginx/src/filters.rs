@@ -142,7 +142,7 @@ pub mod in_place {
                 in_place,
                 (*(*r).connection).error() != 0,
                 (*r).headers_out.status as i32,
-                (*r).header_only() != 0,
+                crate::request::request_header_only(r) != 0,
             ) {
                 InPlaceHeaderAction::Next => pass_to_next(),
                 InPlaceHeaderAction::RecordPreliminary => {
@@ -165,7 +165,7 @@ pub mod in_place {
                     // phase arms the recorder at the miss site
                     // (the lookup never pends), so this keeps the
                     // plan shape and declines without creating.
-                    (*r).set_filter_need_in_memory(1);
+                    crate::request::set_request_filter_need_in_memory(r);
                     decline_request(r, None)
                 }
                 InPlaceHeaderAction::Decline => decline_request(r, None),
@@ -707,7 +707,7 @@ pub mod base_fetch {
             };
             let ctx = crate::request::get_request_ctx(r);
             let fetch_active = !ctx.is_null() && (*ctx).base_fetch.is_some();
-            match base_fetch_gate((*r).header_only() != 0, fetch_active) {
+            match base_fetch_gate(crate::request::request_header_only(r) != 0, fetch_active) {
                 BaseFetchGate::Complete => NGX_OK as ngx_int_t,
                 BaseFetchGate::PassThrough => pass_to_next(chain),
                 BaseFetchGate::Serve => {
@@ -1110,7 +1110,7 @@ pub mod html_rewrite {
                 .headers_mut()
                 .remove_all(header::CONTENT_LENGTH);
             crate::request::set_buffered(r, true);
-            (*r).set_filter_need_in_memory(1);
+            crate::request::set_request_filter_need_in_memory(r);
             NGX_AGAIN as ngx_int_t
         }
     }
@@ -1613,7 +1613,7 @@ pub mod etag {
             // The C++ gates this on `NGX_HTTP_GZIP`; the staged tree
             // has it (pinned by test), so this runs unconditionally.
             if !ctx.is_null() && (*ctx).psol_vary_accept_only {
-                (*r).set_gzip_vary(0);
+                crate::request::set_request_gzip_vary(r, 0);
             }
             // Never on responses to requests that carried
             // Authorization: s-maxage would grant downstream caches

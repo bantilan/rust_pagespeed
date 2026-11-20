@@ -1878,7 +1878,10 @@ unsafe fn serve_response(
             (*r).headers_out.content_length_n = body.len() as i64;
         }
         let rc = ngx_http_send_header(r);
-        if rc == NGX_ERROR as ngx_int_t || rc > NGX_OK as ngx_int_t || (*r).header_only() != 0 {
+        if rc == NGX_ERROR as ngx_int_t
+            || rc > NGX_OK as ngx_int_t
+            || crate::request::request_header_only(r) != 0
+        {
             return rc;
         }
         let Some(chain) =
@@ -2700,7 +2703,7 @@ unsafe fn resource_response(
                 // re-declining after our header filter passed,
                 // which would arm HTML on an errored response.
                 if response.status == 0 || response.status >= 400 {
-                    if (*r).header_only() == 0 {
+                    if crate::request::request_header_only(r) == 0 {
                         let mut request_headers = RequestHeaders::new();
                         {
                             let mut raw: Vec<(String, String, bool)> = Vec::new();
@@ -2739,7 +2742,7 @@ unsafe fn resource_response(
                             -1,
                             Some(Box::new(backend)),
                         ));
-                        (*r).set_filter_need_in_memory(1);
+                        crate::request::set_request_filter_need_in_memory(r);
                     }
                     decline_request_state(&mut *ctx_ptr, None);
                     return NGX_DECLINED as ngx_int_t;
@@ -2850,8 +2853,8 @@ pub unsafe fn discard_request_body(r: *mut ngx_http_request_t) {
                 (*r).headers_in.content_length_n,
                 (*r).headers_in.chunked() != 0,
             );
-            (*r).set_keepalive(u32::from(outcome.keepalive));
-            (*r).set_lingering_close(u32::from(outcome.lingering_close));
+            crate::request::set_request_keepalive(r, u32::from(outcome.keepalive));
+            crate::request::set_request_lingering_close(r, u32::from(outcome.lingering_close));
         }
     }
 }
@@ -3207,7 +3210,10 @@ mod tests {
             let rc = async_wait_response(&mut request);
             assert_eq!(NGX_DONE as ngx_int_t, rc);
             assert_eq!(1, request.count());
-            assert!(request.buffered() & crate::request::PAGESPEED_BUFFERED != 0);
+            assert!(
+                crate::request::request_buffered(&mut request) & crate::request::PAGESPEED_BUFFERED
+                    != 0
+            );
             let read = request.read_event_handler.expect("read handler armed");
             assert_eq!(read as *const (), ngx_http_test_reading as *const ());
             let write = request.write_event_handler.expect("write handler armed");
@@ -3276,7 +3282,10 @@ mod tests {
             advance_past_decline(&mut request);
             assert_eq!(1, request.count());
             assert_eq!(4, request.phase_handler);
-            assert_eq!(0, request.buffered() & crate::request::PAGESPEED_BUFFERED);
+            assert_eq!(
+                0,
+                crate::request::request_buffered(&mut request) & crate::request::PAGESPEED_BUFFERED
+            );
             let read = request.read_event_handler.expect("read handler restored");
             assert_eq!(read as *const (), ngx_http_block_reading as *const ());
             let write = request.write_event_handler.expect("write handler restored");

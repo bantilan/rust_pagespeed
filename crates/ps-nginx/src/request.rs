@@ -93,6 +93,82 @@ impl RequestCtx {
 /// Buffered bit this module owns (`NGX_HTTP_PAGESPEED_BUFFERED`).
 pub const PAGESPEED_BUFFERED: u32 = 0x08;
 
+/// Corrected `ngx_http_request_t` bitfield access.
+///
+/// bindgen models the post-`port` run with 32-bit containers, but
+/// gcc packs it in 16-bit containers here (the run starts 2-byte
+/// aligned, so `count:16` fills the first unit): bits 46-47 are
+/// dead padding and every field at bindgen offset >= 46 sits 2
+/// bits later at runtime. bindgen's own accessors are therefore
+/// wrong for those fields: `buffered()` read `logged` plus the
+/// low `buffered` bits, and `set_filter_need_in_memory(1)` set
+/// `buffered |= 0x08`, which deferred every declined response's
+/// finalize into a `send_timeout` hang. C-verified field by field
+/// against the staged tree (set-one-bit probes:
+/// `no_buffering`@60, `gzip_vary`@66, `header_only`@80,
+/// `keepalive`@82, `lingering_close`@83, `header_sent`@92,
+/// `done`@96, `logged`@97, `buffered`@99:4,
+/// `filter_need_in_memory`@104); fields below bit 46 (`count`,
+/// `blocked`, ...) match bindgen and stay direct, as do the
+/// `ngx_buf_t`, `ngx_connection_t`, and `ngx_http_headers_in_t`
+/// runs (aligned starts, C-verified). Re-verify with the probes
+/// before touching any other field here.
+fn request_bit(r: *mut ngx::ffi::ngx_http_request_t, bindgen_offset: usize, width: u8) -> u32 {
+    let bit = if bindgen_offset >= 46 {
+        bindgen_offset + 2
+    } else {
+        bindgen_offset
+    };
+    // SAFETY: caller guarantees a live request; the unit spans
+    // the whole run.
+    unsafe { (*r)._bitfield_1.get(bit, width) as u32 }
+}
+
+/// Writes one corrected request bitfield (see [`request_bit`]).
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+unsafe fn set_request_bit(
+    r: *mut ngx::ffi::ngx_http_request_t,
+    bindgen_offset: usize,
+    width: u8,
+    val: u32,
+) {
+    let bit = if bindgen_offset >= 46 {
+        bindgen_offset + 2
+    } else {
+        bindgen_offset
+    };
+    // SAFETY: caller guarantees a live request; the unit spans
+    // the whole run.
+    unsafe {
+        (*r)._bitfield_1.set(bit, width, u64::from(val));
+    }
+}
+
+/// Reads the request `buffered` mask (corrected offset).
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+pub unsafe fn request_buffered(r: *mut ngx::ffi::ngx_http_request_t) -> u32 {
+    // SAFETY: caller guarantees a live request.
+    unsafe { request_bit(r, 97, 4) }
+}
+
+/// Writes the request `buffered` mask (corrected offset).
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+pub unsafe fn set_request_buffered(r: *mut ngx::ffi::ngx_http_request_t, val: u32) {
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        set_request_bit(r, 97, 4, val);
+    }
+}
+
 /// Marks the request buffered or not (`ps_set_buffered`).
 ///
 /// # Safety
@@ -101,12 +177,85 @@ pub const PAGESPEED_BUFFERED: u32 = 0x08;
 pub unsafe fn set_buffered(r: *mut ngx::ffi::ngx_http_request_t, on: bool) {
     // SAFETY: caller guarantees a live request.
     unsafe {
-        let buffered = (*r).buffered();
-        (*r).set_buffered(if on {
-            buffered | PAGESPEED_BUFFERED
-        } else {
-            buffered & !PAGESPEED_BUFFERED
-        });
+        let buffered = request_buffered(r);
+        set_request_buffered(
+            r,
+            if on {
+                buffered | PAGESPEED_BUFFERED
+            } else {
+                buffered & !PAGESPEED_BUFFERED
+            },
+        );
+    }
+}
+
+/// Flags in-memory filtering (`filter_need_in_memory`, corrected
+/// offset): the copy filter buffers file ranges in memory.
+/// Must not use bindgen's accessor (it sets `buffered`).
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+pub unsafe fn set_request_filter_need_in_memory(r: *mut ngx::ffi::ngx_http_request_t) {
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        set_request_bit(r, 102, 1, 1);
+    }
+}
+
+/// Reads `header_only` (corrected offset).
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+pub unsafe fn request_header_only(r: *mut ngx::ffi::ngx_http_request_t) -> u32 {
+    // SAFETY: caller guarantees a live request.
+    unsafe { request_bit(r, 78, 1) }
+}
+
+/// Reads `header_sent` (corrected offset).
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+pub unsafe fn request_header_sent(r: *mut ngx::ffi::ngx_http_request_t) -> u32 {
+    // SAFETY: caller guarantees a live request.
+    unsafe { request_bit(r, 90, 1) }
+}
+
+/// Writes `gzip_vary` (corrected offset).
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+pub unsafe fn set_request_gzip_vary(r: *mut ngx::ffi::ngx_http_request_t, val: u32) {
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        set_request_bit(r, 64, 1, val);
+    }
+}
+
+/// Writes `keepalive` (corrected offset).
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+pub unsafe fn set_request_keepalive(r: *mut ngx::ffi::ngx_http_request_t, val: u32) {
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        set_request_bit(r, 80, 1, val);
+    }
+}
+
+/// Writes `lingering_close` (corrected offset).
+///
+/// # Safety
+///
+/// `r` must point at a live request.
+pub unsafe fn set_request_lingering_close(r: *mut ngx::ffi::ngx_http_request_t, val: u32) {
+    // SAFETY: caller guarantees a live request.
+    unsafe {
+        set_request_bit(r, 81, 1, val);
     }
 }
 
@@ -203,5 +352,51 @@ mod tests {
         assert!(!ctx.psol_vary_accept_only);
         assert!(ctx.follow_flushes);
         assert_eq!(0x08, PAGESPEED_BUFFERED);
+    }
+
+    /// Corrected offsets land on distinct live bits (each
+    /// C-verified field reads back what was written, and
+    /// neighbors never alias — the bindgen +2 shift).
+    #[test]
+    fn corrected_bitfields_round_trip() {
+        use std::mem::MaybeUninit;
+        let mut request: ngx::ffi::ngx_http_request_t =
+            unsafe { MaybeUninit::zeroed().assume_init() };
+        let r = &mut request as *mut _;
+        unsafe {
+            set_request_buffered(r, 0);
+            assert_eq!(0, request_buffered(r));
+            set_request_buffered(r, 0x0F);
+            assert_eq!(0x0F, request_buffered(r));
+            // The pagespeed bit survives beside nginx's own.
+            set_request_buffered(r, 0x04);
+            set_buffered(r, true);
+            assert_eq!(0x0C, request_buffered(r));
+            set_buffered(r, false);
+            assert_eq!(0x04, request_buffered(r));
+            set_request_buffered(r, 0);
+            // One-bit fields round-trip without aliasing the
+            // `buffered` nibble or each other.
+            set_request_filter_need_in_memory(r);
+            assert_eq!(0, request_buffered(r));
+            set_request_gzip_vary(r, 1);
+            set_request_keepalive(r, 1);
+            set_request_lingering_close(r, 1);
+            assert_eq!(0, request_header_only(r));
+            assert_eq!(0, request_header_sent(r));
+            assert_eq!(0, request_buffered(r));
+            // Raw unit check: `buffered` sits at run bits
+            // 99-102 (byte 12 bits 3-6), `need_in_memory` at
+            // run bit 104 (byte 13 bit 0).
+            set_request_buffered(r, 0x0F);
+            let raw: &[u8] =
+                std::slice::from_raw_parts(&raw const request._bitfield_1 as *const u8, 15);
+            assert_eq!(0x78, raw[12] & 0x78);
+            set_request_buffered(r, 0);
+            set_request_filter_need_in_memory(r);
+            let raw: &[u8] =
+                std::slice::from_raw_parts(&raw const request._bitfield_1 as *const u8, 15);
+            assert_eq!(0x01, raw[13] & 0x01);
+        }
     }
 }
