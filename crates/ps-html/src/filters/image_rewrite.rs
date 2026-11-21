@@ -191,12 +191,17 @@ fn skip_ascii_whitespace(mut value: &[u8]) -> &[u8] {
 
 /// Single-image behavior (context owned per element/candidate/fetch).
 pub struct ImageRewriteBehavior {
+    // Unread C++ `ImageRewriteFilter` state (driver, candidate
+    // index, resize mode), stored for parity with the C++ filter.
+    #[allow(dead_code)]
     driver: Rc<ResourceDriver>,
     resource_context: ImageResourceContext,
     place: RewritePlace,
+    #[allow(dead_code)]
     image_index: i32,
     in_noscript_element: bool,
     css_image_inline_max_bytes: i64,
+    #[allow(dead_code)]
     is_resized_using_rendered_dimensions: bool,
     base_url: GoogleUrl,
     parent_debug: Option<Rc<std::cell::RefCell<Vec<String>>>>,
@@ -911,7 +916,6 @@ fn rewrite_loaded_resource(
 
     // Now re-compress the (possibly resized) image, and decide if
     // it's saved us anything.
-    let mut optimized_type = working_type;
     if is_resized || options.image_optimization_enabled() {
         let natural_dims = Some((analysis.width, analysis.height));
         let resized_dims = if is_resized {
@@ -948,7 +952,6 @@ fn rewrite_loaded_resource(
         };
         {
             optimized_size = out_bytes.len();
-            optimized_type = out_type;
             if optimized_size * 100
                 < contents.len() * options.image_limit_optimized_percent() as usize
             {
@@ -1100,7 +1103,7 @@ fn maybe_generate_low_res_preview(
     resource_context: &ImageResourceContext,
     working_bytes: &[u8],
     optimized_size: usize,
-    input: &InputResource,
+    _input: &InputResource,
     cached: &mut CachedResult,
 ) {
     use ps_image::format::ImageType;

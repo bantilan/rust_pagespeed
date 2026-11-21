@@ -9,7 +9,6 @@ use std::rc::Rc;
 
 use crate::element::{
     Arena, Attribute, ElementData, ElementStyle, LeafData, LeafKind, NodeData, NodeId, QuoteStyle,
-    NO_NODE,
 };
 use crate::event::{Event, EventQueue, SlotId, NO_SLOT};
 use crate::filter::HtmlFilter;

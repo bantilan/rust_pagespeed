@@ -10,7 +10,6 @@
 use std::rc::Rc;
 
 use ps_cache::hash::Hasher;
-use ps_config::filter::Filter;
 use ps_config::options::Category;
 use ps_http::google_url::GoogleUrl;
 
@@ -20,7 +19,7 @@ use crate::lexer::Lexer;
 use crate::metadata::CachedResult;
 use crate::name::Keyword;
 use crate::parser::Dom;
-use crate::resource::{InputResource, Resource};
+use crate::resource::InputResource;
 use crate::rewrite_context::{InlineBehavior, InlineRewriteContext};
 use crate::script_scanner::{ScriptClassification, ScriptTagScanner, EXECUTE_ASYNC, EXECUTE_DEFER};
 use crate::server_context::{InlineAuthorizationPolicy, InputRole, ResourceDriver};

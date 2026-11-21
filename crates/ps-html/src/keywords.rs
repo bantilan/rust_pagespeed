@@ -3,7 +3,7 @@
 //! Ports `HtmlKeywords`: the escape/unescape maps and helpers, the
 //! element-set predicates (`IsLiteralTag`, `TagAllowsBriefTermination`,
 //! ...), and the auto-close/contained relations. Tables live in
-//! [`keywords_generated`](crate::keywords_generated).
+//! the `generated` submodule.
 
 #[allow(clippy::all)]
 #[path = "keywords_generated.rs"]

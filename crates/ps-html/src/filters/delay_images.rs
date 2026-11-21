@@ -13,7 +13,7 @@ use ps_config::options::{Category, RewriteOptions};
 use super::common::{add_js_to_element, XhtmlStatus};
 use super::lazyload_images::{FinderAvailability, BEACON_IMAGE_ONLOAD_CODE};
 use super::url_left_trim::UrlValuedAttributes;
-use crate::element::{LeafKind, NodeId};
+use crate::element::NodeId;
 use crate::filter::HtmlFilter;
 use crate::lexer::Lexer;
 use crate::name::Keyword;

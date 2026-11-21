@@ -58,7 +58,6 @@ struct PendingScript {
 /// URL hash safe for identifiers (`JavascriptCodeBlock::JsUrlHash`):
 /// hash of the path plus leaf, `-` mapped to `$`.
 fn js_url_hash(url: &str, driver: &ResourceDriver) -> String {
-    use ps_cache::hash::Hasher;
     let path = GoogleUrl::new(url).path_and_leaf().to_string();
     driver
         .server_context()

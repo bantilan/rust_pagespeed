@@ -14,7 +14,6 @@ use std::rc::Rc;
 
 use ps_cache::cache::KeyState;
 use ps_cache::ttl::FetchStatus;
-use ps_http::content_type::ContentTypeKind;
 use ps_http::fetch::AsyncFetch;
 use ps_http::google_url::GoogleUrl;
 
@@ -232,6 +231,9 @@ impl ContextSlot {
     }
 
     /// Whether some context optimized the slot.
+    // Unread: callers reach through `base()` today; the slot-wide
+    // probe stays for parity with `ResourceSlot`.
+    #[allow(dead_code)]
     pub(crate) fn was_optimized(&self) -> bool {
         match self {
             ContextSlot::Html(slot) => slot.borrow().base().was_optimized(),

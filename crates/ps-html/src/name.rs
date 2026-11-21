@@ -2,7 +2,7 @@
 //!
 //! Ports `HtmlName`: the `Keyword` enum (discriminants match the C++ so
 //! sorted-set membership behaves identically), case-insensitive lookup, and
-//! canonical spellings. The tables live in [`name_generated`](crate::name_generated).
+//! canonical spellings. The tables live in the `generated` submodule.
 
 use std::rc::Rc;
 

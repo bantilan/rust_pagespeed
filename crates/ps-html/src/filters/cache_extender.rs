@@ -208,7 +208,7 @@ fn rewrite_loaded_resource(
     }
     let contents = input.contents();
     let mut contents = contents.as_slice();
-    let mut transformed;
+    let transformed;
     if input_type.kind() == ContentTypeKind::Css {
         let input_base = GoogleUrl::new(input.url());
         match driver.resolve_css_urls(&input_base, output.resolved_base(), contents) {

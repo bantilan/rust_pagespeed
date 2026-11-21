@@ -153,8 +153,7 @@ unsafe fn set_request_bit(
 ///
 /// `r` must point at a live request.
 pub unsafe fn request_buffered(r: *mut ngx::ffi::ngx_http_request_t) -> u32 {
-    // SAFETY: caller guarantees a live request.
-    unsafe { request_bit(r, 97, 4) }
+    request_bit(r, 97, 4)
 }
 
 /// Writes the request `buffered` mask (corrected offset).
@@ -209,8 +208,7 @@ pub unsafe fn set_request_filter_need_in_memory(r: *mut ngx::ffi::ngx_http_reque
 ///
 /// `r` must point at a live request.
 pub unsafe fn request_header_only(r: *mut ngx::ffi::ngx_http_request_t) -> u32 {
-    // SAFETY: caller guarantees a live request.
-    unsafe { request_bit(r, 78, 1) }
+    request_bit(r, 78, 1)
 }
 
 /// Reads `header_sent` (corrected offset).
@@ -219,8 +217,7 @@ pub unsafe fn request_header_only(r: *mut ngx::ffi::ngx_http_request_t) -> u32 {
 ///
 /// `r` must point at a live request.
 pub unsafe fn request_header_sent(r: *mut ngx::ffi::ngx_http_request_t) -> u32 {
-    // SAFETY: caller guarantees a live request.
-    unsafe { request_bit(r, 90, 1) }
+    request_bit(r, 90, 1)
 }
 
 /// Writes `gzip_vary` (corrected offset).

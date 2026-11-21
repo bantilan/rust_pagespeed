@@ -36,15 +36,9 @@ pub mod image_url_encoder;
 pub mod ipro;
 pub mod js_escape;
 pub mod keywords;
-#[allow(clippy::all)]
-#[path = "keywords_generated.rs"]
-mod keywords_generated;
 pub mod lexer;
 pub mod metadata;
 pub mod name;
-#[allow(clippy::all)]
-#[path = "name_generated.rs"]
-mod name_generated;
 pub mod namer;
 pub mod output_resource;
 pub mod parser;

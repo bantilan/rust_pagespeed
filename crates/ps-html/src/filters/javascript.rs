@@ -10,7 +10,7 @@
 use std::rc::Rc;
 
 use ps_config::filter::Filter;
-use ps_http::content_type::{mime_to_content_type, ContentType, ContentTypeKind, TYPES};
+use ps_http::content_type::{mime_to_content_type, ContentTypeKind, TYPES};
 use ps_http::google_url::GoogleUrl;
 use ps_js::rewrite::{CodeBlock, CodeBlockConfig};
 use ps_js::sourcemap as source_map;
@@ -28,7 +28,7 @@ use crate::rewrite_context::{
     ContextSlot, RewriteResult, SingleRewriteBehavior, SingleRewriteContext,
 };
 use crate::rewrite_filter::RewriteFilter;
-use crate::script_scanner::{ScriptClassification, ScriptTagScanner, EXECUTE_ASYNC, EXECUTE_DEFER};
+use crate::script_scanner::{ScriptClassification, ScriptTagScanner};
 use crate::server_context::{InlineAuthorizationPolicy, InputRole, IntendedFor, ResourceDriver};
 
 /// Whether a URL names a JS combination (`jc` filter id).
@@ -81,6 +81,9 @@ enum ScriptType {
 
 /// Per-context behavior (source-map mode varies by filter).
 struct JavascriptBehavior {
+    // Unread: rewrite entry points take the driver explicitly;
+    // the stored handle stays for C++ `JavascriptFilter` parity.
+    #[allow(dead_code)]
     driver: Rc<ResourceDriver>,
     patterns: Rc<TokenizerPatterns>,
     output_source_map: bool,

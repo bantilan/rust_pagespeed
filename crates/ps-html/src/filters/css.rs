@@ -314,7 +314,7 @@ impl CssBehavior {
             partition.debug_message.push(message);
             return RewriteResult::Failed;
         }
-        let Some((mut stylesheet, unparseable)) = parse_stylesheet(text) else {
+        let Some((stylesheet, unparseable)) = parse_stylesheet(text) else {
             server.variable(PARSE_FAILURES).add(1);
             partition.debug_message.push(format!(
                 "CSS rewrite failed: Parse error in {}",
@@ -1001,7 +1001,7 @@ impl CssFilter {
                 return;
             }
         }
-        let Some((mut stylesheet, unparseable)) = parse_stylesheet(&style) else {
+        let Some((stylesheet, unparseable)) = parse_stylesheet(&style) else {
             server.variable(PARSE_FAILURES).add(1);
             self.driver.insert_debug_comment(
                 dom,
@@ -1249,7 +1249,7 @@ impl CssFilter {
             self.driver.insert_debug_comment(dom, &message, id);
             return;
         }
-        let Some((mut declarations, unparseable)) = parse_declarations(&value) else {
+        let Some((declarations, unparseable)) = parse_declarations(&value) else {
             server.variable(PARSE_FAILURES).add(1);
             self.driver.insert_debug_comment(
                 dom,

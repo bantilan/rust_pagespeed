@@ -7,7 +7,7 @@
 
 use crate::doctype::DocType;
 use crate::element::{ElementStyle, NodeId, QuoteStyle};
-use crate::event::{Event, SlotId, NO_SLOT};
+use crate::event::{Event, SlotId};
 use crate::filter::HtmlFilter;
 use crate::keywords;
 use crate::name::{self, Keyword};

@@ -21,7 +21,7 @@ pub trait HtmlFilter {
 
     /// Decides whether this filter runs for the current document/options.
     /// Called before any events flow; the parser caches the result.
-    fn determine_enabled(&mut self, _dom: &Dom, lexer: &Lexer) -> bool {
+    fn determine_enabled(&mut self, _dom: &Dom, _lexer: &Lexer) -> bool {
         true
     }
 
@@ -55,25 +55,25 @@ pub trait HtmlFilter {
     }
 
     /// New document: clear per-document state (instances are reused).
-    fn start_document(&mut self, _dom: &mut Dom, lexer: &Lexer) {}
+    fn start_document(&mut self, _dom: &mut Dom, _lexer: &Lexer) {}
     /// End of document, immediately before the last flush.
-    fn end_document(&mut self, _dom: &mut Dom, lexer: &Lexer) {}
+    fn end_document(&mut self, _dom: &mut Dom, _lexer: &Lexer) {}
     /// Element start tag seen.
-    fn start_element(&mut self, _dom: &mut Dom, lexer: &Lexer, _element: NodeId) {}
+    fn start_element(&mut self, _dom: &mut Dom, _lexer: &Lexer, _element: NodeId) {}
     /// Element end tag seen.
-    fn end_element(&mut self, _dom: &mut Dom, lexer: &Lexer, _element: NodeId) {}
+    fn end_element(&mut self, _dom: &mut Dom, _lexer: &Lexer, _element: NodeId) {}
     /// CDATA section.
-    fn cdata(&mut self, _dom: &mut Dom, lexer: &Lexer, _node: NodeId) {}
+    fn cdata(&mut self, _dom: &mut Dom, _lexer: &Lexer, _node: NodeId) {}
     /// HTML comment (not an IE directive).
-    fn comment(&mut self, _dom: &mut Dom, lexer: &Lexer, _node: NodeId) {}
+    fn comment(&mut self, _dom: &mut Dom, _lexer: &Lexer, _node: NodeId) {}
     /// IE conditional directive.
-    fn ie_directive(&mut self, _dom: &mut Dom, lexer: &Lexer, _node: NodeId) {}
+    fn ie_directive(&mut self, _dom: &mut Dom, _lexer: &Lexer, _node: NodeId) {}
     /// Raw characters between tags.
-    fn characters(&mut self, _dom: &mut Dom, lexer: &Lexer, _node: NodeId) {}
+    fn characters(&mut self, _dom: &mut Dom, _lexer: &Lexer, _node: NodeId) {}
     /// HTML directive (`<!...>`).
-    fn directive(&mut self, _dom: &mut Dom, lexer: &Lexer, _node: NodeId) {}
+    fn directive(&mut self, _dom: &mut Dom, _lexer: &Lexer, _node: NodeId) {}
     /// A flush is occurring; streamed-output filters emit now.
-    fn flush(&mut self, _dom: &mut Dom, lexer: &Lexer) {}
+    fn flush(&mut self, _dom: &mut Dom, _lexer: &Lexer) {}
     /// All pre-render filtering done; rendering follows.
-    fn render_done(&mut self, _dom: &mut Dom, lexer: &Lexer) {}
+    fn render_done(&mut self, _dom: &mut Dom, _lexer: &Lexer) {}
 }

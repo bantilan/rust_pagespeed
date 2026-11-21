@@ -596,7 +596,7 @@ pub unsafe extern "C" fn base_fetch_read_event_handler(ev: *mut ngx::ffi::ngx_ev
         // handler cannot null the owner's connection pointer).
         let mut dispatch = |event: PipeEvent| {
             // SAFETY: paired by the post; reclaimed exactly once.
-            let fetch = unsafe { crate::fetch::reclaim_event_sender(event) };
+            let fetch = crate::fetch::reclaim_event_sender(event);
             let r = fetch.with_state(|base| base.request());
             if r.is_null() {
                 drop(fetch);
@@ -608,9 +608,9 @@ pub unsafe extern "C" fn base_fetch_read_event_handler(ev: *mut ngx::ffi::ngx_ev
                 drop(fetch);
                 return;
             }
-            let ctx = unsafe { crate::request::get_request_ctx(r) };
+            let ctx = crate::request::get_request_ctx(r);
             if ctx.is_null() {
-                let log = unsafe { (*ngx::ffi::ngx_cycle).log };
+                let log = (*ngx::ffi::ngx_cycle).log;
                 ngx::ngx_log_error!(
                     ngx::ffi::NGX_LOG_WARN,
                     log,
@@ -620,17 +620,15 @@ pub unsafe extern "C" fn base_fetch_read_event_handler(ev: *mut ngx::ffi::ngx_ev
                 drop(fetch);
                 return;
             }
-            let disassociated = unsafe {
-                match (*ctx).base_fetch.as_ref() {
-                    Some(current) => !std::ptr::eq(
-                        std::sync::Arc::as_ptr(&fetch),
-                        std::sync::Arc::as_ptr(current),
-                    ),
-                    None => true,
-                }
+            let disassociated = match (*ctx).base_fetch.as_ref() {
+                Some(current) => !std::ptr::eq(
+                    std::sync::Arc::as_ptr(&fetch),
+                    std::sync::Arc::as_ptr(current),
+                ),
+                None => true,
             };
             if disassociated {
-                let log = unsafe { (*ngx::ffi::ngx_cycle).log };
+                let log = (*ngx::ffi::ngx_cycle).log;
                 ngx::ngx_log_error!(
                     ngx::ffi::NGX_LOG_WARN,
                     log,
@@ -640,10 +638,8 @@ pub unsafe extern "C" fn base_fetch_read_event_handler(ev: *mut ngx::ffi::ngx_ev
                 drop(fetch);
                 return;
             }
-            let upstream_active = unsafe {
-                let upstream = (*r).upstream;
-                !upstream.is_null() && !(*upstream).cleanup.is_null()
-            };
+            let upstream = (*r).upstream;
+            let upstream_active = !upstream.is_null() && !(*upstream).cleanup.is_null();
             let fetch_type_is_html_or_ipro = fetch.with_state(|base| {
                 matches!(
                     base.fetch_type(),
@@ -652,14 +648,14 @@ pub unsafe extern "C" fn base_fetch_read_event_handler(ev: *mut ngx::ffi::ngx_ev
                 )
             });
             let connection_error_non_ipro =
-                unsafe { !fetch_type_is_html_or_ipro && (*(*r).connection).error() != 0 };
+                !fetch_type_is_html_or_ipro && (*(*r).connection).error() != 0;
             let rc = if connection_error_non_ipro {
                 ngx::ffi::NGX_ERROR as ngx::ffi::ngx_int_t
             } else {
                 // SAFETY: live request with attached context.
-                unsafe { crate::fetch::base_fetch_handler(r) }
+                crate::fetch::base_fetch_handler(r)
             };
-            let _run_posted = unsafe {
+            let _run_posted =
                 match crate::fetch::read_callback_plan(&crate::fetch::ReadCallbackInputs {
                     refcount_reached_zero: zero,
                     detached,
@@ -683,12 +679,11 @@ pub unsafe extern "C" fn base_fetch_read_event_handler(ev: *mut ngx::ffi::ngx_ev
                         run_posted
                     }
                     crate::fetch::ReadCallbackAction::UpstreamAgain { run_posted } => run_posted,
-                }
-            };
+                };
             if _run_posted {
                 // SAFETY: live request connection (the pipe's own
                 // connection carries no posted requests).
-                unsafe { ngx::ffi::ngx_http_run_posted_requests((*r).connection) };
+                ngx::ffi::ngx_http_run_posted_requests((*r).connection);
             }
             drop(fetch);
         };

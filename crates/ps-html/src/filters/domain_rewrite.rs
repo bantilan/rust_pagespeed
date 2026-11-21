@@ -21,7 +21,7 @@ use super::common::{add_js_to_element, BodyEndTracker, XhtmlStatus};
 use crate::base_tracker::BaseTracker;
 use crate::decode_url::{decode_url, DecodeConfig};
 use crate::domain_lawyer::DomainLawyer;
-use crate::element::{LeafKind, NodeId};
+use crate::element::NodeId;
 use crate::filter::HtmlFilter;
 use crate::lexer::Lexer;
 use crate::name::Keyword;
@@ -214,21 +214,6 @@ impl<N: UrlNamer> DomainRewriteFilter<N> {
             apply_sharding,
             apply_domain_suffix,
         )
-    }
-
-    /// Whether a URL names a rewritten resource (`IsPagespeedResource`,
-    /// via URL decoding).
-    fn is_pagespeed_resource(&self, url: &GoogleUrl) -> bool {
-        decode_url(
-            url,
-            &DecodeConfig {
-                options: &self.config.options,
-                namer: &self.namer,
-                hash_length: self.config.hash_length,
-                signature_length: self.config.signature_length,
-            },
-        )
-        .is_some()
     }
 
     /// Rewrites Location/Refresh/Set-Cookie headers (`UpdateDomainHeaders`).

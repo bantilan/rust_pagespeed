@@ -7,7 +7,6 @@
 
 use std::rc::Rc;
 
-use ps_cache::hash::Hasher;
 use ps_cache::namer::ResourceNamer;
 use ps_http::content_type::{ContentType, MAX_EXTENSION_LEN};
 use ps_http::google_url::GoogleUrl;
