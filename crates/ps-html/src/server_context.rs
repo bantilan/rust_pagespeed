@@ -765,7 +765,12 @@ impl ResourceDriver {
             if mapping.kind == DomainMappingKind::Rewrite {
                 lawyer.add_rewrite_domain_mapping(&mapping.to, &mapping.from, None);
             } else if mapping.kind == DomainMappingKind::Proxy {
-                lawyer.add_proxy_domain_mapping(&mapping.from, &mapping.to, "", None);
+                lawyer.add_proxy_domain_mapping(
+                    &mapping.from,
+                    &mapping.to,
+                    &mapping.host_header,
+                    None,
+                );
             }
         }
         drop(options);

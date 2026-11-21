@@ -42,6 +42,7 @@ pub mod mock;
 pub mod module;
 pub mod native_fetch;
 pub mod options;
+pub mod origin_fetch;
 pub mod pipe;
 pub mod recording;
 pub mod request;

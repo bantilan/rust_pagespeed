@@ -423,7 +423,10 @@ pub struct DomainMapping {
     pub from: String,
     /// Target domain.
     pub to: String,
-    /// Host header override (empty for 2-arg forms).
+    /// Third arg (empty for 2-arg forms): the `Host` override for
+    /// origin mappings, the CDN re-base for proxy mappings (C++
+    /// `MapProxyDomain` takes `<proxy> <origin> [<cdn>]`, never a
+    /// host header there).
     pub host_header: String,
 }
 

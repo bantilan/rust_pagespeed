@@ -83,6 +83,15 @@ impl FileFetcher {
         })
     }
 
+    /// Whether this fetcher maps a URL (pure, no I/O): the
+    /// chain leg routes on this, so mapped names never fall
+    /// through to the origin (a mapped-but-missing name answers
+    /// the file leg's 404 rather than loopbacking).
+    #[must_use]
+    pub fn can_fetch(&self, url: &str) -> bool {
+        self.join_root(url).is_some()
+    }
+
     /// Maps a URL to a jailed file path (pure join + checks; the
     /// canonicalization read is the only I/O).
     /// Lexically joins a URL path under the root (no filesystem

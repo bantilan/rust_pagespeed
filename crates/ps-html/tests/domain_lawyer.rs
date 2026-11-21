@@ -1921,3 +1921,51 @@ fn add_proxy_suffix() {
         Some("https://www.example.com.suffix/absolute.html")
     );
 }
+
+#[test]
+fn rebuild_lawyer_threads_proxy_mappings_with_cdn_leg() {
+    use ps_cache::cache::MemoryCache;
+    use ps_config::options::RewriteOptions;
+    use ps_html::server_context::{ResourceDriver, ServerContext};
+    use ps_http::mock::MockUrlFetcher;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::sync::Arc;
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .add_proxy_domain_mapping("http://proxy.com/external", "http://origin.com/static");
+    // The third `MapProxyDomain` arg re-bases onto a CDN.
+    options
+        .borrow_mut()
+        .parse_and_set_3(
+            "MapProxyDomain",
+            "http://proxy2.com/e",
+            "http://origin2.com/s",
+            "http://cdn2.com/e",
+        )
+        .expect("3-arg proxy mapping parses");
+    let server = Rc::new(ServerContext::new_with_metadata(
+        Arc::new(MemoryCache::new()),
+        Arc::new(MemoryCache::new()),
+        Rc::new(MockUrlFetcher::new()),
+        0,
+    ));
+    let driver = ResourceDriver::new(server, options, "http://proxy.com/");
+    let lawyer = driver.lawyer();
+    assert!(lawyer.is_proxy_mapped(&GoogleUrl::new("http://proxy.com/external/a.css")));
+    assert!(!lawyer.is_proxy_mapped(&GoogleUrl::new("http://proxy.com/a.css")));
+    assert!(lawyer.is_proxy_mapped(&GoogleUrl::new("http://proxy2.com/e/a.css")));
+    // The CDN leg maps proxy and CDN paths back to the origin.
+    let (mapped, _, is_proxy) = lawyer
+        .map_origin_url(&GoogleUrl::new("http://proxy2.com/e/a.css"))
+        .expect("proxy maps");
+    assert!(is_proxy);
+    assert_eq!(mapped, "http://origin2.com/s/a.css");
+    let (mapped, _, is_proxy) = lawyer
+        .map_origin_url(&GoogleUrl::new("http://cdn2.com/e/a.css"))
+        .expect("CDN maps");
+    assert!(is_proxy);
+    assert_eq!(mapped, "http://origin2.com/s/a.css");
+}

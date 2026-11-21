@@ -1094,21 +1094,26 @@ unsafe fn child_init_servers(cycle: *mut ngx_cycle_t, main: &mut MainConf) {
                         .duration_since(std::time::UNIX_EPOCH)
                         .map(|age| age.as_millis() as i64)
                         .unwrap_or(0);
-                    let fetcher: Rc<dyn ps_http::fetch::AsyncFetcher> = if clcf.is_null() {
-                        Rc::new(crate::rewrite::UnavailableFetcher)
+                    let file = if clcf.is_null() {
+                        None
                     } else {
-                        match file_fetcher_for_server(cscf, clcf, &context.options.core) {
-                            Some(fetcher) => Rc::new(fetcher),
-                            None => {
-                                main.driver_factory.message_handler.message(
-                                    MessageLevel::Info,
-                                    "pagespeed: origin file fetching unavailable for this \
-                                     server (unmapped root); resources serve from cache only",
-                                );
-                                Rc::new(crate::rewrite::UnavailableFetcher)
-                            }
-                        }
+                        file_fetcher_for_server(cscf, clcf, &context.options.core)
                     };
+                    if file.is_none() {
+                        main.driver_factory.message_handler.message(
+                            MessageLevel::Info,
+                            "pagespeed: origin file fetching unavailable for this \
+                             server (unmapped root); origins fetch over HTTP",
+                        );
+                    }
+                    let fetcher: Rc<dyn ps_http::fetch::AsyncFetcher> =
+                        Rc::new(crate::origin_fetch::ChainedFetcher::new(
+                            file,
+                            crate::origin_fetch::OriginFetcher::new(
+                                context.options.system.blocking_fetch_timeout_ms,
+                                crate::origin_fetch::DEFAULT_MAX_BODY_BYTES,
+                            ),
+                        ));
                     context.html_context = Some(crate::rewrite::html_context(
                         assembled.http_backend,
                         Arc::clone(&assembled.metadata_cache),
@@ -2469,6 +2474,9 @@ unsafe fn resource_response(
             let cscf = *(*r).srv_conf.add(core_index) as *mut ngx::ffi::ngx_http_core_srv_conf_t;
             (*cscf).merge_slashes != 0
         };
+        // The proxy branch answers mapped origins (`MapOriginUrl`
+        // with `is_proxy`); the lawyer snapshots per request.
+        let proxy_mapped = crate::terminal::proxy_lawyer(&resolved.core).is_proxy_mapped(&url);
         let mut inputs = BranchInputs {
             unplugged: false,
             enabled: false,
@@ -2476,7 +2484,7 @@ unsafe fn resource_response(
             html_rewrite,
             route,
             method,
-            proxy_mapped: false,
+            proxy_mapped,
             is_allowed: true,
             in_place_enabled: false,
             ipro_url_agrees: crate::inplace_url_agreement::url_agrees(
@@ -2611,9 +2619,32 @@ unsafe fn resource_response(
                 };
                 serve_response(r, response.status, &response.headers, &response.body)
             }
-            // No origin fetch machinery; without a `DomainLawyer`
-            // nothing maps here anyway.
-            Branch::Proxy => NGX_DECLINED as ngx_int_t,
+            Branch::Proxy => {
+                let (ps_side, ngx_side) = SharedBaseFetch::new_pair(
+                    &url_string,
+                    r,
+                    BaseFetchType::PagespeedProxy,
+                    (*ctx_ptr).preserve_caching_headers,
+                    http_options,
+                );
+                (*ctx_ptr).base_fetch = Some(ngx_side);
+                drop(ps_side);
+                let response = crate::terminal::fetch_proxy_body(
+                    &resolved.core,
+                    resolved.system.blocking_fetch_timeout_ms,
+                    &url_string,
+                    &request_headers,
+                );
+                // Only transport failures decline (nginx renders
+                // its default error page); origin error statuses
+                // serve as-is, like C++'s proxied fetch.
+                if response.status == 0 {
+                    return NGX_DECLINED as ngx_int_t;
+                }
+                let mut headers = response.headers;
+                headers.push((X_PAGE_SPEED.to_string(), resolved.core.x_header_value()));
+                serve_response(r, response.status, &headers, &response.body)
+            }
             Branch::Html => {
                 if request_headers.method() == Method::Head {
                     request_headers.set_method(Method::Get);

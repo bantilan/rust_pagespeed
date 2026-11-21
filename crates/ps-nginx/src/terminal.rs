@@ -11,10 +11,10 @@ use ps_admin::purge::PurgeSetBackend;
 use ps_admin::site::{AdminConfig, AdminRequest, AdminSite, CacheInventory};
 use ps_cache::purge::PurgeSet;
 use ps_html::keywords::escape as html_escape_bytes;
-use ps_http::fetch::{AsyncFetch, BufferingFetch};
+use ps_http::fetch::{AsyncFetch, AsyncFetcher, BufferingFetch};
 use ps_http::google_url::GoogleUrl;
 use ps_http::query_params::QueryParams;
-use ps_http::request::RequestContext;
+use ps_http::request::{Method, RequestContext, RequestHeaders};
 use ps_http::response::HttpOptions;
 use std::sync::{Arc, Mutex};
 
@@ -171,6 +171,100 @@ pub fn fetch_in_place_body(
     driver.register_serving_filters();
     ps_html::ipro::fetch_in_place_resource(&driver, url, &mut fetch, false);
     collect_fetch(&fetch)
+}
+
+/// Builds a lawyer over the proxy mappings (`domain_lawyer()`
+/// reads live options in C++; the sync bridge snapshots per
+/// request, like `ResourceDriver::rebuild_lawyer`).
+#[must_use]
+pub fn proxy_lawyer(
+    options: &ps_config::options::RewriteOptions,
+) -> ps_html::domain_lawyer::DomainLawyer {
+    use ps_config::options::DomainMappingKind;
+    let mut lawyer = ps_html::domain_lawyer::DomainLawyer::new();
+    for mapping in options.domain_mappings() {
+        if mapping.kind == DomainMappingKind::Proxy {
+            // The third `MapProxyDomain` arg re-bases fetches onto
+            // a CDN (C++ `AddProxyDomainMapping` third leg);
+            // two-arg forms carry an empty target.
+            lawyer.add_proxy_domain_mapping(&mapping.from, &mapping.to, &mapping.host_header, None);
+        }
+    }
+    lawyer
+}
+
+/// Serves a proxy-mapped URL through the sync bridge (the nginx
+/// proxy branch, `StartNewProxyFetch` with `is_proxy_mapped`):
+/// maps the request URL onto its origin, fetches it with the
+/// client's headers forwarded transparently (the `Host` stays
+/// the proxy's — C++ computes the mapped host header but never
+/// sends it), and collects the origin's response verbatim.
+/// `HEAD` runs as the `GET` it answers (nginx drops the body
+/// itself, and the fetched length answers correctly); transport
+/// failures yield status 0 (decline), while origin error
+/// statuses serve as-is.
+pub fn fetch_proxy_body(
+    options: &ps_config::options::RewriteOptions,
+    timeout_ms: i64,
+    url: &str,
+    request_headers: &RequestHeaders,
+) -> ResourceResponse {
+    let failed = ResourceResponse {
+        status: 0,
+        headers: Vec::new(),
+        body: Vec::new(),
+    };
+    let lawyer = proxy_lawyer(options);
+    let gurl = GoogleUrl::new(url);
+    let Some((mapped, _, is_proxy)) = lawyer.map_origin_url(&gurl) else {
+        return failed;
+    };
+    if !is_proxy {
+        return failed;
+    }
+    let mut outgoing = request_headers.clone();
+    outgoing.set_method(Method::Get);
+    let mut fetch = BufferingFetch::new(&mapped, RequestContext::new(HttpOptions::default()));
+    *fetch.request_headers_mut() = outgoing;
+    let fetcher = crate::origin_fetch::OriginFetcher::new(
+        timeout_ms,
+        crate::origin_fetch::DEFAULT_MAX_BODY_BYTES,
+    );
+    fetcher.fetch(&mapped, &mut fetch);
+    if !fetch.done() || !fetch.success() {
+        return failed;
+    }
+    collect_proxy(&fetch)
+}
+
+/// Collects a proxied fetch, dropping hop-by-hop response
+/// headers (the fetcher already renormalized framing; emitting
+/// the origin's connection tokens would corrupt ours) and the
+/// internal size-accounting header (inputs keep it; the wire
+/// must not).
+fn collect_proxy(fetch: &BufferingFetch) -> ResourceResponse {
+    use ps_http::names::header;
+    let headers = fetch
+        .response_headers()
+        .headers()
+        .iter()
+        .filter(|(name, _)| {
+            !name.eq_ignore_ascii_case(header::CONNECTION)
+                && !name.eq_ignore_ascii_case(header::KEEP_ALIVE)
+                && !name.eq_ignore_ascii_case(header::PROXY_AUTHENTICATE)
+                && !name.eq_ignore_ascii_case(header::TRANSFER_ENCODING)
+                && !name.eq_ignore_ascii_case(header::UPGRADE)
+                && !name.eq_ignore_ascii_case("Trailer")
+                && !name.eq_ignore_ascii_case(header::TRAILERS)
+                && !name.eq_ignore_ascii_case(header::X_ORIGINAL_CONTENT_LENGTH)
+        })
+        .map(|(name, value)| (name.to_string(), value.to_string()))
+        .collect();
+    ResourceResponse {
+        status: fetch.response_headers().status_code().max(0) as u16,
+        headers,
+        body: fetch.body().to_vec(),
+    }
 }
 
 /// Collects a buffered fetch into a servable response.
@@ -423,6 +517,7 @@ pub fn purge_response(inputs: PurgeInputs) -> ResourceResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::origin_fetch::test_support::{get_headers, Stub};
     use crate::rewrite::html_context;
     use ps_cache::cache::{Cache, MemoryCache};
     use std::sync::Arc;
@@ -591,5 +686,136 @@ mod tests {
         });
         assert_eq!(response.status, 200);
         assert!(!response.body.is_empty());
+    }
+
+    /// Options proxying `proxy.test` at the stub origin.
+    fn proxy_options_for(stub: &Stub) -> ps_config::options::RewriteOptions {
+        let mut options = ps_config::options::RewriteOptions::new();
+        let origin = stub.url("/").trim_end_matches('/').to_string();
+        options.add_proxy_domain_mapping("http://proxy.test/", &origin);
+        options
+    }
+
+    /// Client-style headers (`Host` set, like nginx delivers).
+    fn proxy_request_headers() -> RequestHeaders {
+        let mut headers = get_headers();
+        headers
+            .headers_mut()
+            .add(ps_http::names::header::HOST, "proxy.test");
+        headers
+    }
+
+    #[test]
+    fn proxy_serves_mapped_origin_verbatim() {
+        let stub = Stub::once(
+            b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 7\r\nX-Origin: yes\r\n\r\n<html>\n",
+        );
+        let options = proxy_options_for(&stub);
+        let lawyer = proxy_lawyer(&options);
+        assert!(lawyer.is_proxy_mapped(&GoogleUrl::new("http://proxy.test/page")));
+        assert!(!lawyer.is_proxy_mapped(&GoogleUrl::new("http://other.test/page")));
+        let response = fetch_proxy_body(
+            &options,
+            5000,
+            "http://proxy.test/page",
+            &proxy_request_headers(),
+        );
+        assert_eq!(response.status, 200);
+        assert_eq!(b"<html>\n", response.body.as_slice());
+        assert!(response
+            .headers
+            .iter()
+            .any(|(name, value)| name == "X-Origin" && value == "yes"));
+        assert!(response.headers.iter().all(|(name, _)| {
+            !name.eq_ignore_ascii_case("x-original-content-length")
+        }));
+        // Transparent proxying: the origin sees the proxy's Host.
+        let request = stub.request_text();
+        assert!(request.starts_with("GET /page HTTP/1.1\r\n"), "{request}");
+        assert!(request.contains("Host: proxy.test\r\n"), "{request}");
+    }
+
+    #[test]
+    fn proxy_head_runs_as_get() {
+        let stub = Stub::once(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ndata");
+        let options = proxy_options_for(&stub);
+        let mut headers = proxy_request_headers();
+        headers.set_method(Method::Head);
+        let response = fetch_proxy_body(&options, 5000, "http://proxy.test/f", &headers);
+        assert_eq!(response.status, 200);
+        assert_eq!(b"data", response.body.as_slice());
+        let request = stub.request_text();
+        assert!(request.starts_with("GET /f HTTP/1.1\r\n"), "{request}");
+    }
+
+    #[test]
+    fn proxy_serves_origin_errors_as_is() {
+        let stub = Stub::once(b"HTTP/1.1 404 Gone\r\nContent-Length: 7\r\n\r\nmissing");
+        let options = proxy_options_for(&stub);
+        let response = fetch_proxy_body(
+            &options,
+            5000,
+            "http://proxy.test/nope",
+            &proxy_request_headers(),
+        );
+        assert_eq!(response.status, 404);
+        assert_eq!(b"missing", response.body.as_slice());
+    }
+
+    #[test]
+    fn proxy_strips_hop_by_hop_response_headers() {
+        let stub = Stub::once(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\nKeep-Alive: timeout=5\r\nUpgrade: h2c\r\nX-Keep: 1\r\n\r\nok",
+        );
+        let options = proxy_options_for(&stub);
+        let response = fetch_proxy_body(
+            &options,
+            5000,
+            "http://proxy.test/x",
+            &proxy_request_headers(),
+        );
+        assert_eq!(response.status, 200);
+        for (name, _) in &response.headers {
+            assert!(
+                !name.eq_ignore_ascii_case("connection")
+                    && !name.eq_ignore_ascii_case("keep-alive")
+                    && !name.eq_ignore_ascii_case("upgrade"),
+                "hop-by-hop leaked: {name}"
+            );
+        }
+        assert!(response
+            .headers
+            .iter()
+            .any(|(name, value)| name == "X-Keep" && value == "1"));
+    }
+
+    #[test]
+    fn proxy_unmapped_url_fails_to_decline() {
+        let stub = Stub::once(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+        let options = proxy_options_for(&stub);
+        let response = fetch_proxy_body(
+            &options,
+            5000,
+            "http://other.test/page",
+            &proxy_request_headers(),
+        );
+        assert_eq!(response.status, 0);
+        assert!(response.body.is_empty());
+    }
+
+    #[test]
+    fn proxy_dead_origin_fails_to_decline() {
+        let mut options = ps_config::options::RewriteOptions::new();
+        // Reserved TEST-NET-1: unroutable, so the fetch fails fast.
+        options.add_proxy_domain_mapping("http://proxy.test/", "http://192.0.2.1/");
+        let lawyer = proxy_lawyer(&options);
+        assert!(lawyer.is_proxy_mapped(&GoogleUrl::new("http://proxy.test/page")));
+        let response = fetch_proxy_body(
+            &options,
+            1000,
+            "http://proxy.test/page",
+            &proxy_request_headers(),
+        );
+        assert_eq!(response.status, 0);
     }
 }
