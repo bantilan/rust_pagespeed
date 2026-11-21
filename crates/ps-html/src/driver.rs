@@ -103,6 +103,11 @@ impl Driver {
                         Box::new(filters::ImageRewriteFilter::new(driver))
                             as Box<dyn crate::filter::HtmlFilter>
                     }),
+                    ChainFilter::CriticalImagesBeacon => resource_driver.clone().map(|driver| {
+                        Box::new(filters::critical_images_beacon::CriticalImagesBeaconFilter::new(
+                            driver,
+                        )) as Box<dyn crate::filter::HtmlFilter>
+                    }),
                     ChainFilter::AddHead => Some(Box::new(filters::AddHeadFilter::new(
                         options
                             .filters()

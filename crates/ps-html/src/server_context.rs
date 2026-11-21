@@ -639,6 +639,7 @@ pub struct ResourceDriver {
     user_agent: RefCell<String>,
     request_headers: RefCell<RequestHeaders>,
     image_records: RefCell<Vec<ImageRewriteRecord>>,
+    beacon_evidence_identity: RefCell<Option<Vec<u8>>>,
 }
 
 /// One successful image rewrite, as listed by the admin images
@@ -732,6 +733,7 @@ impl ResourceDriver {
             user_agent: RefCell::new(String::new()),
             request_headers: RefCell::new(RequestHeaders::new()),
             image_records: RefCell::new(Vec::new()),
+            beacon_evidence_identity: RefCell::new(None),
         };
         driver.rebuild_lawyer();
         driver
@@ -747,6 +749,20 @@ impl ResourceDriver {
     #[must_use]
     pub fn take_image_records(&self) -> Vec<ImageRewriteRecord> {
         std::mem::take(&mut *self.image_records.borrow_mut())
+    }
+
+    /// Snapshots the post-render beacon evidence identity (the
+    /// beacon filter writes this after candidate registration so
+    /// the HTML cache can detect mid-render evidence changes).
+    pub fn set_beacon_evidence_identity(&self, identity: Vec<u8>) {
+        *self.beacon_evidence_identity.borrow_mut() = Some(identity);
+    }
+
+    /// Reads the post-render beacon evidence identity, if the
+    /// beacon filter recorded one.
+    #[must_use]
+    pub fn beacon_evidence_identity(&self) -> Option<Vec<u8>> {
+        self.beacon_evidence_identity.borrow().clone()
     }
 
     /// Reads the request user agent (`user_agent`).

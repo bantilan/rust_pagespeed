@@ -55,9 +55,9 @@ pub struct HtmlSink<'a> {
 impl<'a> HtmlSink<'a> {
     /// Builds a sink over request options (`ProxyFetch` ctor
     /// shape): beacon results on (system default), property
-    /// cache off (unported). `resource_driver` instantiates the
-    /// driver-bound CSS/JS filters (`None` keeps the minify
-    /// subsets).
+    /// cache on (metadata-backed beacon cohort).
+    /// `resource_driver` instantiates the driver-bound CSS/JS
+    /// filters (`None` keeps the minify subsets).
     #[must_use]
     pub fn new(
         options: &ps_config::options::RewriteOptions,
@@ -68,7 +68,7 @@ impl<'a> HtmlSink<'a> {
         resource_driver: Option<Rc<ps_html::server_context::ResourceDriver>>,
     ) -> Self {
         let output = Rc::new(RefCell::new(Vec::new()));
-        let context = ps_html::chain::ChainContext::new(true, false);
+        let context = ps_html::chain::ChainContext::new(true, true);
         let mut driver = ps_html::driver::Driver::new(
             options,
             &context,

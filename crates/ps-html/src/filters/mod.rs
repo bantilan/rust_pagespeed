@@ -13,6 +13,7 @@ pub mod base_tag;
 pub mod cache_extender;
 pub mod collapse_whitespace;
 pub mod common;
+pub mod critical_images_beacon;
 pub mod critical_selector;
 pub mod css;
 pub mod css_combine;
