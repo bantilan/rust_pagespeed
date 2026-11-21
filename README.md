@@ -39,6 +39,7 @@ Cargo workspace (`resolver = "2"`):
 | `ps-admin` | Admin pages / status endpoints           |
 | `ps-nginx` | NGINX FFI bindings (see safety note)     |
 | `ps-compat` | Compatibility test harness              |
+| `ps-shm` | Cross-process shared counters (mmap)     |
 
 ## Safety policy
 

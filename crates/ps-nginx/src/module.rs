@@ -857,6 +857,38 @@ fn ignore_sigpipe() {
     }
 }
 
+/// Builds the worker-shared statistics registry (config phase,
+/// pre-fork, inherited by workers): collects the fixed counter table
+/// from a scratch registry, opens the memory-mapped file under the
+/// first configured cache dir, and returns the registry plus setup
+/// messages. Any failure falls back to the null registry (today's
+/// per-process behavior) with an explanatory warning; sharing must
+/// never fail configuration.
+fn open_shared_statistics(cache_dirs: &[&str]) -> (ps_stats::core::Statistics, Vec<String>) {
+    let mut messages = Vec::new();
+    let Some(dir) = cache_dirs.first() else {
+        messages.push(
+            "pagespeed: no FileCachePath configured; statistics stay per-process".to_string(),
+        );
+        return (ps_stats::core::Statistics::new(), messages);
+    };
+    let probe = ps_stats::core::Statistics::new();
+    ps_stats::names::init_all(&probe);
+    let fixed = probe.registered_names();
+    match ps_shm::SharedCounters::open(std::path::Path::new(dir), &fixed) {
+        Ok(counters) => (
+            ps_stats::core::Statistics::with_shared(Arc::new(counters)),
+            messages,
+        ),
+        Err(error) => {
+            messages.push(format!(
+                "pagespeed: shared statistics unavailable ({error}); counters stay per-process"
+            ));
+            (ps_stats::core::Statistics::new(), messages)
+        }
+    }
+}
+
 /// Module init (`ps_init_module`).
 ///
 /// # Safety
@@ -953,9 +985,24 @@ pub unsafe extern "C" fn init_module(cycle: *mut ngx_cycle_t) -> ngx_int_t {
             return NGX_OK as ngx_int_t;
         }
         ignore_sigpipe();
-        // No shared-memory backend exists, so the null registry
-        // always initializes here (pre-fork, inherited by workers).
-        ps_stats::names::init_all(&(*cfg).driver_factory.statistics);
+        // The shared counter table opens here (pre-fork, inherited by
+        // workers); failures fall back to the null registry.
+        {
+            let main = &mut *cfg;
+            let cache_dirs: Vec<&str> = contexts
+                .iter()
+                .map(|context| context.options.system.file_cache_path.as_str())
+                .filter(|dir| !dir.is_empty())
+                .collect();
+            let (statistics, messages) = open_shared_statistics(&cache_dirs);
+            main.driver_factory.statistics = Arc::new(statistics);
+            for message in messages {
+                main.driver_factory
+                    .message_handler
+                    .message(MessageLevel::Warning, &message);
+            }
+            ps_stats::names::init_all(&main.driver_factory.statistics);
+        }
         if outcome.root_init {
             let main = &mut *cfg;
             let options: Vec<&NgxOptions> =
@@ -3692,6 +3739,32 @@ mod tests {
                 &["FileCachePath", "relative"]
             )
         );
+    }
+
+    #[test]
+    fn shared_statistics_open_without_dirs_falls_back() {
+        let (statistics, messages) = open_shared_statistics(&[]);
+        assert_eq!(1, messages.len());
+        assert!(messages[0].contains("stay per-process"));
+        // The fallback registry is fully functional, locally.
+        statistics.add_variable("probe").add(2);
+        assert_eq!(2, statistics.get_variable("probe").unwrap().get());
+        assert_eq!(0, statistics.shared_fallbacks());
+    }
+
+    #[test]
+    fn shared_statistics_open_with_dir_shares() {
+        let dir = std::env::temp_dir().join(format!("psngx-shm-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.to_str().unwrap().to_string();
+        let (first, messages) = open_shared_statistics(&[path.as_str()]);
+        assert!(messages.is_empty(), "{messages:?}");
+        ps_stats::names::init_all(&first);
+        assert_eq!(0, first.shared_fallbacks());
+        let (second, _) = open_shared_statistics(&[path.as_str()]);
+        first.add_variable("cache_hits").add(7);
+        assert_eq!(7, second.add_variable("cache_hits").get());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
 

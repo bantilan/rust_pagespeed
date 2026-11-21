@@ -8,8 +8,11 @@
 //!
 //! Memory model: counters are lock-free atomics (`Relaxed` ordering suits
 //! monotonic reporting counters); histograms and timed variables hold a
-//! mutex, as in C++. Cross-process shared memory lands with the nginx
-//! step; this registry is in-process (`Send + Sync`).
+//! mutex, as in C++. A registry built with [`Statistics::with_shared`]
+//! backs plain and up/down counters in a cross-process memory-mapped
+//! table (`ps-shm`), so every nginx worker reports global totals;
+//! histograms and timed variables stay per-process by design, and a
+//! plain [`Statistics::new`] registry stays fully in-process.
 #![forbid(unsafe_code)]
 
 use std::collections::HashMap;
@@ -17,10 +20,32 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
+/// Counter cell: a process-local atomic or a shared-memory slot.
+#[derive(Debug)]
+enum Cell {
+    /// In-process atomic (plain registries and shared fallbacks).
+    Local(AtomicI64),
+    /// Cross-process slot (shared registries).
+    Shared(SharedCell),
+}
+
+impl Default for Cell {
+    fn default() -> Self {
+        Cell::Local(AtomicI64::new(0))
+    }
+}
+
+/// Shared-memory cell: the mapped table plus the slot index.
+#[derive(Debug, Clone)]
+struct SharedCell {
+    counters: Arc<ps_shm::SharedCounters>,
+    slot: usize,
+}
+
 /// Monotonic counter (`Variable`): `Get`, `Add` (non-negative), `Clear`.
 #[derive(Debug, Default)]
 pub struct Variable {
-    value: AtomicI64,
+    cell: Cell,
     name: String,
 }
 
@@ -29,7 +54,19 @@ impl Variable {
     #[must_use]
     pub fn new(name: &str) -> Variable {
         Variable {
-            value: AtomicI64::new(0),
+            cell: Cell::Local(AtomicI64::new(0)),
+            name: name.to_string(),
+        }
+    }
+
+    /// Creates a variable over a shared slot.
+    pub(crate) fn shared(
+        name: &str,
+        counters: Arc<ps_shm::SharedCounters>,
+        slot: usize,
+    ) -> Variable {
+        Variable {
+            cell: Cell::Shared(SharedCell { counters, slot }),
             name: name.to_string(),
         }
     }
@@ -43,7 +80,10 @@ impl Variable {
     /// Returns the current value (`Get`).
     #[must_use]
     pub fn get(&self) -> i64 {
-        self.value.load(Ordering::Relaxed)
+        match &self.cell {
+            Cell::Local(value) => value.load(Ordering::Relaxed),
+            Cell::Shared(cell) => cell.counters.get(cell.slot),
+        }
     }
 
     /// Adds a non-negative delta, returning the result (`Add`).
@@ -52,12 +92,18 @@ impl Variable {
     /// release wraps.
     pub fn add(&self, delta: i64) -> i64 {
         debug_assert!(delta >= 0, "Variable::add requires non-negative delta");
-        self.value.fetch_add(delta, Ordering::Relaxed) + delta
+        match &self.cell {
+            Cell::Local(value) => value.fetch_add(delta, Ordering::Relaxed) + delta,
+            Cell::Shared(cell) => cell.counters.add(cell.slot, delta),
+        }
     }
 
     /// Resets to zero (`Clear`).
     pub fn clear(&self) {
-        self.value.store(0, Ordering::Relaxed);
+        match &self.cell {
+            Cell::Local(value) => value.store(0, Ordering::Relaxed),
+            Cell::Shared(cell) => cell.counters.clear(cell.slot),
+        }
     }
 }
 
@@ -65,7 +111,7 @@ impl Variable {
 /// `SetReturningPreviousValue`, `Add`, `Clear`.
 #[derive(Debug, Default)]
 pub struct UpDownCounter {
-    value: AtomicI64,
+    cell: Cell,
     name: String,
 }
 
@@ -74,7 +120,19 @@ impl UpDownCounter {
     #[must_use]
     pub fn new(name: &str) -> UpDownCounter {
         UpDownCounter {
-            value: AtomicI64::new(0),
+            cell: Cell::Local(AtomicI64::new(0)),
+            name: name.to_string(),
+        }
+    }
+
+    /// Creates a counter over a shared slot.
+    pub(crate) fn shared(
+        name: &str,
+        counters: Arc<ps_shm::SharedCounters>,
+        slot: usize,
+    ) -> UpDownCounter {
+        UpDownCounter {
+            cell: Cell::Shared(SharedCell { counters, slot }),
             name: name.to_string(),
         }
     }
@@ -88,24 +146,36 @@ impl UpDownCounter {
     /// Returns the current value (`Get`).
     #[must_use]
     pub fn get(&self) -> i64 {
-        self.value.load(Ordering::Relaxed)
+        match &self.cell {
+            Cell::Local(value) => value.load(Ordering::Relaxed),
+            Cell::Shared(cell) => cell.counters.get(cell.slot),
+        }
     }
 
     /// Sets the value (`Set`).
     pub fn set(&self, value: i64) {
-        self.value.store(value, Ordering::Relaxed);
+        match &self.cell {
+            Cell::Local(current) => current.store(value, Ordering::Relaxed),
+            Cell::Shared(cell) => cell.counters.set(cell.slot, value),
+        }
     }
 
     /// Atomically sets the value, returning the previous one
     /// (`SetReturningPreviousValue`; C++ requires atomicity from
     /// implementations used for races, which this satisfies).
     pub fn set_returning_previous(&self, value: i64) -> i64 {
-        self.value.swap(value, Ordering::AcqRel)
+        match &self.cell {
+            Cell::Local(current) => current.swap(value, Ordering::AcqRel),
+            Cell::Shared(cell) => cell.counters.swap(cell.slot, value),
+        }
     }
 
     /// Adds a (possibly negative) delta, returning the result (`Add`).
     pub fn add(&self, delta: i64) -> i64 {
-        self.value.fetch_add(delta, Ordering::Relaxed) + delta
+        match &self.cell {
+            Cell::Local(value) => value.fetch_add(delta, Ordering::Relaxed) + delta,
+            Cell::Shared(cell) => cell.counters.add(cell.slot, delta),
+        }
     }
 
     /// Resets to zero (`Clear`).
@@ -590,6 +660,16 @@ pub struct Statistics {
     histograms: Mutex<HashMap<String, Arc<Histogram>>>,
     timed: Mutex<HashMap<String, Arc<TimedVariable>>>,
     console_logger: Mutex<Option<Arc<dyn StatisticsLogger>>>,
+    shared: Option<SharedBackend>,
+    shared_fallbacks: AtomicI64,
+}
+
+/// Cross-process counter backend: the mapped table plus the fixed
+/// name-to-slot index (dynamic names attach at first use).
+#[derive(Debug, Clone)]
+struct SharedBackend {
+    counters: Arc<ps_shm::SharedCounters>,
+    fixed: HashMap<String, usize>,
 }
 
 /// Statistics-log reader (`StatisticsLogger`): graph JSON dumps
@@ -617,14 +697,108 @@ impl Statistics {
         Statistics::default()
     }
 
+    /// Creates a registry backed by a cross-process counter table.
+    /// Pre-registered names map to fixed slots; names first seen at
+    /// runtime attach to spare dynamic slots, falling back to
+    /// process-local counters when the table is full (counted in
+    /// [`Statistics::shared_fallbacks`]).
+    #[must_use]
+    pub fn with_shared(counters: Arc<ps_shm::SharedCounters>) -> Statistics {
+        let fixed = counters
+            .fixed_names()
+            .iter()
+            .enumerate()
+            .map(|(index, name)| (name.clone(), index))
+            .collect();
+        Statistics {
+            shared: Some(SharedBackend { counters, fixed }),
+            ..Statistics::default()
+        }
+    }
+
+    /// Attaches a name to a shared slot, if this registry is shared.
+    fn shared_slot(&self, name: &str) -> Option<(Arc<ps_shm::SharedCounters>, usize)> {
+        let backend = self.shared.as_ref()?;
+        if let Some(slot) = backend.fixed.get(name) {
+            return Some((Arc::clone(&backend.counters), *slot));
+        }
+        match backend.counters.attach_dynamic(name) {
+            Some(slot) => Some((Arc::clone(&backend.counters), slot)),
+            None => {
+                self.shared_fallbacks.fetch_add(1, Ordering::Relaxed);
+                None
+            }
+        }
+    }
+
+    /// Counts names that fell back to local counters (dynamic table full
+    /// or overlong names; zero in a healthy shared registry).
+    #[must_use]
+    pub fn shared_fallbacks(&self) -> i64 {
+        self.shared_fallbacks.load(Ordering::Relaxed)
+    }
+
+    /// Lists every registered plain and up/down counter name, sorted
+    /// (factory collects the fixed table from a scratch registry).
+    #[must_use]
+    pub fn registered_names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        names.extend(
+            self.variables
+                .lock()
+                .unwrap_or_else(|err| err.into_inner())
+                .keys()
+                .cloned(),
+        );
+        names.extend(
+            self.up_downs
+                .lock()
+                .unwrap_or_else(|err| err.into_inner())
+                .keys()
+                .cloned(),
+        );
+        names.sort();
+        names.dedup();
+        names
+    }
+
     /// Adds (or attaches to) a counter (`AddVariable`).
     pub fn add_variable(&self, name: &str) -> Arc<Variable> {
-        insert_shared(&self.variables, name, || Variable::new(name))
+        // Fast path first: attaching allocates under a cross-process
+        // spinlock, so it must run only for genuinely new names.
+        if let Some(existing) = self.get_variable(name) {
+            return existing;
+        }
+        // Shared counters share one slot namespace across kinds: a name
+        // registered as both would alias. Statically disjoint today;
+        // this fires in tests if that ever regresses.
+        debug_assert!(
+            self.get_up_down_counter(name).is_none(),
+            "counter kind collision: {name}"
+        );
+        match self.shared_slot(name) {
+            Some((counters, slot)) => insert_shared(&self.variables, name, || {
+                Variable::shared(name, counters, slot)
+            }),
+            None => insert_shared(&self.variables, name, || Variable::new(name)),
+        }
     }
 
     /// Adds (or attaches to) a bidirectional counter (`AddUpDownCounter`).
     pub fn add_up_down_counter(&self, name: &str) -> Arc<UpDownCounter> {
-        insert_shared(&self.up_downs, name, || UpDownCounter::new(name))
+        if let Some(existing) = self.get_up_down_counter(name) {
+            return existing;
+        }
+        debug_assert!(
+            self.get_variable(name).is_none(),
+            "counter kind collision: {name}"
+        );
+        match self.shared_slot(name) {
+            Some((counters, slot)) => insert_shared(&self.up_downs, name, || {
+                UpDownCounter::shared(name, counters, slot)
+            }),
+            None => insert_shared(&self.up_downs, name, || UpDownCounter::new(name)),
+        }
     }
 
     /// Adds a process-global counter (`AddGlobalUpDownCounter`; the base
@@ -1115,5 +1289,97 @@ mod tests {
         assert!(stats.get_histogram("h").is_some());
         assert!(stats.get_up_down_counter("u").is_some());
         assert!(stats.get_timed_variable("t").is_some());
+    }
+
+    /// Scratch directory for shared counter files.
+    struct ShmScratch {
+        dir: std::path::PathBuf,
+    }
+
+    impl ShmScratch {
+        fn open(&self, fixed: &[String]) -> Arc<ps_shm::SharedCounters> {
+            Arc::new(ps_shm::SharedCounters::open(&self.dir, fixed).expect("open counters"))
+        }
+    }
+
+    fn shm_scratch() -> ShmScratch {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let id = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!("psstats-{}-{id}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        ShmScratch { dir }
+    }
+
+    impl Drop for ShmScratch {
+        fn drop(&mut self) {
+            std::fs::remove_dir_all(&self.dir).ok();
+        }
+    }
+
+    #[test]
+    fn shared_fixed_names_aggregate_across_registries() {
+        let scratch = shm_scratch();
+        let fixed = vec!["hits".to_string(), "gauge".to_string()];
+        let first = Statistics::with_shared(scratch.open(&fixed));
+        let second = Statistics::with_shared(scratch.open(&fixed));
+        first.add_variable("hits").add(4);
+        second.add_variable("hits").add(6);
+        assert_eq!(10, first.get_variable("hits").unwrap().get());
+        assert_eq!(10, second.get_variable("hits").unwrap().get());
+        first.add_up_down_counter("gauge").set(3);
+        assert_eq!(3, second.add_up_down_counter("gauge").get());
+        second.add_up_down_counter("gauge").add(-1);
+        assert_eq!(2, first.get_up_down_counter("gauge").unwrap().get());
+        assert_eq!(0, first.shared_fallbacks());
+        assert_eq!(0, second.shared_fallbacks());
+    }
+
+    #[test]
+    fn shared_dynamic_names_attach_and_fallbacks_count() {
+        let scratch = shm_scratch();
+        let stats = Statistics::with_shared(scratch.open(&["fixed".to_string()]));
+        // Runtime names attach to spare dynamic slots, shared too.
+        let other = Statistics::with_shared(scratch.open(&["fixed".to_string()]));
+        stats.add_variable("runtime_seen").add(2);
+        assert_eq!(2, other.add_variable("runtime_seen").get());
+        assert_eq!(0, stats.shared_fallbacks());
+        // Overlong names fall back to local counters (still functional).
+        let long = "x".repeat(64);
+        stats.add_variable(&long).add(5);
+        assert_eq!(5, stats.get_variable(&long).unwrap().get());
+        assert_eq!(0, other.get_variable(&long).map_or(0, |var| var.get()));
+        assert_eq!(1, stats.shared_fallbacks());
+    }
+
+    #[test]
+    fn registered_names_lists_both_kinds_sorted() {
+        let stats = Statistics::new();
+        stats.add_up_down_counter("zebra");
+        stats.add_variable("mango");
+        stats.add_variable("apple");
+        assert_eq!(vec!["apple", "mango", "zebra"], stats.registered_names());
+    }
+
+    #[test]
+    fn init_all_attaches_with_zero_fallbacks_and_disjoint_kinds() {
+        let scratch = shm_scratch();
+        // Collect the production fixed set exactly like the factory.
+        let probe = Statistics::new();
+        crate::names::init_all(&probe);
+        let fixed = probe.registered_names();
+        assert!(!fixed.is_empty());
+        let stats = Statistics::with_shared(scratch.open(&fixed));
+        crate::names::init_all(&stats);
+        assert_eq!(0, stats.shared_fallbacks());
+        // One slot namespace across kinds: no name may register as both.
+        let variables = stats.variables.lock().unwrap();
+        let up_downs = stats.up_downs.lock().unwrap();
+        for name in variables.keys() {
+            assert!(
+                !up_downs.contains_key(name),
+                "counter kind collision: {name}"
+            );
+        }
     }
 }

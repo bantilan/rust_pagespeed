@@ -5,8 +5,11 @@
 //! registration ([`names`]), and the append-only statistics log with
 //! restart recovery and JSON dumps ([`logger`]).
 //!
-//! Cross-process shared-memory backing lands with the nginx step; the
-//! registry here is in-process (`Send + Sync`).
+//! Cross-process shared-memory backing plugs in through
+//! [`core::Statistics::with_shared`]: plain and up/down counters live in
+//! a memory-mapped table (`ps-shm`) shared by every nginx worker, while
+//! histograms and timed variables stay per-process. A plain
+//! [`core::Statistics::new`] registry stays fully in-process.
 #![forbid(unsafe_code)]
 
 pub mod core;

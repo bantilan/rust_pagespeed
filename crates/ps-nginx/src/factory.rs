@@ -111,8 +111,9 @@ pub struct DriverFactory {
     pub fetchers: HashMap<String, NativeFetcher>,
     /// Cache system (paths registered at init).
     pub caches: SystemCaches,
-    /// Worker statistics registry (null-statistics stand-in for
-    /// the shared-memory backend; forked per worker).
+    /// Worker statistics registry (cross-process shared counters
+    /// once `init_module` swaps in the mapped table; the null
+    /// registry built here only serves pre-config callers).
     pub statistics: Arc<ps_stats::core::Statistics>,
     /// Shared message buffer (ring stand-in; disabled until
     /// `MessageBufferSize` sets a budget).
