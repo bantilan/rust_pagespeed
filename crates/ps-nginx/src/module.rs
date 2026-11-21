@@ -889,6 +889,31 @@ fn open_shared_statistics(cache_dirs: &[&str]) -> (ps_stats::core::Statistics, V
     }
 }
 
+/// Collects the statistics-log writer config (first server in cycle
+/// order with logging enabled and a `LogDir`; `None` disables
+/// logging): the single global series lives at
+/// `<LogDir>/stats_log_global`, like C++.
+fn stats_log_config_for(
+    contexts: &[crate::factory::PostConfigContext<'_>],
+    now_ms: i64,
+) -> Option<crate::factory::StatsLogConfig> {
+    for context in contexts {
+        let system = &context.options.system;
+        if system.statistics_logging_enabled && !system.log_dir.is_empty() {
+            #[allow(clippy::cast_sign_loss)]
+            let max_bytes = (system.statistics_logging_max_file_size_kb.max(0) as u64) * 1024;
+            return Some(crate::factory::StatsLogConfig {
+                path: std::path::Path::new(&system.log_dir).join("stats_log_global"),
+                interval_ms: system.statistics_logging_interval_ms,
+                max_bytes,
+                instance_start_ms: now_ms,
+                instance_id: now_ms,
+            });
+        }
+    }
+    None
+}
+
 /// Module init (`ps_init_module`).
 ///
 /// # Safety
@@ -1002,6 +1027,23 @@ pub unsafe extern "C" fn init_module(cycle: *mut ngx_cycle_t) -> ngx_int_t {
                     .message(MessageLevel::Warning, &message);
             }
             ps_stats::names::init_all(&main.driver_factory.statistics);
+            // The console logger binds here too (pre-fork, so every
+            // worker graphs the same file); each worker dumps to it
+            // on its own scheduler once logging is enabled.
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|age| age.as_millis() as i64)
+                .unwrap_or(0);
+            if let Some(config) = stats_log_config_for(&contexts, now_ms) {
+                main.driver_factory.statistics.set_console_logger(Arc::new(
+                    ps_stats::logger::FileConsoleLogger::new(
+                        &config.path,
+                        config.instance_start_ms,
+                        config.instance_id,
+                    ),
+                ));
+                main.driver_factory.stats_log = Some(config);
+            }
         }
         if outcome.root_init {
             let main = &mut *cfg;
@@ -1048,6 +1090,12 @@ pub unsafe extern "C" fn init_child_process(cycle: *mut ngx_cycle_t) -> ngx_int_
         main.driver_factory.logging_init((*cycle).log, true);
         child_init_servers(cycle, &mut *cfg);
         main.driver_factory.start_threads();
+        if let Some(warning) = main.driver_factory.schedule_statistics_logging() {
+            // SAFETY: the cycle log is live (just wired above).
+            main.driver_factory
+                .message_handler
+                .message(MessageLevel::Warning, &warning);
+        }
         NGX_OK as ngx_int_t
     }
 }
@@ -3739,6 +3787,24 @@ mod tests {
                 &["FileCachePath", "relative"]
             )
         );
+    }
+
+    #[test]
+    fn stats_log_config_needs_switch_and_dir() {
+        use crate::factory::PostConfigContext;
+        let mut plain = NgxOptions::new();
+        assert!(stats_log_config_for(&[PostConfigContext { options: &plain }], 1000).is_none());
+        plain.system.statistics_logging_enabled = true;
+        assert!(stats_log_config_for(&[PostConfigContext { options: &plain }], 1000).is_none());
+        plain.system.log_dir = "/tmp/logs".to_string();
+        let config = stats_log_config_for(&[PostConfigContext { options: &plain }], 1000)
+            .expect("configured");
+        assert_eq!(
+            std::path::Path::new("/tmp/logs/stats_log_global"),
+            config.path
+        );
+        assert_eq!(1000, config.instance_id);
+        assert_eq!(1000, config.instance_start_ms);
     }
 
     #[test]

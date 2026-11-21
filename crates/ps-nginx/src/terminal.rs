@@ -391,7 +391,7 @@ fn admin_config_for(system: &ps_config::options::NginxSystemOptions) -> AdminCon
         history_archive_retention_days: 7,
         history_archive_max_size_mb: 100,
         statistics_enabled: system.statistics_enabled,
-        statistics_logging_enabled: false,
+        statistics_logging_enabled: system.statistics_logging_enabled,
         log_dir: system.log_dir.clone(),
     }
 }
@@ -801,6 +801,17 @@ mod tests {
         );
         assert_eq!(response.status, 0);
         assert!(response.body.is_empty());
+    }
+
+    #[test]
+    fn admin_config_maps_logging_switch() {
+        let mut system = ps_config::options::NginxSystemOptions::default();
+        assert!(!admin_config_for(&system).statistics_logging_enabled);
+        system.statistics_logging_enabled = true;
+        system.log_dir = "/tmp/logs".to_string();
+        let config = admin_config_for(&system);
+        assert!(config.statistics_logging_enabled);
+        assert_eq!("/tmp/logs", config.log_dir);
     }
 
     #[test]

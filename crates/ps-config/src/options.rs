@@ -534,6 +534,12 @@ pub struct NginxSystemOptions {
     pub file_cache_clean_inode_limit: i64,
     /// `Statistics` collection switch (default on).
     pub statistics_enabled: bool,
+    /// `StatisticsLogging` switch (default off; needs `LogDir`).
+    pub statistics_logging_enabled: bool,
+    /// `StatisticsLoggingIntervalMs` (default 10 minutes).
+    pub statistics_logging_interval_ms: i64,
+    /// `StatisticsLoggingMaxFileSizeKb` (default 1 MiB).
+    pub statistics_logging_max_file_size_kb: i64,
     /// `MemcachedServers` cluster (empty when unset).
     pub memcached_servers: Vec<ExternalServerSpec>,
     /// `RedisServer` endpoint (`None` when unset).
@@ -570,6 +576,12 @@ pub struct NginxSystemOptions {
 pub struct SystemWasSet {
     /// `Statistics` set.
     pub statistics_enabled: bool,
+    /// `StatisticsLogging` set.
+    pub statistics_logging_enabled: bool,
+    /// `StatisticsLoggingIntervalMs` set.
+    pub statistics_logging_interval_ms: bool,
+    /// `StatisticsLoggingMaxFileSizeKb` set.
+    pub statistics_logging_max_file_size_kb: bool,
     /// `FetchProxy` set.
     pub fetcher_proxy: bool,
     /// `FetchWithGzip` set.
@@ -616,6 +628,9 @@ impl Default for NginxSystemOptions {
             global_admin_domains: WildcardGroup::default(),
             file_cache_clean_inode_limit: 0,
             statistics_enabled: true,
+            statistics_logging_enabled: false,
+            statistics_logging_interval_ms: 600_000,
+            statistics_logging_max_file_size_kb: 1024,
             memcached_servers: Vec::new(),
             redis_server: None,
             fetcher_proxy: String::new(),
@@ -4080,6 +4095,45 @@ pub fn apply_nginx_directive(
                     }),
                 };
             }
+            // `StatisticsLogging` (`SystemRewriteOptions`, server
+            // scope, default off; only takes effect with `LogDir`).
+            if directive == "StatisticsLogging" {
+                return match parse_bool(args[0]) {
+                    Some(value) => {
+                        system.statistics_logging_enabled = value;
+                        system.was_set.statistics_logging_enabled = true;
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
+            // `StatisticsLoggingIntervalMs` /
+            // `StatisticsLoggingMaxFileSizeKb` (`SystemRewriteOptions`,
+            // server scope; C++ parses without range checks, so any
+            // 64-bit value stores and the dump driver clamps).
+            if directive == "StatisticsLoggingIntervalMs"
+                || directive == "StatisticsLoggingMaxFileSizeKb"
+            {
+                return match parse_int64(args[0]) {
+                    Some(value) => {
+                        if directive == "StatisticsLoggingIntervalMs" {
+                            system.statistics_logging_interval_ms = value;
+                            system.was_set.statistics_logging_interval_ms = true;
+                        } else {
+                            system.statistics_logging_max_file_size_kb = value;
+                            system.was_set.statistics_logging_max_file_size_kb = true;
+                        }
+                        Ok(())
+                    }
+                    None => Err(SetError {
+                        outcome: SetOutcome::ValueInvalid,
+                        message: nginx_config_error(&full_line, ""),
+                    }),
+                };
+            }
             // `MemcachedServers` / `RedisServer`
             // (`SystemRewriteOptions`, server scope): validated
             // specs, verbatim details wrapped with the full line.
@@ -4897,6 +4951,64 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err.message, "\"Statistics\" cannot be set at this scope.");
+        // `StatisticsLogging` family: server scope, C++ defaults.
+        assert!(!system.statistics_logging_enabled);
+        assert_eq!(600_000, system.statistics_logging_interval_ms);
+        assert_eq!(1024, system.statistics_logging_max_file_size_kb);
+        apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "StatisticsLogging",
+            &["on"],
+            Scope::Server,
+        )
+        .unwrap();
+        assert!(system.statistics_logging_enabled);
+        assert!(system.was_set.statistics_logging_enabled);
+        apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "StatisticsLoggingIntervalMs",
+            &["5000"],
+            Scope::Server,
+        )
+        .unwrap();
+        assert_eq!(5000, system.statistics_logging_interval_ms);
+        apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "StatisticsLoggingMaxFileSizeKb",
+            &["2048"],
+            Scope::Server,
+        )
+        .unwrap();
+        assert_eq!(2048, system.statistics_logging_max_file_size_kb);
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "StatisticsLogging",
+            &["on"],
+            Scope::Directory,
+        )
+        .unwrap_err();
+        assert_eq!(
+            err.message,
+            "\"StatisticsLogging\" cannot be set at this scope."
+        );
+        let err = apply_nginx_directive(
+            &mut options,
+            &mut factory,
+            &mut system,
+            "StatisticsLogging",
+            &["maybe"],
+            Scope::Server,
+        )
+        .unwrap_err();
+        assert_eq!(err.outcome, SetOutcome::ValueInvalid);
     }
 
     #[test]

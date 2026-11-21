@@ -102,6 +102,15 @@ impl NgxOptions {
             };
         }
         flagged!(statistics_enabled, statistics_enabled);
+        flagged!(statistics_logging_enabled, statistics_logging_enabled);
+        flagged!(
+            statistics_logging_interval_ms,
+            statistics_logging_interval_ms
+        );
+        flagged!(
+            statistics_logging_max_file_size_kb,
+            statistics_logging_max_file_size_kb
+        );
         flagged!(fetcher_proxy, fetcher_proxy);
         flagged!(fetch_with_gzip, fetch_with_gzip);
         flagged!(blocking_fetch_timeout_ms, blocking_fetch_timeout_ms);

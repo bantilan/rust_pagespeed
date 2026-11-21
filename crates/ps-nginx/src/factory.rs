@@ -58,6 +58,22 @@ impl SchedulerThreadState {
     }
 }
 
+/// Statistics-log writer config (one global series, `stats_log_global`).
+#[derive(Debug, Clone)]
+pub struct StatsLogConfig {
+    /// Log file path (`<LogDir>/stats_log_global`).
+    pub path: std::path::PathBuf,
+    /// Dump interval in ms (clamped positive at schedule time).
+    pub interval_ms: i64,
+    /// Size cap in bytes (clamped positive at schedule time).
+    pub max_bytes: u64,
+    /// Writing-master start time in ms (restart recovery bound).
+    pub instance_start_ms: i64,
+    /// Writing-master instance id (stable per master so every
+    /// worker's dumps form one series).
+    pub instance_id: i64,
+}
+
 /// Driver factory (`NgxRewriteDriverFactory` config half).
 #[derive(Debug)]
 pub struct DriverFactory {
@@ -115,6 +131,10 @@ pub struct DriverFactory {
     /// once `init_module` swaps in the mapped table; the null
     /// registry built here only serves pre-config callers).
     pub statistics: Arc<ps_stats::core::Statistics>,
+    /// Statistics-log writer config (installed pre-fork when some
+    /// server enables logging with a `LogDir`; each worker dumps
+    /// on its scheduler, serialized by the log file lock).
+    pub stats_log: Option<StatsLogConfig>,
     /// Shared message buffer (ring stand-in; disabled until
     /// `MessageBufferSize` sets a budget).
     pub message_buffer: Arc<Mutex<ps_admin::log_buffer::LogBuffer>>,
@@ -175,6 +195,7 @@ impl DriverFactory {
             fetchers: HashMap::new(),
             caches: SystemCaches::new(),
             statistics: Arc::new(ps_stats::core::Statistics::new()),
+            stats_log: None,
             message_buffer: Arc::new(Mutex::new(ps_admin::log_buffer::LogBuffer::disabled())),
             purge_set: ps_cache::purge::PurgeSet::new(25_000),
         }
@@ -262,6 +283,38 @@ impl DriverFactory {
         if let Some(thread) = self.scheduler_thread.thread.take() {
             let _ = thread.join();
         }
+    }
+
+    /// Starts periodic statistics-log dumps for this worker
+    /// (`SharedMemStatistics` logging): dumps once immediately (a
+    /// writability probe that also seeds graphs), then re-arms every
+    /// interval. Silent without a log config; returns the first
+    /// dump's failure message for the caller to report, if any
+    /// (later failures retry quietly).
+    pub fn schedule_statistics_logging(&self) -> Option<String> {
+        let config = self.stats_log.clone()?;
+        // C++ parses without range checks; clamp at use.
+        let interval_ms = if config.interval_ms > 0 {
+            config.interval_ms
+        } else {
+            600_000
+        };
+        let max_bytes = if config.max_bytes > 0 {
+            config.max_bytes
+        } else {
+            1024 * 1024
+        };
+        let config = StatsLogConfig {
+            interval_ms,
+            max_bytes,
+            ..config
+        };
+        let first_error =
+            stats_log_dump_once(&self.statistics, &config, self.scheduler.now_us() / 1000).err();
+        stats_log_arm(&self.scheduler, &self.statistics, &config);
+        first_error.map(|error| {
+            format!("pagespeed: statistics log unwritable ({error}); graphs stay empty")
+        })
     }
 
     /// Fresh driver options (`NewRewriteOptions`): blank with an
@@ -683,6 +736,42 @@ pub fn remote_config_warning(
              the local configuration."
         ))
     }
+}
+
+/// Dumps one snapshot block (`DumpConsoleVarsToWriter` + trim),
+/// serialized across workers (a truly simultaneous collision
+/// skips quietly and retries next interval).
+fn stats_log_dump_once(
+    statistics: &Arc<ps_stats::core::Statistics>,
+    config: &StatsLogConfig,
+    now_ms: i64,
+) -> std::io::Result<()> {
+    let vars = statistics.snapshot_counters();
+    if ps_stats::logger::append_block_locked(&config.path, now_ms, config.instance_id, &vars)? {
+        ps_stats::logger::trim_log_if_needed(&config.path, config.max_bytes);
+    }
+    Ok(())
+}
+
+/// Arms the next statistics-log dump, re-arming from each firing
+/// (self-perpetuating one-shot alarms; failures retry quietly).
+fn stats_log_arm(
+    scheduler: &Arc<crate::scheduler::Scheduler>,
+    statistics: &Arc<ps_stats::core::Statistics>,
+    config: &StatsLogConfig,
+) {
+    let scheduler = Arc::clone(scheduler);
+    let statistics = Arc::clone(statistics);
+    let config = config.clone();
+    let at_us = scheduler.now_us() + config.interval_ms * 1000;
+    let pump = Arc::clone(&scheduler);
+    scheduler.add_alarm_at_us(
+        at_us,
+        crate::scheduler::AlarmCallback::run_only(move || {
+            let _ = stats_log_dump_once(&statistics, &config, pump.now_us() / 1000);
+            stats_log_arm(&pump, &statistics, &config);
+        }),
+    );
 }
 
 #[cfg(test)]
@@ -1121,5 +1210,89 @@ mod tests {
             "drop stalled: {:?}",
             started.elapsed()
         );
+    }
+
+    /// Factory with a manual clock and scratch log dir for dump tests.
+    struct StatsLogHarness {
+        factory: DriverFactory,
+        clock: Arc<crate::scheduler::ManualClock>,
+        dir: std::path::PathBuf,
+    }
+
+    impl StatsLogHarness {
+        fn new(interval_ms: i64) -> Self {
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static COUNTER: AtomicU64 = AtomicU64::new(0);
+            let clock = Arc::new(crate::scheduler::ManualClock::new(1_000_000));
+            let mut factory = DriverFactory::new("", -1);
+            factory.scheduler = Arc::new(crate::scheduler::Scheduler::with_clock(
+                Arc::clone(&clock) as Arc<dyn crate::scheduler::Clock>,
+            ));
+            let id = COUNTER.fetch_add(1, Ordering::SeqCst);
+            let dir = std::env::temp_dir().join(format!("pslog-{}-{id}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            factory.stats_log = Some(StatsLogConfig {
+                path: dir.join("stats_log_global"),
+                interval_ms,
+                max_bytes: 1024 * 1024,
+                instance_start_ms: 1000,
+                instance_id: 1000,
+            });
+            StatsLogHarness {
+                factory,
+                clock,
+                dir,
+            }
+        }
+
+        fn blocks(&self) -> Vec<ps_stats::logger::LogBlock> {
+            ps_stats::logger::read_blocks(&self.dir.join("stats_log_global"), 0, i64::MAX, 0)
+        }
+    }
+
+    impl Drop for StatsLogHarness {
+        fn drop(&mut self) {
+            std::fs::remove_dir_all(&self.dir).ok();
+        }
+    }
+
+    #[test]
+    fn statistics_logging_dumps_now_and_rearms() {
+        let harness = StatsLogHarness::new(5000);
+        harness.factory.statistics.add_variable("probe").add(7);
+        // Immediate first dump seeds the log.
+        assert_eq!(None, harness.factory.schedule_statistics_logging());
+        let blocks = harness.blocks();
+        assert_eq!(1, blocks.len());
+        assert_eq!(blocks[0].vars.get("probe").unwrap(), "7");
+        assert_eq!(1000, blocks[0].timestamp_ms);
+        // Advancing past the interval fires exactly one more dump.
+        harness.clock.advance_us(5_000_000 + 1);
+        harness.factory.scheduler.run_alarms();
+        let blocks = harness.blocks();
+        assert_eq!(2, blocks.len());
+        // The alarm re-armed itself (a third dump follows).
+        harness.clock.advance_us(5_000_000);
+        harness.factory.scheduler.run_alarms();
+        assert_eq!(3, harness.blocks().len());
+    }
+
+    #[test]
+    fn statistics_logging_clamps_nonpositive_interval() {
+        let harness = StatsLogHarness::new(0);
+        assert_eq!(None, harness.factory.schedule_statistics_logging());
+        // Default 10-minute cadence, not an immediate re-fire.
+        harness.clock.advance_us(5_000_000);
+        harness.factory.scheduler.run_alarms();
+        assert_eq!(1, harness.blocks().len());
+        harness.clock.advance_us(600_000_000);
+        harness.factory.scheduler.run_alarms();
+        assert_eq!(2, harness.blocks().len());
+    }
+
+    #[test]
+    fn statistics_logging_silent_without_config() {
+        let factory = DriverFactory::new("", -1);
+        assert_eq!(None, factory.schedule_statistics_logging());
     }
 }

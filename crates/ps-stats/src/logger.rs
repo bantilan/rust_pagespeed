@@ -38,15 +38,10 @@ pub struct LogBlock {
     pub vars: HashMap<String, String>,
 }
 
-/// Appends one block to the log (`DumpConsoleVarsToWriter`).
+/// Formats one log block (`DumpConsoleVarsToWriter` serialization).
 ///
 /// `vars` are written in byte order (C++ iterates `std::map`).
-pub fn append_block(
-    path: &Path,
-    timestamp_ms: i64,
-    instance_id: i64,
-    vars: &HashMap<String, i64>,
-) -> std::io::Result<()> {
+fn format_block(timestamp_ms: i64, instance_id: i64, vars: &HashMap<String, i64>) -> String {
     let mut names: Vec<&String> = vars.keys().collect();
     names.sort();
     let mut text = format!("timestamp: {timestamp_ms}\n");
@@ -54,9 +49,47 @@ pub fn append_block(
     for name in names {
         text.push_str(&format!("{name}: {}\n", vars[name]));
     }
+    text
+}
+
+/// Appends one block to the log (`DumpConsoleVarsToWriter`).
+pub fn append_block(
+    path: &Path,
+    timestamp_ms: i64,
+    instance_id: i64,
+    vars: &HashMap<String, i64>,
+) -> std::io::Result<()> {
+    let text = format_block(timestamp_ms, instance_id, vars);
     let mut file = OpenOptions::new().create(true).append(true).open(path)?;
     file.write_all(text.as_bytes())?;
     file.flush()
+}
+
+/// Appends one block under an exclusive file lock, skipping
+/// (`false`) when another worker holds it: the lock serializes
+/// concurrent appends so blocks never interleave mid-write. Every
+/// worker still dumps every interval (ticks milliseconds apart
+/// rarely contend), which is harmless: shared counters read
+/// identically everywhere, so same-value blocks contribute zero
+/// recovery delta, and the fixed master instance id keeps one
+/// series. Only a truly simultaneous collision drops a block.
+pub fn append_block_locked(
+    path: &Path,
+    timestamp_ms: i64,
+    instance_id: i64,
+    vars: &HashMap<String, i64>,
+) -> std::io::Result<bool> {
+    use fs2::FileExt;
+    let text = format_block(timestamp_ms, instance_id, vars);
+    let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+    if file.try_lock_exclusive().is_err() {
+        return Ok(false);
+    }
+    file.write_all(text.as_bytes())?;
+    file.flush()?;
+    // The flock releases on close; holding it past the write would
+    // serialize nothing further.
+    Ok(true)
 }
 
 /// Deletes the log when it exceeds the cap (`TrimLogfileIfNeeded`).
@@ -280,6 +313,65 @@ pub fn dump_json(
     out
 }
 
+/// File-backed console logger (`StatisticsLogger` over one stats log).
+///
+/// Graphs and recovery read the file this path names; the nginx dump
+/// driver appends serialized blocks to it. `instance_start_ms` and
+/// `instance_id` identify the writing master for restart recovery.
+#[derive(Debug, Clone)]
+pub struct FileConsoleLogger {
+    path: std::path::PathBuf,
+    instance_start_ms: i64,
+    instance_id: i64,
+}
+
+impl FileConsoleLogger {
+    /// Binds a logger to a stats log file.
+    #[must_use]
+    pub fn new(path: &std::path::Path, instance_start_ms: i64, instance_id: i64) -> Self {
+        FileConsoleLogger {
+            path: path.to_path_buf(),
+            instance_start_ms,
+            instance_id,
+        }
+    }
+
+    /// Borrows the log path.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl crate::core::StatisticsLogger for FileConsoleLogger {
+    fn dump_json(
+        &self,
+        for_graphs: bool,
+        var_titles: &[String],
+        start_ms: i64,
+        end_ms: i64,
+        granularity_ms: i64,
+    ) -> String {
+        let titles: Vec<&str> = var_titles.iter().map(String::as_str).collect();
+        dump_json(
+            &self.path,
+            for_graphs,
+            &titles,
+            start_ms,
+            end_ms,
+            granularity_ms,
+        )
+    }
+
+    fn previous_dashboard_counters(&self, out: &mut HashMap<String, i64>) {
+        if let Some(recovered) =
+            previous_dashboard_counters(&self.path, self.instance_start_ms, self.instance_id)
+        {
+            out.extend(recovered);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -402,6 +494,49 @@ mod tests {
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].vars.get("v").unwrap(), "5");
         assert!(!blocks[0].vars.contains_key("no-separator-here"));
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn locked_append_writes_once_and_skips_under_lock() {
+        use fs2::FileExt;
+        let path = temp_path("elected");
+        let vars = sample_vars(&[("a", 1)]);
+        assert!(append_block_locked(&path, 1000, 7, &vars).unwrap());
+        // A held exclusive lock makes the append skip quietly.
+        let held = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .unwrap();
+        held.lock_exclusive().unwrap();
+        assert!(!append_block_locked(&path, 2000, 7, &vars).unwrap());
+        drop(held);
+        assert!(append_block_locked(&path, 3000, 7, &vars).unwrap());
+        let blocks = read_blocks(&path, 0, i64::MAX, 0);
+        assert_eq!(
+            vec![1000, 3000],
+            blocks.iter().map(|b| b.timestamp_ms).collect::<Vec<_>>()
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn file_console_logger_reads_its_log() {
+        use crate::core::StatisticsLogger;
+        let path = temp_path("console");
+        append_block(&path, 100, 6, &sample_vars(&[("image_rewrites", 5)])).unwrap();
+        append_block(&path, 200, 7, &sample_vars(&[("image_rewrites", 2)])).unwrap();
+        append_block(&path, 1000, 7, &sample_vars(&[("image_rewrites", 2)])).unwrap();
+        let logger = FileConsoleLogger::new(&path, 500, 7);
+        assert_eq!(path, logger.path().to_path_buf());
+        let json = logger.dump_json(false, &["image_rewrites".to_string()], 0, 2000, 0);
+        assert!(json.contains("\"image_rewrites\": [5, 2, 2]"), "{json}");
+        // Recovery sums the prior instance's deltas and skips the
+        // current instance's blocks (a missed skip would add 2).
+        let mut recovered = HashMap::new();
+        logger.previous_dashboard_counters(&mut recovered);
+        assert_eq!(recovered.get("image_rewrites"), Some(&5));
         let _ = std::fs::remove_file(&path);
     }
 }
