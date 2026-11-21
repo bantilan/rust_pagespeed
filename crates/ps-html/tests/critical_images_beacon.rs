@@ -94,6 +94,20 @@ fn first_visit_instruments_stamps_and_registers() {
 }
 
 #[test]
+fn pre_phase_visit_instruments_and_stamps() {
+    // Live chains run this filter pre-render; insertion and
+    // stamping must work there, not only as a post filter.
+    let harness = Harness::new();
+    let driver = harness.driver_for(CHROME_UA);
+    let filter = CriticalImagesBeaconFilter::new(Rc::clone(&driver));
+    let out = run_with_filters(b"<html><body><img src=\"hero.png\"></body></html>", |parser| {
+        parser.add_pre_render_filter(Box::new(filter));
+    });
+    assert_eq!(1, count(&out, b"pagespeed.CriticalImages.Run('"));
+    assert_eq!(1, count(&out, b"data-pagespeed-url-hash="));
+}
+
+#[test]
 fn immediate_revisit_stands_down_without_evidence() {
     let harness = Harness::new();
     let first = harness.driver_for(CHROME_UA);
