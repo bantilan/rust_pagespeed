@@ -30,7 +30,7 @@ use crate::resource_slot::{relativize_or_passthrough, HtmlResourceSlot};
 use crate::rewrite_context::{
     ContextSlot, RewriteResult, SingleRewriteBehavior, SingleRewriteContext,
 };
-use crate::server_context::{InputRole, ResourceDriver};
+use crate::server_context::{ImageRewriteRecord, InputRole, ResourceDriver};
 use crate::url_segment_encoder::UrlSegmentEncoder;
 
 /// Filter id (`RewriteOptions::kImageCompressionId`).
@@ -979,6 +979,18 @@ fn rewrite_loaded_resource(
                 ) {
                     // Update stats.
                     driver.server_context().variable(IMAGE_REWRITES).add(1);
+                    // Record the rewrite for the admin images page.
+                    driver.record_image_rewrite(ImageRewriteRecord {
+                        timestamp_ms: driver.server_context().now_ms(),
+                        original_bytes: original_size as i64,
+                        optimized_bytes: optimized_size as i64,
+                        output_mime_type: output_type.map_or_else(
+                            || "application/octet-stream".to_string(),
+                            |content_type| content_type.mime_type().to_string(),
+                        ),
+                        original_url: input.url().to_string(),
+                        optimized_url: output.url().to_string(),
+                    });
                     driver
                         .server_context()
                         .variable(IMAGE_REWRITE_TOTAL_BYTES_SAVED)

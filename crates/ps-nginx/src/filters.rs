@@ -1224,6 +1224,21 @@ pub mod html_rewrite {
                 .as_mut()
                 .expect("html branch attaches a sink");
             let _outcome = finish_html_body_filter(ctx, chain, sink);
+            // Drain image rewrite records into the message buffer
+            // (the admin images page reads them from there; drains
+            // incrementally per chain).
+            if let Some(context) = cfg_s.context.as_ref() {
+                if let Some(handler) = context.message_handler.as_ref() {
+                    // SAFETY: the handler's log is the cycle error log,
+                    // which outlives every request.
+                    for record in sink.take_image_records() {
+                        handler.message(
+                            ps_config::message_handler::MessageLevel::Info,
+                            &record.message_line(),
+                        );
+                    }
+                }
+            }
             pass_to_next(std::ptr::null_mut())
         }
     }

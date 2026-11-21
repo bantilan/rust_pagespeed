@@ -47,6 +47,7 @@ pub struct HtmlSink<'a> {
     output: Rc<RefCell<Vec<u8>>>,
     fetch: Arc<SharedBaseFetch>,
     slot: &'a Mutex<Option<crate::pipe::PipeChannel>>,
+    resource_driver: Option<Rc<ps_html::server_context::ResourceDriver>>,
 }
 
 impl<'a> HtmlSink<'a> {
@@ -72,7 +73,7 @@ impl<'a> HtmlSink<'a> {
             VecSink {
                 output: Rc::clone(&output),
             },
-            resource_driver,
+            resource_driver.clone(),
         );
         driver.start_parse(url.as_bytes(), content_is_xml_like);
         HtmlSink {
@@ -80,6 +81,7 @@ impl<'a> HtmlSink<'a> {
             output,
             fetch: Arc::clone(fetch),
             slot,
+            resource_driver,
         }
     }
 
@@ -89,6 +91,16 @@ impl<'a> HtmlSink<'a> {
         if !bytes.is_empty() {
             self.fetch.handle_write(&bytes, self.slot);
         }
+    }
+
+    /// Takes accumulated image rewrite records for the admin images
+    /// page (drains incrementally; empty without a resource driver).
+    #[must_use]
+    pub fn take_image_records(&self) -> Vec<ps_html::server_context::ImageRewriteRecord> {
+        self.resource_driver
+            .as_ref()
+            .map(|driver| driver.take_image_records())
+            .unwrap_or_default()
     }
 }
 
@@ -349,6 +361,54 @@ mod tests {
         assert_eq!(Some(InflateError::LimitExceeded), outcome.inflate_error);
         assert!(sink.written.len() <= 4);
         assert!(outcome.fetch_done);
+    }
+
+    #[test]
+    fn html_sink_drains_driver_image_records() {
+        use crate::fetch::{BaseFetchType, SharedBaseFetch};
+        use crate::pipe;
+        use ps_config::options::RewriteOptions;
+        use ps_http::response::HttpOptions;
+        let slot: Mutex<Option<pipe::PipeChannel>> = Mutex::new(None);
+        let (ps_side, _ngx_side) = SharedBaseFetch::new_pair(
+            "http://h/p",
+            std::ptr::null_mut(),
+            BaseFetchType::HtmlTransform,
+            crate::caching::PreserveCachingHeaders::DontPreserve,
+            HttpOptions::default(),
+        );
+        let options = RewriteOptions::new();
+        // Without a resource driver there is nothing to drain.
+        let bare = HtmlSink::new(&options, "http://h/p", false, &ps_side, &slot, None);
+        assert!(bare.take_image_records().is_empty());
+        // With one, driver records flow through and drain.
+        let backend: std::sync::Arc<dyn ps_cache::cache::Cache> =
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new());
+        let html = crate::rewrite::html_context(
+            backend,
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new()),
+            std::sync::Arc::new(ps_stats::core::Statistics::new()),
+            0,
+            std::rc::Rc::new(crate::rewrite::UnavailableFetcher),
+        );
+        let driver = std::rc::Rc::new(ps_html::server_context::ResourceDriver::new(
+            html,
+            std::rc::Rc::new(std::cell::RefCell::new(options.clone())),
+            "http://h/p",
+        ));
+        driver.record_image_rewrite(ps_html::server_context::ImageRewriteRecord {
+            timestamp_ms: 1,
+            original_bytes: 10,
+            optimized_bytes: 4,
+            output_mime_type: "image/webp".to_string(),
+            original_url: "http://h/a.jpg".to_string(),
+            optimized_url: "http://h/a.jpg.pagespeed.ic.h.webp".to_string(),
+        });
+        let sink = HtmlSink::new(&options, "http://h/p", false, &ps_side, &slot, Some(driver));
+        let records = sink.take_image_records();
+        assert_eq!(1, records.len());
+        assert!(records[0].message_line().starts_with("PS_IMAGE_DETAIL\t"));
+        assert!(sink.take_image_records().is_empty());
     }
 
     #[test]

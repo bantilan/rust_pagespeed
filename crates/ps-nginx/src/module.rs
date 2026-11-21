@@ -889,6 +889,27 @@ fn open_shared_statistics(cache_dirs: &[&str]) -> (ps_stats::core::Statistics, V
     }
 }
 
+/// Messages image rewrite records into the server message buffer
+/// (the admin images page reads them from there).
+///
+/// # Safety
+///
+/// The handler's log, when set, must point at a live `ngx_log_t`
+/// (the cycle error log at every call site).
+unsafe fn message_image_records(
+    server: &crate::conf::ServerContext,
+    records: &[ps_html::server_context::ImageRewriteRecord],
+) {
+    // SAFETY: caller guarantees the handler's log as documented.
+    unsafe {
+        if let Some(handler) = server.message_handler.as_ref() {
+            for record in records {
+                handler.message(MessageLevel::Info, &record.message_line());
+            }
+        }
+    }
+}
+
 /// Collects the statistics-log writer config (first server in cycle
 /// order with logging enabled and a `LogDir`; `None` disables
 /// logging): the single global series lives at
@@ -2622,6 +2643,7 @@ unsafe fn resource_response(
                 if response.status == 0 || response.status >= 400 {
                     return NGX_DECLINED as ngx_int_t;
                 }
+                message_image_records(server, &response.image_records);
                 let mut headers = response.headers;
                 headers.push((X_PAGE_SPEED.to_string(), resolved.core.x_header_value()));
                 serve_response(r, response.status, &headers, &response.body)
@@ -2876,6 +2898,7 @@ unsafe fn resource_response(
                 }
                 // No `X-Page-Speed`: C++ stamps it on HTML and
                 // `.pagespeed.` serves, never on in-place serves.
+                message_image_records(server, &response.image_records);
                 let headers = response.headers;
                 serve_response(r, response.status, &headers, &response.body)
             }

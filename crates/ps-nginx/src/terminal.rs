@@ -101,6 +101,9 @@ pub struct ResourceResponse {
     pub headers: Vec<(String, String)>,
     /// Response body.
     pub body: Vec<u8>,
+    /// Image rewrite records for the admin images page (the
+    /// caller messages each line into the message buffer).
+    pub image_records: Vec<ps_html::server_context::ImageRewriteRecord>,
 }
 
 /// Fetches a `.pagespeed.` resource through the sync bridge
@@ -127,7 +130,9 @@ pub fn fetch_resource_body(
     install_request_context(&driver, request_headers);
     driver.register_serving_filters();
     ps_html::server_context::ResourceDriver::fetch_resource(&driver, url, &mut fetch);
-    collect_fetch(&fetch)
+    let mut response = collect_fetch(&fetch);
+    response.image_records = driver.take_image_records();
+    response
 }
 
 /// Installs request headers + UA on a driver (`SetRequestHeaders`
@@ -170,7 +175,9 @@ pub fn fetch_in_place_body(
     install_request_context(&driver, request_headers);
     driver.register_serving_filters();
     ps_html::ipro::fetch_in_place_resource(&driver, url, &mut fetch, false);
-    collect_fetch(&fetch)
+    let mut response = collect_fetch(&fetch);
+    response.image_records = driver.take_image_records();
+    response
 }
 
 /// Builds a lawyer over the proxy mappings (`domain_lawyer()`
@@ -213,6 +220,7 @@ pub fn fetch_proxy_body(
         status: 0,
         headers: Vec::new(),
         body: Vec::new(),
+        image_records: Vec::new(),
     };
     let lawyer = proxy_lawyer(options);
     let gurl = GoogleUrl::new(url);
@@ -264,6 +272,7 @@ fn collect_proxy(fetch: &BufferingFetch) -> ResourceResponse {
         status: fetch.response_headers().status_code().max(0) as u16,
         headers,
         body: fetch.body().to_vec(),
+        image_records: Vec::new(),
     }
 }
 
@@ -279,6 +288,7 @@ fn collect_fetch(fetch: &BufferingFetch) -> ResourceResponse {
         status: fetch.response_headers().status_code().max(0) as u16,
         headers,
         body: fetch.body().to_vec(),
+        image_records: Vec::new(),
     }
 }
 

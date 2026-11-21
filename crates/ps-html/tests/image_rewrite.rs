@@ -4956,3 +4956,38 @@ fn servant_recompresses_without_browser_flag() {
         assert_eq!(orig_rgba.pixels(), rgba.pixels());
     }
 }
+
+#[test]
+fn successful_rewrite_records_admin_row() {
+    let fixture = Fixture::new();
+    fixture.add_file_to_mock_fetcher(PUZZLE_URL, PUZZLE_JPG, "image/jpeg", 100);
+    fixture.add_recompress_image_filters();
+    let driver = fixture.driver_for("http://rewrite_image.test/RewriteImage.html");
+    let html = "<head/><body><img src=\"Puzzle.jpg\"/></body>";
+    let output =
+        fixture.parse_with_driver(&driver, "http://rewrite_image.test/RewriteImage.html", html);
+    let srcs = collect_img_srcs(&output);
+    assert_eq!(1, srcs.len());
+    assert!(srcs[0].contains(".pagespeed."), "{}", srcs[0]);
+    let records = driver.take_image_records();
+    assert_eq!(1, records.len());
+    let record = &records[0];
+    assert!(
+        record.original_url.ends_with("Puzzle.jpg"),
+        "{}",
+        record.original_url
+    );
+    assert!(
+        record.optimized_url.contains(".pagespeed."),
+        "{}",
+        record.optimized_url
+    );
+    assert!(record.original_bytes > 0);
+    assert!(record.optimized_bytes > 0);
+    assert!(!record.output_mime_type.is_empty());
+    let line = record.message_line();
+    assert!(line.starts_with("PS_IMAGE_DETAIL\t"), "{line}");
+    assert_eq!(7, line.split('\t').count(), "{line}");
+    // Takes drain.
+    assert!(driver.take_image_records().is_empty());
+}

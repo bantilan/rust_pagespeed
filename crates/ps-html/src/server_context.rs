@@ -638,6 +638,48 @@ pub struct ResourceDriver {
     response_headers: Rc<RefCell<ResponseHeaders>>,
     user_agent: RefCell<String>,
     request_headers: RefCell<RequestHeaders>,
+    image_records: RefCell<Vec<ImageRewriteRecord>>,
+}
+
+/// One successful image rewrite, as listed by the admin images
+/// page (`ImageRewriteRow`): the `message_line` rendering is the
+/// single source of truth for the `PS_IMAGE_DETAIL` marker format
+/// the admin parser consumes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImageRewriteRecord {
+    /// Rewrite completion time in ms.
+    pub timestamp_ms: i64,
+    /// Input size in bytes.
+    pub original_bytes: i64,
+    /// Output size in bytes.
+    pub optimized_bytes: i64,
+    /// Output MIME type.
+    pub output_mime_type: String,
+    /// Input URL.
+    pub original_url: String,
+    /// Rewritten URL.
+    pub optimized_url: String,
+}
+
+impl ImageRewriteRecord {
+    /// Marker prefix (`PS_IMAGE_DETAIL\t`).
+    pub const MARKER: &'static str = "PS_IMAGE_DETAIL\t";
+
+    /// Renders the message-buffer line (marker plus six tab
+    /// fields: timestamp, sizes, MIME, original URL, output URL).
+    #[must_use]
+    pub fn message_line(&self) -> String {
+        format!(
+            "{}{}\t{}\t{}\t{}\t{}\t{}",
+            Self::MARKER,
+            self.timestamp_ms,
+            self.original_bytes,
+            self.optimized_bytes,
+            self.output_mime_type,
+            self.original_url,
+            self.optimized_url,
+        )
+    }
 }
 
 /// Response-mime XHTML verdict (`RewriteDriver::XhtmlStatus`).
@@ -689,9 +731,22 @@ impl ResourceDriver {
             response_headers: Rc::new(RefCell::new(ResponseHeaders::default())),
             user_agent: RefCell::new(String::new()),
             request_headers: RefCell::new(RequestHeaders::new()),
+            image_records: RefCell::new(Vec::new()),
         };
         driver.rebuild_lawyer();
         driver
+    }
+
+    /// Records a successful image rewrite for the admin images page
+    /// (drained into the message buffer at request completion).
+    pub fn record_image_rewrite(&self, record: ImageRewriteRecord) {
+        self.image_records.borrow_mut().push(record);
+    }
+
+    /// Takes accumulated image rewrite records, leaving the list empty.
+    #[must_use]
+    pub fn take_image_records(&self) -> Vec<ImageRewriteRecord> {
+        std::mem::take(&mut *self.image_records.borrow_mut())
     }
 
     /// Reads the request user agent (`user_agent`).

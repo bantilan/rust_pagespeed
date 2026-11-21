@@ -335,6 +335,35 @@ fn dashboard_shows_html_activity_without_inventing_savings() {
 }
 
 #[test]
+fn images_page_parses_emitted_record_format() {
+    use ps_html::server_context::ImageRewriteRecord;
+    let fixture = Fixture::new();
+    // The filter's rendering is the format's single source of truth;
+    // the admin parser must consume it verbatim (drift guard).
+    let record = ImageRewriteRecord {
+        timestamp_ms: NOW_MS,
+        original_bytes: 10000,
+        optimized_bytes: 4000,
+        output_mime_type: "image/avif".to_string(),
+        original_url: "https://example.com/a.jpg".to_string(),
+        optimized_url: "https://example.com/a.jpg.pagespeed.ic.h.avif".to_string(),
+    };
+    fixture.message(MessageLevel::Info, &record.message_line());
+    let mut fetch = test_fetch("http://localhost/pagespeed_admin/images");
+    fixture
+        .site
+        .images_handler(AdminSource::PageSpeedAdmin, &mut fetch, None, "");
+    let body = body_of(&fetch);
+    for expected in [
+        "https://example.com/a.jpg",
+        "image/avif",
+        "1</strong><span>recent rewrites</span>",
+    ] {
+        assert!(body.contains(expected), "missing {expected}\n{body}");
+    }
+}
+
+#[test]
 fn images_page_shows_recorded_rewrite_and_comparison() {
     let fixture = Fixture::new();
     fixture.message(
