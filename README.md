@@ -1,14 +1,14 @@
-# pagespeed-rust
+# Rust Pagespeed
 
-An experimental Rust rewrite of PageSpeed (HTML/CSS/JS/image optimization,
-caching, HTTP helpers, stats, configuration, admin pages, and an NGINX
-module backend).
+A Rust port of PageSpeed (HTML/CSS/JS/image optimization, caching, HTTP
+helpers, stats, configuration, admin pages, and an NGINX module backend).
 
-## Status: experimental scaffold
+## Status: working, under active development
 
-This workspace is a **scaffold only**. It must be treated as **experimental
-until compatibility tests plus benchmarks pass** against the production
-C++ implementation. Do not deploy it in place of the production module.
+The workspace test suite passes, live compatibility checks against the C++
+module pass, and the module serves rewritten traffic (HTML, images with
+WebP/AVIF negotiation, proxy mode). It is still maturing: keep backups of
+your C++ configuration when switching over.
 
 ## Original sources are preserved
 
@@ -38,6 +38,7 @@ Cargo workspace (`resolver = "2"`):
 | `ps-config`| Configuration / rewrite options         |
 | `ps-admin` | Admin pages / status endpoints           |
 | `ps-nginx` | NGINX FFI bindings (see safety note)     |
+| `ps-compat` | Compatibility test harness              |
 
 ## Safety policy
 
