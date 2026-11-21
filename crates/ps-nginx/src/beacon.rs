@@ -1,11 +1,11 @@
-//! Beacon handling (`ps_beacon_handler`, `HandleBeacon` stats half).
+//! Beacon handling (`ps_beacon_handler`, `HandleBeacon`).
 //!
-//! Combines query and POST beacon data, validates the URL,
-//! folds onload timings into the worker statistics, and answers
-//! 204. The property-cache half (critical-image sets) waits for
-//! the property store; without it the handler returns after the
-//! stats, exactly like C++ with a disabled pcache.
+//! Combines query and POST beacon data, validates the URL, folds
+//! onload timings into the worker statistics, merges critical
+//! image and LCP evidence into the metadata-backed beacon cohort,
+//! and answers 204.
 
+use ps_html::beacon_finder::{self, AcceptOutcome, BeaconFinder, BeaconReport};
 use ps_http::google_url::GoogleUrl;
 use ps_http::query_params::QueryParams;
 use ps_stats::core::Statistics;
@@ -80,6 +80,74 @@ pub fn handle_beacon(params: &str, statistics: &Statistics) -> (bool, Option<Str
     (status, None)
 }
 
+/// Evidence-store half of a beacon (`HandleBeacon` pcache half):
+/// parses the LCP/nonce report and merges it into the variant's
+/// record. Returns the merge outcome, or `None` when the beacon
+/// carries no options hash (evidence keys require it).
+pub fn handle_beacon_evidence(
+    params: &str,
+    page_url: &str,
+    user_agent: &str,
+    server: &ps_html::server_context::ServerContext,
+    now_ms: i64,
+) -> Option<AcceptOutcome> {
+    let mut query_params = QueryParams::new();
+    query_params.parse_from_untrusted_string(params);
+    let options_hash = query_params.lookup1_unescaped(beacon_finder::PARAM_OPTIONS_HASH)?;
+    let report = parse_beacon_report(&query_params);
+    if report.html_hashes.is_none() {
+        return None;
+    }
+    let matcher = ps_http::user_agent_matcher::UserAgentMatcher::new();
+    let device = matcher.device_type_for_ua(user_agent);
+    let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(device);
+    let finder = BeaconFinder::new(server.metadata_cache());
+    let mut evidence = finder.load(page_url, &options_hash, suffix).into_record();
+    let before = evidence.clone();
+    let outcome = beacon_finder::accept_beacon(&mut evidence, &report, now_ms);
+    // The cohort writes back unconditionally (even nonce
+    // failures), preserving expiry feedback.
+    if evidence != before {
+        finder.store(page_url, &options_hash, suffix, &evidence);
+    }
+    Some(outcome)
+}
+
+/// Parses the LCP/nonce evidence report: a stamped LCP hash joins
+/// the critical set with img kind; otherwise a valid kind (with
+/// an empty set, so the beacon still counts) plus the loaded URL
+/// for unstamped image LCP.
+fn parse_beacon_report(query_params: &QueryParams) -> BeaconReport {
+    let mut report = BeaconReport::default();
+    if let Some(hash) = query_params.lookup1_unescaped(beacon_finder::PARAM_LCP_IMAGE) {
+        if !hash.is_empty() {
+            report
+                .html_hashes
+                .get_or_insert_with(std::collections::HashSet::new)
+                .insert(hash);
+        }
+    }
+    if report.html_hashes.is_some() {
+        report.lcp_kind = beacon_finder::LCP_KIND_IMG.to_string();
+    } else if let Some(kind) = query_params.lookup1_unescaped(beacon_finder::PARAM_LCP_KIND) {
+        if beacon_finder::valid_lcp_kind(&kind) {
+            if kind != beacon_finder::LCP_KIND_TEXT {
+                if let Some(url) = query_params.lookup1_unescaped(beacon_finder::PARAM_LCP_URL) {
+                    if !url.is_empty() && url.len() <= beacon_finder::LCP_URL_MAX_LENGTH {
+                        report.lcp_image_url = url;
+                    }
+                }
+            }
+            report.lcp_kind = kind;
+            report.html_hashes = Some(std::collections::HashSet::new());
+        }
+    }
+    if let Some(nonce) = query_params.lookup1_unescaped(beacon_finder::PARAM_NONCE) {
+        report.nonce = nonce;
+    }
+    report
+}
+
 /// Escapes client data for single-line logs (`CEscape`): keeps
 /// printable ASCII, C-escapes quotes/backslash/controls, octal
 /// escapes the rest.
@@ -144,5 +212,71 @@ mod tests {
         // Data combination always joins with `&`, even when empty.
         assert_eq!(combine_beacon_data("a=1", "b=2"), "a=1&b=2");
         assert_eq!(combine_beacon_data("", ""), "&");
+    }
+
+    #[test]
+    fn evidence_half_stores_lcp() {
+        use ps_html::beacon_finder::{BeaconEvidence, BeaconFinder};
+        // One metadata cache backs the finder (like one server).
+        let metadata: std::sync::Arc<dyn ps_cache::cache::Cache> =
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new());
+        let html = crate::rewrite::html_context(
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new()),
+            std::sync::Arc::clone(&metadata),
+            std::sync::Arc::new(ps_stats::core::Statistics::new()),
+            0,
+            std::rc::Rc::new(crate::rewrite::UnavailableFetcher),
+        );
+        let server = html;
+        // No options hash: stats-only, nothing stored.
+        assert!(handle_beacon_evidence(
+            "url=http://h/p&lcp=1&n=x",
+            "http://h/p",
+            "Test/1.0",
+            &server,
+            1000
+        )
+        .is_none());
+        // Seed a pending nonce through the finder.
+        let finder = BeaconFinder::new(server.metadata_cache());
+        let mut evidence = BeaconEvidence::default();
+        let nonce =
+            ps_html::beacon_finder::prepare_beacon(&mut evidence, 1000, 5, 42)
+                .expect("due");
+        let hash = ps_html::beacon_finder::url_hash("http://h/hero.png");
+        let keys: std::collections::HashSet<String> =
+            [hash.clone()].into_iter().collect();
+        ps_html::beacon_finder::update_candidates(&mut evidence, &keys, false);
+        finder.store("http://h/p", "oh1", "@Desktop", &evidence);
+        // Bad nonces reject without merging.
+        assert_eq!(
+            handle_beacon_evidence(
+                &format!("url=http://h/p&oh=oh1&lcp={hash}&n=wrong"),
+                "http://h/p",
+                "Test/1.0",
+                &server,
+                1000
+            ),
+            Some(AcceptOutcome::BadNonce)
+        );
+        // The issued nonce accepts and stores LCP evidence.
+        assert_eq!(
+            handle_beacon_evidence(
+                &format!("url=http://h/p&oh=oh1&lcp={hash}&n={nonce}"),
+                "http://h/p",
+                "Test/1.0",
+                &server,
+                1000
+            ),
+            Some(AcceptOutcome::Accepted)
+        );
+        let stored = finder.load("http://h/p", "oh1", "@Desktop");
+        let record = stored.record().expect("stored record");
+        assert_eq!(1, record.valid_beacons);
+        assert_eq!(ps_html::beacon_finder::LCP_KIND_IMG, record.lcp_kind);
+        assert!(ps_html::beacon_finder::is_html_critical_image(
+            "http://h/hero.png",
+            record
+        ));
     }
 }

@@ -2239,12 +2239,30 @@ unsafe fn answer_beacon(r: *mut ngx_http_request_t, data: &str) {
     // SAFETY: caller guarantees a live request.
     unsafe {
         let main = &*main_conf_of_request(r);
-        let _user_agent = header_value((*r).headers_in.user_agent);
+        let user_agent = header_value((*r).headers_in.user_agent).unwrap_or_default();
         // The success flag is ignored, like C++.
         let (_, warning) = crate::beacon::handle_beacon(data, &main.driver_factory.statistics);
         if let Some(warning) = warning {
             let log = (*(*r).connection).log;
             ngx::ngx_log_error!(NGX_LOG_WARN, log, "{}", warning);
+        }
+        // The evidence half needs the serving server's context;
+        // without one the beacon stays stats-only.
+        let server = &*srv_conf_of_request(r);
+        if let Some(html) = server
+            .context
+            .as_ref()
+            .and_then(|context| context.html_context.as_ref())
+        {
+            let mut query = ps_http::query_params::QueryParams::new();
+            query.parse_from_untrusted_string(data);
+            if let Some(page_url) = query.lookup1_unescaped(crate::beacon::BEACON_URL_PARAM) {
+                let now_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|age| age.as_millis() as i64)
+                    .unwrap_or(0);
+                crate::beacon::handle_beacon_evidence(data, &page_url, &user_agent, html, now_ms);
+            }
         }
         // C++ passes a string literal through `const_cast`; the
         // static outlives the request the same way.

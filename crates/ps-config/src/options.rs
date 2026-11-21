@@ -2956,6 +2956,30 @@ impl RewriteOptions {
         self.set_image_bool("ioci", value);
     }
 
+    /// Whether client-side critical-image detection JS inserts
+    /// (`CriticalImagesBeaconEnabled`, default true).
+    #[must_use]
+    pub fn critical_images_beacon_enabled(&self) -> bool {
+        self.image_bool("CriticalImagesBeaconEnabled", true)
+    }
+
+    /// Sets critical-image beaconing.
+    pub fn set_critical_images_beacon_enabled(&mut self, value: bool) {
+        self.set_image_bool("cibe", value);
+    }
+
+    /// Beacon reinstrumentation interval in seconds
+    /// (`BeaconReinstrumentTimeSec`, default 5).
+    #[must_use]
+    pub fn beacon_reinstrument_time_sec(&self) -> i64 {
+        self.image_int("BeaconReinstrumentTimeSec", 5)
+    }
+
+    /// Sets the reinstrumentation interval.
+    pub fn set_beacon_reinstrument_time_sec(&mut self, value: i64) {
+        self.set_image_int("brts", value);
+    }
+
     /// Whether small images stay unrewritten
     /// (`CacheSmallImagesUnrewritten`, default false).
     #[must_use]
