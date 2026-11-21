@@ -8,6 +8,12 @@
 //! rather than preloaded on a contradicted guess. At most one
 //! preload is inserted, skipped when the author already preloads
 //! the target (element or Link header).
+//!
+//! CSS-background LCP (`bg` reports carry the loaded URL but no
+//! element) preloads from evidence at end of document when no
+//! image spent the single-preload budget: a head-level
+//! `as=image` hint with high fetch priority, format-checked
+//! against the request (learned bytes are format-specific).
 #![forbid(unsafe_code)]
 
 use crate::beacon_finder::{self, Availability, BeaconEvidence, BeaconFinder};
@@ -367,6 +373,52 @@ impl PrioritizeLcpImagesFilter {
         }
         dom.add_attribute(id, b"loading", b"lazy");
     }
+
+    /// Preloads a CSS-background LCP URL from learned evidence.
+    /// Only when no image spent the single-preload budget, the
+    /// author does not already cover the URL, a head exists to
+    /// hold the hint, and the request supports the learned bytes'
+    /// format (evidence is per device suffix, not per format, so
+    /// a learned AVIF must not hint a non-AVIF browser).
+    fn maybe_preload_background_lcp(&mut self, dom: &mut Dom) {
+        if self.prioritized_count >= MAX_PRIORITIZED_IMAGES {
+            return;
+        }
+        let evidence = self.evidence();
+        if evidence.lcp_kind != beacon_finder::LCP_KIND_BACKGROUND
+            || evidence.lcp_image_url.is_empty()
+        {
+            return;
+        }
+        let url = evidence.lcp_image_url.clone();
+        if self.is_covered_by_author_preload(&url) {
+            return;
+        }
+        let mut properties = self.driver.request_properties();
+        let supports_avif = properties.supports_avif_rewritten_urls();
+        let supports_webp = properties.supports_webp_rewritten_urls();
+        if !bg_preload_format_supported(&url, supports_avif, supports_webp) {
+            return;
+        }
+        if !self.preloaded_srcs.insert(url.as_bytes().to_vec()) {
+            return;
+        }
+        let Some(head) = self.head_element else {
+            return;
+        };
+        if !dom.can_append_child(head) {
+            return;
+        }
+        // Backgrounds load without credentials, matching a
+        // crossorigin-less preload exactly.
+        let preload = dom.new_element(None, b"link");
+        dom.add_attribute(preload, b"rel", b"preload");
+        dom.add_attribute(preload, b"as", b"image");
+        dom.add_attribute(preload, b"href", url.as_bytes());
+        dom.add_attribute(preload, b"fetchpriority", b"high");
+        dom.append_child(self.head_element, preload);
+        self.prioritized_count += 1;
+    }
 }
 
 impl HtmlFilter for PrioritizeLcpImagesFilter {
@@ -475,6 +527,10 @@ impl HtmlFilter for PrioritizeLcpImagesFilter {
         } else if keyword == Keyword::Noscript {
             self.noscript_depth = self.noscript_depth.saturating_sub(1);
         }
+    }
+
+    fn end_document(&mut self, dom: &mut Dom, _lexer: &Lexer) {
+        self.maybe_preload_background_lcp(dom);
     }
 }
 
@@ -599,4 +655,81 @@ fn trim_bytes(bytes: &[u8]) -> &[u8] {
         end -= 1;
     }
     &bytes[start..end]
+}
+
+/// Whether the request can use learned background-LCP bytes:
+/// AVIF/WebP need matching support, universal raster kinds
+/// always pass, and anything unrecognized (or extensionless)
+/// fails closed so one variant never hints another's bytes.
+fn bg_preload_format_supported(url: &str, supports_avif: bool, supports_webp: bool) -> bool {
+    let path = url.split(['?', '#']).next().unwrap_or_default();
+    let Some(extension) = path.rsplit('.').next() else {
+        return false;
+    };
+    // No dot, a trailing dot, or a slash after the last dot
+    // (the dot belongs to a directory): not a usable extension.
+    if !path.contains('.') || extension.is_empty() || extension.contains('/') {
+        return false;
+    }
+    if extension.eq_ignore_ascii_case("avif") {
+        supports_avif
+    } else if extension.eq_ignore_ascii_case("webp") {
+        supports_webp
+    } else {
+        matches!(
+            extension.to_ascii_lowercase().as_str(),
+            "jpg" | "jpeg" | "png" | "gif" | "svg" | "ico" | "bmp"
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bg_preload_format_supported;
+
+    #[test]
+    fn format_matrix() {
+        // AVIF/WebP follow capabilities.
+        assert!(bg_preload_format_supported("http://h/x.avif", true, false));
+        assert!(!bg_preload_format_supported(
+            "http://h/x.avif",
+            false,
+            true
+        ));
+        assert!(bg_preload_format_supported(
+            "http://h/x.webp",
+            false,
+            true
+        ));
+        assert!(!bg_preload_format_supported(
+            "http://h/x.webp",
+            false,
+            false
+        ));
+        // Universal kinds always pass.
+        assert!(bg_preload_format_supported(
+            "http://h/x.jpg",
+            false,
+            false
+        ));
+        assert!(bg_preload_format_supported(
+            "http://h/x.JPEG?y=1",
+            false,
+            false
+        ));
+        assert!(bg_preload_format_supported(
+            "http://h/x.png#frag",
+            false,
+            false
+        ));
+        // Unknown or missing extensions fail closed.
+        assert!(!bg_preload_format_supported("http://h/x.jxl", true, true));
+        assert!(!bg_preload_format_supported("http://h/noext", true, true));
+        assert!(!bg_preload_format_supported(
+            "http://h/dir.name/x",
+            true,
+            true
+        ));
+        assert!(!bg_preload_format_supported("http://h/x.", true, true));
+    }
 }

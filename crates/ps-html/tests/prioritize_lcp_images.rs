@@ -36,12 +36,16 @@ impl Harness {
     }
 
     fn driver(&self) -> Rc<ResourceDriver> {
+        self.driver_for(CHROME_UA)
+    }
+
+    fn driver_for(&self, user_agent: &str) -> Rc<ResourceDriver> {
         let driver = Rc::new(ResourceDriver::new(
             Rc::clone(&self.server),
             Rc::clone(&self.options),
             PAGE_URL,
         ));
-        driver.set_user_agent(CHROME_UA);
+        driver.set_user_agent(user_agent);
         driver
     }
 
@@ -72,6 +76,35 @@ impl Harness {
             html_hashes: Some([hash].into_iter().collect()),
             lcp_kind: finder::LCP_KIND_IMG.to_string(),
             lcp_image_url: String::new(),
+            nonce,
+        };
+        assert_eq!(
+            finder::accept_beacon(&mut evidence, &report, 1000),
+            finder::AcceptOutcome::Accepted
+        );
+        backend.store(PAGE_URL, &oh, "@Desktop", &evidence);
+    }
+
+    /// Seeds one accepted beacon with explicit hashes, LCP kind,
+    /// and LCP URL (background LCP reports an empty set).
+    fn seed_lcp_report(&self, hashes: &[String], kind: &str, url: &str) {
+        use ps_html::beacon_finder as finder;
+        let backend = finder::BeaconFinder::new(self.server.metadata_cache());
+        let oh = self
+            .server
+            .hasher()
+            .hash(self.options.borrow().signature().as_bytes());
+        let mut evidence = finder::BeaconEvidence::default();
+        let nonce = finder::prepare_beacon(&mut evidence, 1000, 5, 11).expect("due");
+        finder::update_candidates(
+            &mut evidence,
+            &hashes.iter().cloned().collect(),
+            false,
+        );
+        let report = finder::BeaconReport {
+            html_hashes: Some(hashes.iter().cloned().collect()),
+            lcp_kind: kind.to_string(),
+            lcp_image_url: url.to_string(),
             nonce,
         };
         assert_eq!(
@@ -161,4 +194,92 @@ fn explicit_high_priority_is_never_lazy() {
     );
     assert_eq!(1, count(&out, b"rel=\"preload\""));
     assert_eq!(0, count(&out, b"loading=\"lazy\""));
+}
+
+const BG_URL: &str = "http://lcp.test/bg.avif";
+
+#[test]
+fn background_lcp_preloads_head_hint() {
+    let harness = Harness::new();
+    harness.seed_lcp_report(&[], ps_html::beacon_finder::LCP_KIND_BACKGROUND, BG_URL);
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><img src=\"a.png\"><img src=\"b.png\"></body></html>",
+    );
+    // Exactly one preload, pointing at the background URL with
+    // high fetch priority; no image element is touched for
+    // priority (the contradicted first image stays plain).
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, BG_URL.as_bytes()) >= 1);
+    assert_eq!(1, count(&out, b"fetchpriority=\"high\""));
+    assert_eq!(1, count(&out, b"loading=\"lazy\""));
+}
+
+#[test]
+fn background_lcp_yields_to_image_hero() {
+    // A learned-critical image spends the single-preload budget,
+    // so the background URL gets no second hint.
+    let harness = Harness::new();
+    let hash = ps_html::beacon_finder::url_hash("http://lcp.test/b.png");
+    harness.seed_lcp_report(
+        &[hash],
+        ps_html::beacon_finder::LCP_KIND_BACKGROUND,
+        BG_URL,
+    );
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><img src=\"a.png\"><img src=\"b.png\"></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"b.png\"") >= 1);
+    assert_eq!(0, count(&out, BG_URL.as_bytes()));
+}
+
+const LEGACY_UA: &str = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)";
+
+#[test]
+fn background_lcp_format_mismatch_skips() {
+    let harness = Harness::new();
+    harness.seed_lcp_report(&[], ps_html::beacon_finder::LCP_KIND_BACKGROUND, BG_URL);
+    let driver = harness.driver_for(LEGACY_UA);
+    assert!(
+        !driver
+            .request_properties()
+            .supports_avif_rewritten_urls(),
+        "legacy UA must lack AVIF support"
+    );
+    // Learned AVIF bytes are not hinted to a non-AVIF browser.
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><img src=\"a.png\"></body></html>",
+    );
+    assert_eq!(0, count(&out, b"rel=\"preload\""));
+    // Universal formats still preload for the same client.
+    let jpg = Harness::new();
+    jpg.seed_lcp_report(
+        &[],
+        ps_html::beacon_finder::LCP_KIND_BACKGROUND,
+        "http://lcp.test/bg.jpg",
+    );
+    let legacy = jpg.driver_for(LEGACY_UA);
+    let out = jpg.render(
+        &legacy,
+        b"<html><head><title>t</title></head><body><img src=\"a.png\"></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+}
+
+#[test]
+fn background_lcp_author_preload_wins() {
+    let harness = Harness::new();
+    harness.seed_lcp_report(&[], ps_html::beacon_finder::LCP_KIND_BACKGROUND, BG_URL);
+    let driver = harness.driver();
+    let html = format!(
+        "<html><head><link rel=\"preload\" as=\"image\" href=\"{BG_URL}\"></head><body><img src=\"a.png\"></body></html>"
+    );
+    let out = harness.render(&driver, html.as_bytes());
+    // The author's hint stands; no duplicate is inserted.
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
 }
