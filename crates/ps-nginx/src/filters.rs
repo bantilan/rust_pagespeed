@@ -986,9 +986,20 @@ pub mod html_rewrite {
                 .base_fetch
                 .as_ref()
                 .expect("html branch attaches a fetch");
-            fetch.with_state(|base| {
+            let rc = fetch.with_state(|base| {
                 finish_html_header_filter(r, ctx_ptr, base.response_headers_mut())
-            })
+            });
+            // Serve stashed cache hits once the fetch-state guard
+            // above has dropped (the origin body is swallowed
+            // downstream).
+            if let Some(entry) = (*ctx).html_cache_hit.take() {
+                let now = now_ms();
+                if let Some(sink) = (*ctx).html_sink.as_ref() {
+                    sink.serve_html_cache_hit(&entry, now);
+                }
+                (*ctx).html_cache_served = true;
+            }
+            rc
         }
     }
 
@@ -1009,12 +1020,29 @@ pub mod html_rewrite {
     ) -> ngx_int_t {
         use crate::caching::note_cache_control_limits;
         use crate::headers::copy_response_headers;
-        use crate::module::srv_conf_of_request;
+        use crate::module::{main_conf_of_request, srv_conf_of_request};
         use ngx::ffi::NGX_AGAIN;
         use ps_config::filter::Filter;
         use ps_http::names::header;
         // SAFETY: caller guarantees as documented.
         unsafe {
+            // HTML-cache lookup on pristine origin headers, before
+            // any mutation below (a hit serves cached bytes and the
+            // origin body is swallowed downstream).
+            let now = now_ms();
+            let hit_entry = (*ctx).html_sink.as_mut().and_then(|sink| {
+                let origin = pristine_origin_headers(r, now);
+                let request = current_request_headers(r);
+                let main = &*main_conf_of_request(r);
+                let mtime = origin_file_mtime(r);
+                sink.html_cache_lookup(
+                    &origin,
+                    &request,
+                    &main.driver_factory.purge_set,
+                    mtime,
+                    now,
+                )
+            });
             // Content-encoding handling.
             let encoding = (*r).headers_out.content_encoding;
             if !encoding.is_null() && (*encoding).value.len > 0 {
@@ -1111,7 +1139,131 @@ pub mod html_rewrite {
                 .remove_all(header::CONTENT_LENGTH);
             crate::request::set_buffered(r, true);
             crate::request::set_request_filter_need_in_memory(r);
+            // Stash hits for the caller: serving touches fetch
+            // state, whose guard this call holds (serving here
+            // would self-deadlock).
+            (*ctx).html_cache_hit = hit_entry;
             NGX_AGAIN as ngx_int_t
+        }
+    }
+
+    /// Snapshots pristine origin response headers (pre-strip, for
+    /// HTML-cache eligibility and identity).
+    ///
+    /// # Safety
+    ///
+    /// `r` must point at a live request.
+    unsafe fn pristine_origin_headers(
+        r: *mut ngx_http_request_t,
+        now_ms: i64,
+    ) -> ps_http::response::ResponseHeaders {
+        use crate::headers::copy_response_headers;
+        // SAFETY: caller guarantees a live request.
+        unsafe {
+            let pairs = collect_response_headers(r);
+            let refs: Vec<crate::headers::RawHeader<'_>> = pairs
+                .iter()
+                .map(|(name, value, hashed)| (name.as_str(), value.as_str(), *hashed))
+                .collect();
+            let content_type = ngx_str_text(&raw const (*r).headers_out.content_type);
+            let mut origin =
+                ps_http::response::ResponseHeaders::new(ps_http::response::HttpOptions::default());
+            copy_response_headers(
+                (*r).http_version,
+                (*r).headers_out.status,
+                &content_type,
+                &refs,
+                now_ms,
+                &mut origin,
+            );
+            // Out-of-band caching headers never reach the list above.
+            for (slot, name) in [
+                ((*r).headers_out.cache_control, "Cache-Control"),
+                ((*r).headers_out.expires, "Expires"),
+                ((*r).headers_out.etag, "ETag"),
+                ((*r).headers_out.last_modified, "Last-Modified"),
+            ] {
+                if !slot.is_null() && !origin.headers().has(name) {
+                    let value = ngx_str_text(&raw const (*slot).value);
+                    origin.headers_mut().add(name, &value);
+                }
+            }
+            origin.compute_caching();
+            origin
+        }
+    }
+
+    /// Resolves the origin file's mtime for HTML-cache freshness
+    /// (same-server statics carry no visible expiry at filter time;
+    /// foreign/unmapped URLs yield `None`). Tries the post-redirect
+    /// URI first (internal redirects already ran), then the raw URI
+    /// with default index fallbacks.
+    ///
+    /// # Safety
+    ///
+    /// `r` must point at a live request.
+    unsafe fn origin_file_mtime(r: *mut ngx_http_request_t) -> Option<(u64, u32)> {
+        // SAFETY: caller guarantees a live request.
+        unsafe {
+            // The postconfiguration snapshot (never live nginx
+            // config memory: `server_names` elements dangle past
+            // `ngx_init_cycle`).
+            let cfg_s = &*crate::module::srv_conf_of_request(r);
+            let context = cfg_s.context.as_ref()?;
+            let fetcher = crate::module::file_fetcher_for_server(
+                cfg_s.file_identity.as_ref(),
+                &context.options.core,
+            )?;
+            let uri = ngx_str_text(&raw const (*r).uri);
+            let mut candidates = vec![
+                crate::module::request_url_for_uri_text(r, &uri),
+                crate::module::request_url_text(r),
+            ];
+            let base = candidates[1].clone();
+            let rooted = format!("{}/", base.trim_end_matches('/'));
+            candidates.push(format!("{rooted}index.html"));
+            candidates.push(format!("{rooted}index.htm"));
+            for url in candidates {
+                if let Some(path) = fetcher.resolve_routed(&url) {
+                    if let Some(age) = std::fs::metadata(&path)
+                        .ok()
+                        .and_then(|meta| meta.modified().ok())
+                        .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+                    {
+                        return Some((age.as_secs(), age.subsec_nanos()));
+                    }
+                }
+            }
+            None
+        }
+    }
+
+    /// Rebuilds the live request headers (for HTML-cache identity).
+    ///
+    /// # Safety
+    ///
+    /// `r` must point at a live request.
+    unsafe fn current_request_headers(
+        r: *mut ngx_http_request_t,
+    ) -> ps_http::request::RequestHeaders {
+        use crate::headers::{copy_request_headers, RawHeader};
+        // SAFETY: caller guarantees a live request.
+        unsafe {
+            let mut raw: Vec<(String, String, bool)> = Vec::new();
+            for_each_header(&mut (*r).headers_in.headers, |elt| {
+                let key = ngx_str_text(&raw const (*elt).key);
+                let value = ngx_str_text(&raw const (*elt).value);
+                raw.push((key, value, (*elt).hash != 0));
+                true
+            });
+            let refs: Vec<RawHeader<'_>> = raw
+                .iter()
+                .map(|(key, value, hashed)| (key.as_str(), value.as_str(), *hashed))
+                .collect();
+            let method_name = ngx_str_text(&raw const (*r).method_name);
+            let mut request_headers = ps_http::request::RequestHeaders::new();
+            copy_request_headers((*r).http_version, &method_name, &refs, &mut request_headers);
+            request_headers
         }
     }
 
@@ -1219,6 +1371,10 @@ pub mod html_rewrite {
                     uri
                 );
             }
+            // Cache hits swallow the origin body (already served).
+            if (*ctx).html_cache_served {
+                return pass_to_next(std::ptr::null_mut());
+            }
             let sink = (*ctx)
                 .html_sink
                 .as_mut()
@@ -1236,6 +1392,9 @@ pub mod html_rewrite {
                             ps_config::message_handler::MessageLevel::Info,
                             &record.message_line(),
                         );
+                    }
+                    if let Some(line) = sink.take_html_cache_line() {
+                        handler.message(ps_config::message_handler::MessageLevel::Info, &line);
                     }
                 }
             }
@@ -1567,6 +1726,8 @@ pub mod html_rewrite {
                     base_fetch: None,
                     html_sink: None,
                     recorder: None,
+                    html_cache_served: false,
+                    html_cache_hit: None,
                 };
                 let mut sink = FakeSink::default();
                 let outcome = finish_html_body_filter(&mut ctx, &mut first_link, &mut sink);

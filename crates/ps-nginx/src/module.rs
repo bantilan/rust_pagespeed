@@ -684,6 +684,10 @@ unsafe fn push_phase_handler(
 pub unsafe extern "C" fn postconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
     // SAFETY: caller guarantees a live conf.
     unsafe {
+        // Snapshot file identities first: the config temp pool
+        // (home of `server_names` elements) dies with
+        // `ngx_init_cycle`, so post-init code must never touch it.
+        snapshot_file_identities((*cf).cycle);
         let cfg = main_conf_of(cf);
         // The factory is eagerly owned, so presence is the
         // deletion latch (`driver_factory != NULL` ⟺
@@ -1121,20 +1125,54 @@ pub unsafe extern "C" fn init_child_process(cycle: *mut ngx_cycle_t) -> ngx_int_
     }
 }
 
-/// Builds the server's file fetcher (`None` falls back to the
-/// unavailable fetcher with a loud log): server-level root
-/// only (aliases, variables, relative, and missing roots fail
-/// closed), every configured server name (regex names never
-/// match).
+/// Snapshots every server's file identity into our server
+/// confs. Must run at postconfiguration: `server_names` elements
+/// live in the config temp pool, which `ngx_init_cycle` frees
+/// before workers start (reading them later is use-after-free).
 ///
 /// # Safety
 ///
-/// `cscf`/`clcf` must point at live confs.
-unsafe fn file_fetcher_for_server(
+/// `cycle` must point at a live `ngx_cycle_t` with built http
+/// config contexts (or be null, which snapshots nothing).
+unsafe fn snapshot_file_identities(cycle: *mut ngx_cycle_t) {
+    // SAFETY: caller guarantees a live configured cycle.
+    unsafe {
+        if cycle.is_null() {
+            return;
+        }
+        let ours = NGX_PAGE_SPEED.ctx_index;
+        let core = ngx::ffi::ngx_http_core_module.ctx_index;
+        for cscf in core_servers(cycle) {
+            if cscf.is_null() {
+                continue;
+            }
+            let sctx = (*cscf).ctx;
+            if sctx.is_null() {
+                continue;
+            }
+            let srv = *(*sctx).srv_conf.add(ours) as *mut SrvConf;
+            if srv.is_null() {
+                continue;
+            }
+            let clcf = *(*sctx).loc_conf.add(core) as *mut ngx_http_core_loc_conf_t;
+            (*srv).file_identity = snapshot_file_identity(cscf, clcf);
+        }
+    }
+}
+
+/// Captures one server's file identity (server-level root plus
+/// exact server names; aliases and missing roots snapshot to
+/// `None`). Postconfiguration-only (see
+/// [`snapshot_file_identities`]).
+///
+/// # Safety
+///
+/// `cscf` must point at a live core server conf; `clcf` at its
+/// live location conf (or be null).
+unsafe fn snapshot_file_identity(
     cscf: *mut ngx_http_core_srv_conf_t,
     clcf: *mut ngx_http_core_loc_conf_t,
-    options: &ps_config::options::RewriteOptions,
-) -> Option<crate::file_fetch::FileFetcher> {
+) -> Option<crate::conf::FileIdentitySnapshot> {
     // SAFETY: caller guarantees live confs.
     unsafe {
         if clcf.is_null() || (*clcf).alias != 0 {
@@ -1162,12 +1200,25 @@ unsafe fn file_fetcher_for_server(
         }
         names.sort();
         names.dedup();
-        crate::file_fetch::FileFetcher::new(
-            &root,
-            &names,
-            options.max_cacheable_response_content_length(),
-        )
+        Some(crate::conf::FileIdentitySnapshot { root, names })
     }
+}
+
+/// Builds the server's file fetcher from its postconfiguration
+/// snapshot (`None` falls back to the unavailable fetcher with a
+/// loud log): server-level root only (aliases, variables,
+/// relative, and missing roots fail closed), every configured
+/// server name (regex names never match).
+pub(crate) fn file_fetcher_for_server(
+    identity: Option<&crate::conf::FileIdentitySnapshot>,
+    options: &ps_config::options::RewriteOptions,
+) -> Option<crate::file_fetch::FileFetcher> {
+    let identity = identity?;
+    crate::file_fetch::FileFetcher::new(
+        &identity.root,
+        &identity.names,
+        options.max_cacheable_response_content_length(),
+    )
 }
 
 /// Runs per-server child init: cache assembly plus the
@@ -1203,6 +1254,9 @@ unsafe fn child_init_servers(cycle: *mut ngx_cycle_t, main: &mut MainConf) {
             if srv.is_null() {
                 continue;
             }
+            // Clone the postconfiguration snapshot before the
+            // context borrow below (both live in our server conf).
+            let identity = (*srv).file_identity.clone();
             if let Some(context) = (*srv).context.as_mut() {
                 let clcf = *(*sctx).loc_conf.add(core) as *mut ngx_http_core_loc_conf_t;
                 if let Some(assembled) = main.driver_factory.caches.setup_caches(&context.options) {
@@ -1213,7 +1267,7 @@ unsafe fn child_init_servers(cycle: *mut ngx_cycle_t, main: &mut MainConf) {
                     let file = if clcf.is_null() {
                         None
                     } else {
-                        file_fetcher_for_server(cscf, clcf, &context.options.core)
+                        file_fetcher_for_server(identity.as_ref(), &context.options.core)
                     };
                     if file.is_none() {
                         main.driver_factory.message_handler.message(
@@ -1778,6 +1832,12 @@ pub unsafe fn loc_conf_of_request(r: *mut ngx_http_request_t) -> *mut LocConf {
 unsafe fn ngx_str_text(s: *const ngx_str_t) -> String {
     // SAFETY: caller guarantees a readable string.
     unsafe {
+        // Unset strings carry null data (notably
+        // `headers_out.content_type` before assignment): read
+        // those as empty instead of invoking UB.
+        if (*s).data.is_null() {
+            return String::new();
+        }
         let bytes = std::slice::from_raw_parts((*s).data, (*s).len);
         String::from_utf8_lossy(bytes).into_owned()
     }
@@ -1900,11 +1960,20 @@ unsafe fn request_host(r: *mut ngx_http_request_t) -> String {
 pub(crate) unsafe fn request_url_text(r: *mut ngx_http_request_t) -> String {
     // SAFETY: caller guarantees a live request.
     unsafe {
+        let uri = ngx_str_text(&raw const (*r).unparsed_uri);
+        request_url_for_uri_text(r, &uri)
+    }
+}
+
+/// Absolute URL for an explicit URI on this request (post-redirect
+/// form for file mapping).
+pub(crate) unsafe fn request_url_for_uri_text(r: *mut ngx_http_request_t, uri: &str) -> String {
+    // SAFETY: caller guarantees a live request.
+    unsafe {
         let https = request_is_https(r);
         let port = request_port(r);
         let host = request_host(r);
-        let uri = ngx_str_text(&raw const (*r).unparsed_uri);
-        routing::build_url(https, port, &host, &uri)
+        routing::build_url(https, port, &host, uri)
     }
 }
 

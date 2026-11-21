@@ -339,6 +339,19 @@ pub struct MainConf {
     pub base_fetch_read_conn: Option<*mut ngx::ffi::ngx_connection_t>,
 }
 
+/// Owned file-identity snapshot (postconfiguration capture of
+/// the core server root plus exact server names; `server_names`
+/// elements live in the config temp pool, which `ngx_init_cycle`
+/// frees before workers start, so everything past postconfiguration
+/// reads this instead of nginx memory).
+#[derive(Debug, Clone, Default)]
+pub struct FileIdentitySnapshot {
+    /// Server-level root.
+    pub root: String,
+    /// Exact (non-regex) server names, sorted and deduped.
+    pub names: Vec<String>,
+}
+
 /// Server conf (`ps_srv_conf_t`).
 #[derive(Debug, Default)]
 pub struct SrvConf {
@@ -346,6 +359,8 @@ pub struct SrvConf {
     pub options: Option<NgxOptions>,
     /// Server context after merge (`server_context`).
     pub context: Option<ServerContext>,
+    /// File-identity snapshot (`None` when aliased or rootless).
+    pub file_identity: Option<FileIdentitySnapshot>,
 }
 
 impl SrvConf {
@@ -630,6 +645,7 @@ mod tests {
                 ("FileCachePath", &["/cache"]),
             ])),
             context: None,
+            file_identity: None,
         };
         let index = merge_srv_conf(&mut main, Some(&parent), &mut srv, 7, |_| true).unwrap();
         assert_eq!(7, index);
@@ -661,6 +677,7 @@ mod tests {
         let mut srv = SrvConf {
             options: Some(ngx(&[("FileCachePath", &["/cache"])])),
             context: None,
+            file_identity: None,
         };
         merge_srv_conf(&mut main, Some(&parent), &mut srv, 0, |_| true).unwrap();
         assert!(main.driver_factory.default_options.core.was_set("im"));
@@ -668,6 +685,7 @@ mod tests {
         let mut srv = SrvConf {
             options: Some(ngx(&[("FileCachePath", &["/cache"])])),
             context: None,
+            file_identity: None,
         };
         merge_srv_conf(&mut main, None, &mut srv, 0, |_| true).unwrap();
         assert!(main.driver_factory.default_options.core.was_set("im"));
@@ -679,6 +697,7 @@ mod tests {
         let mut srv = SrvConf {
             options: Some(ngx(&[("RewriteLevel", &["CoreFilters"])])),
             context: None,
+            file_identity: None,
         };
         assert_eq!(
             Err("FileCachePath must be set, even for standby"),
@@ -765,6 +784,7 @@ mod tests {
                 ("FileCachePath", &["/cache"]),
             ])),
             context: None,
+            file_identity: None,
         };
         merge_srv_conf(&mut main, None, &mut srv, 0, |_| true).unwrap();
         assert!(!srv.disabled());
@@ -778,6 +798,7 @@ mod tests {
         let mut srv = SrvConf {
             options: Some(ngx(&[("off", &[]), ("FileCachePath", &["/cache"])])),
             context: None,
+            file_identity: None,
         };
         merge_srv_conf(&mut main, None, &mut srv, 0, |_| true).unwrap();
         assert!(srv.disabled());

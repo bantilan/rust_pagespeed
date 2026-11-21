@@ -32,6 +32,7 @@ pub mod filter;
 pub mod filters;
 pub mod flush_early;
 pub mod font_service_input_resource;
+pub mod html_cache;
 pub mod image_url_encoder;
 pub mod ipro;
 pub mod js_escape;

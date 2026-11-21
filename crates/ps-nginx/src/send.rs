@@ -48,6 +48,8 @@ pub struct HtmlSink<'a> {
     fetch: Arc<SharedBaseFetch>,
     slot: &'a Mutex<Option<crate::pipe::PipeChannel>>,
     resource_driver: Option<Rc<ps_html::server_context::ResourceDriver>>,
+    html_cache: Option<ps_html::html_cache::HtmlCacheSession>,
+    html_cache_line: Option<String>,
 }
 
 impl<'a> HtmlSink<'a> {
@@ -76,19 +78,27 @@ impl<'a> HtmlSink<'a> {
             resource_driver.clone(),
         );
         driver.start_parse(url.as_bytes(), content_is_xml_like);
+        let html_cache = resource_driver
+            .clone()
+            .map(|driver| ps_html::html_cache::HtmlCacheSession::new(driver, url));
         HtmlSink {
             driver,
             output,
             fetch: Arc::clone(fetch),
             slot,
             resource_driver,
+            html_cache,
+            html_cache_line: None,
         }
     }
 
     /// Moves rewritten bytes into the base fetch.
-    fn pump_output(&self) {
+    fn pump_output(&mut self) {
         let bytes = std::mem::take(&mut *self.output.borrow_mut());
         if !bytes.is_empty() {
+            if let Some(session) = self.html_cache.as_mut() {
+                session.write(&bytes);
+            }
             self.fetch.handle_write(&bytes, self.slot);
         }
     }
@@ -101,6 +111,49 @@ impl<'a> HtmlSink<'a> {
             .as_ref()
             .map(|driver| driver.take_image_records())
             .unwrap_or_default()
+    }
+
+    /// Looks up a cached rewrite for origin headers (hit entries
+    /// serve instead of the origin body). `file_mtime` carries the
+    /// origin file's modification time when the URL maps to one.
+    pub fn html_cache_lookup(
+        &mut self,
+        origin: &ps_http::response::ResponseHeaders,
+        request: &ps_http::request::RequestHeaders,
+        purge: &ps_cache::purge::PurgeSet,
+        file_mtime: Option<(u64, u32)>,
+        now_ms: i64,
+    ) -> Option<ps_cache::html::HtmlCacheEntry> {
+        let out = self
+            .html_cache
+            .as_mut()
+            .and_then(|session| session.lookup(origin, request, purge, file_mtime, now_ms));
+        out
+    }
+
+    /// Serves a cache hit through the base fetch, completing it.
+    pub fn serve_html_cache_hit(&self, entry: &ps_cache::html::HtmlCacheEntry, now_ms: i64) {
+        if let Some(session) = self.html_cache.as_ref() {
+            self.fetch.handle_write(&entry.body, self.slot);
+            if let Some(comment) = session.hit_comment(entry, now_ms) {
+                self.fetch.handle_write(&comment, self.slot);
+            }
+            let _deleted = self.fetch.handle_done(self.slot);
+        }
+    }
+
+    /// Takes the pending HTML-cache history line, if any.
+    #[must_use]
+    pub fn take_html_cache_line(&mut self) -> Option<String> {
+        self.html_cache_line.take()
+    }
+
+    /// Current time in ms since the epoch.
+    fn now_ms() -> i64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|age| age.as_millis() as i64)
+            .unwrap_or(0)
     }
 }
 
@@ -119,6 +172,13 @@ impl BodySink for HtmlSink<'_> {
     fn done(&mut self) {
         self.driver.finish();
         self.pump_output();
+        if let Some(session) = self.html_cache.as_mut() {
+            let finish = session.finish(Self::now_ms());
+            self.html_cache_line = finish.detail_line;
+            if let Some(comment) = finish.show_comment {
+                self.fetch.handle_write(&comment, self.slot);
+            }
+        }
         self.fetch.handle_done(self.slot);
     }
 }
@@ -409,6 +469,104 @@ mod tests {
         assert_eq!(1, records.len());
         assert!(records[0].message_line().starts_with("PS_IMAGE_DETAIL\t"));
         assert!(sink.take_image_records().is_empty());
+    }
+
+    #[test]
+    fn html_sink_caches_miss_then_serves_hit() {
+        use crate::fetch::{BaseFetchType, SharedBaseFetch};
+        use crate::pipe;
+        use ps_config::options::RewriteOptions;
+        use ps_http::request::Method;
+        use ps_http::response::HttpOptions;
+        // One metadata cache shared by both sinks (like one server).
+        let metadata: std::sync::Arc<dyn ps_cache::cache::Cache> =
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new());
+        let mut make_sink = |metadata: std::sync::Arc<dyn ps_cache::cache::Cache>| {
+            // The slot outlives the sink via a leaked box (test-only).
+            let slot: &'static Mutex<Option<pipe::PipeChannel>> =
+                Box::leak(Box::new(Mutex::new(None)));
+            let (ps_side, _ngx_side) = SharedBaseFetch::new_pair(
+                "http://h/p",
+                std::ptr::null_mut(),
+                BaseFetchType::HtmlTransform,
+                crate::caching::PreserveCachingHeaders::DontPreserve,
+                HttpOptions::default(),
+            );
+            let html = crate::rewrite::html_context(
+                std::sync::Arc::new(ps_cache::cache::MemoryCache::new()),
+                metadata,
+                std::sync::Arc::new(ps_stats::core::Statistics::new()),
+                0,
+                std::rc::Rc::new(crate::rewrite::UnavailableFetcher),
+            );
+            let mut options = RewriteOptions::new();
+            options
+                .set_option("HtmlCache", "on", ps_config::scope::Scope::Server)
+                .unwrap();
+            options
+                .set_option("HtmlCacheTtlSec", "60", ps_config::scope::Scope::Server)
+                .unwrap();
+            let driver = std::rc::Rc::new(ps_html::server_context::ResourceDriver::new(
+                html,
+                std::rc::Rc::new(std::cell::RefCell::new(options.clone())),
+                "http://h/p",
+            ));
+            // The sink clones what it needs; locals drop freely.
+            let sink = HtmlSink::new(&options, "http://h/p", false, &ps_side, slot, Some(driver));
+            (sink, ps_side)
+        };
+        fn get_request() -> ps_http::request::RequestHeaders {
+            let mut request = ps_http::request::RequestHeaders::new();
+            request.set_method(Method::Get);
+            request.set_version(1, 1);
+            request.headers_mut().add("Host", "h");
+            request
+        }
+        fn ok_origin(date_ms: i64) -> ps_http::response::ResponseHeaders {
+            let mut origin =
+                ps_http::response::ResponseHeaders::new(HttpOptions::default_for_tests());
+            origin.set_status_and_reason(200);
+            origin.headers_mut().add("Content-Type", "text/html");
+            origin
+                .headers_mut()
+                .add("Date", &ps_http::time::format_http_date(date_ms));
+            origin
+                .headers_mut()
+                .add("Cache-Control", "public, max-age=300");
+            origin.compute_caching();
+            origin
+        }
+        // The sink stamps with wall time; keep fixtures coherent.
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|age| age.as_millis() as i64)
+            .unwrap_or(0);
+        let purge = ps_cache::purge::PurgeSet::new(25_000);
+        let request = get_request();
+        let origin = ok_origin(now_ms);
+        // First sink misses, buffers the rewrite, and stores on done.
+        let (mut first, _fetch) = make_sink(std::sync::Arc::clone(&metadata));
+        assert!(first
+            .html_cache_lookup(&origin, &request, &purge, None, now_ms)
+            .is_none());
+        first.write(b"<html>hi</html>");
+        BodySink::done(&mut first);
+        let line = first.take_html_cache_line().expect("stored line");
+        assert!(line.starts_with("PS_HTML_DETAIL\t"), "{line}");
+        // A fresh sink over the same metadata hits and serves.
+        // (Later wall time: entries created after `now_ms` are
+        // future-dated by construction.)
+        let later_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|age| age.as_millis() as i64)
+            .unwrap_or(now_ms)
+            .max(now_ms);
+        let (mut second, _fetch) = make_sink(std::sync::Arc::clone(&metadata));
+        let entry = second
+            .html_cache_lookup(&origin, &request, &purge, None, later_ms)
+            .expect("hit");
+        assert!(!entry.body.is_empty());
+        second.serve_html_cache_hit(&entry, later_ms);
     }
 
     #[test]

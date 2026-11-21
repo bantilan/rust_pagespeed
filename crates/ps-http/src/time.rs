@@ -64,6 +64,24 @@ fn days_in_month(year: i64, month: u32) -> u32 {
     }
 }
 
+/// Breaks ms-since-epoch into UTC (year, month, day, hour, minute,
+/// second) for fixed-format stamps (`gmtime_r` use sites).
+#[must_use]
+pub fn utc_ymd_hms(time_ms: i64) -> (i64, u32, u32, u32, u32, u32) {
+    let secs = time_ms.div_euclid(1000);
+    let days = secs.div_euclid(86_400);
+    let clock = secs.rem_euclid(86_400);
+    let (year, month, day) = civil_from_days(days);
+    (
+        year,
+        month,
+        day,
+        (clock / 3600) as u32,
+        (clock % 3600 / 60) as u32,
+        (clock % 60) as u32,
+    )
+}
+
 /// Formats ms-since-epoch as IMF-fixdate (`ConvertTimeToString`).
 #[must_use]
 pub fn format_http_date(time_ms: i64) -> String {
@@ -247,5 +265,13 @@ mod tests {
         // Leap day accepted only on leap years.
         assert!(parse_http_date("Tue, 29 Feb 2000 00:00:00 GMT").is_some());
         assert_eq!(parse_http_date("Mon, 29 Feb 1999 00:00:00 GMT"), None);
+    }
+
+    #[test]
+    fn utc_breakdown_matches_http_date() {
+        // 1994-11-06 08:49:37 UTC (the IMF-fixdate golden above).
+        let ms = parse_http_date("Sun, 06 Nov 1994 08:49:37 GMT").unwrap();
+        assert_eq!(utc_ymd_hms(ms), (1994, 11, 6, 8, 49, 37));
+        assert_eq!(utc_ymd_hms(0), (1970, 1, 1, 0, 0, 0));
     }
 }

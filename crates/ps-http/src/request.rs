@@ -189,6 +189,28 @@ impl RequestHeaders {
         self.minor_version = Some(minor);
     }
 
+    /// Serializes as an HTTP request with an empty URL (`ToString`):
+    /// `METHOD  HTTP/x.y` plus `Name: Value` lines in order, CRLF
+    /// terminated with a trailing blank line. The HTML cache hashes
+    /// this into its identity string.
+    #[must_use]
+    pub fn to_http_string(&self) -> String {
+        let mut out = format!(
+            "{}  HTTP/{}.{}\r\n",
+            self.method.token(),
+            self.major_version(),
+            self.minor_version()
+        );
+        for (name, value) in self.headers.iter() {
+            out.push_str(name);
+            out.push_str(": ");
+            out.push_str(value);
+            out.push_str("\r\n");
+        }
+        out.push_str("\r\n");
+        out
+    }
+
     /// Derives caching properties (`GetProperties`).
     #[must_use]
     pub fn properties(&self) -> RequestProperties {
@@ -521,6 +543,20 @@ mod tests {
                 cache_lookup_ms: 3,
                 fetch_ms: 40,
             }
+        );
+    }
+
+    #[test]
+    fn http_string_shape() {
+        use super::Method;
+        let mut headers = RequestHeaders::new();
+        headers.set_method(Method::Get);
+        headers.set_version(1, 1);
+        headers.headers_mut().add("Host", "x.test");
+        headers.headers_mut().add("Accept", "text/html");
+        assert_eq!(
+            headers.to_http_string(),
+            "GET  HTTP/1.1\r\nHost: x.test\r\nAccept: text/html\r\n\r\n"
         );
     }
 }

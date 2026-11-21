@@ -24,6 +24,11 @@ pub type RawHeader<'a> = (&'a str, &'a str, bool);
 pub(crate) unsafe fn ngx_str_text(s: *const ngx::ffi::ngx_str_t) -> String {
     // SAFETY: caller guarantees a readable string.
     unsafe {
+        // Unset strings carry null data: read those as empty
+        // instead of invoking UB.
+        if (*s).data.is_null() {
+            return String::new();
+        }
         let bytes = std::slice::from_raw_parts((*s).data, (*s).len);
         String::from_utf8_lossy(bytes).into_owned()
     }

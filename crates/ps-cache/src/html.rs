@@ -24,8 +24,6 @@ pub const MAX_HTML_BODY_BYTES: usize = 1024 * 1024;
 pub const MAX_HTML_TTL_SEC: i64 = 31_536_000;
 /// Beacon nonce marker that disqualifies bodies ("nonce".
 pub const BEACON_NONCE_MARKER: &str = "\"nonce\":";
-/// Served-timestamp comment format.
-pub const SERVED_COMMENT_PREFIX: &str = "<!--Served from html cache";
 
 /* Signatures (`SHA1Signature`). */
 
@@ -195,13 +193,6 @@ pub fn store_expiry_ms(origin_expiry_ms: i64, now_ms: i64, ttl_ms: i64) -> i64 {
     origin_expiry_ms.min(now_ms + ttl_ms)
 }
 
-/// Formats the served-timestamp comment (`show_cache_timestamp`).
-#[must_use]
-pub fn served_comment(created_ms: i64) -> String {
-    // `%s; t=%ld` with the prefix as the message.
-    format!("{SERVED_COMMENT_PREFIX}; t={created_ms} -->")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298,6 +289,5 @@ mod tests {
         assert!(!request_headers_cacheable(&[("Vary", "Cookie")]));
         assert_eq!(store_expiry_ms(9000, 1000, 60_000), 9000);
         assert_eq!(store_expiry_ms(999_000, 1000, 60_000), 61_000);
-        assert_eq!(served_comment(123), "<!--Served from html cache; t=123 -->");
     }
 }

@@ -44,6 +44,12 @@ pub struct RequestCtx {
     /// In-place recorder (`recorder`), active while caching a
     /// missed resource for future optimization.
     pub recorder: Option<InPlaceRecorder>,
+    /// HTML cache hit served; swallow the origin body.
+    pub html_cache_served: bool,
+    /// HTML cache hit entry awaiting serve (stashed by the header
+    /// tail because serving touches fetch state, whose guard the
+    /// finish call holds).
+    pub html_cache_hit: Option<ps_cache::html::HtmlCacheEntry>,
 }
 
 impl std::fmt::Debug for RequestCtx {
@@ -60,6 +66,8 @@ impl std::fmt::Debug for RequestCtx {
             .field("inflater_armed", &self.inflater.is_some())
             .field("fetch_active", &self.base_fetch.is_some())
             .field("recording", &self.recorder.is_some())
+            .field("html_cache_served", &self.html_cache_served)
+            .field("html_cache_hit", &self.html_cache_hit.is_some())
             .finish()
     }
 }
@@ -86,6 +94,8 @@ impl RequestCtx {
             base_fetch: None,
             html_sink: None,
             recorder: None,
+            html_cache_served: false,
+            html_cache_hit: None,
         }
     }
 }

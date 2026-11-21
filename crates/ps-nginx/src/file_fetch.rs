@@ -106,6 +106,13 @@ impl FileFetcher {
         if !self.host_matches(&gurl.host()) {
             return None;
         }
+        self.join_root_path(&gurl)
+    }
+
+    /// Lexically joins a URL path under the root without host
+    /// verification (the request was already routed to this
+    /// server; the scheme is immaterial for file identity).
+    fn join_root_path(&self, gurl: &GoogleUrl) -> Option<PathBuf> {
         let raw_path = gurl.path_sans_query();
         let unescaped = GoogleUrl::unescape_ignore_plus(raw_path);
         if unescaped.contains(&0) {
@@ -130,10 +137,34 @@ impl FileFetcher {
         Some(joined)
     }
 
-    fn resolve(&self, url: &str) -> Option<PathBuf> {
+    pub(crate) fn resolve(&self, url: &str) -> Option<PathBuf> {
         let joined = self.join_root(url)?;
+        Self::jail_canonical(&self.root, &joined)
+    }
+
+    /// Resolves an already-routed request URL to its jailed file
+    /// (HTML-cache freshness): the host needs no re-check and
+    /// both web schemes map, since only the path identifies the
+    /// file nginx routed to this server. Traversal, NUL, and
+    /// non-file hits still fail closed.
+    pub(crate) fn resolve_routed(&self, url: &str) -> Option<PathBuf> {
+        let gurl = GoogleUrl::new(url);
+        if !gurl.is_web_valid() {
+            return None;
+        }
+        let scheme = gurl.scheme();
+        if scheme != "http" && scheme != "https" {
+            return None;
+        }
+        let joined = self.join_root_path(&gurl)?;
+        Self::jail_canonical(&self.root, &joined)
+    }
+
+    /// Canonicalizes a joined path back into the root jail
+    /// (files only; the canonicalization read is the only I/O).
+    fn jail_canonical(root: &std::path::Path, joined: &std::path::Path) -> Option<PathBuf> {
         let canonical = joined.canonicalize().ok()?;
-        if !canonical.starts_with(&self.root) {
+        if !canonical.starts_with(root) {
             return None;
         }
         if !canonical.is_file() {
@@ -443,6 +474,36 @@ mod tests {
         let small = FileFetcher::new(scratch.dir.to_str().unwrap(), &["localhost".to_string()], 2)
             .expect("scratch root fetches");
         assert!(!scratch.fetch(&small, "http://localhost/a.css").success());
+    }
+
+    #[test]
+    fn routed_resolve_ignores_host_and_scheme() {
+        let scratch = Scratch::new(&[("a.css", b"a{}")]);
+        let fetcher = scratch.fetcher();
+        // Foreign hosts and https map (already routed); the gated
+        // resolver still refuses the foreign host.
+        let foreign = fetcher
+            .resolve_routed("http://127.0.0.1:18081/a.css")
+            .expect("routed foreign host maps");
+        assert!(foreign.ends_with("a.css"));
+        assert!(fetcher.resolve("http://127.0.0.1:18081/a.css").is_none());
+        assert!(fetcher.resolve_routed("https://localhost/a.css").is_some());
+        // Dot segments normalize inside the jail (safe mapping),
+        // while NUL, missing names, directories, and other schemes
+        // fail closed.
+        let collapsed = fetcher
+            .resolve_routed("http://x/sub/../../a.css")
+            .expect("lexical traversal stays jailed");
+        assert!(collapsed.ends_with("a.css"));
+        assert!(fetcher.resolve_routed("http://x/a%00.css").is_none());
+        assert!(fetcher.resolve_routed("http://x/nope.css").is_none());
+        assert!(fetcher.resolve_routed("http://x/").is_none());
+        assert!(fetcher.resolve_routed("ftp://x/a.css").is_none());
+        // Symlink escapes fail closed through the same jail.
+        let outside = Scratch::new(&[("secret.css", b"top")]);
+        std::os::unix::fs::symlink(outside.dir.join("secret.css"), scratch.dir.join("link.css"))
+            .unwrap();
+        assert!(fetcher.resolve_routed("http://x/link.css").is_none());
     }
 
     #[test]
