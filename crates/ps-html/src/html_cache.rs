@@ -10,11 +10,11 @@
 //! registry, so every worker reports global totals.
 //!
 //! Divergences from C++, all deliberate: the port's stricter
-//! `vary_absent` gate replaces C++'s `Vary: *`-only check; beacon
-//! gating is limited to the nonce exclusion because no port filter
-//! consumes beacon state (so no beacon identity enters the key);
+//! `vary_absent` gate replaces C++'s `Vary: *`-only check;
 //! per-request `Vary` on the request side follows the ported
-//! `request_headers_cacheable` helper verbatim.
+//! `request_headers_cacheable` helper verbatim; detached-rewrite
+//! tracking is omitted (port rewrites are synchronous, so no
+//! rewrite ever detaches resource work past a deadline).
 #![forbid(unsafe_code)]
 
 use ps_cache::html as html_codec;
@@ -45,6 +45,7 @@ pub struct HtmlCacheSession {
     url: String,
     device: String,
     formats: String,
+    device_suffix: String,
     state: SessionState,
 }
 
@@ -65,6 +66,9 @@ enum SessionState {
         origin_expiry_ms: i64,
         /// Buffered rewritten bytes.
         body: Vec<u8>,
+        /// Lookup-time beacon evidence identity (`None` when
+        /// beaconing is inactive).
+        beacon_identity: Option<Vec<u8>>,
     },
     /// Lookup hit; the caller serves the returned entry.
     Hit,
@@ -88,10 +92,13 @@ impl HtmlCacheSession {
     #[must_use]
     pub fn new(driver: Rc<super::server_context::ResourceDriver>, url: &str) -> Self {
         let mut properties = driver.request_properties();
-        let device = ps_http::user_agent_matcher::UserAgentMatcher::device_type_string(
-            properties.device_type(),
-        )
-        .to_string();
+        let device_type = properties.device_type();
+        let device =
+            ps_http::user_agent_matcher::UserAgentMatcher::device_type_string(device_type)
+                .to_string();
+        let device_suffix =
+            ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(device_type)
+                .to_string();
         let formats = if properties.supports_avif_rewritten_urls() {
             "AVIF capable"
         } else if properties.supports_webp_rewritten_urls() {
@@ -105,6 +112,7 @@ impl HtmlCacheSession {
             url: url.to_string(),
             device,
             formats,
+            device_suffix,
             state: SessionState::Pending,
         }
     }
@@ -128,7 +136,7 @@ impl HtmlCacheSession {
     ) -> Option<html_codec::HtmlCacheEntry> {
         let options = self.driver.options();
         let enabled = options.html_cache();
-        let Some((key, ttl_ms, origin_expiry_ms)) =
+        let Some((key, ttl_ms, origin_expiry_ms, beacon_identity)) =
             self.eligibility_key(origin, request, &options, file_mtime, now_ms)
         else {
             if enabled {
@@ -150,6 +158,7 @@ impl HtmlCacheSession {
                     ttl_ms,
                     origin_expiry_ms,
                     body: Vec::new(),
+                    beacon_identity,
                 };
                 return None;
             }
@@ -169,6 +178,7 @@ impl HtmlCacheSession {
                     ttl_ms,
                     origin_expiry_ms,
                     body: Vec::new(),
+                    beacon_identity,
                 };
                 None
             }
@@ -199,9 +209,10 @@ impl HtmlCacheSession {
     }
 
     /// Completes the session (`Finish`): hits report bytes served,
-    /// armed rewrites store (nonce-bearing and empty bodies
-    /// excluded) with a history line, and `ShowCacheTimestamp`
-    /// renders the HIT/MISS/BYPASS comment. Idempotent.
+    /// armed rewrites store (empty bodies, sampled beacon
+    /// initializations, and mid-render evidence changes excluded)
+    /// with a history line, and `ShowCacheTimestamp` renders the
+    /// HIT/MISS/BYPASS comment. Idempotent.
     pub fn finish(&mut self, now_ms: i64) -> HtmlCacheFinish {
         let options = self.driver.options();
         let show = options.show_cache_timestamp();
@@ -218,10 +229,19 @@ impl HtmlCacheSession {
                 ttl_ms,
                 origin_expiry_ms,
                 body,
+                beacon_identity,
             } => {
                 let mut created_ms = 0;
                 let mut detail_line = None;
-                if !body.is_empty() && !contains_nonce(&body) {
+                // Skip rewrites whose beacon evidence changed while
+                // filters ran (the beacon filter snapshots the
+                // post-render identity at end of document).
+                let evidence_settled = match (&beacon_identity, self.driver.beacon_evidence_identity()) {
+                    (Some(then), Some(now)) => then == &now,
+                    (Some(_), None) => false,
+                    (None, _) => true,
+                };
+                if !body.is_empty() && evidence_settled && !contains_sampled_beacon_init(&body) {
                     let expires_ms = html_codec::store_expiry_ms(origin_expiry_ms, now_ms, ttl_ms);
                     if expires_ms > now_ms {
                         if let Some(value) = html_codec::encode_value(now_ms, expires_ms, &body) {
@@ -270,7 +290,9 @@ impl HtmlCacheSession {
     }
 
     /// Computes eligibility plus the identity key (`ShouldCache`
-    /// plus identity construction), or `None` when bypassing.
+    /// plus identity construction), or `None` when bypassing. The
+    /// trailing element snapshots the lookup-time beacon evidence
+    /// (`None` when beaconing is inactive).
     fn eligibility_key(
         &self,
         origin: &ResponseHeaders,
@@ -278,7 +300,7 @@ impl HtmlCacheSession {
         options: &ps_config::options::RewriteOptions,
         file_mtime: Option<(u64, u32)>,
         now_ms: i64,
-    ) -> Option<(String, i64, i64)> {
+    ) -> Option<(String, i64, i64, Option<Vec<u8>>)> {
         use ps_config::filter::Filter;
         let request_pairs: Vec<(&str, &str)> = request.headers().iter().collect();
         // Origin cacheability on a Vary-stripped policy copy, as in C++.
@@ -309,9 +331,8 @@ impl HtmlCacheSession {
             request_headers_ok: html_codec::request_headers_cacheable(&request_pairs),
             origin_cacheable: origin_cacheable || file_ok,
             origin_fresh: explicitly_fresh || file_ok,
-            // Beacon-gated keying is unnecessary here (no port filter
-            // consumes beacon state); nonce-bearing bodies are still
-            // excluded at store time.
+            // Structural beacon flag only; learning gates (sampling
+            // due, missing evidence) apply below with identity.
             beacon_ok: true,
         };
         if !eligibility.cacheable() {
@@ -350,10 +371,54 @@ impl HtmlCacheSession {
             identity.push_str(value);
             identity.push('\n');
         }
+        // Beacon learning participation: when beaconing drives
+        // rewrites, sampling-due requests and pre-learning
+        // variants bypass, while learned evidence (including LCP)
+        // joins the identity so each accepted beacon invalidates
+        // the variant.
+        let mut beacon_identity = None;
+        if super::beacon_finder::beaconing_active(options) {
+            let server = self.driver.server_context();
+            let oh = server.hasher().hash(options.signature().as_bytes());
+            let finder =
+                super::beacon_finder::BeaconFinder::new(server.metadata_cache());
+            let lookup = finder.load(&self.url, &oh, &self.device_suffix);
+            match &lookup {
+                super::beacon_finder::EvidenceLookup::Found(_) => {
+                    self.count(super::beacon_finder::VALID_COUNT, 1);
+                }
+                super::beacon_finder::EvidenceLookup::Corrupt => {
+                    self.count(super::beacon_finder::EXPIRED_COUNT, 1);
+                }
+                super::beacon_finder::EvidenceLookup::Missing => {
+                    self.count(super::beacon_finder::NOT_FOUND_COUNT, 1);
+                }
+            }
+            let record = lookup.record();
+            let header = request.headers().lookup1("PS-ShouldBeacon");
+            let downstream = super::beacon_finder::downstream_beacon_gate(
+                options,
+                header.as_deref(),
+            );
+            let learned = record.is_some_and(|record| record.valid_beacons >= 1);
+            if !learned
+                || super::beacon_finder::should_beacon(now_ms, record, downstream)
+            {
+                return None;
+            }
+            let record = record.expect("learned evidence has a record");
+            let encoded = super::beacon_finder::encode_evidence(record);
+            identity.push_str("\nbeacon:");
+            identity.push_str(
+                &String::from_utf8(encoded.clone()).expect("evidence codec emits UTF-8"),
+            );
+            beacon_identity = Some(encoded);
+        }
         Some((
             html_codec::html_cache_key(&identity),
             ttl_ms,
             origin_expiry_ms,
+            beacon_identity,
         ))
     }
 
@@ -389,10 +454,20 @@ fn has_cache_prohibition(origin: &ResponseHeaders) -> bool {
         })
 }
 
-/// Whether a body carries a beacon nonce (never cache those).
-fn contains_nonce(body: &[u8]) -> bool {
-    body.windows(html_codec::BEACON_NONCE_MARKER.len())
-        .any(|window| window == html_codec::BEACON_NONCE_MARKER.as_bytes())
+/// Sampled beacon initialization markers (never freeze these
+/// into a cached document, including the boundary case where
+/// sampling becomes due during the rewrite).
+const SAMPLED_BEACON_MARKERS: &[&[u8]] = &[
+    b"pagespeed.CriticalImages.Run(",
+    b"CriticalCssBeacon",
+];
+
+/// Whether a body carries sampled beacon initialization.
+fn contains_sampled_beacon_init(body: &[u8]) -> bool {
+    SAMPLED_BEACON_MARKERS.iter().any(|marker| {
+        body.windows(marker.len())
+            .any(|window| window == *marker)
+    })
 }
 
 /// Formats the served-timestamp comment (`show_cache_timestamp`):
@@ -684,7 +759,7 @@ mod tests {
     }
 
     #[test]
-    fn oversize_and_nonce_bodies_do_not_store() {
+    fn oversize_and_sampled_bodies_do_not_store() {
         let harness = Harness::new();
         let request = harness.get_request();
         let origin = harness.ok_origin();
@@ -697,14 +772,21 @@ mod tests {
         let finish = big.finish(START_MS + 1000);
         assert!(finish.detail_line.is_none());
         assert_eq!(0, harness.counter("html_cache_inserts"));
-        // Nonce-bearing bodies never freeze.
-        let mut nonce = harness.session();
-        assert!(nonce
-            .lookup(&origin, &request, &harness.purge, None, START_MS)
-            .is_none());
-        nonce.write(b"<html>{\"nonce\":\"abc\"}</html>");
-        let finish = nonce.finish(START_MS + 1000);
-        assert!(finish.detail_line.is_none());
+        // Sampled beacon initializations never freeze.
+        for marker in [
+            "pagespeed.CriticalImages.Run('",
+            "CriticalCssBeacon",
+        ] {
+            let mut sampled = harness.session();
+            assert!(sampled
+                .lookup(&origin, &request, &harness.purge, None, START_MS)
+                .is_none());
+            sampled.write(b"<html><script>");
+            sampled.write(marker.as_bytes());
+            sampled.write(b"</script></html>");
+            let finish = sampled.finish(START_MS + 1000);
+            assert!(finish.detail_line.is_none(), "{marker}");
+        }
         assert_eq!(0, harness.counter("html_cache_inserts"));
     }
 
@@ -781,6 +863,161 @@ mod tests {
             .lookup(&no_store, &request, &harness.purge, mtime, START_MS + 2000)
             .is_none());
         assert_eq!(1, harness.counter("html_cache_bypasses"));
+    }
+
+    /// Seeds one accepted stamped beacon for the harness page,
+    /// returning the stored evidence. Repeatable: each seed
+    /// simulates a due sampling followed by its beacon, leaving
+    /// sampling settled in the future.
+    fn seed_learned_beacon(harness: &Harness) -> crate::beacon_finder::BeaconEvidence {
+        use crate::beacon_finder as finder;
+        let server = harness.driver.server_context();
+        let oh = server
+            .hasher()
+            .hash(harness.driver.options().signature().as_bytes());
+        let cohort = finder::BeaconFinder::new(server.metadata_cache());
+        let mut evidence = cohort.load(PAGE_URL, &oh, "@Desktop").into_record();
+        evidence.next_beacon_ms = 0;
+        let nonce = finder::prepare_beacon(&mut evidence, START_MS, 5, 77).expect("due");
+        let hash = finder::url_hash("http://cache.test/hero.png");
+        finder::update_candidates(
+            &mut evidence,
+            &[hash.clone()].into_iter().collect(),
+            false,
+        );
+        let report = finder::BeaconReport {
+            html_hashes: Some([hash].into_iter().collect()),
+            lcp_kind: finder::LCP_KIND_IMG.to_string(),
+            lcp_image_url: String::new(),
+            nonce,
+        };
+        assert_eq!(
+            finder::accept_beacon(&mut evidence, &report, START_MS),
+            finder::AcceptOutcome::Accepted
+        );
+        // Settle sampling so lookups are not due.
+        evidence.next_beacon_ms = START_MS + 1_000_000;
+        cohort.store(PAGE_URL, &oh, "@Desktop", &evidence);
+        evidence
+    }
+
+    /// Snapshots the current evidence identity into the driver,
+    /// mirroring the beacon filter's end-of-document write.
+    fn settle_driver_identity(harness: &Harness) {
+        use crate::beacon_finder as finder;
+        let server = harness.driver.server_context();
+        let oh = server
+            .hasher()
+            .hash(harness.driver.options().signature().as_bytes());
+        let cohort = finder::BeaconFinder::new(server.metadata_cache());
+        let evidence = cohort.load(PAGE_URL, &oh, "@Desktop").into_record();
+        harness
+            .driver
+            .set_beacon_evidence_identity(finder::encode_evidence(&evidence));
+    }
+
+    #[test]
+    fn beacon_learning_gates_lookup_store_and_identity() {
+        use crate::beacon_finder as finder;
+        // Default options drive no beacon learning.
+        assert!(!finder::beaconing_active(
+            &Harness::new().driver.options()
+        ));
+        let harness = Harness::new();
+        harness
+            .options
+            .borrow_mut()
+            .soft_enable_filter_for_testing(Filter::PrioritizeLcpImages);
+        assert!(finder::beaconing_active(&harness.driver.options()));
+        let request = harness.get_request();
+        let origin = harness.ok_origin();
+        // Pre-learning variants bypass (nothing stored to hit).
+        let mut cold = harness.session();
+        assert!(cold
+            .lookup(&origin, &request, &harness.purge, None, START_MS)
+            .is_none());
+        assert_eq!(1, harness.counter("html_cache_bypasses"));
+        assert_eq!(1, harness.counter(finder::NOT_FOUND_COUNT));
+        // A learned, settled variant misses, stores, and hits.
+        seed_learned_beacon(&harness);
+        let mut first = harness.session();
+        assert!(first
+            .lookup(&origin, &request, &harness.purge, None, START_MS)
+            .is_none());
+        assert_eq!(1, harness.counter("html_cache_misses"));
+        assert_eq!(1, harness.counter(finder::VALID_COUNT));
+        first.write(b"<html/>");
+        settle_driver_identity(&harness);
+        let finish = first.finish(START_MS + 1000);
+        assert!(finish.detail_line.is_some());
+        assert_eq!(1, harness.counter("html_cache_inserts"));
+        let mut second = harness.session();
+        assert!(second
+            .lookup(&origin, &request, &harness.purge, None, START_MS + 2000)
+            .is_some());
+        assert_eq!(1, harness.counter("html_cache_hits"));
+        // A new accepted beacon invalidates the variant (miss).
+        seed_learned_beacon(&harness);
+        let mut third = harness.session();
+        assert!(third
+            .lookup(&origin, &request, &harness.purge, None, START_MS + 3000)
+            .is_none());
+        assert_eq!(2, harness.counter("html_cache_misses"));
+    }
+
+    #[test]
+    fn sampling_due_and_unsettled_renders_bypass() {
+        // Sampling-due variants bypass even with learned evidence.
+        let harness = Harness::new();
+        harness
+            .options
+            .borrow_mut()
+            .soft_enable_filter_for_testing(Filter::PrioritizeLcpImages);
+        let mut evidence = seed_learned_beacon(&harness);
+        evidence.next_beacon_ms = 0;
+        let server = harness.driver.server_context();
+        let oh = server
+            .hasher()
+            .hash(harness.driver.options().signature().as_bytes());
+        crate::beacon_finder::BeaconFinder::new(server.metadata_cache()).store(
+            PAGE_URL,
+            &oh,
+            "@Desktop",
+            &evidence,
+        );
+        let mut due = harness.session();
+        assert!(due
+            .lookup(
+                &harness.ok_origin(),
+                &harness.get_request(),
+                &harness.purge,
+                None,
+                START_MS
+            )
+            .is_none());
+        assert_eq!(1, harness.counter("html_cache_bypasses"));
+        // Renders whose evidence changed mid-flight do not store.
+        let settled = Harness::new();
+        settled
+            .options
+            .borrow_mut()
+            .soft_enable_filter_for_testing(Filter::PrioritizeLcpImages);
+        seed_learned_beacon(&settled);
+        let mut render = settled.session();
+        assert!(render
+            .lookup(
+                &settled.ok_origin(),
+                &settled.get_request(),
+                &settled.purge,
+                None,
+                START_MS
+            )
+            .is_none());
+        render.write(b"<html/>");
+        // No driver snapshot (or a divergent one): skip the store.
+        let finish = render.finish(START_MS + 1000);
+        assert!(finish.detail_line.is_none());
+        assert_eq!(0, settled.counter("html_cache_inserts"));
     }
 
     #[test]

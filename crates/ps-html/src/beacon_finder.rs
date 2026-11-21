@@ -285,10 +285,64 @@ pub fn is_html_critical_image(image_url: &str, evidence: &BeaconEvidence) -> boo
     html_critical_images(evidence).contains(&url_hash(image_url))
 }
 
-/// Whether a rewrite is sampling-due (`ShouldBeacon`): the first
-/// visit past the reinstrumentation timestamp beacons.
+/// Downstream-cache beacon gate (`ShouldBeacon` rebeaconing-key
+/// path): with downstream integration plus a configured key, only
+/// matching `PS-ShouldBeacon` request headers rebeacon.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DownstreamBeacon {
+    /// No downstream gate applies.
+    Inactive,
+    /// Gate applies; whether the request header matched.
+    MustMatch(bool),
+}
+
+/// Builds the downstream gate from options plus the request's
+/// `PS-ShouldBeacon` header value, if any.
 #[must_use]
-pub fn should_beacon(now_ms: i64, evidence: Option<&BeaconEvidence>) -> bool {
+pub fn downstream_beacon_gate(
+    options: &ps_config::options::RewriteOptions,
+    header: Option<&str>,
+) -> DownstreamBeacon {
+    if !options.is_downstream_cache_integration_enabled() {
+        return DownstreamBeacon::Inactive;
+    }
+    if options.downstream_cache_rebeaconing_key().is_empty() {
+        return DownstreamBeacon::Inactive;
+    }
+    let matched = header.is_some_and(|value| {
+        options.matches_downstream_cache_rebeaconing_key(value)
+    });
+    DownstreamBeacon::MustMatch(matched)
+}
+
+/// Whether beacon learning drives rewrites
+/// (`is_critical_images_beacon_enabled`, minus the factory and
+/// property-cache conjuncts, which always hold here: the cohort
+/// is the metadata cache).
+#[must_use]
+pub fn beaconing_active(options: &ps_config::options::RewriteOptions) -> bool {
+    use ps_config::filter::Filter;
+    let filters = options.filters();
+    (filters.enabled(Filter::LazyloadImages)
+        || filters.enabled(Filter::InlineImages)
+        || filters.enabled(Filter::DelayImages)
+        || filters.enabled(Filter::PrioritizeLcpImages)
+        || filters.enabled(Filter::ResizeToRenderedImageDimensions))
+        && options.critical_images_beacon_enabled()
+}
+
+/// Whether a rewrite is sampling-due (`ShouldBeacon`): the
+/// downstream key decides when gated, else the first visit past
+/// the reinstrumentation timestamp beacons.
+#[must_use]
+pub fn should_beacon(
+    now_ms: i64,
+    evidence: Option<&BeaconEvidence>,
+    downstream: DownstreamBeacon,
+) -> bool {
+    if let DownstreamBeacon::MustMatch(matched) = downstream {
+        return matched;
+    }
     evidence.is_none_or(|record| now_ms >= record.next_beacon_ms)
 }
 
@@ -444,6 +498,9 @@ pub fn update_candidates(
         }
     }
     evidence.valid_beacons = 0;
+    // No generation bump: generation counts accepted beacons
+    // only (merge_support). Candidate changes already alter the
+    // HTML identity via the reset count and key map above.
     if clear_rebeacon {
         evidence.next_beacon_ms = 0;
     }
@@ -688,13 +745,25 @@ mod tests {
 
     #[test]
     fn sampling_cadence_and_low_frequency() {
+        use DownstreamBeacon::Inactive;
         // Unknown variants are due immediately.
-        assert!(should_beacon(1000, None));
+        assert!(should_beacon(1000, None, Inactive));
         let (mut evidence, _) = prepared(1000);
         // Just instrumented: next due in 5s (high frequency).
         assert_eq!(6000, evidence.next_beacon_ms);
-        assert!(!should_beacon(5999, Some(&evidence)));
-        assert!(should_beacon(6000, Some(&evidence)));
+        assert!(!should_beacon(5999, Some(&evidence), Inactive));
+        assert!(should_beacon(6000, Some(&evidence), Inactive));
+        // A downstream gate replaces the timestamp check.
+        assert!(should_beacon(
+            5999,
+            Some(&evidence),
+            DownstreamBeacon::MustMatch(true)
+        ));
+        assert!(!should_beacon(
+            6000,
+            Some(&evidence),
+            DownstreamBeacon::MustMatch(false)
+        ));
         // Three valid beacons flip to low frequency (×100).
         evidence.valid_beacons = HIGH_FREQ_BEACON_COUNT;
         evidence.next_beacon_ms = 0;
@@ -755,6 +824,9 @@ mod tests {
         assert!(update_candidates(&mut evidence, &more, false));
         assert_eq!(0, evidence.valid_beacons);
         assert_eq!(999, evidence.next_beacon_ms);
+        // Candidate churn never bumps the accepted-beacon
+        // generation (merge_support owns it).
+        assert_eq!(0, evidence.generation);
     }
 
     #[test]

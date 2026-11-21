@@ -49,6 +49,7 @@ pub mod js_inline;
 pub mod js_minify;
 pub mod js_outline;
 pub mod lazyload_images;
+pub mod prioritize_lcp_images;
 pub mod local_storage_cache;
 pub mod make_show_ads_async;
 pub mod meta_tag;

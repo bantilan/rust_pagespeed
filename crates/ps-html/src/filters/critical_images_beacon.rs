@@ -66,22 +66,12 @@ impl CriticalImagesBeaconFilter {
             .unwrap_or(0)
     }
 
-    /// Downstream-cache beacon gate for this request (`None`
-    /// unless integration plus a configured key applies).
+    /// Downstream-cache beacon gate for this request.
     fn downstream_gate(&self) -> DownstreamBeacon {
         let options = self.driver.options();
-        if !options.is_downstream_cache_integration_enabled() {
-            return DownstreamBeacon::Inactive;
-        }
-        let key = options.downstream_cache_rebeaconing_key();
-        if key.is_empty() {
-            return DownstreamBeacon::Inactive;
-        }
         let headers = self.driver.request_headers();
-        let matched = headers.headers().lookup1("PS-ShouldBeacon").is_some_and(|value| {
-            options.matches_downstream_cache_rebeaconing_key(&value)
-        });
-        DownstreamBeacon::MustMatch(matched)
+        let header = headers.headers().lookup1("PS-ShouldBeacon");
+        beacon_finder::downstream_beacon_gate(&options, header.as_deref())
     }
 
     /// Prepares insertion state once per document

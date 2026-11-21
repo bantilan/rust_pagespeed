@@ -108,6 +108,11 @@ impl Driver {
                             driver,
                         )) as Box<dyn crate::filter::HtmlFilter>
                     }),
+                    ChainFilter::PrioritizeLcpImages => resource_driver.clone().map(|driver| {
+                        Box::new(filters::prioritize_lcp_images::PrioritizeLcpImagesFilter::new(
+                            driver,
+                        )) as Box<dyn crate::filter::HtmlFilter>
+                    }),
                     ChainFilter::AddHead => Some(Box::new(filters::AddHeadFilter::new(
                         options
                             .filters()

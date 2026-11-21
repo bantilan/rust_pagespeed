@@ -22,8 +22,6 @@ pub const SIGNATURE_CHARS: usize = 27;
 pub const MAX_HTML_BODY_BYTES: usize = 1024 * 1024;
 /// Maximum TTL, seconds (1 year, enforced at config time).
 pub const MAX_HTML_TTL_SEC: i64 = 31_536_000;
-/// Beacon nonce marker that disqualifies bodies ("nonce".
-pub const BEACON_NONCE_MARKER: &str = "\"nonce\":";
 
 /* Signatures (`SHA1Signature`). */
 
