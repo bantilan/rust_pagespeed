@@ -7,10 +7,12 @@ mod harness;
 
 use harness::SharedSink;
 use ps_html::filters::google_analytics::{
-    GoogleAnalyticsFilter, GA_SNIPPET_PREFIX, GA_SNIPPET_SUFFIX,
+    GoogleAnalyticsFilter, GA_SNIPPET_PREFIX, GA_SNIPPET_SUFFIX, PAGE_LOAD_COUNT,
+    REWRITTEN_COUNT,
 };
 use ps_html::parser::Parser;
 use ps_html::writer::WriterFilter;
+use ps_stats::core::Statistics;
 
 /// Test glue methods (`kAsyncGlueMethods`).
 const ASYNC_GLUE_METHODS: &[u8] = b"        '_trackPageview',\n        '_setCookiePath'\n";
@@ -161,4 +163,27 @@ fn unknown_call_still_allows_rewrite() {
     expected
         .extend_from_slice(b"<script type=\"text/javascript\">pageTracker._getFoo();</script>\n");
     validate_expected("unknown_call_still_allows_rewrite", &input, &expected);
+}
+
+#[test]
+fn publishes_page_counters() {
+    let stats = Statistics::new();
+    let mut filter = GoogleAnalyticsFilter::with_methods(
+        vec!["_trackPageview".to_string(), "_setCookiePath".to_string()],
+        vec!["_get".to_string(), "_getLinkerUrl".to_string()],
+    );
+    filter.init_stats(&stats);
+    let sink = SharedSink::default();
+    let mut parser = Parser::new();
+    parser.add_pre_render_filter(Box::new(filter));
+    parser.add_filter(Box::new(WriterFilter::new(sink.clone())));
+    parser.start_parse(b"http://test.com/stats.html", false);
+    let mut input =
+        b"<script src=\"http://www.google-analytics.com/ga.js\" type=\"text/javascript\">\n</script>\n"
+            .to_vec();
+    input.extend_from_slice(SYNC_INIT);
+    parser.write(&input);
+    parser.finish();
+    assert_eq!(stats.get_variable(PAGE_LOAD_COUNT).unwrap().get(), 1);
+    assert_eq!(stats.get_variable(REWRITTEN_COUNT).unwrap().get(), 1);
 }

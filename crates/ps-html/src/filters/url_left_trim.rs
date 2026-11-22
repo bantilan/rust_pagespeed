@@ -8,12 +8,14 @@
 //! net); [`UrlLeftTrimFilter`] applies it to every scanned attribute except
 //! on `<base>` elements, gated on a web-valid live base.
 //!
-//! TODO(step4): the trim counters still live on the filter; publish them
-//! as the `url_trims`/`url_trim_saved_bytes` statistics variables once the
-//! driver owns a statistics registry.
+//! Trim counters publish through [`UrlLeftTrimFilter::init_stats`]
+//! (`InitStats`); without it the filter counts locally only.
+
+use std::sync::Arc;
 
 use ps_config::options::Category;
 use ps_http::google_url::GoogleUrl;
+use ps_stats::core::{Statistics, Variable};
 
 use crate::base_tracker::BaseTracker;
 use crate::element::NodeId;
@@ -23,8 +25,20 @@ use crate::name::Keyword;
 use crate::parser::Dom;
 use crate::resource_tag_scanner::scan_element;
 
+/// Successful trims (`url_trims`).
+pub const URL_TRIMS: &str = "url_trims";
+/// Bytes saved (`url_trim_saved_bytes`).
+pub const URL_TRIM_SAVED_BYTES: &str = "url_trim_saved_bytes";
+
 /// Operator URL-valued attributes (passed through to the scanner).
 pub type UrlValuedAttributes = Vec<(String, String, Category)>;
+
+/// Resolved statistics counters (`None` until [`UrlLeftTrimFilter::init_stats`]).
+#[derive(Debug, Default)]
+struct UrlLeftTrimStats {
+    trims: Option<Arc<Variable>>,
+    saved_bytes: Option<Arc<Variable>>,
+}
 
 /// Trims absolute URLs down to relative ones (`UrlLeftTrimFilter`).
 #[derive(Debug)]
@@ -33,6 +47,7 @@ pub struct UrlLeftTrimFilter {
     url_valued: UrlValuedAttributes,
     trim_count: i64,
     trim_saved_bytes: i64,
+    stats: UrlLeftTrimStats,
 }
 
 impl UrlLeftTrimFilter {
@@ -44,7 +59,14 @@ impl UrlLeftTrimFilter {
             url_valued,
             trim_count: 0,
             trim_saved_bytes: 0,
+            stats: UrlLeftTrimStats::default(),
         }
+    }
+
+    /// Resolves statistics counters (`InitStats`).
+    pub fn init_stats(&mut self, statistics: &Statistics) {
+        self.stats.trims = Some(statistics.add_variable(URL_TRIMS));
+        self.stats.saved_bytes = Some(statistics.add_variable(URL_TRIM_SAVED_BYTES));
     }
 
     /// Shortens `url` against `base` (`Trim`); `None` keeps the original.
@@ -126,7 +148,14 @@ impl UrlLeftTrimFilter {
                 let original = String::from_utf8_lossy(&value);
                 if let Some(trimmed) = Self::trim(&self.base.base(), &original) {
                     self.trim_count += 1;
-                    self.trim_saved_bytes += original.len() as i64 - trimmed.len() as i64;
+                    let saved = original.len() as i64 - trimmed.len() as i64;
+                    self.trim_saved_bytes += saved;
+                    if let Some(trims) = &self.stats.trims {
+                        trims.add(1);
+                    }
+                    if let Some(saved_bytes) = &self.stats.saved_bytes {
+                        saved_bytes.add(saved);
+                    }
                     dom.element_attributes_mut(id)[index].set_value(trimmed.as_bytes());
                 }
             }

@@ -7,15 +7,17 @@
 //! `DomainLawyer`; options, allow rules, namer, response headers, and
 //! document context arrive via config.
 //!
-//! TODO(step4): publish the rewrite counter as the `domain_rewrites`
-//! statistics variable once the driver owns a registry.
+//! The rewrite counter publishes through [`DomainRewriteFilter::init_stats`]
+//! (`InitStats`); without it the filter counts locally only.
 
 use std::rc::Rc;
+use std::sync::Arc;
 
 use ps_cache::hash::hash_string_case_preserve;
 use ps_config::options::RewriteOptions;
 use ps_http::google_url::GoogleUrl;
 use ps_http::response::ResponseHeaders;
+use ps_stats::core::{Statistics, Variable};
 
 use super::common::{add_js_to_element, BodyEndTracker, XhtmlStatus};
 use crate::base_tracker::BaseTracker;
@@ -163,6 +165,9 @@ impl Default for DomainRewriteConfig {
     }
 }
 
+/// Rewritten URLs (`domain_rewrites`).
+pub const DOMAIN_REWRITES: &str = "domain_rewrites";
+
 /// Rewrites domains (`DomainRewriteFilter`).
 pub struct DomainRewriteFilter<N: UrlNamer> {
     config: DomainRewriteConfig,
@@ -171,6 +176,7 @@ pub struct DomainRewriteFilter<N: UrlNamer> {
     base: BaseTracker,
     body_end: BodyEndTracker,
     rewrite_count: i64,
+    rewritten: Option<Arc<Variable>>,
 }
 
 impl<N: UrlNamer> DomainRewriteFilter<N> {
@@ -186,7 +192,13 @@ impl<N: UrlNamer> DomainRewriteFilter<N> {
             base,
             body_end: BodyEndTracker::default(),
             rewrite_count: 0,
+            rewritten: None,
         }
+    }
+
+    /// Resolves statistics counters (`InitStats`).
+    pub fn init_stats(&mut self, statistics: &Statistics) {
+        self.rewritten = Some(statistics.add_variable(DOMAIN_REWRITES));
     }
 
     /// Rewritten URLs (`domain_rewrites`).
@@ -565,6 +577,9 @@ impl<N: UrlNamer> HtmlFilter for DomainRewriteFilter<N> {
             if status == RewriteResult::RewroteDomain {
                 dom.element_attributes_mut(id)[index].set_value(&rewritten);
                 self.rewrite_count += 1;
+                if let Some(rewritten) = &self.rewritten {
+                    rewritten.add(1);
+                }
             }
         }
         if keyword == Keyword::Meta {

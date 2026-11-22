@@ -11,10 +11,11 @@ mod harness;
 use harness::{SharedFilter, SharedSink};
 use ps_html::filters::common::XhtmlStatus;
 use ps_html::filters::css_inline_import_to_link::{
-    CssInlineImportToLinkConfig, CssInlineImportToLinkFilter,
+    CssInlineImportToLinkConfig, CssInlineImportToLinkFilter, IMPORTS_TO_LINKS,
 };
 use ps_html::parser::Parser;
 use ps_html::writer::WriterFilter;
+use ps_stats::core::Statistics;
 
 fn config() -> CssInlineImportToLinkConfig {
     CssInlineImportToLinkConfig {
@@ -338,4 +339,21 @@ fn unclosed_style_gets_converted() {
         b"<link rel=\"stylesheet\" href=\"assets/styles.css\">"
     );
     assert_eq!(filter.with(|filter| filter.imports_to_links()), 1);
+}
+
+#[test]
+fn publishes_conversion_counter() {
+    let stats = Statistics::new();
+    let mut filter = CssInlineImportToLinkFilter::new(config());
+    filter.init_stats(&stats);
+    let sink = SharedSink::default();
+    let mut parser = Parser::new();
+    parser.add_filter(Box::new(filter));
+    parser.add_filter(Box::new(WriterFilter::new(sink.clone())));
+    parser.start_parse(b"http://test.com/test.html", false);
+    parser.write(&wrap_page(
+        b"<style>@import url(assets/styles.css);</style>",
+    ));
+    parser.finish();
+    assert_eq!(stats.get_variable(IMPORTS_TO_LINKS).unwrap().get(), 1);
 }

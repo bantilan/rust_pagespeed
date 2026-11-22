@@ -7,10 +7,14 @@
 //! [`ShowAdsSnippetParser`](crate::show_ads_snippet_parser::ShowAdsSnippetParser);
 //! rewritability gates on the element staying inside the flush window.
 //!
-//! TODO(step4): publish the conversion counters as the
-//! `show_ads_snippets_converted` / `show_ads_api_replaced_for_async`
-//! statistics variables once the driver owns a registry. (Upstream also
-//! registers `show_ads_snippets_not_converted` but never increments it.)
+//! Conversion counters publish through [`MakeShowAdsAsyncFilter::init_stats`]
+//! (`InitStats`); without it the filter counts locally only. (Upstream
+//! also registers `show_ads_snippets_not_converted` but never increments
+//! it.)
+
+use std::sync::Arc;
+
+use ps_stats::core::{Statistics, Variable};
 
 use crate::ads_attribute::{self, lookup_ads_by_google_attribute_name};
 use crate::ads_util;
@@ -20,6 +24,18 @@ use crate::lexer::Lexer;
 use crate::name::Keyword;
 use crate::parser::Dom;
 use crate::show_ads_snippet_parser::{AttributeMap, ShowAdsSnippetParser};
+
+/// Converted snippets (`show_ads_snippets_converted`).
+pub const SNIPPETS_CONVERTED: &str = "show_ads_snippets_converted";
+/// Replaced API calls (`show_ads_api_replaced_for_async`).
+pub const API_CALLS_REPLACED: &str = "show_ads_api_replaced_for_async";
+
+/// Resolved statistics counters (`None` until [`MakeShowAdsAsyncFilter::init_stats`]).
+#[derive(Debug, Default)]
+struct MakeShowAdsAsyncStats {
+    snippets: Option<Arc<Variable>>,
+    api_calls: Option<Arc<Variable>>,
+}
 
 /// Converts ShowAds snippets to async adsbygoogle (`MakeShowAdsAsyncFilter`).
 #[derive(Debug)]
@@ -31,6 +47,7 @@ pub struct MakeShowAdsAsyncFilter {
     pending_api_call_replacements: i32,
     snippets_converted: i64,
     api_calls_replaced: i64,
+    stats: MakeShowAdsAsyncStats,
 }
 
 impl MakeShowAdsAsyncFilter {
@@ -45,7 +62,14 @@ impl MakeShowAdsAsyncFilter {
             pending_api_call_replacements: 0,
             snippets_converted: 0,
             api_calls_replaced: 0,
+            stats: MakeShowAdsAsyncStats::default(),
         }
+    }
+
+    /// Resolves statistics counters (`InitStats`).
+    pub fn init_stats(&mut self, statistics: &Statistics) {
+        self.stats.snippets = Some(statistics.add_variable(SNIPPETS_CONVERTED));
+        self.stats.api_calls = Some(statistics.add_variable(API_CALLS_REPLACED));
     }
 
     /// Converted snippets (`show_ads_snippets_converted`).
@@ -131,6 +155,9 @@ impl MakeShowAdsAsyncFilter {
         self.pending_api_call_replacements += 1;
         dom.delete_node(id);
         self.snippets_converted += 1;
+        if let Some(snippets) = &self.stats.snippets {
+            snippets.add(1);
+        }
     }
 
     /// Replaces a ShowAds API call with the adsbygoogle push
@@ -147,6 +174,9 @@ impl MakeShowAdsAsyncFilter {
         dom.append_child(Some(script), snippet);
         dom.delete_node(id);
         self.api_calls_replaced += 1;
+        if let Some(api_calls) = &self.stats.api_calls {
+            api_calls.add(1);
+        }
     }
 
     /// Raw `src` value (`EscapedAttributeValue`, absent when missing).

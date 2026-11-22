@@ -7,14 +7,17 @@
 //! a mid-style flush vetoes the rewrite. The XHTML verdict selects brief
 //! link closes.
 //!
-//! TODO(step4): publish the conversion counter as the
-//! `css_imports_to_links` statistics variable once the driver owns a
-//! registry.
+//! The conversion counter publishes through
+//! [`CssInlineImportToLinkFilter::init_stats`] (`InitStats`); without it
+//! the filter counts locally only.
+
+use std::sync::Arc;
 
 use ps_css::ast::Import;
 use ps_css::media::MediaQueries;
 use ps_css::parser::Parser as CssParser;
 use ps_css::util as css_util;
+use ps_stats::core::{Statistics, Variable};
 
 use super::common::XhtmlStatus;
 use crate::element::{ElementStyle, NodeId};
@@ -23,6 +26,9 @@ use crate::lexer::Lexer;
 use crate::name::Keyword;
 use crate::parser::Dom;
 use crate::script_scanner::ScriptTagScanner;
+
+/// Converted styles (`css_imports_to_links`).
+pub const IMPORTS_TO_LINKS: &str = "css_imports_to_links";
 
 /// Driver inputs for import conversion.
 #[derive(Debug, Clone, Default)]
@@ -38,6 +44,7 @@ pub struct CssInlineImportToLinkFilter {
     style_element: Option<NodeId>,
     style_characters: Option<NodeId>,
     imports_to_links: i64,
+    converted: Option<Arc<Variable>>,
 }
 
 impl CssInlineImportToLinkFilter {
@@ -49,7 +56,13 @@ impl CssInlineImportToLinkFilter {
             style_element: None,
             style_characters: None,
             imports_to_links: 0,
+            converted: None,
         }
+    }
+
+    /// Resolves statistics counters (`InitStats`).
+    pub fn init_stats(&mut self, statistics: &Statistics) {
+        self.converted = Some(statistics.add_variable(IMPORTS_TO_LINKS));
     }
 
     /// Converted styles (`css_imports_to_links`).
@@ -153,6 +166,9 @@ impl CssInlineImportToLinkFilter {
             dom.leaf_contents_mut(chars).drain(..offset);
         }
         self.imports_to_links += 1;
+        if let Some(converted) = &self.converted {
+            converted.add(1);
+        }
     }
 }
 

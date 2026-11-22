@@ -128,9 +128,11 @@ impl Driver {
                             }
                             DriverXhtml::Unknown => crate::filters::common::XhtmlStatus::Unknown,
                         };
-                        Box::new(filters::CssInlineImportToLinkFilter::new(
+                        let mut filter = filters::CssInlineImportToLinkFilter::new(
                             filters::CssInlineImportToLinkConfig { xhtml },
-                        )) as Box<dyn crate::filter::HtmlFilter>
+                        );
+                        filter.init_stats(driver.server_context().statistics());
+                        Box::new(filter) as Box<dyn crate::filter::HtmlFilter>
                     }),
                     ChainFilter::StripSubresourceHints => {
                         resource_driver.clone().map(|driver| {

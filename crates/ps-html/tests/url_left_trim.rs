@@ -4,9 +4,11 @@ mod harness;
 
 use harness::SharedSink;
 use ps_html::filters::UrlLeftTrimFilter;
+use ps_html::filters::url_left_trim::{URL_TRIM_SAVED_BYTES, URL_TRIMS};
 use ps_html::parser::Parser;
 use ps_html::writer::WriterFilter;
 use ps_http::google_url::GoogleUrl;
+use ps_stats::core::Statistics;
 
 fn one_trim(base: &GoogleUrl, changed: bool, init: &str, expected: &str) {
     assert_eq!(
@@ -271,4 +273,23 @@ fn query_with_encoded_ampersand() {
         &image("http://test.com/?q=klaatu+nikto+barada&lang=fr"),
         &image("http://test.com/?q=klaatu+nikto+barada&lang=fr"),
     );
+}
+
+#[test]
+fn publishes_trim_counters() {
+    let stats = Statistics::new();
+    let mut filter = UrlLeftTrimFilter::new(Vec::new());
+    filter.init_stats(&stats);
+    let sink = SharedSink::default();
+    let mut parser = Parser::new();
+    parser.add_filter(Box::new(filter));
+    parser.add_filter(Box::new(WriterFilter::new(sink.clone())));
+    parser.start_parse(b"http://test.com/stats.html", false);
+    parser.write(
+        b"<head><base href='http://foo.bar/baz/'/></head><body><img src='http://foo.bar/baz/nav.jpg'/></body>",
+    );
+    parser.finish();
+    assert_eq!(stats.get_variable(URL_TRIMS).unwrap().get(), 1);
+    // "http://foo.bar/baz/nav.jpg" (26) trims to "nav.jpg" (7).
+    assert_eq!(stats.get_variable(URL_TRIM_SAVED_BYTES).unwrap().get(), 19);
 }

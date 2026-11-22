@@ -7,15 +7,31 @@
 //! document-global across scripts; any tag, comment, CDATA, IE directive,
 //! second characters node, or mid-script flush resets the match.
 //!
-//! TODO(step4): publish the page-load/rewrite counters as the
-//! `google_analytics_page_load_count` / `google_analytics_rewritten_count`
-//! statistics variables once the driver owns a registry.
+//! Page-load/rewrite counters publish through
+//! [`GoogleAnalyticsFilter::init_stats`] (`InitStats`); without it the
+//! filter counts locally only.
+
+use std::sync::Arc;
+
+use ps_stats::core::{Statistics, Variable};
 
 use crate::element::{LeafKind, NodeId};
 use crate::filter::HtmlFilter;
 use crate::lexer::Lexer;
 use crate::name::Keyword;
 use crate::parser::Dom;
+
+/// Documents seen (`google_analytics_page_load_count`).
+pub const PAGE_LOAD_COUNT: &str = "google_analytics_page_load_count";
+/// Documents rewritten (`google_analytics_rewritten_count`).
+pub const REWRITTEN_COUNT: &str = "google_analytics_rewritten_count";
+
+/// Resolved statistics counters (`None` until [`GoogleAnalyticsFilter::init_stats`]).
+#[derive(Debug, Default)]
+struct GoogleAnalyticsStats {
+    page_loads: Option<Arc<Variable>>,
+    rewritten: Option<Arc<Variable>>,
+}
 
 /// Tracker shim call (`kGaSnippetGetTracker`).
 pub const GA_SNIPPET_GET_TRACKER: &[u8] = b"_modpagespeed_getRewriteTracker(";
@@ -177,6 +193,7 @@ pub struct GoogleAnalyticsFilter {
     editors: Vec<ScriptEditor>,
     page_load_count: i64,
     rewritten_count: i64,
+    stats: GoogleAnalyticsStats,
 }
 
 impl GoogleAnalyticsFilter {
@@ -199,7 +216,14 @@ impl GoogleAnalyticsFilter {
             editors: Vec::new(),
             page_load_count: 0,
             rewritten_count: 0,
+            stats: GoogleAnalyticsStats::default(),
         }
+    }
+
+    /// Resolves statistics counters (`InitStats`).
+    pub fn init_stats(&mut self, statistics: &Statistics) {
+        self.stats.page_loads = Some(statistics.add_variable(PAGE_LOAD_COUNT));
+        self.stats.rewritten = Some(statistics.add_variable(REWRITTEN_COUNT));
     }
 
     /// Builds the filter with custom method lists (tests).
@@ -456,11 +480,17 @@ impl HtmlFilter for GoogleAnalyticsFilter {
     fn start_document(&mut self, _dom: &mut Dom, _lexer: &Lexer) {
         self.reset_filter();
         self.page_load_count += 1;
+        if let Some(page_loads) = &self.stats.page_loads {
+            page_loads.add(1);
+        }
     }
 
     fn end_document(&mut self, dom: &mut Dom, _lexer: &Lexer) {
         if self.is_load_found && self.is_init_found && self.rewrite_as_async(dom) {
             self.rewritten_count += 1;
+            if let Some(rewritten) = &self.stats.rewritten {
+                rewritten.add(1);
+            }
         }
         self.reset_filter();
     }

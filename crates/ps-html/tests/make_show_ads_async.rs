@@ -9,8 +9,10 @@ mod harness;
 
 use harness::{SharedFilter, SharedSink};
 use ps_html::filters::MakeShowAdsAsyncFilter;
+use ps_html::filters::make_show_ads_async::{API_CALLS_REPLACED, SNIPPETS_CONVERTED};
 use ps_html::parser::Parser;
 use ps_html::writer::WriterFilter;
+use ps_stats::core::Statistics;
 
 const ADS_BY_GOOGLE_JS: &[u8] =
     b"<script async src=\"//pagead2.googlesyndication.com/pagead/js/adsbygoogle.js\"></script>";
@@ -424,4 +426,22 @@ fn show_ads_no_parent() {
     let (output, filter) = run_case("no_parent", &input);
     assert_eq!(output, show_ads_format_1_output());
     check_stats(&filter, 1, 1);
+}
+
+#[test]
+fn publishes_conversion_counters() {
+    let stats = Statistics::new();
+    let mut filter = MakeShowAdsAsyncFilter::new();
+    filter.init_stats(&stats);
+    let sink = SharedSink::default();
+    let mut parser = Parser::new();
+    parser.add_filter(Box::new(filter));
+    parser.add_filter(Box::new(WriterFilter::new(sink.clone())));
+    parser.start_parse(b"http://test.com/stats.html", false);
+    let mut input = snippet(&show_ads_content_1(b"", b"", b""));
+    input.extend_from_slice(SHOW_ADS_API_CALL);
+    parser.write(&page(&input));
+    parser.finish();
+    assert_eq!(stats.get_variable(SNIPPETS_CONVERTED).unwrap().get(), 1);
+    assert_eq!(stats.get_variable(API_CALLS_REPLACED).unwrap().get(), 1);
 }

@@ -15,13 +15,16 @@ use ps_config::options::RewriteOptions;
 use ps_config::Scope;
 use ps_html::domain_lawyer::DomainLawyer;
 use ps_html::filters::common::XhtmlStatus;
-use ps_html::filters::domain_rewrite::{DomainRewriteConfig, DomainRewriteFilter};
+use ps_html::filters::domain_rewrite::{
+    DomainRewriteConfig, DomainRewriteFilter, DOMAIN_REWRITES,
+};
 use ps_html::parser::Parser;
 use ps_html::static_assets::{get_asset, StaticAsset};
 use ps_html::url_namer::TestUrlNamer;
 use ps_html::writer::WriterFilter;
 use ps_http::google_url::GoogleUrl;
 use ps_http::response::{HttpOptions, ResponseHeaders};
+use ps_stats::core::Statistics;
 
 type Filter = DomainRewriteFilter<TestUrlNamer>;
 
@@ -829,4 +832,23 @@ fn proxy_suffix_set_cookie() {
     assert_eq!(values.len(), 2);
     assert_eq!(values[0], "a=b; Domain=www.example.com.suffix");
     assert_eq!(values[1], "c=d; Secure; Domain=www.example.com.suffix");
+}
+
+#[test]
+fn publishes_rewrite_counter() {
+    let mut mapped = fixture_lawyer();
+    let mut handler = NullMessageHandler;
+    assert!(mapped.add_rewrite_domain_mapping(TO1_DOMAIN, HTML_DOMAIN, Some(&mut handler)));
+    let mapped = Rc::new(mapped);
+    let stats = Statistics::new();
+    let mut filter = DomainRewriteFilter::new(config(), TestUrlNamer::new(), &mapped);
+    filter.init_stats(&stats);
+    let sink = SharedSink::default();
+    let mut parser = Parser::new();
+    parser.add_filter(Box::new(filter));
+    parser.add_filter(Box::new(WriterFilter::new(sink.clone())));
+    parser.start_parse(b"http://test.com/subdir/relative.html", false);
+    parser.write(b"<link rel=stylesheet href=under_subdir.css>");
+    parser.finish();
+    assert_eq!(stats.get_variable(DOMAIN_REWRITES).unwrap().get(), 1);
 }
