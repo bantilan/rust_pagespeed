@@ -7,15 +7,16 @@
 //! must not be forbidden, and every decoded URL must absolutize onto the
 //! leaf's origin. Anything else fails closed.
 //!
-//! TODO(pipeline): id `ic` (image compression) needs `ImageUrlEncoder`
-//! (dimension codes + libwebp levels); it currently fails decode like an
-//! unknown id and lands with the image pipeline slice.
+//! The image id (`ic`) decodes through [`ImageUrlEncoder`](crate::image_url_encoder::ImageUrlEncoder)
+//! (dimension codes plus legacy webp/mobile terminators); only the
+//! recovered URL is kept (dimensions feed the fetch path, not decode).
 
 use ps_cache::namer::ResourceNamer;
 use ps_config::filter::Filter;
 use ps_config::options::RewriteOptions;
 use ps_http::google_url::GoogleUrl;
 
+use crate::image_url_encoder::{ImageResourceContext, ImageUrlEncoder};
 use crate::url_namer::{ProxyExtent, UrlNamer};
 use crate::url_segment_encoder::{
     CssUrlEncoder, DefaultEncoder, MultipartEncoder, UrlSegmentEncoder,
@@ -28,6 +29,7 @@ fn encoder_for_id(id: &str) -> Option<EncoderKind> {
         "ce" | "jm" | "ls" | "sm" => Some(EncoderKind::Default),
         "cc" | "jc" | "is" => Some(EncoderKind::Multipart),
         "cf" => Some(EncoderKind::Css),
+        "ic" => Some(EncoderKind::Image),
         _ => None,
     }
 }
@@ -38,6 +40,7 @@ enum EncoderKind {
     Default,
     Multipart,
     Css,
+    Image,
 }
 
 impl EncoderKind {
@@ -46,6 +49,12 @@ impl EncoderKind {
             EncoderKind::Default => DefaultEncoder.decode(segment),
             EncoderKind::Multipart => MultipartEncoder.decode(segment),
             EncoderKind::Css => CssUrlEncoder.decode(segment),
+            EncoderKind::Image => {
+                let mut context = ImageResourceContext::default();
+                ImageUrlEncoder
+                    .decode(segment, &mut context)
+                    .map(|url| vec![url])
+            }
         }
     }
 }
@@ -199,6 +208,33 @@ mod tests {
     }
 
     #[test]
+    fn image_id_decodes_through_image_encoder() {
+        // Dimension codes and legacy terminators all recover the URL
+        // (dimensions feed the fetch path, not decode).
+        for leaf in [
+            "xa.jpg",
+            "17x33xa.jpg",
+            "100xNxa.jpg",
+            "wa.jpg",
+            "va.jpg",
+            "mxa.jpg",
+        ] {
+            assert_eq!(
+                decode(&format!("http://example.com/{leaf}.pagespeed.ic.0.webp")),
+                Some(vec!["http://example.com/a.jpg".to_string()]),
+                "{leaf}"
+            );
+        }
+        // Decoded names stay on the leaf's origin.
+        let foreign =
+            ps_cache::namer::encode_url_segment_bytes(b"http://other.com/x.jpg");
+        assert_eq!(
+            decode(&format!("http://example.com/x{foreign}.pagespeed.ic.0.webp")),
+            None
+        );
+    }
+
+    #[test]
     fn outline_decodes_empty() {
         assert_eq!(
             decode("http://test.com/x.pagespeed.co.0.css"),
@@ -216,7 +252,7 @@ mod tests {
         assert_eq!(decode("http://test.com/a.css"), None);
         // Unknown filter id.
         assert_eq!(decode("http://test.com/a.pagespeed.zz.0.css"), None);
-        // Image id waits for its encoder (pipeline slice).
+        // Malformed image segment fails closed (no dimension codes).
         assert_eq!(decode("http://test.com/a.pagespeed.ic.0.jpg"), None);
         // Invalid URLs never decode.
         assert_eq!(decode("bogus"), None);
