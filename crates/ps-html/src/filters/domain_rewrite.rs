@@ -201,6 +201,11 @@ impl<N: UrlNamer> DomainRewriteFilter<N> {
         self.rewritten = Some(statistics.add_variable(DOMAIN_REWRITES));
     }
 
+    /// Overrides the base-URL length cap (`max_url_size`).
+    pub fn set_max_url_size(&mut self, max_url_size: i64) {
+        self.base.set_max_url_size(max_url_size);
+    }
+
     /// Rewritten URLs (`domain_rewrites`).
     #[must_use]
     pub fn rewrite_count(&self) -> i64 {

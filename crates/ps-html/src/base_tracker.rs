@@ -12,13 +12,17 @@
 //! tags (inserted base tags latch first-wins here exactly as `ScanFilter`
 //! latches onto `BaseTagFilter`'s insertion upstream).
 //!
-//! TODO(step4): the remaining `ScanFilter` guards — CSP `base-uri`
-//! conservatism and `max_url_size` — need options/CSP plumbing that has
-//! not landed yet. Trackers without a lawyer also skip proxy suffixing
-//! (equivalent to an empty suffix); the driver's shared scan filter will
-//! replace per-filter tracking once live chains exist.
-
-use std::rc::Rc;
+//! One `ScanFilter` guard is deliberately unported: CSP `base-uri`
+//! conservatism. Upstream poisons the base gate whenever the response
+//! carries a `base-uri` directive (it cannot prove the base safe); the
+//! port has no CSP parsing or enforcement subsystem, so it resolves
+//! bases normally. Impact is limited to conservatism parity: rewriting
+//! still only touches same-origin, explicitly allowed URLs, and no
+//! security boundary depends on the gate. Do not add ad hoc CSP
+//! matching here; port the subsystem if the behavior is ever needed.
+//!
+//! A shared driver-level scan filter will replace per-filter tracking
+//! once live chains exist.
 
 use ps_http::google_url::GoogleUrl;
 
@@ -27,14 +31,31 @@ use crate::element::NodeId;
 use crate::name::Keyword;
 use crate::parser::Dom;
 
+/// Default URL length cap (C++ `kDefaultMaxUrlSize`).
+const DEFAULT_MAX_URL_SIZE: i64 = 2083;
+
 /// Live base URL for one filter (`ScanFilter`'s base half).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct BaseTracker {
     base: GoogleUrl,
     document_url: String,
-    lawyer: Option<Rc<DomainLawyer>>,
+    lawyer: Option<DomainLawyer>,
     base_was_set: bool,
     base_problem: bool,
+    max_url_size: i64,
+}
+
+impl Default for BaseTracker {
+    fn default() -> Self {
+        BaseTracker {
+            base: GoogleUrl::default(),
+            document_url: String::new(),
+            lawyer: None,
+            base_was_set: false,
+            base_problem: false,
+            max_url_size: DEFAULT_MAX_URL_SIZE,
+        }
+    }
 }
 
 impl BaseTracker {
@@ -77,8 +98,13 @@ impl BaseTracker {
 
     /// Installs the domain lawyer for proxy suffixing (absent by
     /// default, matching an empty suffix).
-    pub fn set_lawyer(&mut self, lawyer: &Rc<DomainLawyer>) {
+    pub fn set_lawyer(&mut self, lawyer: &DomainLawyer) {
         self.lawyer = Some(lawyer.clone());
+    }
+
+    /// Overrides the URL length cap (`max_url_size`, default 2083).
+    pub fn set_max_url_size(&mut self, max_url_size: i64) {
+        self.max_url_size = max_url_size;
     }
 
     /// Resets to the document URL at parse start.
@@ -110,6 +136,12 @@ impl BaseTracker {
             self.base_problem = true;
             return;
         };
+        // Overlong bases are never adopted (C++ compares the decoded
+        // length against `max_url_size`; equality still adopts).
+        if href.len() as i64 > self.max_url_size {
+            self.base_problem = true;
+            return;
+        }
         // Proxy deployments suffix the href against the document URL
         // before adopting it.
         let mut href = href.to_string();
@@ -213,5 +245,65 @@ mod tests {
         tracker.observe(&mut dom, late);
         assert_eq!(tracker.base().spec(), "http://foo.bar/");
         assert!(!tracker.base_url_is_valid());
+    }
+
+    #[test]
+    fn max_url_size_boundary() {
+        use crate::parser::Dom;
+
+        // Default cap is 2083; equality still adopts.
+        for (length, adopts) in [(2082, true), (2083, true), (2084, false)] {
+            let mut tracker = BaseTracker::default();
+            tracker.reset("http://test.com/doc.html");
+            let mut dom = Dom::new();
+            let base = dom.new_element(None, b"base");
+            let href = format!("http://example.com/{}", "a".repeat(length - 19));
+            assert_eq!(href.len(), length);
+            dom.add_attribute(base, b"href", href.as_bytes());
+            tracker.observe(&mut dom, base);
+            assert_eq!(tracker.base_url_is_valid(), adopts, "length {length}");
+            if adopts {
+                assert_eq!(tracker.base().spec(), href);
+            } else {
+                assert_eq!(tracker.base().spec(), "http://test.com/doc.html");
+            }
+        }
+        // Overrides apply the same boundary.
+        for (length, adopts) in [(10, true), (11, false)] {
+            let mut tracker = BaseTracker::default();
+            tracker.set_max_url_size(10);
+            tracker.reset("http://test.com/doc.html");
+            let mut dom = Dom::new();
+            let base = dom.new_element(None, b"base");
+            let href = "http://z/".to_string() + &"a".repeat(length - 9);
+            dom.add_attribute(base, b"href", href.as_bytes());
+            tracker.observe(&mut dom, base);
+            assert_eq!(tracker.base_url_is_valid(), adopts, "length {length}");
+        }
+    }
+
+    #[test]
+    fn lawyer_suffixes_adopted_bases() {
+        use crate::parser::Dom;
+
+        let mut lawyer = DomainLawyer::new();
+        lawyer.set_proxy_suffix(".sfx");
+        let mut tracker = BaseTracker::default();
+        tracker.set_lawyer(&lawyer);
+        tracker.reset("http://example.com.sfx/page.html");
+        let mut dom = Dom::new();
+        let base = dom.new_element(None, b"base");
+        dom.add_attribute(base, b"href", b"http://example.com/dir/");
+        tracker.observe(&mut dom, base);
+        assert!(tracker.base_url_is_valid());
+        assert_eq!(tracker.base().spec(), "http://example.com.sfx/dir/");
+        // Without a lawyer the href adopts verbatim.
+        let mut plain = BaseTracker::default();
+        plain.reset("http://example.com.sfx/page.html");
+        let mut dom = Dom::new();
+        let base = dom.new_element(None, b"base");
+        dom.add_attribute(base, b"href", b"http://example.com/dir/");
+        plain.observe(&mut dom, base);
+        assert_eq!(plain.base().spec(), "http://example.com/dir/");
     }
 }

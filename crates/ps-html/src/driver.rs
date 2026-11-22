@@ -152,7 +152,7 @@ impl Driver {
                             let lawyer = std::rc::Rc::new(
                                 crate::domain_lawyer::DomainLawyer::clone(driver.lawyer()),
                             );
-                            Box::new(filters::StripSubresourceHintsFilter::new(
+                            let mut filter = filters::StripSubresourceHintsFilter::new(
                                 filters::StripSubresourceHintsConfig {
                                     can_modify_urls: rewrites_urls,
                                     css_preserve_urls: options.filters().css_preserve_urls(),
@@ -161,7 +161,9 @@ impl Driver {
                                     allow_resources: options.allow_resources().clone(),
                                 },
                                 &lawyer,
-                            )) as Box<dyn crate::filter::HtmlFilter>
+                            );
+                            filter.set_max_url_size(options.max_url_size());
+                            Box::new(filter) as Box<dyn crate::filter::HtmlFilter>
                         })
                     }
                     ChainFilter::MetaTag => resource_driver.clone().map(|driver| {
@@ -185,6 +187,75 @@ impl Driver {
                         crate::keywords::escape(with_param.spec().as_bytes(), &mut escaped);
                         Box::new(filters::SupportNoscriptFilter::new(&escaped, should_insert))
                             as Box<dyn crate::filter::HtmlFilter>
+                    }),
+                    ChainFilter::MakeShowAdsAsync => {
+                        let mut filter = filters::MakeShowAdsAsyncFilter::new();
+                        if let Some(driver) = resource_driver.clone() {
+                            filter.init_stats(driver.server_context().statistics());
+                        }
+                        Some(Box::new(filter) as Box<dyn crate::filter::HtmlFilter>)
+                    }
+                    ChainFilter::GoogleAnalytics => {
+                        let mut filter = filters::GoogleAnalyticsFilter::new();
+                        if let Some(driver) = resource_driver.clone() {
+                            filter.init_stats(driver.server_context().statistics());
+                        }
+                        Some(Box::new(filter) as Box<dyn crate::filter::HtmlFilter>)
+                    }
+                    ChainFilter::UrlLeftTrim => {
+                        let mut filter = filters::UrlLeftTrimFilter::new(
+                            options.url_valued_attributes().to_vec(),
+                        );
+                        filter.set_max_url_size(options.max_url_size());
+                        if let Some(driver) = resource_driver.clone() {
+                            filter.init_stats(driver.server_context().statistics());
+                            filter.set_lawyer(driver.lawyer());
+                        }
+                        Some(Box::new(filter) as Box<dyn crate::filter::HtmlFilter>)
+                    }
+                    ChainFilter::DomainRewrite => resource_driver.clone().map(|driver| {
+                        use crate::server_context::XhtmlStatus as DriverXhtml;
+                        let xhtml = match driver.mime_type_xhtml_status() {
+                            DriverXhtml::IsXhtml => crate::filters::common::XhtmlStatus::IsXhtml,
+                            DriverXhtml::IsNotXhtml => {
+                                crate::filters::common::XhtmlStatus::IsNotXhtml
+                            }
+                            DriverXhtml::Unknown => crate::filters::common::XhtmlStatus::Unknown,
+                        };
+                        // The AMP verdict resolves during parsing, after
+                        // construction; the client shim additionally
+                        // requires ClientDomainRewrite plus rewritten-to
+                        // domains, so non-AMP documents behave exactly
+                        // like C++.
+                        let lawyer = std::rc::Rc::new(
+                            crate::domain_lawyer::DomainLawyer::clone(driver.lawyer()),
+                        );
+                        let mut filter = filters::DomainRewriteFilter::new(
+                            filters::DomainRewriteConfig {
+                                options: options.clone(),
+                                disable_domain_rewrite: false,
+                                is_amp_document: false,
+                                debug: options
+                                    .filters()
+                                    .enabled(ps_config::filter::Filter::Debug),
+                                pedantic: options
+                                    .filters()
+                                    .enabled(ps_config::filter::Filter::Pedantic),
+                                xhtml,
+                                hash_length: driver
+                                    .server_context()
+                                    .hasher()
+                                    .hash_size_in_chars(),
+                                signature_length: driver.signature_length(),
+                                url_valued: options.url_valued_attributes().to_vec(),
+                                response_headers: Some(driver.response_headers_shared()),
+                            },
+                            driver.server_context().url_namer().clone(),
+                            &lawyer,
+                        );
+                        filter.init_stats(driver.server_context().statistics());
+                        filter.set_max_url_size(options.max_url_size());
+                        Box::new(filter) as Box<dyn crate::filter::HtmlFilter>
                     }),
                     _ => None,
                 };

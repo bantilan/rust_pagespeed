@@ -6,10 +6,12 @@
 //! mappings stay index-stable (the C++ uses raw pointers); the registry
 //! map is ordered like the C++ `std::map` so signatures are stable.
 //!
-//! TODO(pipeline): origin mapping (`MapOrigin*`, `AddOriginDomainMapping`),
-//! proxy support (`AddProxyDomainMapping`, `IsProxyMapped`, suffix
-//! helpers), `Merge`, and `DoDomainsServeSameContent` land with their
-//! slices; the `Domain` record already carries their fields.
+//! Origin mapping, proxy support (mappings, `IsProxyMapped`, suffix
+//! helpers), `Merge`, and `DoDomainsServeSameContent` are implemented
+//! and verified against the C++ originals, wired through
+//! `ResourceDriver::rebuild_lawyer` and the nginx proxy branch. The
+//! one deliberate gap is `Merge`'s incompatible-suffix warning, which
+//! has no log channel here yet.
 
 use std::collections::BTreeMap;
 

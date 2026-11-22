@@ -14,6 +14,7 @@
 
 pub mod client_options;
 pub mod cookies;
+pub mod file_load;
 pub mod filter;
 pub mod message_handler;
 pub mod options;

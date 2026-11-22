@@ -11,6 +11,7 @@ use ps_http::request::RequestContext;
 use ps_http::response::{HttpOptions, ResponseHeaders};
 
 use super::cacheable_resource::{LoadCallback, NotCacheablePolicy};
+use super::file_input_resource::FileInputResource;
 use super::font_service_input_resource::FontServiceInputResource;
 use super::url_input_resource::UrlInputResource;
 
@@ -111,7 +112,7 @@ impl Resource for DataUrlInputResource {
 }
 
 /// Any driver-created input resource (`ResourcePtr` from
-/// `CreateInputResource`, file inputs deferred).
+/// `CreateInputResource`).
 #[derive(Debug, Clone)]
 pub enum InputResource {
     /// Fetched URL (`UrlInputResource`).
@@ -120,6 +121,8 @@ pub enum InputResource {
     Font(FontServiceInputResource),
     /// Inline payload (`DataUrlInputResource`).
     DataUrl(DataUrlInputResource),
+    /// Local file (`FileInputResource`).
+    File(FileInputResource),
 }
 
 impl InputResource {
@@ -130,6 +133,7 @@ impl InputResource {
             InputResource::Url(resource) => resource.cache_key(),
             InputResource::Font(resource) => resource.cache_key(),
             InputResource::DataUrl(resource) => resource.url(),
+            InputResource::File(resource) => resource.cache_key(),
         }
     }
 
@@ -140,6 +144,7 @@ impl InputResource {
             InputResource::Url(resource) => resource.content_type(),
             InputResource::Font(resource) => resource.content_type(),
             InputResource::DataUrl(resource) => resource.content_type(),
+            InputResource::File(resource) => resource.content_type(),
         }
     }
 
@@ -149,7 +154,7 @@ impl InputResource {
         match self {
             InputResource::Url(resource) => resource.charset(),
             InputResource::Font(resource) => resource.charset(),
-            InputResource::DataUrl(_) => "",
+            InputResource::DataUrl(_) | InputResource::File(_) => "",
         }
     }
 
@@ -160,6 +165,7 @@ impl InputResource {
             InputResource::Url(resource) => resource.response_headers(),
             InputResource::Font(resource) => resource.response_headers(),
             InputResource::DataUrl(resource) => resource.response_headers(),
+            InputResource::File(resource) => resource.response_headers(),
         }
     }
 
@@ -170,6 +176,7 @@ impl InputResource {
             InputResource::Url(resource) => resource.contents(),
             InputResource::Font(resource) => resource.contents(),
             InputResource::DataUrl(resource) => resource.contents().to_vec(),
+            InputResource::File(resource) => resource.contents().to_vec(),
         }
     }
 
@@ -180,6 +187,7 @@ impl InputResource {
             InputResource::Url(resource) => resource.is_valid_and_cacheable(),
             InputResource::Font(resource) => resource.is_valid_and_cacheable(),
             InputResource::DataUrl(resource) => resource.is_valid_and_cacheable(),
+            InputResource::File(resource) => resource.is_valid_and_cacheable(),
         }
     }
 
@@ -209,6 +217,14 @@ impl InputResource {
                     (false, format!("preventing rewriting of {}", resource.url()))
                 }
             }
+            // File inputs synthesize theirs the same way.
+            InputResource::File(resource) => {
+                if resource.is_valid_and_cacheable() {
+                    (true, String::new())
+                } else {
+                    (false, format!("preventing rewriting of {}", resource.url()))
+                }
+            }
         }
     }
 
@@ -228,6 +244,9 @@ impl InputResource {
             InputResource::DataUrl(_) => {
                 input.info_type = super::cacheable_resource::InputInfoType::AlwaysValid;
             }
+            InputResource::File(resource) => {
+                resource.fill_in_partition_input_info(include_hash, input)
+            }
         }
     }
 
@@ -241,6 +260,7 @@ impl InputResource {
                 use ps_cache::hash::{Hasher, Md5Hasher};
                 Md5Hasher::with_size(21).hash(resource.contents())
             }
+            InputResource::File(resource) => resource.contents_hash(),
         }
     }
 
@@ -250,7 +270,9 @@ impl InputResource {
         match self {
             InputResource::Url(resource) => resource.fetch_response_status(),
             InputResource::Font(resource) => resource.fetch_response_status(),
-            InputResource::DataUrl(_) => ps_cache::ttl::FetchStatus::NotSet,
+            InputResource::DataUrl(_) | InputResource::File(_) => {
+                ps_cache::ttl::FetchStatus::NotSet
+            }
         }
     }
 
@@ -261,7 +283,7 @@ impl InputResource {
         match self {
             InputResource::Url(resource) => resource.load_pending(),
             InputResource::Font(resource) => resource.load_pending(),
-            InputResource::DataUrl(_) => false,
+            InputResource::DataUrl(_) | InputResource::File(_) => false,
         }
     }
 
@@ -281,7 +303,7 @@ impl InputResource {
             InputResource::Font(resource) => {
                 resource.set_is_background_fetch(background);
             }
-            InputResource::DataUrl(_) => {}
+            InputResource::DataUrl(_) | InputResource::File(_) => {}
         }
     }
 
@@ -301,6 +323,7 @@ impl InputResource {
                 let _ = ctx;
                 callback.done(false, resource.is_valid_and_cacheable())
             }
+            InputResource::File(resource) => resource.load(policy, ctx, callback),
         }
     }
 }
@@ -311,6 +334,7 @@ impl Resource for InputResource {
             InputResource::Url(resource) => resource.url(),
             InputResource::Font(resource) => resource.url(),
             InputResource::DataUrl(resource) => resource.url(),
+            InputResource::File(resource) => resource.url(),
         }
     }
 
@@ -319,6 +343,7 @@ impl Resource for InputResource {
             InputResource::Url(resource) => resource.is_authorized_domain(),
             InputResource::Font(resource) => resource.is_authorized_domain(),
             InputResource::DataUrl(resource) => resource.is_authorized_domain(),
+            InputResource::File(resource) => resource.is_authorized_domain(),
         }
     }
 
@@ -327,6 +352,7 @@ impl Resource for InputResource {
             InputResource::Url(resource) => resource.set_is_authorized_domain(authorized),
             InputResource::Font(resource) => resource.set_is_authorized_domain(authorized),
             InputResource::DataUrl(resource) => resource.set_is_authorized_domain(authorized),
+            InputResource::File(resource) => resource.set_is_authorized_domain(authorized),
         }
     }
 }

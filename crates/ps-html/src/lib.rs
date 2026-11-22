@@ -28,6 +28,7 @@ pub mod driver;
 pub mod element;
 pub mod event;
 pub mod fake_filter;
+pub mod file_input_resource;
 pub mod filter;
 pub mod filters;
 pub mod flush_early;

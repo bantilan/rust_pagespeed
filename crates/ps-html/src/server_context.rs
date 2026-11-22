@@ -33,6 +33,7 @@ use super::filters::domain_rewrite::{rewrite_url, RewriteResult as DomainRewrite
 use super::filters::url_left_trim::UrlLeftTrimFilter;
 use super::output_resource::{OutputResource, OutputResourceKind};
 use super::parser::Dom;
+use super::file_input_resource::FileInputResource;
 use super::resource::{DataUrlInputResource, InputResource, Resource};
 use super::resource_slot::HtmlResourceSlot;
 use super::rewrite_filter::RewriteFilter;
@@ -826,6 +827,7 @@ impl ResourceDriver {
         use ps_config::options::DomainMappingKind;
         let mut lawyer = DomainLawyer::new();
         let options = self.options.borrow();
+        lawyer.set_proxy_suffix(options.proxy_suffix());
         for domain in options.domains() {
             lawyer.add_domain(domain, None);
         }
@@ -835,6 +837,13 @@ impl ResourceDriver {
         for mapping in options.domain_mappings() {
             if mapping.kind == DomainMappingKind::Rewrite {
                 lawyer.add_rewrite_domain_mapping(&mapping.to, &mapping.from, None);
+            } else if mapping.kind == DomainMappingKind::Origin {
+                lawyer.add_origin_domain_mapping(
+                    &mapping.to,
+                    &mapping.from,
+                    &mapping.host_header,
+                    None,
+                );
             } else if mapping.kind == DomainMappingKind::Proxy {
                 lawyer.add_proxy_domain_mapping(
                     &mapping.from,
@@ -1032,9 +1041,33 @@ impl ResourceDriver {
             return None;
         }
         let content_type = extension_to_content_type(&url.leaf_sans_query());
-        let policy = self.options().file_load_policy().clone();
-        if !policy.exact.is_empty() || !policy.regex.is_empty() || !policy.rules.is_empty() {
-            todo!("file-load matching lands with FileInputResource");
+        // File-load mappings win over HTTP fetching, like C++: the
+        // mapped file must carry a known static type (C++
+        // ShouldLoadFromFile's content-type gate), while the
+        // resource keeps the URL leaf's type (possibly none).
+        let options = self.options();
+        if !options.file_load_policy().is_empty() {
+            if let Some(filename) = options
+                .file_load_policy()
+                .map_url_to_filename(url.all_except_query())
+            {
+                if let Some(mapped_type) = extension_to_content_type(&filename) {
+                    if mapped_type.is_likely_static_resource() {
+                        let file_ttl_ms = options
+                            .was_set("lfct")
+                            .then(|| options.load_from_file_cache_ttl_ms());
+                        return Some(InputResource::File(FileInputResource::make(
+                            url.spec(),
+                            &filename,
+                            content_type,
+                            authorized,
+                            options.max_cacheable_response_content_length(),
+                            file_ttl_ms,
+                            self.server.now_ms(),
+                        )));
+                    }
+                }
+            }
         }
         let fetch_is_http_like = match self.lawyer.map_origin_url(url) {
             Some((mapped, _, _)) => GoogleUrl::new(&mapped),

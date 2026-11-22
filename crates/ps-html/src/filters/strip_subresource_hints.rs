@@ -46,11 +46,18 @@ impl StripSubresourceHintsFilter {
     /// Builds the filter from driver inputs.
     #[must_use]
     pub fn new(config: StripSubresourceHintsConfig, lawyer: &Rc<DomainLawyer>) -> Self {
+        let mut base = BaseTracker::default();
+        base.set_lawyer(lawyer);
         StripSubresourceHintsFilter {
             config,
             lawyer: lawyer.clone(),
-            base: BaseTracker::default(),
+            base,
         }
+    }
+
+    /// Overrides the base-URL length cap (`max_url_size`).
+    pub fn set_max_url_size(&mut self, max_url_size: i64) {
+        self.base.set_max_url_size(max_url_size);
     }
 
     /// Decoded attribute value, empty when missing (`AttributeValue`).

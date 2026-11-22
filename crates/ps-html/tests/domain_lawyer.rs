@@ -1969,3 +1969,69 @@ fn rebuild_lawyer_threads_proxy_mappings_with_cdn_leg() {
     assert!(is_proxy);
     assert_eq!(mapped, "http://origin2.com/s/a.css");
 }
+
+#[test]
+fn rebuild_lawyer_threads_rewrite_direction() {
+    use ps_cache::cache::MemoryCache;
+    use ps_config::options::RewriteOptions;
+    use ps_html::server_context::{ResourceDriver, ServerContext};
+    use ps_http::mock::MockUrlFetcher;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::sync::Arc;
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    // C++ order is (to, from): origin.com rewrites onto cdn.com.
+    options
+        .borrow_mut()
+        .parse_and_set_2("MapRewriteDomain", "http://cdn.com/", "http://origin.com/")
+        .unwrap();
+    let server = Rc::new(ServerContext::new_with_metadata(
+        Arc::new(MemoryCache::new()),
+        Arc::new(MemoryCache::new()),
+        Rc::new(MockUrlFetcher::new()),
+        0,
+    ));
+    let driver = ResourceDriver::new(server, options, "http://origin.com/");
+    let lawyer = driver.lawyer();
+    assert!(lawyer.do_domains_serve_same_content("http://origin.com/", "http://cdn.com/"));
+    // Directional: origin.com points at cdn.com, not the reverse.
+    assert_eq!(
+        lawyer.find_domains_rewritten_to(&GoogleUrl::new("http://cdn.com/a.css")),
+        vec!["http://origin.com/".to_string()]
+    );
+    assert!(lawyer
+        .find_domains_rewritten_to(&GoogleUrl::new("http://origin.com/a.css"))
+        .is_empty());
+}
+
+#[test]
+fn rebuild_lawyer_threads_origin_mappings() {
+    use ps_cache::cache::MemoryCache;
+    use ps_config::options::RewriteOptions;
+    use ps_html::server_context::{ResourceDriver, ServerContext};
+    use ps_http::mock::MockUrlFetcher;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::sync::Arc;
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .parse_and_set_2("MapOriginDomain", "http://origin.com/", "http://example.com/")
+        .unwrap();
+    let server = Rc::new(ServerContext::new_with_metadata(
+        Arc::new(MemoryCache::new()),
+        Arc::new(MemoryCache::new()),
+        Rc::new(MockUrlFetcher::new()),
+        0,
+    ));
+    let driver = ResourceDriver::new(server, options, "http://example.com/");
+    let lawyer = driver.lawyer();
+    let (mapped, host, is_proxy) = lawyer
+        .map_origin_url(&GoogleUrl::new("http://example.com/a.css"))
+        .expect("origin maps");
+    assert!(!is_proxy);
+    assert_eq!(mapped, "http://origin.com/a.css");
+    assert_eq!(host, "example.com");
+}

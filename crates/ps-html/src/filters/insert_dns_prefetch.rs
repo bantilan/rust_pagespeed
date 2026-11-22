@@ -22,6 +22,7 @@ use ps_config::options::{Category, RewriteOptions};
 
 use super::url_left_trim::UrlValuedAttributes;
 use crate::base_tracker::BaseTracker;
+use crate::domain_lawyer::DomainLawyer;
 use crate::element::NodeId;
 use crate::filter::HtmlFilter;
 use crate::flush_early::FlushEarlyInfo;
@@ -125,6 +126,16 @@ impl InsertDnsPrefetchFilter {
             applied_ok: 0,
             not_applied: 0,
         }
+    }
+
+    /// Installs the domain lawyer for proxy suffixing.
+    pub fn set_lawyer(&mut self, lawyer: &DomainLawyer) {
+        self.base.set_lawyer(lawyer);
+    }
+
+    /// Overrides the base-URL length cap (`max_url_size`).
+    pub fn set_max_url_size(&mut self, max_url_size: i64) {
+        self.base.set_max_url_size(max_url_size);
     }
 
     /// Returns the recorded log statuses (html status plus

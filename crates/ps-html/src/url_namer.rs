@@ -6,6 +6,8 @@
 //! policy (`http://cdn.com/<scheme>/<host>/...`) used across the filter
 //! suites.
 
+use std::rc::Rc;
+
 use ps_cache::hash::hash_string_case_preserve;
 use ps_cache::namer::ResourceNamer;
 use ps_http::google_url::GoogleUrl;
@@ -82,6 +84,31 @@ fn base_encode(lawyer: &DomainLawyer, resource: &OutputResource, option: EncodeO
         resource.resolved_base().to_string()
     };
     format!("{path}{leaf}")
+}
+
+/// Forwards to the installed namer, so driver-owned filters can
+/// hold the shared policy object instead of a concrete namer.
+impl UrlNamer for Rc<dyn UrlNamer> {
+    fn decode(&self, request_url: &GoogleUrl) -> Option<String> {
+        (**self).decode(request_url)
+    }
+
+    fn is_proxy_encoded(&self, url: &GoogleUrl) -> bool {
+        (**self).is_proxy_encoded(url)
+    }
+
+    fn proxy_mode(&self) -> ProxyExtent {
+        (**self).proxy_mode()
+    }
+
+    fn encode(
+        &self,
+        lawyer: &DomainLawyer,
+        resource: &OutputResource,
+        option: EncodeOption,
+    ) -> String {
+        (**self).encode(lawyer, resource, option)
+    }
 }
 
 /// Production namer (`StandardUrlNamer`): base behavior throughout.

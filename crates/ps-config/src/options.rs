@@ -393,36 +393,18 @@ pub enum SetOutcome {
     ValueInvalid,
 }
 
-/// File-loading policy entries (`FileLoadPolicy`).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct FileLoadPolicy {
-    /// Exact URL-prefix associations (`LoadFromFile`).
-    pub exact: Vec<(String, String)>,
-    /// Regexp associations (`LoadFromFileMatch`).
-    pub regex: Vec<(String, String)>,
-    /// Allow/disallow rules (`LoadFromFileRule[Match]`).
-    pub rules: Vec<LoadRule>,
-}
+/// File-loading policy entries (`FileLoadPolicy`, compiled at config time).
+pub use crate::file_load::{FileLoadPolicy, LoadRule};
 
-/// One `LoadFromFileRule[Match]` entry.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LoadRule {
-    /// Whether the rule allows (vs disallows) loading.
-    pub allow: bool,
-    /// Pattern text (kept verbatim; matching lands with the fetcher).
-    pub pattern: String,
-    /// Whether the pattern is a regexp (vs prefix).
-    pub is_regexp: bool,
-}
-
-/// Domain-mapping entry (stored verbatim; full `DomainLawyer` lands later).
+/// Domain-mapping entry, stored in true from/to order (C++ passes
+/// `(arg1, arg2)` as `(to, from)` for origin and rewrite mappings).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DomainMapping {
     /// Mapping flavor: origin, proxy, or rewrite.
     pub kind: DomainMappingKind,
-    /// Source domain.
+    /// Source domain (rewrite/origin `from`; proxy domain for proxy).
     pub from: String,
-    /// Target domain.
+    /// Target domain (rewrite/origin `to`; origin domain for proxy).
     pub to: String,
     /// Third arg (empty for 2-arg forms): the `Host` override for
     /// origin mappings, the CDN re-base for proxy mappings (C++
@@ -1059,15 +1041,11 @@ impl RewriteOptions {
             self.custom_fetch_headers
                 .push((arg1.to_string(), arg2.to_string()));
         } else if name.eq_ignore_ascii_case("LoadFromFile") {
-            self.file_load
-                .exact
-                .push((arg1.to_string(), arg2.to_string()));
+            self.file_load.associate(arg1, arg2);
         } else if name.eq_ignore_ascii_case("LoadFromFileMatch") {
-            // Regexp validity is enforced when the fetcher compiles it;
-            // stored verbatim here.
-            self.file_load
-                .regex
-                .push((arg1.to_string(), arg2.to_string()));
+            if let Err(error) = self.file_load.associate_regexp(arg1, arg2) {
+                return invalid(&format!("Invalid LoadFromFileMatch: {error}"));
+            }
         } else if name.eq_ignore_ascii_case("LoadFromFileRule")
             || name.eq_ignore_ascii_case("LoadFromFileRuleMatch")
         {
@@ -1079,16 +1057,15 @@ impl RewriteOptions {
             } else {
                 return invalid("Argument 1 must be either 'Allow' or 'Disallow'");
             };
-            self.file_load.rules.push(LoadRule {
-                allow,
-                pattern: arg2.to_string(),
-                is_regexp,
-            });
+            if let Err(error) = self.file_load.add_rule(arg2, is_regexp, allow) {
+                return invalid(&format!("Invalid {name}: {error}"));
+            }
         } else if name.eq_ignore_ascii_case("MapOriginDomain") {
+            // C++ passes (arg1, arg2) as (to, from).
             self.domain_mappings.push(DomainMapping {
                 kind: DomainMappingKind::Origin,
-                from: arg1.to_string(),
-                to: arg2.to_string(),
+                from: arg2.to_string(),
+                to: arg1.to_string(),
                 host_header: String::new(),
             });
         } else if name.eq_ignore_ascii_case("MapProxyDomain") {
@@ -1099,10 +1076,11 @@ impl RewriteOptions {
                 host_header: String::new(),
             });
         } else if name.eq_ignore_ascii_case("MapRewriteDomain") {
+            // C++ passes (arg1, arg2) as (to, from).
             self.domain_mappings.push(DomainMapping {
                 kind: DomainMappingKind::Rewrite,
-                from: arg1.to_string(),
-                to: arg2.to_string(),
+                from: arg2.to_string(),
+                to: arg1.to_string(),
                 host_header: String::new(),
             });
         } else if name.eq_ignore_ascii_case("ShardDomain") {
@@ -1149,10 +1127,11 @@ impl RewriteOptions {
                 ));
             }
         } else if name.eq_ignore_ascii_case("MapOriginDomain") {
+            // C++ passes (arg1, arg2, arg3) as (to, from, host).
             self.domain_mappings.push(DomainMapping {
                 kind: DomainMappingKind::Origin,
-                from: arg1.to_string(),
-                to: arg2.to_string(),
+                from: arg2.to_string(),
+                to: arg1.to_string(),
                 host_header: arg3.to_string(),
             });
         } else if name.eq_ignore_ascii_case("MapProxyDomain") {
@@ -1324,15 +1303,7 @@ impl RewriteOptions {
         self.domain_mappings
             .extend(src.domain_mappings.iter().cloned());
         self.shards.extend(src.shards.iter().cloned());
-        self.file_load
-            .exact
-            .extend(src.file_load.exact.iter().cloned());
-        self.file_load
-            .regex
-            .extend(src.file_load.regex.iter().cloned());
-        self.file_load
-            .rules
-            .extend(src.file_load.rules.iter().cloned());
+        self.file_load.append_from(&src.file_load);
         self.allow_resources.append_from(&src.allow_resources);
         self.retain_comments.append_from(&src.retain_comments);
         self.css_combining_ids.append_from(&src.css_combining_ids);
@@ -2226,6 +2197,8 @@ impl RewriteOptions {
             "cookiebypass={}",
             self.html_cache_bypass_cookies.signature()
         ));
+        parts.push(format!("fileload={}", self.file_load.signature()));
+        parts.push(format!("proxysuf={}", self.proxy_suffix));
         parts.push(format!("experiment={}", self.experiment_state_str()));
         parts.join(";")
     }
@@ -2237,6 +2210,12 @@ impl RewriteOptions {
             Some(Value::Int(limit)) => limit,
             _ => -1,
         }
+    }
+
+    /// Reads the proxy suffix (`ProxySuffix`, empty when unset).
+    #[must_use]
+    pub fn proxy_suffix(&self) -> &str {
+        &self.proxy_suffix
     }
 
     /// Reads the preemptive-JS flag
@@ -4735,6 +4714,38 @@ mod tests {
         assert!(options
             .parse_and_set_2("LoadFromFileRule", "Maybe", "/x")
             .is_err());
+        // File-load mappings validate at config time, like C++.
+        let base_signature = options.signature();
+        options
+            .parse_and_set_2("LoadFromFile", "http://example.com/", "/var/www")
+            .unwrap();
+        options
+            .parse_and_set_2(
+                "LoadFromFileMatch",
+                "^http://example.com/~([^/]*)/",
+                "/var/users/\\1/",
+            )
+            .unwrap();
+        assert_ne!(base_signature, options.signature());
+        assert!(options
+            .parse_and_set_2("LoadFromFileMatch", "http://example.com/", "/var/")
+            .is_err());
+        assert!(options
+            .parse_and_set_2("LoadFromFileMatch", "^http://([/", "/var/")
+            .is_err());
+        assert!(options
+            .parse_and_set_2("LoadFromFileRuleMatch", "Allow", "([/")
+            .is_err());
+        // Scope merge appends mappings (merged entries win).
+        let mut child = RewriteOptions::new();
+        child
+            .parse_and_set_2("LoadFromFile", "http://example.com/", "/var/other/")
+            .unwrap();
+        options.merge(&child);
+        assert_eq!(
+            options.file_load_policy().map_url_to_filename("http://example.com/a.js"),
+            Some("/var/other/a.js".to_string())
+        );
         options.parse_and_set_2("ShardDomain", "a.com", "").unwrap();
         assert!(options.shards.is_empty()); // empty shard disables
         options
@@ -6087,5 +6098,45 @@ mod tests {
             .parse_and_set_1("htmlcacheignorecookie", "x", Scope::Server)
             .unwrap();
         assert_eq!(1, lower.html_cache_ignore_cookies().len());
+    }
+
+    #[test]
+    fn proxy_suffix_reads_and_keys() {
+        use super::Scope;
+        let mut options = RewriteOptions::new();
+        assert_eq!(options.proxy_suffix(), "");
+        let base_signature = options.signature();
+        options
+            .parse_and_set_1("ProxySuffix", ".sfx", Scope::Server)
+            .unwrap();
+        assert_eq!(options.proxy_suffix(), ".sfx");
+        assert_ne!(base_signature, options.signature());
+    }
+
+    #[test]
+    fn domain_mapping_arg_order_matches_cxx() {
+        use super::Scope;
+        // C++ passes (arg1, arg2) as (to, from) for rewrite/origin.
+        let mut options = RewriteOptions::new();
+        options
+            .parse_and_set_2("MapRewriteDomain", "to.com", "from.com")
+            .unwrap();
+        options
+            .parse_and_set_2("MapOriginDomain", "origin-to.com", "origin-from.com")
+            .unwrap();
+        let maps = options.domain_mappings();
+        assert_eq!(maps.len(), 2);
+        assert_eq!(maps[0].to, "to.com");
+        assert_eq!(maps[0].from, "from.com");
+        assert_eq!(maps[1].to, "origin-to.com");
+        assert_eq!(maps[1].from, "origin-from.com");
+        // Proxy keeps (proxy, origin, cdn) order.
+        options
+            .parse_and_set_3("MapProxyDomain", "proxy.com", "origin.com", "cdn.com")
+            .unwrap();
+        assert_eq!(options.domain_mappings().len(), 3);
+        assert_eq!(options.domain_mappings()[2].from, "proxy.com");
+        assert_eq!(options.domain_mappings()[2].to, "origin.com");
+        assert_eq!(options.domain_mappings()[2].host_header, "cdn.com");
     }
 }

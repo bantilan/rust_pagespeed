@@ -17,6 +17,7 @@ use ps_http::google_url::GoogleUrl;
 
 use super::common::{add_js_to_element, XhtmlStatus};
 use crate::base_tracker::BaseTracker;
+use crate::domain_lawyer::DomainLawyer;
 use crate::decode_url::{decode_url, DecodeConfig};
 use crate::element::{LeafKind, NodeId};
 use crate::filter::HtmlFilter;
@@ -191,6 +192,16 @@ impl<N: UrlNamer> LazyloadImagesFilter<N> {
     #[must_use]
     pub fn log_status(&self) -> (Option<LazyloadHtmlStatus>, &[LazyloadLogRecord]) {
         (self.html_status, &self.log_records)
+    }
+
+    /// Installs the domain lawyer for proxy suffixing.
+    pub fn set_lawyer(&mut self, lawyer: &DomainLawyer) {
+        self.base.set_lawyer(lawyer);
+    }
+
+    /// Overrides the base-URL length cap (`max_url_size`).
+    pub fn set_max_url_size(&mut self, max_url_size: i64) {
+        self.base.set_max_url_size(max_url_size);
     }
 
     /// Whether the filter may run (`ShouldApply`).

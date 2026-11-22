@@ -482,3 +482,240 @@ fn driver_binds_support_noscript_with_driver_url() {
     expected.extend_from_slice(b"\">here</a> if you are not redirected within a few seconds.</div></noscript><p>x</p></body>");
     assert_eq!(sink.bytes(), expected);
 }
+
+/// Reads a statistics counter through the resource driver.
+fn stat(
+    resource_driver: &Rc<ps_html::server_context::ResourceDriver>,
+    name: &str,
+) -> i64 {
+    resource_driver
+        .server_context()
+        .statistics()
+        .get_variable(name)
+        .unwrap_or_else(|| panic!("missing stat {name}"))
+        .get()
+}
+
+#[test]
+fn show_ads_async_runs_through_driver() {
+    use ps_html::filters::make_show_ads_async::{API_CALLS_REPLACED, SNIPPETS_CONVERTED};
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(Filter::MakeShowAdsAsync);
+    let resource_driver = resource_driver_for(options.clone(), "http://test.com/ads.html");
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ctx(),
+        sink.clone(),
+        Some(resource_driver.clone()),
+    );
+    assert!(
+        !driver
+            .skipped_slots()
+            .contains(&(Phase::PreRender, ChainFilter::MakeShowAdsAsync)),
+        "MakeShowAdsAsync must bind, skipped: {:?}",
+        driver.skipped_slots()
+    );
+    driver.start_parse(b"http://test.com/ads.html", false);
+    driver.write(b"<head><title>t</title></head><body><script type=\"text/javascript\"> google_ad_client = \"pub\"; google_ad_width = 728; google_ad_height = 90; </script><script type=\"text/javascript\" src=\"http://pagead2.googlesyndication.com/pagead/show_ads.js\"> </script></body>");
+    driver.finish();
+    let output = String::from_utf8_lossy(&sink.bytes()).into_owned();
+    assert!(output.contains("adsbygoogle"), "{output}");
+    assert_eq!(stat(&resource_driver, SNIPPETS_CONVERTED), 1);
+    assert_eq!(stat(&resource_driver, API_CALLS_REPLACED), 1);
+}
+
+#[test]
+fn show_ads_async_runs_without_resource_driver() {
+    // Driver-independent filters bind (but count locally) with no driver.
+    let mut options = RewriteOptions::new();
+    enable(&mut options, &[Filter::MakeShowAdsAsync]);
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(&options, &ctx(), sink.clone(), None);
+    assert!(
+        !driver
+            .skipped_slots()
+            .contains(&(Phase::PreRender, ChainFilter::MakeShowAdsAsync)),
+        "MakeShowAdsAsync must bind, skipped: {:?}",
+        driver.skipped_slots()
+    );
+    driver.start_parse(b"http://test.com/ads.html", false);
+    driver.write(b"<head><title>t</title></head><body><script type=\"text/javascript\"> google_ad_client = \"pub\"; google_ad_width = 728; google_ad_height = 90; </script><script type=\"text/javascript\" src=\"http://pagead2.googlesyndication.com/pagead/show_ads.js\"> </script></body>");
+    driver.finish();
+    let output = String::from_utf8_lossy(&sink.bytes()).into_owned();
+    assert!(output.contains("adsbygoogle"), "{output}");
+}
+
+#[test]
+fn google_analytics_runs_through_driver() {
+    use ps_html::filters::google_analytics::{PAGE_LOAD_COUNT, REWRITTEN_COUNT};
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(Filter::MakeGoogleAnalyticsAsync);
+    let resource_driver = resource_driver_for(options.clone(), "http://test.com/ga.html");
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ctx(),
+        sink.clone(),
+        Some(resource_driver.clone()),
+    );
+    assert!(
+        !driver
+            .skipped_slots()
+            .contains(&(Phase::PreRender, ChainFilter::GoogleAnalytics)),
+        "GoogleAnalytics must bind, skipped: {:?}",
+        driver.skipped_slots()
+    );
+    driver.start_parse(b"http://test.com/ga.html", false);
+    let mut input =
+        b"<head><title>t</title></head><body><script src=\"http://www.google-analytics.com/ga.js\" type=\"text/javascript\">\n</script>\n".to_vec();
+    input.extend_from_slice(b"<script type=\"text/javascript\">\ntry {\nvar pageTracker = _gat._getTracker(\"UA-XXXXX-X\");\npageTracker._trackPageview();} catch(err) {}</script></body>");
+    driver.write(&input);
+    driver.finish();
+    let output = String::from_utf8_lossy(&sink.bytes()).into_owned();
+    assert!(output.contains("_modpagespeed_getRewriteTracker"), "{output}");
+    assert_eq!(stat(&resource_driver, PAGE_LOAD_COUNT), 1);
+    assert_eq!(stat(&resource_driver, REWRITTEN_COUNT), 1);
+}
+
+#[test]
+fn url_left_trim_runs_through_driver() {
+    use ps_html::filters::url_left_trim::URL_TRIMS;
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(Filter::LeftTrimUrls);
+    let resource_driver = resource_driver_for(options.clone(), "http://test.com/trim.html");
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ctx(),
+        sink.clone(),
+        Some(resource_driver.clone()),
+    );
+    assert!(
+        !driver
+            .skipped_slots()
+            .contains(&(Phase::PostRender, ChainFilter::UrlLeftTrim)),
+        "UrlLeftTrim must bind, skipped: {:?}",
+        driver.skipped_slots()
+    );
+    driver.start_parse(b"http://test.com/trim.html", false);
+    driver.write(b"<head><base href='http://foo.bar/baz/'/></head><body><img src='http://foo.bar/baz/nav.jpg'/></body>");
+    driver.finish();
+    let output = String::from_utf8_lossy(&sink.bytes()).into_owned();
+    assert!(output.contains("src='nav.jpg'"), "{output}");
+    assert_eq!(stat(&resource_driver, URL_TRIMS), 1);
+}
+
+#[test]
+fn max_url_size_blocks_base_adoption_through_driver() {
+    use ps_html::filters::url_left_trim::URL_TRIMS;
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .set_option("MaxUrlSize", "10", Scope::Server)
+        .unwrap();
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(Filter::LeftTrimUrls);
+    let resource_driver = resource_driver_for(options.clone(), "http://test.com/max.html");
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ctx(),
+        sink.clone(),
+        Some(resource_driver.clone()),
+    );
+    driver.start_parse(b"http://test.com/max.html", false);
+    // The 24-char base href exceeds the cap, so the base stays the
+    // document URL and the foreign-origin image keeps its absolute URL.
+    driver.write(b"<head><base href='http://example.com/dir/'/></head><body><img src='http://foo.bar/baz/nav.jpg'/></body>");
+    driver.finish();
+    let output = String::from_utf8_lossy(&sink.bytes()).into_owned();
+    assert!(output.contains("src='http://foo.bar/baz/nav.jpg'"), "{output}");
+    assert_eq!(stat(&resource_driver, URL_TRIMS), 0);
+}
+
+#[test]
+fn proxy_suffix_threads_lawyer_through_driver() {
+    use ps_html::filters::url_left_trim::URL_TRIMS;
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .parse_and_set_1("ProxySuffix", ".sfx", Scope::Server)
+        .unwrap();
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(Filter::LeftTrimUrls);
+    let resource_driver =
+        resource_driver_for(options.clone(), "http://example.com.sfx/page.html");
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ctx(),
+        sink.clone(),
+        Some(resource_driver.clone()),
+    );
+    driver.start_parse(b"http://example.com.sfx/page.html", false);
+    // The lawyer suffixes the adopted base to the proxy host, so the
+    // origin-host image no longer shares the base origin: no trim.
+    driver.write(b"<head><base href='http://example.com/dir/'/></head><body><img src='http://example.com/dir/pic.png'/></body>");
+    driver.finish();
+    let output = String::from_utf8_lossy(&sink.bytes()).into_owned();
+    assert!(
+        output.contains("src='http://example.com/dir/pic.png'"),
+        "{output}"
+    );
+    assert_eq!(stat(&resource_driver, URL_TRIMS), 0);
+}
+
+#[test]
+fn domain_rewrite_runs_through_driver() {
+    use ps_html::filters::domain_rewrite::DOMAIN_REWRITES;
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .parse_and_set_2("MapRewriteDomain", "to.com", "from.com")
+        .unwrap();
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(Filter::RewriteDomains);
+    let resource_driver = resource_driver_for(options.clone(), "http://test.com/rw.html");
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ctx(),
+        sink.clone(),
+        Some(resource_driver.clone()),
+    );
+    assert!(
+        !driver
+            .skipped_slots()
+            .contains(&(Phase::PostRender, ChainFilter::DomainRewrite)),
+        "DomainRewrite must bind, skipped: {:?}",
+        driver.skipped_slots()
+    );
+    driver.start_parse(b"http://test.com/rw.html", false);
+    driver.write(b"<head></head><body><img src='http://from.com/a.png'/></body>");
+    driver.finish();
+    let output = String::from_utf8_lossy(&sink.bytes()).into_owned();
+    assert!(output.contains("http://to.com/a.png"), "{output}");
+    assert_eq!(stat(&resource_driver, DOMAIN_REWRITES), 1);
+}

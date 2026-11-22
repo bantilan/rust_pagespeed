@@ -18,6 +18,7 @@ use ps_http::google_url::GoogleUrl;
 use ps_stats::core::{Statistics, Variable};
 
 use crate::base_tracker::BaseTracker;
+use crate::domain_lawyer::DomainLawyer;
 use crate::element::NodeId;
 use crate::filter::HtmlFilter;
 use crate::lexer::Lexer;
@@ -67,6 +68,16 @@ impl UrlLeftTrimFilter {
     pub fn init_stats(&mut self, statistics: &Statistics) {
         self.stats.trims = Some(statistics.add_variable(URL_TRIMS));
         self.stats.saved_bytes = Some(statistics.add_variable(URL_TRIM_SAVED_BYTES));
+    }
+
+    /// Installs the domain lawyer for proxy suffixing.
+    pub fn set_lawyer(&mut self, lawyer: &DomainLawyer) {
+        self.base.set_lawyer(lawyer);
+    }
+
+    /// Overrides the base-URL length cap (`max_url_size`).
+    pub fn set_max_url_size(&mut self, max_url_size: i64) {
+        self.base.set_max_url_size(max_url_size);
     }
 
     /// Shortens `url` against `base` (`Trim`); `None` keeps the original.
