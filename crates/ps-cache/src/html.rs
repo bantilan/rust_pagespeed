@@ -65,8 +65,12 @@ pub struct HtmlEligibility {
     pub no_experiment: bool,
     /// PrioritizeCriticalCss not evaluating/admin.
     pub critical_css_ok: bool,
-    /// Request carries no forbidden headers.
+    /// Request carries no `Authorization` or request `Vary`
+    /// (cookies are judged separately by `cookies_ok`).
     pub request_headers_ok: bool,
+    /// Request cookies all allowlisted under the HTML-cache cookie
+    /// policy (or no cookies sent at all).
+    pub cookies_ok: bool,
     /// Origin proxy-cacheable (Vary-insensitive check).
     pub origin_cacheable: bool,
     /// Origin not already expired.
@@ -89,6 +93,7 @@ impl HtmlEligibility {
             && self.no_experiment
             && self.critical_css_ok
             && self.request_headers_ok
+            && self.cookies_ok
             && self.origin_cacheable
             && self.origin_fresh
             && self.beacon_ok
@@ -98,8 +103,13 @@ impl HtmlEligibility {
 /// Request headers that disqualify HTML caching (method aside).
 pub const FORBIDDEN_REQUEST_HEADERS: &[&str] = &["Cookie", "Cookie2", "Authorization"];
 
-/// Whether request headers pass (`method == GET` handled by callers via
-/// `is_get`; cookies/auth/Vary checked here).
+/// Whether request headers pass the strict no-cookie rule
+/// (`method == GET` handled by callers via `is_get`; any
+/// Cookie/Cookie2/Authorization or request Vary fails). The live
+/// HTML cache judges cookies through the allowlist policy in
+/// `ps_config::cookies` instead; this stays as the strict form
+/// (and the `HtmlCacheIgnoreCommonCookies off` behavior for
+/// requests without custom ignore rules).
 #[must_use]
 pub fn request_headers_cacheable(headers: &[(&str, &str)]) -> bool {
     !headers.iter().any(|(name, _)| {
@@ -255,6 +265,7 @@ mod tests {
             no_experiment: true,
             critical_css_ok: true,
             request_headers_ok: true,
+            cookies_ok: true,
             origin_cacheable: true,
             origin_fresh: true,
             beacon_ok: true,
@@ -273,6 +284,7 @@ mod tests {
             Box::new(|e| e.no_experiment = false),
             Box::new(|e| e.critical_css_ok = false),
             Box::new(|e| e.request_headers_ok = false),
+            Box::new(|e| e.cookies_ok = false),
             Box::new(|e| e.origin_cacheable = false),
             Box::new(|e| e.origin_fresh = false),
             Box::new(|e| e.beacon_ok = false),

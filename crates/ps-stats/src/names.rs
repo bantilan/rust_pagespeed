@@ -56,7 +56,7 @@ pub fn init_http_cache(stats: &Statistics) {
     }
 }
 
-/// `RewriteDriver::InitStats`: 5 HTML-cache variables plus the 27-filter
+/// `RewriteDriver::InitStats`: 6 HTML-cache variables plus the 27-filter
 /// fan-out (closes admin-gap-1: every fan-out target enumerated).
 pub fn init_rewrite_driver(stats: &Statistics) {
     for name in [
@@ -65,6 +65,7 @@ pub fn init_rewrite_driver(stats: &Statistics) {
         "html_cache_bypasses",
         "html_cache_inserts",
         "html_cache_bytes_served",
+        "html_cache_cookie_allowlisted",
     ] {
         var(stats, name);
     }
@@ -775,6 +776,7 @@ pub const OTHER_LOGGED_VARS: &[&str] = &[
     "html_cache_bypasses",
     "html_cache_inserts",
     "html_cache_bytes_served",
+    "html_cache_cookie_allowlisted",
 ];
 
 /// Dashboard counters recovered across restarts (`kDashboardCounters`).
@@ -790,6 +792,7 @@ pub const DASHBOARD_COUNTERS: &[&str] = &[
     "html_cache_bypasses",
     "html_cache_inserts",
     "html_cache_bytes_served",
+    "html_cache_cookie_allowlisted",
 ];
 
 /// Graph variables (`kGraphsVars`, C++ order).
@@ -953,13 +956,14 @@ mod tests {
     fn fan_out_count_and_kinds() {
         let stats = Statistics::new();
         init_rewrite_driver(&stats);
-        // 5 HTML-cache variables present.
+        // 6 HTML-cache variables present.
         for name in [
             "html_cache_hits",
             "html_cache_misses",
             "html_cache_bypasses",
             "html_cache_inserts",
             "html_cache_bytes_served",
+            "html_cache_cookie_allowlisted",
         ] {
             assert!(stats.get_variable(name).is_some());
         }
@@ -1046,8 +1050,8 @@ mod tests {
     #[test]
     fn logger_list_lengths() {
         assert_eq!(CONSOLE_VARS.len(), 23);
-        assert_eq!(OTHER_LOGGED_VARS.len(), 32);
-        assert_eq!(DASHBOARD_COUNTERS.len(), 11);
+        assert_eq!(OTHER_LOGGED_VARS.len(), 33);
+        assert_eq!(DASHBOARD_COUNTERS.len(), 12);
         // Console list intentionally repeats one name (verbatim C++).
         assert_eq!(
             CONSOLE_VARS

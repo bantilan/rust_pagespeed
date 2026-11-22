@@ -108,7 +108,9 @@ pub fn matches(kind: &str, message: &str) -> bool {
     match kind {
         "messages" => true,
         "images" => message.contains("PS_IMAGE_DETAIL\t"),
-        "html_cache" => message.contains("PS_HTML_DETAIL\t"),
+        "html_cache" => {
+            message.contains("PS_HTML_DETAIL\t") || message.contains("PS_HTML_BYPASS\t")
+        }
         "javascript" => {
             message.contains("Javascript minification failed.")
                 || message.contains("Canonical script ")

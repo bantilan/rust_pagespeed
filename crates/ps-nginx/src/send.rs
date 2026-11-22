@@ -50,6 +50,7 @@ pub struct HtmlSink<'a> {
     resource_driver: Option<Rc<ps_html::server_context::ResourceDriver>>,
     html_cache: Option<ps_html::html_cache::HtmlCacheSession>,
     html_cache_line: Option<String>,
+    html_cache_request: Option<ps_http::request::RequestHeaders>,
 }
 
 impl<'a> HtmlSink<'a> {
@@ -89,6 +90,7 @@ impl<'a> HtmlSink<'a> {
             resource_driver,
             html_cache,
             html_cache_line: None,
+            html_cache_request: None,
         }
     }
 
@@ -116,6 +118,8 @@ impl<'a> HtmlSink<'a> {
     /// Looks up a cached rewrite for origin headers (hit entries
     /// serve instead of the origin body). `file_mtime` carries the
     /// origin file's modification time when the URL maps to one.
+    /// The request headers are snapshotted for the publication
+    /// re-check at `done`.
     pub fn html_cache_lookup(
         &mut self,
         origin: &ps_http::response::ResponseHeaders,
@@ -124,6 +128,7 @@ impl<'a> HtmlSink<'a> {
         file_mtime: Option<(u64, u32)>,
         now_ms: i64,
     ) -> Option<ps_cache::html::HtmlCacheEntry> {
+        self.html_cache_request = Some(request.clone());
         let out = self
             .html_cache
             .as_mut()
@@ -142,7 +147,9 @@ impl<'a> HtmlSink<'a> {
         }
     }
 
-    /// Takes the pending HTML-cache history line, if any.
+    /// Takes the pending HTML-cache history line, if any
+    /// (publication detail or cookie-bypass line, mutually
+    /// exclusive).
     #[must_use]
     pub fn take_html_cache_line(&mut self) -> Option<String> {
         self.html_cache_line.take()
@@ -173,8 +180,17 @@ impl BodySink for HtmlSink<'_> {
         self.driver.finish();
         self.pump_output();
         if let Some(session) = self.html_cache.as_mut() {
-            let finish = session.finish(Self::now_ms());
-            self.html_cache_line = finish.detail_line;
+            let empty;
+            let request = match self.html_cache_request.as_ref() {
+                Some(request) => request,
+                None => {
+                    empty = ps_http::request::RequestHeaders::new();
+                    &empty
+                }
+            };
+            let finish = session.finish(request, Self::now_ms());
+            // Stores and cookie bypasses never coincide.
+            self.html_cache_line = finish.detail_line.or(finish.bypass_line);
             if let Some(comment) = finish.show_comment {
                 self.fetch.handle_write(&comment, self.slot);
             }
@@ -567,6 +583,108 @@ mod tests {
             .expect("hit");
         assert!(!entry.body.is_empty());
         second.serve_html_cache_hit(&entry, later_ms);
+    }
+
+    #[test]
+    fn html_sink_caches_analytics_cookies_and_names_bypassers() {
+        use crate::fetch::{BaseFetchType, SharedBaseFetch};
+        use crate::pipe;
+        use ps_config::options::RewriteOptions;
+        use ps_http::request::Method;
+        use ps_http::response::HttpOptions;
+        let metadata: std::sync::Arc<dyn ps_cache::cache::Cache> =
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new());
+        let make_sink = |metadata: std::sync::Arc<dyn ps_cache::cache::Cache>| {
+            let slot: &'static Mutex<Option<pipe::PipeChannel>> =
+                Box::leak(Box::new(Mutex::new(None)));
+            let (ps_side, _ngx_side) = SharedBaseFetch::new_pair(
+                "http://h/c",
+                std::ptr::null_mut(),
+                BaseFetchType::HtmlTransform,
+                crate::caching::PreserveCachingHeaders::DontPreserve,
+                HttpOptions::default(),
+            );
+            let html = crate::rewrite::html_context(
+                std::sync::Arc::new(ps_cache::cache::MemoryCache::new()),
+                metadata,
+                std::sync::Arc::new(ps_stats::core::Statistics::new()),
+                0,
+                std::rc::Rc::new(crate::rewrite::UnavailableFetcher),
+            );
+            let mut options = RewriteOptions::new();
+            options
+                .set_option("HtmlCache", "on", ps_config::scope::Scope::Server)
+                .unwrap();
+            options
+                .set_option("HtmlCacheTtlSec", "60", ps_config::scope::Scope::Server)
+                .unwrap();
+            let driver = std::rc::Rc::new(ps_html::server_context::ResourceDriver::new(
+                html,
+                std::rc::Rc::new(std::cell::RefCell::new(options.clone())),
+                "http://h/c",
+            ));
+            HtmlSink::new(&options, "http://h/c", false, &ps_side, slot, Some(driver))
+        };
+        fn cookie_request(cookies: &str) -> ps_http::request::RequestHeaders {
+            let mut request = ps_http::request::RequestHeaders::new();
+            request.set_method(Method::Get);
+            request.set_version(1, 1);
+            request.headers_mut().add("Host", "h");
+            request.headers_mut().add("Cookie", cookies);
+            request
+        }
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|age| age.as_millis() as i64)
+            .unwrap_or(0);
+        let mut origin =
+            ps_http::response::ResponseHeaders::new(HttpOptions::default_for_tests());
+        origin.set_status_and_reason(200);
+        origin.headers_mut().add("Content-Type", "text/html");
+        origin
+            .headers_mut()
+            .add("Date", &ps_http::time::format_http_date(now_ms));
+        origin
+            .headers_mut()
+            .add("Cache-Control", "public, max-age=300");
+        origin.compute_caching();
+        let purge = ps_cache::purge::PurgeSet::new(25_000);
+        // Analytics-only requests store …
+        let request = cookie_request("_ga=GA1.1; _gid=2");
+        let mut first = make_sink(std::sync::Arc::clone(&metadata));
+        assert!(first
+            .html_cache_lookup(&origin, &request, &purge, None, now_ms)
+            .is_none());
+        first.write(b"<html>hi</html>");
+        BodySink::done(&mut first);
+        let line = first.take_html_cache_line().expect("stored line");
+        assert!(line.starts_with("PS_HTML_DETAIL\t"), "{line}");
+        // … and rotated analytics values hit the same entry
+        // (fresh wall time: entries created after `now_ms` are
+        // future-dated by construction).
+        let later_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|age| age.as_millis() as i64)
+            .unwrap_or(now_ms)
+            .max(now_ms);
+        let rotated = cookie_request("_ga=GA9.9; _gid=8");
+        let mut second = make_sink(std::sync::Arc::clone(&metadata));
+        let entry = second
+            .html_cache_lookup(&origin, &rotated, &purge, None, later_ms)
+            .expect("hit");
+        assert!(!entry.body.is_empty());
+        // Unknown cookies bypass with a named history line.
+        let personal = cookie_request("_ga=1; sessionid=secret-value");
+        let mut third = make_sink(std::sync::Arc::clone(&metadata));
+        assert!(third
+            .html_cache_lookup(&origin, &personal, &purge, None, later_ms)
+            .is_none());
+        third.write(b"<html>hi</html>");
+        BodySink::done(&mut third);
+        let line = third.take_html_cache_line().expect("bypass line");
+        assert!(line.starts_with("PS_HTML_BYPASS\t"), "{line}");
+        assert!(line.contains("cookie:sessionid"), "{line}");
+        assert!(!line.contains("secret-value"), "{line}");
     }
 
     #[test]

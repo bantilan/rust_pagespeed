@@ -211,6 +211,34 @@ impl RequestHeaders {
         out
     }
 
+    /// Serializes like [`RequestHeaders::to_http_string`] but drops
+    /// `Cookie`/`Cookie2` lines. The HTML cache hashes this into its
+    /// identity string so allowlisted cookie values (per-client
+    /// analytics IDs) never split cache keys; requests that reach
+    /// key generation hold only ignored cookies, so this renders
+    /// byte-identical output for cookie-free requests.
+    #[must_use]
+    pub fn to_http_string_without_cookies(&self) -> String {
+        let mut out = format!(
+            "{}  HTTP/{}.{}\r\n",
+            self.method.token(),
+            self.major_version(),
+            self.minor_version()
+        );
+        for (name, value) in self.headers.iter() {
+            if name.eq_ignore_ascii_case(header::COOKIE) || name.eq_ignore_ascii_case(header::COOKIE2)
+            {
+                continue;
+            }
+            out.push_str(name);
+            out.push_str(": ");
+            out.push_str(value);
+            out.push_str("\r\n");
+        }
+        out.push_str("\r\n");
+        out
+    }
+
     /// Derives caching properties (`GetProperties`).
     #[must_use]
     pub fn properties(&self) -> RequestProperties {
@@ -557,6 +585,31 @@ mod tests {
         assert_eq!(
             headers.to_http_string(),
             "GET  HTTP/1.1\r\nHost: x.test\r\nAccept: text/html\r\n\r\n"
+        );
+    }
+
+    #[test]
+    fn http_string_without_cookies() {
+        use super::Method;
+        let mut headers = RequestHeaders::new();
+        headers.set_method(Method::Get);
+        headers.set_version(1, 1);
+        headers.headers_mut().add("Host", "x.test");
+        headers.headers_mut().add("Cookie", "_ga=1; _gid=2");
+        headers.headers_mut().add("Accept", "text/html");
+        headers.headers_mut().add("Cookie2", "$Version=1");
+        assert_eq!(
+            headers.to_http_string_without_cookies(),
+            "GET  HTTP/1.1\r\nHost: x.test\r\nAccept: text/html\r\n\r\n"
+        );
+        // Cookie-free requests render byte-identically either way.
+        let mut plain = RequestHeaders::new();
+        plain.set_method(Method::Get);
+        plain.set_version(1, 1);
+        plain.headers_mut().add("Host", "x.test");
+        assert_eq!(
+            plain.to_http_string_without_cookies(),
+            plain.to_http_string()
         );
     }
 }

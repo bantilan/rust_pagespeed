@@ -438,6 +438,10 @@ fn html_detail(bytes: i64, variant: &str, encoded_url: &str) -> String {
     )
 }
 
+fn html_bypass(timestamp_ms: i64, reason: &str, encoded_url: &str) -> String {
+    format!("PS_HTML_BYPASS\t{timestamp_ms}\t{reason}\t{encoded_url}")
+}
+
 #[test]
 fn html_cache_records_are_escaped_and_deduplicated() {
     let fixture = Fixture::new();
@@ -468,6 +472,172 @@ fn html_cache_records_are_escaped_and_deduplicated() {
     assert_eq!(None, body[first + 1..].find("<tr data-device="));
     assert!(body.contains("pagespeed-html-search"), "{body}");
     assert!(body.contains("pagespeed-html-format"), "{body}");
+}
+
+#[test]
+fn html_cache_cookie_policy_panel_lists_effective_rules() {
+    let mut fixture = Fixture::new();
+    fixture
+        .options
+        .parse_and_set_1("HtmlCacheIgnoreCookie", "tracker", Scope::Server)
+        .unwrap();
+    fixture
+        .options
+        .parse_and_set_1("HtmlCacheBypassCookie", "session*", Scope::Server)
+        .unwrap();
+    let mut fetch = test_fetch("http://localhost/pagespeed_admin/html_cache");
+    fixture.site.html_cache_handler(
+        AdminSource::PageSpeedAdmin,
+        &mut fetch,
+        &fixture.stats,
+        &fixture.options,
+        None,
+        "",
+        None,
+    );
+    let body = body_of(&fetch);
+    // Effective policy: built-in list, custom entries, bypass rules.
+    for expected in [
+        "Cookie allowlist",
+        "Common cookies: <strong>Ignored</strong>",
+        "<code>_ga</code>",
+        "<code>_ga_*</code>",
+        "<code>_fbp</code>",
+        "<code>_clck</code>",
+        "<code>_hjSession*</code>",
+        "<code>tracker</code>",
+        "<code>session*</code>",
+        "must not influence server-generated HTML",
+    ] {
+        assert!(body.contains(expected), "missing {expected}\n{body}");
+    }
+    // Disabling the common list shows through.
+    fixture
+        .options
+        .set_option("HtmlCacheIgnoreCommonCookies", "off", Scope::Server)
+        .unwrap();
+    let mut fetch = test_fetch("http://localhost/pagespeed_admin/html_cache");
+    fixture.site.html_cache_handler(
+        AdminSource::PageSpeedAdmin,
+        &mut fetch,
+        &fixture.stats,
+        &fixture.options,
+        None,
+        "",
+        None,
+    );
+    let body = body_of(&fetch);
+    assert!(
+        body.contains("Common cookies: <strong>Not ignored</strong>"),
+        "{body}"
+    );
+}
+
+#[test]
+fn html_cache_cookie_bypasses_render_newest_first() {
+    let fixture = Fixture::new();
+    let page = web64_encode("https://example.com/page".as_bytes());
+    let shop = web64_encode("https://example.com/shop/?x=1&y=2".as_bytes());
+    fixture.message(
+        MessageLevel::Info,
+        &html_bypass(1000, "cookie:sessionid", &page),
+    );
+    fixture.message(
+        MessageLevel::Info,
+        &html_bypass(2000, "malformed-cookie", &shop),
+    );
+    // Malformed lines never render.
+    fixture.message(
+        MessageLevel::Info,
+        "PS_HTML_BYPASS\t3000\tcookie:broken",
+    );
+    fixture.message(
+        MessageLevel::Info,
+        &html_bypass(3000, "bogus-reason", &page),
+    );
+    let mut fetch = test_fetch("http://localhost/pagespeed_admin/html_cache");
+    fixture.site.html_cache_handler(
+        AdminSource::PageSpeedAdmin,
+        &mut fetch,
+        &fixture.stats,
+        &fixture.options,
+        None,
+        "",
+        None,
+    );
+    let body = body_of(&fetch);
+    assert!(body.contains("Recent cookie bypasses"), "{body}");
+    assert!(body.contains("<code>cookie:sessionid</code>"), "{body}");
+    assert!(body.contains("<code>malformed-cookie</code>"), "{body}");
+    assert!(!body.contains("bogus-reason"), "{body}");
+    assert!(!body.contains("cookie:broken"), "{body}");
+    assert!(body.contains("&amp;y=2"), "{body}");
+    // Newest first: the malformed row precedes the cookie row.
+    let malformed = body.find("malformed-cookie").expect("row");
+    let cookie = body.find("cookie:sessionid").expect("row");
+    assert!(malformed < cookie, "{body}");
+}
+
+#[test]
+fn html_cache_bypass_reasons_escape_html() {
+    let fixture = Fixture::new();
+    let page = web64_encode("https://example.com/".as_bytes());
+    fixture.message(
+        MessageLevel::Info,
+        &html_bypass(1000, "cookie:x<y", &page),
+    );
+    let mut fetch = test_fetch("http://localhost/pagespeed_admin/html_cache");
+    fixture.site.html_cache_handler(
+        AdminSource::PageSpeedAdmin,
+        &mut fetch,
+        &fixture.stats,
+        &fixture.options,
+        None,
+        "",
+        None,
+    );
+    let body = body_of(&fetch);
+    assert!(body.contains("<code>cookie:x&lt;y</code>"), "{body}");
+    assert!(!body.contains("cookie:x<y"), "{body}");
+}
+
+#[test]
+fn html_cache_summary_counts_allowlist_accepts() {
+    let fixture = Fixture::new();
+    fixture
+        .stats
+        .add_variable("html_cache_cookie_allowlisted")
+        .add(7);
+    let mut fetch = test_fetch("http://localhost/pagespeed_admin/html_cache");
+    fixture.site.html_cache_handler(
+        AdminSource::PageSpeedAdmin,
+        &mut fetch,
+        &fixture.stats,
+        &fixture.options,
+        None,
+        "",
+        None,
+    );
+    let body = body_of(&fetch);
+    assert!(body.contains("COOKIE ALLOWLIST ACCEPTS"), "{body}");
+    assert!(body.contains("pagespeed-dashboard-value'>7</div>"), "{body}");
+}
+
+#[test]
+fn history_matches_html_cache_bypass_lines() {
+    assert!(history_matches(
+        "html_cache",
+        "I[date] PS_HTML_BYPASS\t1\tcookie:a\txyz"
+    ));
+    assert!(history_matches(
+        "html_cache",
+        "I[date] PS_HTML_DETAIL\t1\t2\t3\td\tf\tk\tu"
+    ));
+    assert!(!history_matches("html_cache", "I[date] unrelated"));
+    assert!(history_matches(
+        "messages",
+        "PS_HTML_BYPASS\t1\tcookie:a\txyz"
+    ));
 }
 
 #[test]

@@ -20,6 +20,7 @@ use crate::property::{
     lookup_by_id, lookup_by_name, nginx_option_scope, strip_mod_pagespeed_prefix, PropDefault,
     PropKind, Property, PROPERTIES,
 };
+use crate::cookies::{CookiePatternSet, CookiePolicy};
 use crate::scope::Scope;
 use crate::wildcard::WildcardGroup;
 use std::collections::{HashMap, HashSet};
@@ -759,6 +760,8 @@ pub struct RewriteOptions {
     lazyload_enabled_classes: WildcardGroup,
     override_caching_wildcard: WildcardGroup,
     allow_when_inlining_resources: WildcardGroup,
+    html_cache_ignore_cookies: CookiePatternSet,
+    html_cache_bypass_cookies: CookiePatternSet,
     inline_unauthorized_types: Vec<Category>,
     domains: Vec<String>,
     known_domains: Vec<String>,
@@ -988,6 +991,14 @@ impl RewriteOptions {
             self.allow_resources.disallow(arg);
         } else if name.eq_ignore_ascii_case("Domain") {
             self.domains.push(arg.to_string());
+        } else if name.eq_ignore_ascii_case("HtmlCacheIgnoreCookie") {
+            if let Err(error) = self.html_cache_ignore_cookies.add(arg) {
+                return invalid(&format!("Invalid HtmlCacheIgnoreCookie: {}", error.message()));
+            }
+        } else if name.eq_ignore_ascii_case("HtmlCacheBypassCookie") {
+            if let Err(error) = self.html_cache_bypass_cookies.add(arg) {
+                return invalid(&format!("Invalid HtmlCacheBypassCookie: {}", error.message()));
+            }
         } else if name.eq_ignore_ascii_case("ProxySuffix") {
             self.proxy_suffix = arg.to_string();
         } else if name.eq_ignore_ascii_case("DownstreamCachePurgeLocationPrefix") {
@@ -1333,6 +1344,10 @@ impl RewriteOptions {
             .append_from(&src.override_caching_wildcard);
         self.allow_when_inlining_resources
             .append_from(&src.allow_when_inlining_resources);
+        self.html_cache_ignore_cookies
+            .append_from(&src.html_cache_ignore_cookies);
+        self.html_cache_bypass_cookies
+            .append_from(&src.html_cache_bypass_cookies);
         self.polyfill_filenames
             .extend(src.polyfill_filenames.iter().cloned());
         if !src.proxy_suffix.is_empty() {
@@ -2039,6 +2054,56 @@ impl RewriteOptions {
         self.modified = true;
     }
 
+    /// Whether common analytics/tracking cookies are ignored for
+    /// HTML-cache eligibility and keys
+    /// (`html_cache_ignore_common_cookies`, default true).
+    ///
+    /// Requests carrying only allowlisted cookies cache exactly
+    /// like cookie-free requests. The built-in list covers
+    /// first-party analytics names (Google Analytics legacy and
+    /// GA4, Google Ads, Meta Pixel, Microsoft Clarity, Hotjar)
+    /// whose values never change server-generated HTML.
+    #[must_use]
+    pub fn html_cache_ignore_common_cookies(&self) -> bool {
+        match self.get_by_name("HtmlCacheIgnoreCommonCookies") {
+            Some(Value::Bool(value)) => value,
+            _ => true,
+        }
+    }
+
+    /// Sets the common-cookie allowlist switch.
+    pub fn set_html_cache_ignore_common_cookies(&mut self, value: bool) {
+        self.values.insert("fhcc", Value::Bool(value));
+        self.modified = true;
+    }
+
+    /// Custom ignored cookie patterns (`HtmlCacheIgnoreCookie`,
+    /// repeatable): exact names or `prefix*` wildcards extending
+    /// the built-in allowlist. Only list cookies that cannot
+    /// influence server-generated HTML.
+    #[must_use]
+    pub fn html_cache_ignore_cookies(&self) -> &CookiePatternSet {
+        &self.html_cache_ignore_cookies
+    }
+
+    /// Forced-bypass cookie patterns (`HtmlCacheBypassCookie`,
+    /// repeatable): exact names or `prefix*` wildcards that bypass
+    /// the HTML cache even when allowlisted.
+    #[must_use]
+    pub fn html_cache_bypass_cookies(&self) -> &CookiePatternSet {
+        &self.html_cache_bypass_cookies
+    }
+
+    /// Cookie policy view for HTML-cache eligibility.
+    #[must_use]
+    pub fn html_cache_cookie_policy(&self) -> CookiePolicy<'_> {
+        CookiePolicy {
+            common_enabled: self.html_cache_ignore_common_cookies(),
+            ignore: &self.html_cache_ignore_cookies,
+            bypass: &self.html_cache_bypass_cookies,
+        }
+    }
+
     /// Formats `name args` for config snippets (`FormatOption`).
     #[must_use]
     pub fn format_option(name: &str, args: &str) -> String {
@@ -2152,6 +2217,14 @@ impl RewriteOptions {
         parts.push(format!(
             "ttlwild={}",
             self.override_caching_wildcard.signature()
+        ));
+        parts.push(format!(
+            "cookieignore={}",
+            self.html_cache_ignore_cookies.signature()
+        ));
+        parts.push(format!(
+            "cookiebypass={}",
+            self.html_cache_bypass_cookies.signature()
         ));
         parts.push(format!("experiment={}", self.experiment_state_str()));
         parts.join(";")
@@ -5940,5 +6013,79 @@ mod tests {
             .set_option("ObliviousPagespeedUrls", "on", Scope::ProcessStrict)
             .unwrap();
         assert!(options.oblivious_pagespeed_urls());
+    }
+
+    #[test]
+    fn html_cache_cookie_directives() {
+        use super::Scope;
+        // Built-in allowlist defaults on: existing installs benefit
+        // with no configuration.
+        let mut options = RewriteOptions::new();
+        assert!(options.html_cache_ignore_common_cookies());
+        assert!(options.html_cache_ignore_cookies().is_empty());
+        assert!(options.html_cache_bypass_cookies().is_empty());
+        options
+            .set_option("HtmlCacheIgnoreCommonCookies", "off", Scope::Server)
+            .unwrap();
+        assert!(!options.html_cache_ignore_common_cookies());
+        options
+            .set_option("HtmlCacheIgnoreCommonCookies", "on", Scope::Server)
+            .unwrap();
+        assert!(options.html_cache_ignore_common_cookies());
+        assert!(options
+            .set_option("HtmlCacheIgnoreCommonCookies", "maybe", Scope::Server)
+            .is_err());
+        // Custom patterns accumulate across declarations and extend
+        // (never replace) the built-in list.
+        let base_signature = options.signature();
+        options
+            .parse_and_set_1("HtmlCacheIgnoreCookie", "tracker", Scope::Server)
+            .unwrap();
+        options
+            .parse_and_set_1("HtmlCacheIgnoreCookie", "_pk_*", Scope::Server)
+            .unwrap();
+        options
+            .parse_and_set_1("HtmlCacheBypassCookie", "session*", Scope::Server)
+            .unwrap();
+        assert_eq!(
+            options.html_cache_ignore_cookies().patterns(),
+            &["tracker".to_string(), "_pk_*".to_string()]
+        );
+        assert_eq!(
+            options.html_cache_bypass_cookies().patterns(),
+            &["session*".to_string()]
+        );
+        assert_ne!(base_signature, options.signature());
+        // Invalid patterns reject the directive, keeping prior state.
+        assert!(options
+            .parse_and_set_1("HtmlCacheIgnoreCookie", "a=b", Scope::Server)
+            .is_err());
+        assert!(options
+            .parse_and_set_1("HtmlCacheBypassCookie", "", Scope::Server)
+            .is_err());
+        assert_eq!(2, options.html_cache_ignore_cookies().len());
+        assert_eq!(1, options.html_cache_bypass_cookies().len());
+        // Scope merge appends both lists.
+        let mut child = RewriteOptions::new();
+        child
+            .parse_and_set_1("HtmlCacheIgnoreCookie", "child_only", Scope::Server)
+            .unwrap();
+        child
+            .parse_and_set_1("HtmlCacheBypassCookie", "no_cache_me", Scope::Server)
+            .unwrap();
+        options.merge(&child);
+        assert_eq!(3, options.html_cache_ignore_cookies().len());
+        assert_eq!(2, options.html_cache_bypass_cookies().len());
+        // The policy view reflects every input.
+        let policy = options.html_cache_cookie_policy();
+        assert!(policy.common_enabled);
+        assert!(policy.ignore.matches("_pk_id.1.2"));
+        assert!(policy.bypass.matches("session_abc"));
+        // Case-insensitive directive names, like every other option.
+        let mut lower = RewriteOptions::new();
+        lower
+            .parse_and_set_1("htmlcacheignorecookie", "x", Scope::Server)
+            .unwrap();
+        assert_eq!(1, lower.html_cache_ignore_cookies().len());
     }
 }

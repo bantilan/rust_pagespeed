@@ -2,7 +2,7 @@
 //!
 //! This crate ports `RewriteOptions` and its parsing/dispatch surface:
 //! the 95-filter enum with names, URL ids, sets, and enablement
-//! ([`filter`]), option scopes ([`scope`]), the 167-row property table
+//! ([`filter`]), option scopes ([`scope`]), the 168-row property table
 //! with lookups and scope gates ([`property`]), wildcard groups
 //! ([`wildcard`]), and the value store with config-file, nginx-directive,
 //! merge, and query-param entry points ([`options`]).
@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 pub mod client_options;
+pub mod cookies;
 pub mod filter;
 pub mod message_handler;
 pub mod options;

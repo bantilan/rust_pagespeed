@@ -12,9 +12,13 @@
 //! Divergences from C++, all deliberate: the port's stricter
 //! `vary_absent` gate replaces C++'s `Vary: *`-only check;
 //! per-request `Vary` on the request side follows the ported
-//! `request_headers_cacheable` helper verbatim; detached-rewrite
-//! tracking is omitted (port rewrites are synchronous, so no
-//! rewrite ever detaches resource work past a deadline).
+//! `request_headers_cacheable` helper verbatim; request cookies
+//! pass through the allowlist policy in `ps_config::cookies`
+//! (common analytics/tracking cookies cache like cookie-free
+//! requests, with values excluded from the cache key) instead of
+//! bypassing outright; detached-rewrite tracking is omitted (port
+//! rewrites are synchronous, so no rewrite ever detaches resource
+//! work past a deadline).
 #![forbid(unsafe_code)]
 
 use ps_cache::html as html_codec;
@@ -49,13 +53,47 @@ pub struct HtmlCacheSession {
     state: SessionState,
 }
 
+/// Why a lookup bypassed (cookie names only; cookie values never
+/// leave the parser).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HtmlCacheBypassReason {
+    /// Non-cookie gate (method, status, Vary, freshness, beacon …).
+    Other,
+    /// First offending request-cookie name (truncated to
+    /// [`ps_config::cookies::MAX_REASON_NAME_LEN`] characters).
+    Cookie(String),
+    /// A `Cookie` header failed strict parsing.
+    MalformedCookie,
+    /// A forbidden request header (`Authorization`, request `Vary`,
+    /// or `Cookie2`).
+    ForbiddenHeader(&'static str),
+}
+
+/// Eligible lookup inputs plus the allowlisted-cookie count.
+struct Eligibility {
+    /// Cache key.
+    key: String,
+    /// TTL in ms.
+    ttl_ms: i64,
+    /// Origin expiry in ms.
+    origin_expiry_ms: i64,
+    /// Lookup-time beacon evidence identity (`None` when
+    /// beaconing is inactive).
+    beacon_identity: Option<Vec<u8>>,
+    /// Cookies accepted through the allowlist (0 when cookie-free).
+    allowlisted_cookies: usize,
+}
+
 /// Session state machine.
 #[derive(Debug)]
 enum SessionState {
     /// Lookup not run yet.
     Pending,
     /// Ineligible or disqualified (show renders BYPASS).
-    Bypass,
+    Bypass {
+        /// Attributed reason (drives bypass history lines).
+        reason: HtmlCacheBypassReason,
+    },
     /// Lookup missed; buffering the rewrite for store.
     Armed {
         /// Cache key.
@@ -79,8 +117,11 @@ enum SessionState {
 /// Store/show outcome of [`HtmlCacheSession::finish`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HtmlCacheFinish {
-    /// History line for the message buffer ( publications only).
+    /// History line for the message buffer (publications only).
     pub detail_line: Option<String>,
+    /// History line for cookie-attributed bypasses (`None` for
+    /// stores and non-cookie bypasses).
+    pub bypass_line: Option<String>,
     /// `ShowCacheTimestamp` comment bytes, if enabled.
     pub show_comment: Option<Vec<u8>>,
 }
@@ -136,15 +177,27 @@ impl HtmlCacheSession {
     ) -> Option<html_codec::HtmlCacheEntry> {
         let options = self.driver.options();
         let enabled = options.html_cache();
-        let Some((key, ttl_ms, origin_expiry_ms, beacon_identity)) =
-            self.eligibility_key(origin, request, &options, file_mtime, now_ms)
-        else {
-            if enabled {
-                self.count("html_cache_bypasses", 1);
+        let eligibility = match self.eligibility_key(origin, request, &options, file_mtime, now_ms)
+        {
+            Ok(eligibility) => eligibility,
+            Err(reason) => {
+                if enabled {
+                    self.count("html_cache_bypasses", 1);
+                }
+                self.state = SessionState::Bypass { reason };
+                return None;
             }
-            self.state = SessionState::Bypass;
-            return None;
         };
+        if eligibility.allowlisted_cookies > 0 {
+            self.count("html_cache_cookie_allowlisted", 1);
+        }
+        let Eligibility {
+            key,
+            ttl_ms,
+            origin_expiry_ms,
+            beacon_identity,
+            ..
+        } = eligibility;
         let lookup = self.driver.server_context().metadata_cache().get(&key);
         let blob = match lookup {
             ps_cache::cache::Lookup {
@@ -203,25 +256,34 @@ impl HtmlCacheSession {
                 body.extend_from_slice(bytes);
             } else {
                 body.clear();
-                self.state = SessionState::Bypass;
+                self.state = SessionState::Bypass {
+                    reason: HtmlCacheBypassReason::Other,
+                };
             }
         }
     }
 
     /// Completes the session (`Finish`): hits report bytes served,
     /// armed rewrites store (empty bodies, sampled beacon
-    /// initializations, and mid-render evidence changes excluded)
-    /// with a history line, and `ShowCacheTimestamp` renders the
+    /// initializations, mid-render evidence changes, and requests
+    /// failing the publication cookie re-check excluded) with a
+    /// history line, cookie-attributed bypasses emit a bypass
+    /// history line, and `ShowCacheTimestamp` renders the
     /// HIT/MISS/BYPASS comment. Idempotent.
-    pub fn finish(&mut self, now_ms: i64) -> HtmlCacheFinish {
+    pub fn finish(&mut self, request: &RequestHeaders, now_ms: i64) -> HtmlCacheFinish {
         let options = self.driver.options();
         let show = options.show_cache_timestamp();
+        // Publication re-check: the store path enforces the same
+        // request policy as lookup (fail closed).
+        let request_pairs: Vec<(&str, &str)> = request.headers().iter().collect();
+        let publication_ok = request_eligible(&options, &request_pairs).is_ok();
         match std::mem::replace(&mut self.state, SessionState::Done) {
             // Hits serve at lookup time (the origin body is
             // swallowed, so this never runs for them); reaching
             // here anyway stays quiet and uncounted.
             SessionState::Hit => HtmlCacheFinish {
                 detail_line: None,
+                bypass_line: None,
                 show_comment: None,
             },
             SessionState::Armed {
@@ -241,7 +303,11 @@ impl HtmlCacheSession {
                     (Some(_), None) => false,
                     (None, _) => true,
                 };
-                if !body.is_empty() && evidence_settled && !contains_sampled_beacon_init(&body) {
+                if !body.is_empty()
+                    && evidence_settled
+                    && publication_ok
+                    && !contains_sampled_beacon_init(&body)
+                {
                     let expires_ms = html_codec::store_expiry_ms(origin_expiry_ms, now_ms, ttl_ms);
                     if expires_ms > now_ms {
                         if let Some(value) = html_codec::encode_value(now_ms, expires_ms, &body) {
@@ -270,13 +336,23 @@ impl HtmlCacheSession {
                     show.then(|| show_comment(false, created_ms, now_ms).into_bytes());
                 HtmlCacheFinish {
                     detail_line,
+                    bypass_line: None,
                     show_comment,
                 }
             }
-            _ => {
+            SessionState::Bypass { reason } => {
                 let show_comment = show.then(|| show_comment(false, 0, now_ms).into_bytes());
                 HtmlCacheFinish {
                     detail_line: None,
+                    bypass_line: bypass_history_line(&reason, &self.url, now_ms),
+                    show_comment,
+                }
+            }
+            SessionState::Pending | SessionState::Done => {
+                let show_comment = show.then(|| show_comment(false, 0, now_ms).into_bytes());
+                HtmlCacheFinish {
+                    detail_line: None,
+                    bypass_line: None,
                     show_comment,
                 }
             }
@@ -289,10 +365,21 @@ impl HtmlCacheSession {
         matches!(self.state, SessionState::Hit)
     }
 
+    /// The attributed bypass reason (`None` unless bypassed).
+    #[must_use]
+    pub fn bypass_reason(&self) -> Option<&HtmlCacheBypassReason> {
+        match &self.state {
+            SessionState::Bypass { reason } => Some(reason),
+            _ => None,
+        }
+    }
+
     /// Computes eligibility plus the identity key (`ShouldCache`
-    /// plus identity construction), or `None` when bypassing. The
-    /// trailing element snapshots the lookup-time beacon evidence
-    /// (`None` when beaconing is inactive).
+    /// plus identity construction), or the attributed bypass reason.
+    /// The identity drops `Cookie` lines (requests that reach key
+    /// generation hold only ignored cookies) and snapshots the
+    /// lookup-time beacon evidence (`None` when beaconing is
+    /// inactive).
     fn eligibility_key(
         &self,
         origin: &ResponseHeaders,
@@ -300,7 +387,7 @@ impl HtmlCacheSession {
         options: &ps_config::options::RewriteOptions,
         file_mtime: Option<(u64, u32)>,
         now_ms: i64,
-    ) -> Option<(String, i64, i64, Option<Vec<u8>>)> {
+    ) -> Result<Eligibility, HtmlCacheBypassReason> {
         use ps_config::filter::Filter;
         let request_pairs: Vec<(&str, &str)> = request.headers().iter().collect();
         // Origin cacheability on a Vary-stripped policy copy, as in C++.
@@ -318,6 +405,11 @@ impl HtmlCacheSession {
         // changes track the mtime, which enters the identity. An
         // explicitly prohibitive origin still vetoes.
         let file_ok = file_mtime.is_some() && !has_cache_prohibition(origin);
+        // Strict request gates first (attributed precisely), then
+        // the cookie policy; the matrix below keeps the full gate
+        // set in one place.
+        let strict = strict_request_headers_ok(&request_pairs);
+        let cookies = cookie_verdict(options, &request_pairs);
         let eligibility = html_codec::HtmlEligibility {
             html_cache_enabled: options.html_cache(),
             ttl_sec: options.html_cache_ttl_sec(),
@@ -328,7 +420,8 @@ impl HtmlCacheSession {
             vary_absent: !origin.headers().has("Vary"),
             no_experiment: !options.running_experiment(),
             critical_css_ok: !options.enabled(Filter::PrioritizeCriticalCss),
-            request_headers_ok: html_codec::request_headers_cacheable(&request_pairs),
+            request_headers_ok: strict.is_ok(),
+            cookies_ok: cookies.is_ok(),
             origin_cacheable: origin_cacheable || file_ok,
             origin_fresh: explicitly_fresh || file_ok,
             // Structural beacon flag only; learning gates (sampling
@@ -336,8 +429,15 @@ impl HtmlCacheSession {
             beacon_ok: true,
         };
         if !eligibility.cacheable() {
-            return None;
+            if let Err(header) = strict {
+                return Err(HtmlCacheBypassReason::ForbiddenHeader(header));
+            }
+            if let Err(reason) = &cookies {
+                return Err(reason.clone());
+            }
+            return Err(HtmlCacheBypassReason::Other);
         }
+        let allowlisted_cookies = cookies.unwrap_or(0);
         let ttl_ms = options.html_cache_ttl_sec() * 1000;
         let origin_expiry_ms = if explicitly_fresh {
             policy.cache_expiration_time_ms()
@@ -350,7 +450,7 @@ impl HtmlCacheSession {
             self.url,
             self.driver.cache_fragment(),
             options.signature(),
-            request.to_http_string(),
+            request.to_http_string_without_cookies(),
         );
         identity.push_str(&format!("origin-ttl:{}\n", policy.cache_ttl_ms()));
         if let Some((secs, nanos)) = file_mtime {
@@ -404,7 +504,7 @@ impl HtmlCacheSession {
             if !learned
                 || super::beacon_finder::should_beacon(now_ms, record, downstream)
             {
-                return None;
+                return Err(HtmlCacheBypassReason::Other);
             }
             let record = record.expect("learned evidence has a record");
             let encoded = super::beacon_finder::encode_evidence(record);
@@ -414,18 +514,103 @@ impl HtmlCacheSession {
             );
             beacon_identity = Some(encoded);
         }
-        Some((
-            html_codec::html_cache_key(&identity),
+        Ok(Eligibility {
+            key: html_codec::html_cache_key(&identity),
             ttl_ms,
             origin_expiry_ms,
             beacon_identity,
-        ))
+            allowlisted_cookies,
+        })
     }
 
     /// Bumps a counter, creating it when absent.
     fn count(&self, name: &str, delta: i64) {
         self.driver.server_context().variable(name).add(delta);
     }
+}
+
+/// Strict request gates (`Authorization`, request `Vary`): any
+/// presence bypasses, naming the header.
+fn strict_request_headers_ok(headers: &[(&str, &str)]) -> Result<(), &'static str> {
+    for (name, _) in headers {
+        if name.eq_ignore_ascii_case("Authorization") {
+            return Err("Authorization");
+        }
+        if name.eq_ignore_ascii_case("Vary") {
+            return Err("Vary");
+        }
+    }
+    Ok(())
+}
+
+/// Cookie gate verdict plus the allowlisted-cookie count (shared by
+/// lookup and the publication re-check).
+fn cookie_verdict(
+    options: &ps_config::options::RewriteOptions,
+    headers: &[(&str, &str)],
+) -> Result<usize, HtmlCacheBypassReason> {
+    use ps_config::cookies::{CookieBypass, CookieDecision};
+    match ps_config::cookies::evaluate_cookie_headers(headers, &options.html_cache_cookie_policy())
+    {
+        CookieDecision::Absent => Ok(0),
+        CookieDecision::Allowlisted { count } => Ok(count),
+        CookieDecision::Bypass(CookieBypass::Cookie2) => {
+            Err(HtmlCacheBypassReason::ForbiddenHeader("Cookie2"))
+        }
+        CookieDecision::Bypass(CookieBypass::Malformed) => {
+            Err(HtmlCacheBypassReason::MalformedCookie)
+        }
+        CookieDecision::Bypass(CookieBypass::Cookie(name)) => {
+            Err(HtmlCacheBypassReason::Cookie(name))
+        }
+    }
+}
+
+/// Full request verdict for lookup and publication (strict gates
+/// first, then the cookie policy).
+fn request_eligible(
+    options: &ps_config::options::RewriteOptions,
+    headers: &[(&str, &str)],
+) -> Result<usize, HtmlCacheBypassReason> {
+    strict_request_headers_ok(headers).map_err(HtmlCacheBypassReason::ForbiddenHeader)?;
+    cookie_verdict(options, headers)
+}
+
+/// History line for cookie-attributed bypasses (`PS_HTML_BYPASS`,
+/// cookie names only, values never): `None` for non-cookie reasons
+/// (no new noise) and overlong URLs.
+fn bypass_history_line(
+    reason: &HtmlCacheBypassReason,
+    url: &str,
+    now_ms: i64,
+) -> Option<String> {
+    let token = match reason {
+        HtmlCacheBypassReason::Cookie(name) => format!("cookie:{}", sanitize_reason_name(name)),
+        HtmlCacheBypassReason::MalformedCookie => "malformed-cookie".to_string(),
+        HtmlCacheBypassReason::ForbiddenHeader("Cookie2") => "header:Cookie2".to_string(),
+        _ => return None,
+    };
+    if url.len() > 4096 {
+        return None;
+    }
+    Some(format!(
+        "PS_HTML_BYPASS\t{now_ms}\t{token}\t{}",
+        ps_cache::base64::web64_encode(url.as_bytes()),
+    ))
+}
+
+/// Sanitizes a cookie name for history lines (control characters,
+/// whitespace, and TSV separators become `?`).
+fn sanitize_reason_name(name: &str) -> String {
+    name.chars()
+        .map(|char| {
+            if char.is_ascii_graphic() && char != '\t' {
+                char
+            } else {
+                '?'
+            }
+        })
+        .collect()
 }
 
 /// Whether visible origin headers prohibit caching outright
@@ -591,7 +776,7 @@ mod tests {
         // Streaming the rewrite then finishing stores it.
         first.write(b"<html>");
         first.write(b"</html>");
-        let finish = first.finish(START_MS + 1000);
+        let finish = first.finish(&request, START_MS + 1000);
         assert_eq!(1, harness.counter("html_cache_inserts"));
         let line = finish.detail_line.expect("stored line");
         assert!(line.starts_with("PS_HTML_DETAIL\t"), "{line}");
@@ -769,7 +954,7 @@ mod tests {
             .lookup(&origin, &request, &harness.purge, None, START_MS)
             .is_none());
         big.write(&vec![b'x'; html_codec::MAX_HTML_BODY_BYTES + 1]);
-        let finish = big.finish(START_MS + 1000);
+        let finish = big.finish(&request, START_MS + 1000);
         assert!(finish.detail_line.is_none());
         assert_eq!(0, harness.counter("html_cache_inserts"));
         // Sampled beacon initializations never freeze.
@@ -784,7 +969,7 @@ mod tests {
             sampled.write(b"<html><script>");
             sampled.write(marker.as_bytes());
             sampled.write(b"</script></html>");
-            let finish = sampled.finish(START_MS + 1000);
+            let finish = sampled.finish(&request, START_MS + 1000);
             assert!(finish.detail_line.is_none(), "{marker}");
         }
         assert_eq!(0, harness.counter("html_cache_inserts"));
@@ -800,7 +985,7 @@ mod tests {
             .lookup(&origin, &request, &harness.purge, None, START_MS)
             .is_none());
         first.write(b"<html/>");
-        first.finish(START_MS + 1000);
+        first.finish(&request, START_MS + 1000);
         assert_eq!(1, harness.counter("html_cache_inserts"));
         // A different UA is a different variant (identity miss).
         let mut other_ua = harness.get_request();
@@ -835,7 +1020,7 @@ mod tests {
             .lookup(&origin, &request, &harness.purge, mtime, START_MS)
             .is_none());
         first.write(b"<html/>");
-        let finish = first.finish(START_MS + 1000);
+        let finish = first.finish(&request, START_MS + 1000);
         assert!(finish.detail_line.is_some());
         assert_eq!(1, harness.counter("html_cache_inserts"));
         // Same mtime hits.
@@ -948,7 +1133,7 @@ mod tests {
         assert_eq!(1, harness.counter(finder::VALID_COUNT));
         first.write(b"<html/>");
         settle_driver_identity(&harness);
-        let finish = first.finish(START_MS + 1000);
+        let finish = first.finish(&request, START_MS + 1000);
         assert!(finish.detail_line.is_some());
         assert_eq!(1, harness.counter("html_cache_inserts"));
         let mut second = harness.session();
@@ -1003,19 +1188,14 @@ mod tests {
             .borrow_mut()
             .soft_enable_filter_for_testing(Filter::PrioritizeLcpImages);
         seed_learned_beacon(&settled);
+        let request = settled.get_request();
         let mut render = settled.session();
         assert!(render
-            .lookup(
-                &settled.ok_origin(),
-                &settled.get_request(),
-                &settled.purge,
-                None,
-                START_MS
-            )
+            .lookup(&settled.ok_origin(), &request, &settled.purge, None, START_MS)
             .is_none());
         render.write(b"<html/>");
         // No driver snapshot (or a divergent one): skip the store.
-        let finish = render.finish(START_MS + 1000);
+        let finish = render.finish(&request, START_MS + 1000);
         assert!(finish.detail_line.is_none());
         assert_eq!(0, settled.counter("html_cache_inserts"));
     }
@@ -1036,5 +1216,284 @@ mod tests {
             show_comment(false, 0, created),
             "<!-- PageSpeed Cache: BYPASS | Created: N/A | Age: N/A -->"
         );
+    }
+
+    /// Request with the given `Cookie` header value added.
+    fn cookie_request(harness: &Harness, cookies: &str) -> RequestHeaders {
+        let mut request = harness.get_request();
+        request.headers_mut().add("Cookie", cookies);
+        request
+    }
+
+    #[test]
+    fn allowlisted_cookies_miss_store_and_hit() {
+        let harness = Harness::new();
+        let origin = harness.ok_origin();
+        // Analytics-only requests cache like cookie-free ones.
+        let request = cookie_request(&harness, "_ga=GA1.1.1; _gid=2; __utma=3");
+        let mut first = harness.session();
+        assert!(first
+            .lookup(&origin, &request, &harness.purge, None, START_MS)
+            .is_none());
+        assert_eq!(1, harness.counter("html_cache_misses"));
+        assert_eq!(1, harness.counter("html_cache_cookie_allowlisted"));
+        first.write(b"<html/>");
+        let finish = first.finish(&request, START_MS + 1000);
+        assert!(finish.detail_line.is_some());
+        assert!(finish.bypass_line.is_none());
+        assert_eq!(1, harness.counter("html_cache_inserts"));
+        // New per-client values hit the same key (values ignored).
+        let rotated = cookie_request(&harness, "_ga=GA1.9.9; _gid=8; __utma=7");
+        let mut second = harness.session();
+        assert!(second
+            .lookup(&origin, &rotated, &harness.purge, None, START_MS + 2000)
+            .is_some());
+        assert_eq!(1, harness.counter("html_cache_hits"));
+        assert_eq!(2, harness.counter("html_cache_cookie_allowlisted"));
+        // And the cookie-free variant shares the key too.
+        let mut third = harness.session();
+        assert!(third
+            .lookup(
+                &origin,
+                &harness.get_request(),
+                &harness.purge,
+                None,
+                START_MS + 3000
+            )
+            .is_some());
+        assert_eq!(2, harness.counter("html_cache_hits"));
+        assert_eq!(0, harness.counter("html_cache_bypasses"));
+    }
+
+    #[test]
+    fn unknown_and_mixed_cookies_bypass_with_named_reason() {
+        let harness = Harness::new();
+        let origin = harness.ok_origin();
+        for (cookies, expected) in [
+            ("sessionid=abc", "sessionid"),
+            ("_ga=1; cart=full; _gid=2", "cart"),
+            ("PHPSESSID=x; _fbp=y", "PHPSESSID"),
+        ] {
+            let request = cookie_request(&harness, cookies);
+            let mut session = harness.session();
+            assert!(session
+                .lookup(&origin, &request, &harness.purge, None, START_MS)
+                .is_none());
+            assert_eq!(
+                session.bypass_reason(),
+                Some(&HtmlCacheBypassReason::Cookie(expected.to_string())),
+                "{cookies}"
+            );
+            let finish = session.finish(&request, START_MS + 1000);
+            assert!(finish.detail_line.is_none());
+            let line = finish.bypass_line.expect("bypass line");
+            let fields: Vec<&str> = line.split('\t').collect();
+            assert_eq!(fields[0], "PS_HTML_BYPASS", "{line}");
+            // The reason names the cookie; values never leak in
+            // (the URL field decodes back exactly).
+            assert_eq!(4, fields.len(), "{line}");
+            assert_eq!(fields[2], format!("cookie:{expected}"), "{line}");
+            let url = ps_cache::base64::web64_decode(fields[3]).expect("url b64");
+            assert_eq!(PAGE_URL.as_bytes(), url.as_slice());
+        }
+        assert_eq!(3, harness.counter("html_cache_bypasses"));
+        assert_eq!(0, harness.counter("html_cache_cookie_allowlisted"));
+    }
+
+    #[test]
+    fn malformed_and_cookie2_bypass_with_lines() {
+        let harness = Harness::new();
+        let origin = harness.ok_origin();
+        // Malformed headers fail closed with a valueless line.
+        let request = cookie_request(&harness, "_ga=1; oops");
+        let mut session = harness.session();
+        assert!(session
+            .lookup(&origin, &request, &harness.purge, None, START_MS)
+            .is_none());
+        assert_eq!(
+            session.bypass_reason(),
+            Some(&HtmlCacheBypassReason::MalformedCookie)
+        );
+        let finish = session.finish(&request, START_MS + 1000);
+        let line = finish.bypass_line.expect("bypass line");
+        assert!(line.contains("malformed-cookie"), "{line}");
+        // Obsolete Cookie2 bypasses with a header line.
+        let mut cookie2 = harness.get_request();
+        cookie2.headers_mut().add("Cookie2", "$Version=1");
+        let mut second = harness.session();
+        assert!(second
+            .lookup(&origin, &cookie2, &harness.purge, None, START_MS)
+            .is_none());
+        assert_eq!(
+            second.bypass_reason(),
+            Some(&HtmlCacheBypassReason::ForbiddenHeader("Cookie2"))
+        );
+        let finish = second.finish(&cookie2, START_MS + 1000);
+        let line = finish.bypass_line.expect("bypass line");
+        assert!(line.contains("header:Cookie2"), "{line}");
+        assert_eq!(2, harness.counter("html_cache_bypasses"));
+    }
+
+    #[test]
+    fn auth_and_generic_bypasses_stay_quiet() {
+        let harness = Harness::new();
+        let origin = harness.ok_origin();
+        // Authorization still bypasses (existing protection), with
+        // no new history noise.
+        let mut authed = harness.get_request();
+        authed.headers_mut().add("Authorization", "Bearer x");
+        let mut session = harness.session();
+        assert!(session
+            .lookup(&origin, &authed, &harness.purge, None, START_MS)
+            .is_none());
+        assert_eq!(
+            session.bypass_reason(),
+            Some(&HtmlCacheBypassReason::ForbiddenHeader("Authorization"))
+        );
+        let finish = session.finish(&authed, START_MS + 1000);
+        assert!(finish.bypass_line.is_none());
+        // Non-cookie gates attribute `Other`, also without lines.
+        let mut varied = harness.ok_origin();
+        varied.headers_mut().add("Vary", "Cookie");
+        varied.compute_caching();
+        let mut second = harness.session();
+        assert!(second
+            .lookup(
+                &varied,
+                &harness.get_request(),
+                &harness.purge,
+                None,
+                START_MS
+            )
+            .is_none());
+        assert_eq!(
+            second.bypass_reason(),
+            Some(&HtmlCacheBypassReason::Other)
+        );
+        let finish = second.finish(&harness.get_request(), START_MS + 1000);
+        assert!(finish.bypass_line.is_none());
+    }
+
+    #[test]
+    fn cookie_configuration_overrides() {
+        // `off` restores strict bypassing for built-in names.
+        let strict = Harness::new();
+        strict
+            .options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheIgnoreCommonCookies",
+                "off",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        let request = cookie_request(&strict, "_ga=1");
+        let mut session = strict.session();
+        assert!(session
+            .lookup(&strict.ok_origin(), &request, &strict.purge, None, START_MS)
+            .is_none());
+        assert_eq!(
+            session.bypass_reason(),
+            Some(&HtmlCacheBypassReason::Cookie("_ga".to_string()))
+        );
+        // Custom ignores extend the built-in list …
+        let custom = Harness::new();
+        custom
+            .options
+            .borrow_mut()
+            .parse_and_set_1("HtmlCacheIgnoreCookie", "tracker", ps_config::scope::Scope::Server)
+            .unwrap();
+        let request = cookie_request(&custom, "_ga=1; tracker=2");
+        let mut session = custom.session();
+        assert!(session
+            .lookup(&custom.ok_origin(), &request, &custom.purge, None, START_MS)
+            .is_none());
+        assert!(session.bypass_reason().is_none());
+        // … even with the common list disabled …
+        custom
+            .options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheIgnoreCommonCookies",
+                "off",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        let request = cookie_request(&custom, "tracker=1");
+        let mut session = custom.session();
+        assert!(session
+            .lookup(&custom.ok_origin(), &request, &custom.purge, None, START_MS)
+            .is_none());
+        assert!(session.bypass_reason().is_none());
+        // … while bypass rules win over both allowlists.
+        custom
+            .options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheIgnoreCommonCookies",
+                "on",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        custom
+            .options
+            .borrow_mut()
+            .parse_and_set_1("HtmlCacheBypassCookie", "_ga", ps_config::scope::Scope::Server)
+            .unwrap();
+        let request = cookie_request(&custom, "_ga=1");
+        let mut session = custom.session();
+        assert!(session
+            .lookup(&custom.ok_origin(), &request, &custom.purge, None, START_MS)
+            .is_none());
+        assert_eq!(
+            session.bypass_reason(),
+            Some(&HtmlCacheBypassReason::Cookie("_ga".to_string()))
+        );
+    }
+
+    #[test]
+    fn publication_rechecks_request_cookies() {
+        let harness = Harness::new();
+        let origin = harness.ok_origin();
+        let request = cookie_request(&harness, "_ga=1");
+        let mut session = harness.session();
+        assert!(session
+            .lookup(&origin, &request, &harness.purge, None, START_MS)
+            .is_none());
+        session.write(b"<html/>");
+        // Finishing against a poisoned request skips the store.
+        let poisoned = cookie_request(&harness, "_ga=1; sessionid=x");
+        let finish = session.finish(&poisoned, START_MS + 1000);
+        assert!(finish.detail_line.is_none());
+        assert_eq!(0, harness.counter("html_cache_inserts"));
+    }
+
+    #[test]
+    fn bypass_reasons_sanitize_and_truncate() {
+        // Control characters and separators cannot break the TSV line.
+        let line = bypass_history_line(
+            &HtmlCacheBypassReason::Cookie("a\tb\nc d".to_string()),
+            PAGE_URL,
+            START_MS,
+        )
+        .expect("line");
+        assert_eq!(4, line.split('\t').count(), "{line}");
+        assert!(line.contains("cookie:a?b?c?d"), "{line}");
+        // Overlong URLs suppress the line like detail lines.
+        let long_url = format!("http://x/{}", "y".repeat(4096));
+        assert!(bypass_history_line(
+            &HtmlCacheBypassReason::Cookie("a".to_string()),
+            &long_url,
+            START_MS
+        )
+        .is_none());
+        // Non-cookie reasons stay quiet.
+        for reason in [
+            HtmlCacheBypassReason::Other,
+            HtmlCacheBypassReason::ForbiddenHeader("Authorization"),
+            HtmlCacheBypassReason::ForbiddenHeader("Vary"),
+        ] {
+            assert!(bypass_history_line(&reason, PAGE_URL, START_MS).is_none());
+        }
     }
 }

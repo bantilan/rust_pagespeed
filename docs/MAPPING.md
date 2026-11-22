@@ -216,7 +216,8 @@ Prefixes: `M:` = mod_pagespeed, `N:` = ngx_pagespeed, `P:` = ngx_psol
   `rewrite_filter_names.gperf`. Pinned by
   `filter_identity_vectors` plus the exhaustive `Filter::ALL`
   sweep (`all_filter_ids_are_unique_and_round_trip`).
-- Naming pins: 167-row table shape (34 NULL-help + 5 synthetic)
+- Naming pins: 168-row table shape (34 NULL-help + 5 synthetic,
+  plus the port's `HtmlCacheIgnoreCommonCookies`)
   in `property_table_shape_pins_config_1`; scope gate in
   `scope_gate_pins_config_2`; 14 admin leaves + redirect/404/
   purge-auth in `admin_route_vectors`; 20 stat names across all

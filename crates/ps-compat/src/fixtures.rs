@@ -400,6 +400,7 @@ pub fn stat_name_vectors() -> Vec<&'static str> {
         "html_cache_misses",
         "html_cache_inserts",
         "html_cache_bytes_served",
+        "html_cache_cookie_allowlisted",
         "resource_404_count",
         "num_flushes",
         "ipro_served",
@@ -848,8 +849,9 @@ mod tests {
 
     #[test]
     fn property_table_shape_pins_config_1() {
-        // 167 `AddProperties` registrations, in C++ order.
-        assert_eq!(167, PROPERTIES.len());
+        // 167 `AddProperties` registrations in C++ order, plus the
+        // port's `HtmlCacheIgnoreCommonCookies`.
+        assert_eq!(168, PROPERTIES.len());
         let mut ids = HashSet::new();
         let mut named_helpless = 0;
         let mut synthetic = 0;

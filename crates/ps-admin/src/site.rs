@@ -593,6 +593,10 @@ impl AdminSite {
         );
         let previous = Self::previous_dashboard_counters(stats, archive_options);
         Self::write_html_cache_summary(stats, fetch, &previous);
+        Self::write_html_cache_cookie_policy(options, fetch);
+        let mut bypasses = Vec::new();
+        read_recent_cookie_bypasses(&log, &mut bypasses);
+        Self::write_html_cache_cookie_bypasses(&bypasses, fetch);
         fetch.handle_write(
             format!(
                 "<section class='pagespeed-dashboard-panel'><div class='pagespeed-dashboard-panel-heading'><div><h2>Recent HTML publications</h2><p>HTML cache: <strong>{}</strong>. Configured TTL cap: {} seconds.</p></div><a href='config'>View configuration &rarr;</a></div>{}This is publication history, not a live cache inventory: eviction, purge, policy changes, or new beacon evidence can invalidate an entry before its TTL. No HTML bodies or raw request headers are recorded. Opening a URL makes a new request using your browser's headers; it is not a snapshot of the listed variant.</p>",
@@ -697,6 +701,11 @@ impl AdminSite {
                 "HTML PUBLICATIONS",
                 "Best-effort cache writes",
             ),
+            (
+                "html_cache_cookie_allowlisted",
+                "COOKIE ALLOWLIST ACCEPTS",
+                "Lookups admitted with ignored cookies",
+            ),
         ] {
             fetch.handle_write(
                 format!(
@@ -720,6 +729,67 @@ impl AdminSite {
             )
             .as_bytes(),
         );
+    }
+
+    /// Writes the effective HTML-cache cookie policy: the built-in
+    /// common-cookie allowlist, custom `HtmlCacheIgnoreCookie`
+    /// patterns, and explicit `HtmlCacheBypassCookie` rules.
+    fn write_html_cache_cookie_policy(options: &RewriteOptions, fetch: &mut dyn AsyncFetch) {
+        let builtin = ps_config::cookies::builtin_ignore_patterns();
+        let chips = |patterns: &[String]| -> String {
+            if patterns.is_empty() {
+                return "<span class='pagespeed-dashboard-muted'>None</span>".to_string();
+            }
+            patterns
+                .iter()
+                .map(|pattern| format!("<code>{}</code>", escape_html(pattern)))
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        fetch.handle_write(
+            format!(
+                "<section class='pagespeed-dashboard-panel'><div class='pagespeed-dashboard-panel-heading'><div><h2>Cookie allowlist</h2><p>Requests carrying only allowlisted cookies cache exactly like cookie-free requests; cookie values never enter cache keys. Common cookies: <strong>{}</strong> ({} built-in patterns).</p></div></div><dl class='pagespeed-admin-data-list'><dt>Built-in common cookies</dt><dd>{}</dd><dt>HtmlCacheIgnoreCookie (custom, extends built-in)</dt><dd>{}</dd><dt>HtmlCacheBypassCookie (forces bypass)</dt><dd>{}</dd></dl><p class='pagespeed-dashboard-footnote'>Allowlisted cookies must not influence server-generated HTML: a cached variant is served to every visitor regardless of their ignored-cookie values. Unknown, authentication, session, cart, and personalization cookies always bypass. Cookie values are never logged; bypass history below names cookies only.</p></section>",
+                if options.html_cache_ignore_common_cookies() {
+                    "Ignored"
+                } else {
+                    "Not ignored"
+                },
+                builtin.len(),
+                chips(&builtin),
+                chips(options.html_cache_ignore_cookies().patterns()),
+                chips(options.html_cache_bypass_cookies().patterns()),
+            )
+            .as_bytes(),
+        );
+    }
+
+    /// Writes recent cookie-attributed bypasses (skipped when none
+    /// recorded): each row names the responsible cookie, never its
+    /// value.
+    fn write_html_cache_cookie_bypasses(
+        bypasses: &[HtmlCacheBypassRow],
+        fetch: &mut dyn AsyncFetch,
+    ) {
+        if bypasses.is_empty() {
+            return;
+        }
+        fetch.handle_write(
+            b"<section class='pagespeed-dashboard-panel'><div class='pagespeed-dashboard-panel-heading'><div><h2>Recent cookie bypasses</h2><p>Lookups bypassed by request cookies, newest first. Remove the cookie, allowlist it with HtmlCacheIgnoreCookie when it cannot change server HTML, or force it with HtmlCacheBypassCookie.</p></div></div><div class='pagespeed-images-table-wrap'><table class='pagespeed-admin-data-table'><thead><tr><th>Time</th><th>Reason</th><th>Page URL</th></tr></thead><tbody>",
+        );
+        for row in bypasses {
+            let escaped_url = escape_html(&row.url);
+            fetch.handle_write(
+                format!(
+                    "<tr><td>{}</td><td><code>{}</code></td><td class='pagespeed-image-url'><a href='{}' target='_blank' rel='noopener noreferrer' referrerpolicy='no-referrer'>{}</a></td></tr>",
+                    escape_html(&ps_http::time::format_http_date(row.timestamp_ms)),
+                    escape_html(&row.reason),
+                    escaped_url,
+                    escaped_url,
+                )
+                .as_bytes(),
+            );
+        }
+        fetch.handle_write(b"</tbody></table></div></section>");
     }
 
     /// Displays the message log (`MessageHistoryHandler`).
@@ -2115,6 +2185,70 @@ fn read_recent_image_rewrites(log: &str, max_rows: usize, rows: &mut Vec<ImageRe
             optimized_url: fields[6].to_string(),
         });
     }
+}
+
+/// One cookie-bypass record (`PS_HTML_BYPASS` history line).
+#[derive(Debug, Clone, Default)]
+struct HtmlCacheBypassRow {
+    timestamp_ms: i64,
+    reason: String,
+    url: String,
+}
+
+/// Reads recent cookie bypasses newest-first, capped at 20.
+fn read_recent_cookie_bypasses(log: &str, rows: &mut Vec<HtmlCacheBypassRow>) {
+    for message in LogBuffer::parse_dump(log).iter().rev() {
+        if rows.len() >= 20 {
+            break;
+        }
+        let Some(marker) = message.find("PS_HTML_BYPASS\t") else {
+            continue;
+        };
+        let fields: Vec<&str> = message[marker..]
+            .split('\t')
+            .filter(|field| !field.is_empty())
+            .collect();
+        if fields.len() != 4 {
+            continue;
+        }
+        let Some(timestamp_ms) = fields[1].parse::<i64>().ok() else {
+            continue;
+        };
+        if timestamp_ms <= 0 || !valid_bypass_reason(fields[2]) {
+            continue;
+        }
+        if fields[3].len() > 6000 {
+            continue;
+        }
+        let Some(url_bytes) = ps_cache::base64::web64_decode(fields[3]) else {
+            continue;
+        };
+        let Ok(url) = String::from_utf8(url_bytes) else {
+            continue;
+        };
+        if url.len() > 4096 || !GoogleUrl::new(&url).is_web_valid() {
+            continue;
+        }
+        rows.push(HtmlCacheBypassRow {
+            timestamp_ms,
+            reason: fields[2].to_string(),
+            url,
+        });
+    }
+}
+
+/// Whether a bypass reason token is well-formed (`cookie:<name>`,
+/// `malformed-cookie`, or `header:Cookie2`).
+fn valid_bypass_reason(reason: &str) -> bool {
+    if reason == "malformed-cookie" || reason == "header:Cookie2" {
+        return true;
+    }
+    let Some(name) = reason.strip_prefix("cookie:") else {
+        return false;
+    };
+    !name.is_empty()
+        && name.len() <= ps_config::cookies::MAX_REASON_NAME_LEN
+        && name.bytes().all(|byte| byte.is_ascii_graphic())
 }
 
 /// One HTML cache record (`HtmlCacheRow`).

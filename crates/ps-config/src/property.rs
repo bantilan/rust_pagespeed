@@ -312,8 +312,9 @@ mod tests {
 
     #[test]
     fn table_count_and_uniqueness() {
-        // 167 `AddBaseProperty`/`AddRequestProperty` calls in C++ order.
-        assert_eq!(NUM_PROPERTIES, 167);
+        // 167 `AddBaseProperty`/`AddRequestProperty` calls in C++ order,
+        // plus the port's `HtmlCacheIgnoreCommonCookies`.
+        assert_eq!(NUM_PROPERTIES, 168);
         let ids: HashSet<&str> = PROPERTIES.iter().map(|p| p.id).collect();
         assert_eq!(ids.len(), NUM_PROPERTIES, "duplicate option id");
         let names: HashSet<&str> = PROPERTIES
@@ -342,6 +343,7 @@ mod tests {
         assert_eq!(get("ict").default, PropDefault::Int(300000)); // 5min
         assert_eq!(get("bfto").default, PropDefault::Int(5000)); // 5s
         assert_eq!(get("fhct").default, PropDefault::Int(300));
+        assert_eq!(get("fhcc").default, PropDefault::Bool(true));
         assert_eq!(get("rcfgt").default, PropDefault::Int(1000)); // 1s
         assert_eq!(get("rbls").default, PropDefault::Int(403));
         assert_eq!(get("eeid").default, PropDefault::Int(-2));
