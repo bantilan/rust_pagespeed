@@ -4,19 +4,38 @@
 //! attribute today; CSS and fetch slots later). Rewrites swap the
 //! resource off-thread and render back into the DOM synchronously.
 //!
-//! TODO(pipeline): context tracking (`AddContext`/`DetachContext`
-//! /`LastContext`) and aggregate input infos arrive with
-//! `RewriteContext` and the input-info proto.
+//! Context tracking records every context that attaches to a slot,
+//! in order: the sync engine runs each context to completion inline,
+//! so unlike C++ (which detaches on completion before waking
+//! successors) the registry is a historical record rather than a
+//! live set. Successor wakeups need no machinery here — program
+//! order is completion order — and the ids never enter output,
+//! hashes, or keys.
 
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use ps_config::options::RewriteOptions;
 use ps_http::google_url::{GoogleUrl, UrlRelativity};
 
+use super::cacheable_resource::InputInfo;
 use super::resource::ResourceHandle;
 use crate::element::NodeId;
 use crate::name::Keyword;
 use crate::parser::Dom;
+
+/// Rewrite-context identity for slot tracking (process-unique,
+/// starting at 1; bookkeeping only, never output).
+pub type ContextId = u64;
+
+/// Next context identity.
+static NEXT_CONTEXT_ID: AtomicU64 = AtomicU64::new(1);
+
+/// Mints a fresh context identity.
+#[must_use]
+pub(crate) fn mint_context_id() -> ContextId {
+    NEXT_CONTEXT_ID.fetch_add(1, Ordering::Relaxed)
+}
 
 /// Shared slot flags (`ResourceSlot` state).
 #[derive(Debug, Clone, Default)]
@@ -28,6 +47,8 @@ pub struct SlotBase {
     disable_further_processing: bool,
     was_optimized: bool,
     need_aggregate_input_info: bool,
+    contexts: Vec<ContextId>,
+    inputs: Option<Vec<InputInfo>>,
 }
 
 impl SlotBase {
@@ -38,6 +59,40 @@ impl SlotBase {
             resource,
             ..SlotBase::default()
         }
+    }
+
+    /// Records a context attachment (`AddContext`).
+    pub fn add_context(&mut self, id: ContextId) {
+        self.contexts.push(id);
+    }
+
+    /// Detaches a context (`DetachContext`): only the first or last
+    /// attachment may leave, like C++ (anything else is a bug).
+    pub fn detach_context(&mut self, id: ContextId) {
+        if self.contexts.first() == Some(&id) {
+            self.contexts.remove(0);
+        } else if self.contexts.last() == Some(&id) {
+            self.contexts.pop();
+        } else {
+            debug_assert!(false, "can only detach first or last context");
+        }
+    }
+
+    /// Most recently attached context (`LastContext`), if any.
+    #[must_use]
+    pub fn last_context(&self) -> Option<ContextId> {
+        self.contexts.last().copied()
+    }
+
+    /// Records one input's validity watermark (`ReportInput`).
+    pub fn report_input(&mut self, input: InputInfo) {
+        self.inputs.get_or_insert_with(Vec::new).push(input);
+    }
+
+    /// Aggregated input infos (`inputs`, `None` until reported).
+    #[must_use]
+    pub fn inputs(&self) -> Option<&Vec<InputInfo>> {
+        self.inputs.as_ref()
     }
 
     /// Borrows the bound resource, if any.

@@ -655,3 +655,120 @@ macro_rules! single_resource_tests {
 
 single_resource_tests!(plain, false);
 single_resource_tests!(custom, true);
+
+/// Shared slot plus fetched input for chaining tests.
+fn chaining_setup() -> (
+    Fixture,
+    Rc<ResourceDriver>,
+    Dom,
+    Rc<RefCell<ps_html::resource_slot::HtmlResourceSlot>>,
+    InputResource,
+) {
+    let fixture = Fixture::new(false);
+    fixture.mock_default_resources();
+    let driver = fixture.driver_for("http://test.com/dir/page.html");
+    let mut dom = Dom::new();
+    let el = dom.new_element(None, b"tag");
+    dom.add_attribute(el, b"src", b"a.tst");
+    let url = GoogleUrl::new("http://test.com/a.tst");
+    let (input, _) = driver.create_input_resource(
+        &url,
+        InlineAuthorizationPolicy::InlineOnlyAuthorizedResources,
+        IntendedFor::General,
+        InputRole::Unknown,
+    );
+    let input = input.expect("input");
+    let slot = Rc::new(RefCell::new(
+        ps_html::resource_slot::HtmlResourceSlot::new(None, &mut dom, el, 0, "test"),
+    ));
+    (fixture, driver, dom, slot, input)
+}
+
+fn test_behavior() -> TestBehavior {
+    TestBehavior {
+        rewrites: Rc::new(RefCell::new(0)),
+        custom_encoder: false,
+    }
+}
+
+#[test]
+fn contexts_chain_through_shared_slots() {
+    let (_fixture, driver, _dom, slot, input) = chaining_setup();
+    let mut first = SingleRewriteContext::new(driver.clone(), test_behavior());
+    assert!(first.predecessors().is_empty());
+    first.add_slot(slot.clone(), input.clone());
+    assert_eq!(
+        slot.borrow().base().last_context(),
+        Some(first.context_id())
+    );
+    let mut second = SingleRewriteContext::new(driver.clone(), test_behavior());
+    second.add_slot(slot.clone(), input);
+    // The second context chains onto the first through the slot.
+    assert_eq!(second.predecessors(), &[first.context_id()]);
+    assert_ne!(first.context_id(), second.context_id());
+    assert_eq!(
+        slot.borrow().base().last_context(),
+        Some(second.context_id())
+    );
+    // Explicit teardown detaches in front/back order.
+    first.detach_slots();
+    assert_eq!(
+        slot.borrow().base().last_context(),
+        Some(second.context_id())
+    );
+    second.detach_slots();
+    assert_eq!(slot.borrow().base().last_context(), None);
+}
+
+#[test]
+fn aggregate_input_infos_collect_when_flagged() {
+    let (_fixture, driver, mut dom, slot, input) = chaining_setup();
+    slot.borrow_mut()
+        .base_mut()
+        .set_need_aggregate_input_info(true);
+    let mut context = SingleRewriteContext::new(driver.clone(), test_behavior());
+    context.add_slot(slot.clone(), input);
+    context.start(&mut dom);
+    let infos = slot
+        .borrow()
+        .base()
+        .inputs()
+        .map(|infos| infos.len())
+        .unwrap_or(0);
+    assert!(infos >= 1, "flagged slot collects partition inputs");
+    assert!(slot.borrow().base().was_optimized());
+}
+
+#[test]
+fn aggregate_input_infos_stay_empty_without_flag() {
+    let (_fixture, driver, mut dom, slot, input) = chaining_setup();
+    let mut context = SingleRewriteContext::new(driver.clone(), test_behavior());
+    context.add_slot(slot.clone(), input);
+    context.start(&mut dom);
+    assert!(slot.borrow().base().inputs().is_none());
+    assert!(slot.borrow().base().was_optimized());
+}
+
+#[test]
+fn sequential_contexts_share_one_rewrite() {
+    // Two contexts, one slot (the nested css_image pattern): the
+    // second chains, sees the optimization, and reuses the cached
+    // partition instead of rewriting again.
+    let (fixture, driver, mut dom, slot, input) = chaining_setup();
+    let mut first = SingleRewriteContext::new(driver.clone(), TestBehavior {
+        rewrites: fixture.rewrites.clone(),
+        custom_encoder: false,
+    });
+    first.add_slot(slot.clone(), input.clone());
+    first.start(&mut dom);
+    assert!(slot.borrow().base().was_optimized());
+    let mut second = SingleRewriteContext::new(driver.clone(), TestBehavior {
+        rewrites: fixture.rewrites.clone(),
+        custom_encoder: false,
+    });
+    second.add_slot(slot.clone(), input);
+    assert_eq!(second.predecessors(), &[first.context_id()]);
+    second.start(&mut dom);
+    assert_eq!(*fixture.rewrites.borrow(), 1);
+    assert!(slot.borrow().base().was_optimized());
+}

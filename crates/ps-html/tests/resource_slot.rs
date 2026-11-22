@@ -227,3 +227,37 @@ fn render_delete() {
         "<link href=\"v3\" src=\"v4\"/>"
     );
 }
+
+#[test]
+fn context_tracking_rules() {
+    use ps_html::cacheable_resource::InputInfo;
+    use ps_html::resource_slot::SlotBase;
+
+    let mut base = SlotBase::new(None);
+    assert_eq!(base.last_context(), None);
+    assert!(base.inputs().is_none());
+    base.add_context(7);
+    base.add_context(9);
+    assert_eq!(base.last_context(), Some(9));
+    // First and last attachments may leave, in any order.
+    base.detach_context(7);
+    assert_eq!(base.last_context(), Some(9));
+    base.detach_context(9);
+    assert_eq!(base.last_context(), None);
+    // Inputs aggregate from empty.
+    base.report_input(InputInfo::default());
+    base.report_input(InputInfo::default());
+    assert_eq!(base.inputs().unwrap().len(), 2);
+}
+
+#[test]
+#[should_panic(expected = "first or last")]
+fn detach_middle_context_panics() {
+    use ps_html::resource_slot::SlotBase;
+
+    let mut base = SlotBase::new(None);
+    base.add_context(1);
+    base.add_context(2);
+    base.add_context(3);
+    base.detach_context(2);
+}

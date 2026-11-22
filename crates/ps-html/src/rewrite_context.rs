@@ -209,6 +209,61 @@ impl ContextSlot {
         }
     }
 
+    /// Records a context attachment on the slot (`AddContext`).
+    fn add_context(&self, id: super::resource_slot::ContextId) {
+        match self {
+            ContextSlot::Html(slot) => slot.borrow_mut().base_mut().add_context(id),
+            ContextSlot::SrcSet(slot) => slot.borrow_mut().base_mut().add_context(id),
+            ContextSlot::Fetch(slot) => slot.borrow_mut().base_mut().add_context(id),
+            ContextSlot::Css(slot) => slot.borrow_mut().base_mut().add_context(id),
+            ContextSlot::Assoc(slot) => slot.borrow_mut().base_mut().add_context(id),
+        }
+    }
+
+    /// Detaches a context from the slot (`DetachContext`).
+    fn detach_context(&self, id: super::resource_slot::ContextId) {
+        match self {
+            ContextSlot::Html(slot) => slot.borrow_mut().base_mut().detach_context(id),
+            ContextSlot::SrcSet(slot) => slot.borrow_mut().base_mut().detach_context(id),
+            ContextSlot::Fetch(slot) => slot.borrow_mut().base_mut().detach_context(id),
+            ContextSlot::Css(slot) => slot.borrow_mut().base_mut().detach_context(id),
+            ContextSlot::Assoc(slot) => slot.borrow_mut().base_mut().detach_context(id),
+        }
+    }
+
+    /// Most recently attached context (`LastContext`), if any.
+    fn last_context(&self) -> Option<super::resource_slot::ContextId> {
+        match self {
+            ContextSlot::Html(slot) => slot.borrow().base().last_context(),
+            ContextSlot::SrcSet(slot) => slot.borrow().base().last_context(),
+            ContextSlot::Fetch(slot) => slot.borrow().base().last_context(),
+            ContextSlot::Css(slot) => slot.borrow().base().last_context(),
+            ContextSlot::Assoc(slot) => slot.borrow().base().last_context(),
+        }
+    }
+
+    /// Whether chained input infos aggregate here.
+    fn need_aggregate_input_info(&self) -> bool {
+        match self {
+            ContextSlot::Html(slot) => slot.borrow().base().need_aggregate_input_info(),
+            ContextSlot::SrcSet(slot) => slot.borrow().base().need_aggregate_input_info(),
+            ContextSlot::Fetch(slot) => slot.borrow().base().need_aggregate_input_info(),
+            ContextSlot::Css(slot) => slot.borrow().base().need_aggregate_input_info(),
+            ContextSlot::Assoc(slot) => slot.borrow().base().need_aggregate_input_info(),
+        }
+    }
+
+    /// Records one input's validity watermark (`ReportInput`).
+    fn report_input(&self, input: super::cacheable_resource::InputInfo) {
+        match self {
+            ContextSlot::Html(slot) => slot.borrow_mut().base_mut().report_input(input),
+            ContextSlot::SrcSet(slot) => slot.borrow_mut().base_mut().report_input(input),
+            ContextSlot::Fetch(slot) => slot.borrow_mut().base_mut().report_input(input),
+            ContextSlot::Css(slot) => slot.borrow_mut().base_mut().report_input(input),
+            ContextSlot::Assoc(slot) => slot.borrow_mut().base_mut().report_input(input),
+        }
+    }
+
     /// Marks the slot optimized.
     pub(crate) fn set_was_optimized(&self, optimized: bool) {
         match self {
@@ -404,6 +459,8 @@ pub fn add_link_rel_canonical(
 pub struct SingleRewriteContext<B: SingleRewriteBehavior> {
     driver: Rc<ResourceDriver>,
     behavior: B,
+    id: super::resource_slot::ContextId,
+    predecessors: Vec<super::resource_slot::ContextId>,
     slots: Vec<ContextSlot>,
     inputs: Vec<InputResource>,
     outputs: Vec<Option<OutputResource>>,
@@ -423,6 +480,8 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
         SingleRewriteContext {
             driver,
             behavior,
+            id: super::resource_slot::mint_context_id(),
+            predecessors: Vec::new(),
             slots: Vec::new(),
             inputs: Vec::new(),
             outputs: Vec::new(),
@@ -437,14 +496,26 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
         }
     }
 
+    /// Attaches a slot, recording the chain (`AddSlot`): a slot
+    /// already held makes its last holder this context's
+    /// predecessor, like C++ (successor wakeups need no machinery —
+    /// the sync engine runs predecessors to completion first).
+    fn attach(&mut self, slot: ContextSlot, input: InputResource) {
+        if let Some(predecessor) = slot.last_context() {
+            self.predecessors.push(predecessor);
+        }
+        slot.add_context(self.id);
+        self.slots.push(slot);
+        self.inputs.push(input);
+        self.render_slots.push(false);
+    }
+
     /// Attaches a slot with its owned input (`AddSlot`; the input
     /// rides alongside because sync ownership splits here — slot
     /// snapshots stay valid since URLs and authorization never
     /// change after creation).
     pub fn add_slot(&mut self, slot: Rc<RefCell<HtmlResourceSlot>>, input: InputResource) {
-        self.slots.push(ContextSlot::Html(slot));
-        self.inputs.push(input);
-        self.render_slots.push(false);
+        self.attach(ContextSlot::Html(slot), input);
     }
 
     /// Attaches a srcset candidate slot.
@@ -453,33 +524,45 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
         slot: Rc<RefCell<super::srcset::SrcSetSlot>>,
         input: InputResource,
     ) {
-        self.slots.push(ContextSlot::SrcSet(slot));
-        self.inputs.push(input);
-        self.render_slots.push(false);
+        self.attach(ContextSlot::SrcSet(slot), input);
     }
 
     /// Attaches a CSS `url()` slot.
     pub fn add_css_slot(&mut self, slot: Rc<RefCell<CssResourceSlot>>, input: InputResource) {
-        self.slots.push(ContextSlot::Css(slot));
-        self.inputs.push(input);
-        self.render_slots.push(false);
+        self.attach(ContextSlot::Css(slot), input);
     }
 
     /// Attaches a fallback association slot.
     pub fn add_assoc_slot(&mut self, slot: Rc<RefCell<AssociationSlot>>, input: InputResource) {
-        self.slots.push(ContextSlot::Assoc(slot));
-        self.inputs.push(input);
-        self.render_slots.push(false);
+        self.attach(ContextSlot::Assoc(slot), input);
     }
 
     /// Attaches a fetch slot (`AddSlot` with a `FetchResourceSlot`).
     fn add_fetch_slot(&mut self, input: InputResource) {
         let handle: ResourceHandle = Rc::new(input.clone());
-        self.slots.push(ContextSlot::Fetch(Rc::new(RefCell::new(
-            FetchResourceSlot::new(Some(handle)),
-        ))));
-        self.inputs.push(input);
-        self.render_slots.push(false);
+        self.attach(
+            ContextSlot::Fetch(Rc::new(RefCell::new(FetchResourceSlot::new(Some(handle))))),
+            input,
+        );
+    }
+
+    /// This context's tracking identity.
+    #[must_use]
+    pub fn context_id(&self) -> super::resource_slot::ContextId {
+        self.id
+    }
+
+    /// Chained predecessors (`num_predecessors`, in attach order).
+    #[must_use]
+    pub fn predecessors(&self) -> &[super::resource_slot::ContextId] {
+        &self.predecessors
+    }
+
+    /// Detaches every slot (`DetachSlots`), for explicit teardown.
+    pub fn detach_slots(&self) {
+        for slot in &self.slots {
+            slot.detach_context(self.id);
+        }
     }
 
     /// Borrows the partition key (valid after [`start`](Self::start)).
@@ -995,7 +1078,8 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
 
     /// Renders slots from their partitions (`Propagate`).
     fn propagate(&mut self, dom: &mut Dom, render_slots: bool) {
-        // NOTE: successor chaining lands with multi-filter flows.
+        // Chained contexts share slots by attachment order; each runs
+        // to completion inline, so no wakeup scheduling is needed.
         let base = self.driver.base_url().clone();
         let options = self.driver.options().clone();
         for partition_index in 0..self.partitions.partition.len() {
@@ -1027,6 +1111,17 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
                 // Swap in the output snapshot, then render relocatable URLs.
                 if let Some(output) = self.outputs[partition_index].clone() {
                     self.slots[slot_index].set_resource(Rc::new(output));
+                }
+                if self.slots[slot_index].need_aggregate_input_info() {
+                    // C++ indexes other_dependency by partition here
+                    // (likely a copy slip for the loop index); each
+                    // dependency reports once instead.
+                    for dep in &self.partitions.other_dependency {
+                        self.slots[slot_index].report_input(dep.clone());
+                    }
+                    for dep in &self.partitions.partition[partition_index].input {
+                        self.slots[slot_index].report_input(dep.clone());
+                    }
                 }
                 if render_slots && relocatable && !self.was_too_busy && !custom {
                     self.slots[slot_index].render(dom, &base, &options);
@@ -1621,6 +1716,8 @@ pub trait InlineBehavior {
 pub struct InlineRewriteContext<B: InlineBehavior> {
     driver: Rc<ResourceDriver>,
     behavior: B,
+    id: super::resource_slot::ContextId,
+    predecessors: Vec<super::resource_slot::ContextId>,
     slot: Option<ContextSlot>,
     input: Option<InputResource>,
     partitions: OutputPartitions,
@@ -1642,6 +1739,8 @@ impl<B: InlineBehavior> InlineRewriteContext<B> {
         InlineRewriteContext {
             driver,
             behavior,
+            id: super::resource_slot::mint_context_id(),
+            predecessors: Vec::new(),
             slot: None,
             input: None,
             partitions: OutputPartitions::default(),
@@ -1650,6 +1749,25 @@ impl<B: InlineBehavior> InlineRewriteContext<B> {
             base_url,
             rewrite_done: false,
             ok_to_write_partitions: true,
+        }
+    }
+
+    /// This context's tracking identity.
+    #[must_use]
+    pub fn context_id(&self) -> super::resource_slot::ContextId {
+        self.id
+    }
+
+    /// Chained predecessors (`num_predecessors`, in attach order).
+    #[must_use]
+    pub fn predecessors(&self) -> &[super::resource_slot::ContextId] {
+        &self.predecessors
+    }
+
+    /// Detaches the slot (`DetachSlots`), for explicit teardown.
+    pub fn detach_slots(&self) {
+        if let Some(slot) = &self.slot {
+            slot.detach_context(self.id);
         }
     }
 
@@ -1688,7 +1806,12 @@ impl<B: InlineBehavior> InlineRewriteContext<B> {
             attribute,
             self.behavior.id(),
         );
-        self.slot = Some(ContextSlot::Html(slot));
+        let slot = ContextSlot::Html(slot);
+        if let Some(predecessor) = slot.last_context() {
+            self.predecessors.push(predecessor);
+        }
+        slot.add_context(self.id);
+        self.slot = Some(slot);
         self.input = Some(input);
         self.start(dom);
         true
