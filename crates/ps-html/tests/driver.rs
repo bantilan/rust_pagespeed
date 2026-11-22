@@ -684,6 +684,122 @@ fn proxy_suffix_threads_lawyer_through_driver() {
     assert_eq!(stat(&resource_driver, URL_TRIMS), 0);
 }
 
+/// Desktop Chrome UA (supports lazyload and DNS prefetch).
+const CHROME_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+#[test]
+fn lazyload_images_runs_through_driver() {
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    // Beaconing off: every image is a rewrite candidate (C++
+    // ShouldApply contrast case).
+    options
+        .borrow_mut()
+        .set_option("CriticalImagesBeaconEnabled", "off", Scope::Server)
+        .unwrap();
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(Filter::LazyloadImages);
+    let resource_driver = resource_driver_for(options.clone(), "http://test.com/lz.html");
+    resource_driver.set_user_agent(CHROME_UA);
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ctx(),
+        sink.clone(),
+        Some(resource_driver.clone()),
+    );
+    assert!(
+        !driver
+            .skipped_slots()
+            .contains(&(Phase::PostRender, ChainFilter::LazyloadImages)),
+        "LazyloadImages must bind, skipped: {:?}",
+        driver.skipped_slots()
+    );
+    driver.start_parse(b"http://test.com/lz.html", false);
+    driver.write(b"<head></head><body><img src='http://test.com/a.png'/></body>");
+    driver.finish();
+    let output = String::from_utf8_lossy(&sink.bytes()).into_owned();
+    assert!(output.contains("data-pagespeed-lazy-src"), "{output}");
+    assert!(output.contains("data:image/gif;base64,"), "{output}");
+}
+
+#[test]
+fn lazyload_images_stands_down_without_beacon_data() {
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(Filter::LazyloadImages);
+    let resource_driver = resource_driver_for(options.clone(), "http://test.com/lz.html");
+    resource_driver.set_user_agent(CHROME_UA);
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ctx(),
+        sink.clone(),
+        Some(resource_driver.clone()),
+    );
+    // Bound but idle: beaconing is on with fresh metadata, so the
+    // filter waits for critical-image data.
+    assert!(
+        !driver
+            .skipped_slots()
+            .contains(&(Phase::PostRender, ChainFilter::LazyloadImages)),
+        "LazyloadImages must bind, skipped: {:?}",
+        driver.skipped_slots()
+    );
+    driver.start_parse(b"http://test.com/lz.html", false);
+    driver.write(b"<head></head><body><img src='http://test.com/a.png'/></body>");
+    driver.finish();
+    let output = String::from_utf8_lossy(&sink.bytes()).into_owned();
+    assert!(!output.contains("data-pagespeed-lazy-src"), "{output}");
+}
+
+#[test]
+fn insert_dns_prefetch_runs_through_driver() {
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(Filter::InsertDnsPrefetch);
+    let resource_driver = resource_driver_for(options.clone(), "http://test.com/dns.html");
+    resource_driver.set_user_agent(CHROME_UA);
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ctx(),
+        sink.clone(),
+        Some(resource_driver.clone()),
+    );
+    assert!(
+        !driver
+            .skipped_slots()
+            .contains(&(Phase::PostRender, ChainFilter::InsertDnsPrefetch)),
+        "InsertDnsPrefetch must bind, skipped: {:?}",
+        driver.skipped_slots()
+    );
+    // Three passes through one driver: the first two store the
+    // domain list (nothing inserted, like C++ without prior
+    // property-cache data); the stable third inserts the tags.
+    for pass in 0..3 {
+        driver.start_parse(
+            format!("http://test.com/dns{pass}.html").as_bytes(),
+            false,
+        );
+        driver.write(b"<head><script></script></head><body><script src='http://a.com/1.js'/><script src='http://b.com/2.js'/><script src='http://c.com/3.js'/></body>");
+        driver.finish();
+    }
+    let output = String::from_utf8_lossy(&sink.bytes()).into_owned();
+    for domain in ["a.com", "b.com", "c.com"] {
+        assert!(
+            output.contains(&format!("<link rel=\"dns-prefetch\" href=\"//{domain}\">")),
+            "{output}"
+        );
+    }
+    assert_eq!(output.matches("dns-prefetch").count(), 3, "{output}");
+}
+
 #[test]
 fn domain_rewrite_runs_through_driver() {
     use ps_html::filters::domain_rewrite::DOMAIN_REWRITES;

@@ -34,6 +34,14 @@ pub const IMAGE_ONLOAD_CODE: &[u8] = b"if(window.pagespeed){if(pagespeed.lazyLoa
 pub const LOAD_ALL_IMAGES: &[u8] =
     b"if(window.pagespeed){if(pagespeed.lazyLoadImages){pagespeed.lazyLoadImages.loadAllImages();}}";
 
+/// Blank placeholder (1x1 transparent gif as a data URI): C++
+/// serves equivalent bytes from the static-asset handler, whose
+/// prefix lives outside this crate, so the driver inlines the bytes
+/// instead. Renders identically with no extra fetch; the
+/// `LazyloadImagesBlankUrl` option still overrides it.
+pub const BLANK_IMAGE_DATA_URL: &str =
+    "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
 /// Override-script body (`kOverrideAttributeFunctions`).
 pub const OVERRIDE_ATTRIBUTE_FUNCTIONS: &[u8] = b"if(window.pagespeed){if(pagespeed.lazyLoadImages){pagespeed.lazyLoadImages.overrideAttributeFunctions();}}";
 
@@ -103,7 +111,8 @@ pub struct LazyloadImagesConfig {
     pub is_xml_http_request: bool,
     /// Finder availability (`CriticalImagesFinder::Available`).
     pub finder_availability: FinderAvailability,
-    /// Critical-image full URLs (`IsHtmlCriticalImage` set).
+    /// Critical-image key hashes (`IsHtmlCriticalImage` set, keyed
+    /// by [`crate::beacon_finder::url_hash`] like C++ `GetKeyForUrl`).
     pub critical_images: HashSet<String>,
     /// Blank placeholder URL (the `BLANK_GIF` asset URL; the
     /// `LazyloadImagesBlankUrl` option overrides it when set).
@@ -515,7 +524,10 @@ impl<N: UrlNamer> HtmlFilter for LazyloadImagesFilter<N> {
             return;
         }
         if self.config.finder_availability == FinderAvailability::Available
-            && self.config.critical_images.contains(&full_url)
+            && self
+                .config
+                .critical_images
+                .contains(crate::beacon_finder::url_hash(&full_url).as_str())
         {
             self.log(LazyloadStatus::NotApplied, false, true);
             return;

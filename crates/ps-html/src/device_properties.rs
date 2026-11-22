@@ -17,6 +17,8 @@ pub struct DeviceProperties {
     user_agent: String,
     supports_image_inlining: bool,
     supports_lazyload_images: bool,
+    supports_dns_prefetch: bool,
+    supports_dns_prefetch_using_rel_prefetch: bool,
     supports_critical_css: bool,
     supports_js_defer_mobile: bool,
     supports_js_defer_desktop: bool,
@@ -39,6 +41,8 @@ impl DeviceProperties {
             user_agent: String::new(),
             supports_image_inlining: false,
             supports_lazyload_images: false,
+            supports_dns_prefetch: false,
+            supports_dns_prefetch_using_rel_prefetch: false,
             supports_critical_css: false,
             supports_js_defer_mobile: false,
             supports_js_defer_desktop: false,
@@ -64,6 +68,9 @@ impl DeviceProperties {
         self.supports_js_defer_mobile = self.matcher.supports_js_defer(ua, true);
         self.supports_js_defer_desktop = self.matcher.supports_js_defer(ua, false);
         self.supports_lazyload_images = !self.is_bot() && self.matcher.supports_lazyload_images(ua);
+        self.supports_dns_prefetch = self.matcher.supports_dns_prefetch(ua);
+        self.supports_dns_prefetch_using_rel_prefetch =
+            self.matcher.supports_dns_prefetch_using_rel_prefetch(ua);
     }
 
     /// Parses request headers (`ParseRequestHeaders`).
@@ -97,6 +104,18 @@ impl DeviceProperties {
     #[must_use]
     pub fn supports_lazyload_images(&self) -> bool {
         self.supports_lazyload_images
+    }
+
+    /// Whether DNS prefetch is supported.
+    #[must_use]
+    pub fn supports_dns_prefetch(&self) -> bool {
+        self.supports_dns_prefetch
+    }
+
+    /// Whether DNS prefetch uses `rel=prefetch` (IE9).
+    #[must_use]
+    pub fn supports_dns_prefetch_using_rel_prefetch(&self) -> bool {
+        self.supports_dns_prefetch_using_rel_prefetch
     }
 
     /// Whether critical CSS is supported.

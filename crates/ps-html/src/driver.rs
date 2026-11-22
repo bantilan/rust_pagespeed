@@ -43,6 +43,11 @@ impl Driver {
         let mut parser = Parser::new();
         let mut skipped = Vec::new();
         let amp_verdict = Rc::new(RefCell::new(None));
+        // One flush-early page state shared by its filters, like C++
+        // `driver()->flush_early_info()`.
+        let flush_early_info = Rc::new(RefCell::new(
+            crate::flush_early::FlushEarlyInfo::default(),
+        ));
         for slot in &plan.listeners {
             match slot {
                 ChainFilter::AmpDocument => {
@@ -213,6 +218,65 @@ impl Driver {
                         }
                         Some(Box::new(filter) as Box<dyn crate::filter::HtmlFilter>)
                     }
+                    ChainFilter::InsertDnsPrefetch => resource_driver.clone().map(|driver| {
+                        let properties = driver.request_properties();
+                        let mut filter = filters::InsertDnsPrefetchFilter::new(
+                            filters::InsertDnsPrefetchConfig {
+                                options: options.clone(),
+                                supports_dns_prefetch: properties.supports_dns_prefetch(),
+                                use_rel_prefetch: properties
+                                    .supports_dns_prefetch_using_rel_prefetch(),
+                                url_valued: options.url_valued_attributes().to_vec(),
+                                flush_early_info: flush_early_info.clone(),
+                            },
+                        );
+                        filter.set_lawyer(driver.lawyer());
+                        filter.set_max_url_size(options.max_url_size());
+                        Box::new(filter) as Box<dyn crate::filter::HtmlFilter>
+                    }),
+                    ChainFilter::LazyloadImages => resource_driver.clone().map(|driver| {
+                        use crate::server_context::XhtmlStatus as DriverXhtml;
+                        let mut properties = driver.request_properties();
+                        let xhtml = match driver.mime_type_xhtml_status() {
+                            DriverXhtml::IsXhtml => crate::filters::common::XhtmlStatus::IsXhtml,
+                            DriverXhtml::IsNotXhtml => {
+                                crate::filters::common::XhtmlStatus::IsNotXhtml
+                            }
+                            DriverXhtml::Unknown => crate::filters::common::XhtmlStatus::Unknown,
+                        };
+                        let (finder_availability, critical_images) =
+                            Self::critical_images_for(&driver, options);
+                        let mut filter = filters::LazyloadImagesFilter::new(
+                            filters::LazyloadImagesConfig {
+                                options: options.clone(),
+                                supports_lazyload_images: properties.supports_lazyload_images(),
+                                is_xml_http_request: driver
+                                    .request_headers()
+                                    .is_xml_http_request(),
+                                finder_availability,
+                                critical_images,
+                                blank_image_url: filters::lazyload_images::BLANK_IMAGE_DATA_URL
+                                    .to_string(),
+                                lazyload_script_flushed: false,
+                                hash_length: driver
+                                    .server_context()
+                                    .hasher()
+                                    .hash_size_in_chars(),
+                                signature_length: driver.signature_length(),
+                                debug: options
+                                    .filters()
+                                    .enabled(ps_config::filter::Filter::Debug),
+                                pedantic: options
+                                    .filters()
+                                    .enabled(ps_config::filter::Filter::Pedantic),
+                                xhtml,
+                            },
+                            driver.server_context().url_namer().clone(),
+                        );
+                        filter.set_lawyer(driver.lawyer());
+                        filter.set_max_url_size(options.max_url_size());
+                        Box::new(filter) as Box<dyn crate::filter::HtmlFilter>
+                    }),
                     ChainFilter::DomainRewrite => resource_driver.clone().map(|driver| {
                         use crate::server_context::XhtmlStatus as DriverXhtml;
                         let xhtml = match driver.mime_type_xhtml_status() {
@@ -280,6 +344,43 @@ impl Driver {
             plan,
             skipped,
             amp_verdict,
+        }
+    }
+
+    /// Resolves lazyload critical-image inputs (`Availability` +
+    /// `GetHtmlCriticalImages`): beaconing off means every image is
+    /// a candidate, learned evidence yields the critical key hashes,
+    /// and anything else stands the filter down until data arrives.
+    fn critical_images_for(
+        driver: &ResourceDriver,
+        options: &RewriteOptions,
+    ) -> (
+        filters::lazyload_images::FinderAvailability,
+        std::collections::HashSet<String>,
+    ) {
+        use filters::lazyload_images::FinderAvailability;
+        if !crate::beacon_finder::beaconing_active(options) {
+            return (FinderAvailability::Disabled, std::collections::HashSet::new());
+        }
+        let server = driver.server_context();
+        let options_hash = server.hasher().hash(options.signature().as_bytes());
+        let properties = driver.request_properties();
+        let device_suffix =
+            ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
+                properties.device_type(),
+            );
+        let finder = crate::beacon_finder::BeaconFinder::new(server.metadata_cache());
+        let lookup = finder.load(
+            driver.base_url().spec(),
+            &options_hash,
+            device_suffix,
+        );
+        match lookup.record() {
+            Some(record) if record.valid_beacons >= 1 => (
+                FinderAvailability::Available,
+                crate::beacon_finder::html_critical_images(record),
+            ),
+            _ => (FinderAvailability::NoDataYet, std::collections::HashSet::new()),
         }
     }
 

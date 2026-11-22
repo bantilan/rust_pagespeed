@@ -51,6 +51,18 @@ impl RequestProperties {
         self.downstream.supports_lazyload_images() && self.device.supports_lazyload_images()
     }
 
+    /// Whether DNS prefetch is supported (device-only, like C++).
+    #[must_use]
+    pub fn supports_dns_prefetch(&self) -> bool {
+        self.device.supports_dns_prefetch()
+    }
+
+    /// Whether DNS prefetch uses `rel=prefetch` (IE9, device-only).
+    #[must_use]
+    pub fn supports_dns_prefetch_using_rel_prefetch(&self) -> bool {
+        self.device.supports_dns_prefetch_using_rel_prefetch()
+    }
+
     /// Whether critical CSS is supported.
     #[must_use]
     pub fn supports_critical_css(&self) -> bool {

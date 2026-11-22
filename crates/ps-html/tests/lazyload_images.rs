@@ -214,7 +214,7 @@ fn critical_images() {
         "http://test.com/critical4.jpg",
     ]
     .into_iter()
-    .map(String::from)
+    .map(ps_html::beacon_finder::url_hash)
     .collect::<HashSet<_>>();
     fixture.hash_length = 1;
 
