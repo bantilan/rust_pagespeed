@@ -18,7 +18,9 @@ use ps_cache::cache::MemoryCache;
 use ps_config::filter::Filter;
 use ps_config::options::RewriteOptions;
 use ps_html::filter::HtmlFilter;
-use ps_html::filters::image_rewrite::{ImageRewriteFilter, FILTER_ID, IMAGE_WEBP_REWRITES};
+use ps_html::filters::image_rewrite::{
+    ImageRewriteFilter, IMAGE_REWRITES_DEFERRED, IMAGE_WEBP_REWRITES,
+};
 use ps_html::parser::Parser;
 use ps_html::server_context::{ResourceDriver, ServerContext};
 use ps_html::writer::WriterFilter;
@@ -350,6 +352,32 @@ fn collect_img_srcs(html: &[u8]) -> Vec<String> {
     out
 }
 
+/// Serves every `.pagespeed.` URL in a render once, driving lazy
+/// partitions to their steady state (a re-parse afterwards matches
+/// eager exactly).
+fn serve_rendered_urls(fixture: &Fixture, page_url: &str, html: &str) {
+    let base = GoogleUrl::new(page_url);
+    for token in html.split(|c: char| {
+        c.is_whitespace() || c == '"' || c == '\'' || c == '(' || c == ')' || c == '<' || c == '>'
+    }) {
+        if !token.contains(".pagespeed.") {
+            continue;
+        }
+        // Strip attribute prefixes on unquoted values (`src=...`).
+        let mut url = token;
+        for prefix in ["src=", "href=", "background=", "content="] {
+            if let Some(stripped) = url.strip_prefix(prefix) {
+                url = stripped;
+                break;
+            }
+        }
+        let absolute = GoogleUrl::resolve(&base, url).spec().to_string();
+        fixture
+            .serve_url(&absolute)
+            .unwrap_or_else(|| panic!("serve {absolute}"));
+    }
+}
+
 /// Rewrites one image tag and checks fetching (`RewriteImage`).
 fn rewrite_image(fixture: &Fixture, tag_string: &str, content_type: &str) -> String {
     // Store image contents into fetcher.
@@ -401,10 +429,29 @@ fn rewrite_image_from_html(fixture: &Fixture, tag_string: &str, content_type: &s
     const HTML_URL: &str = "http://rewrite_image.test/RewriteImage.html";
     let html = format!("<head/><body><{tag_string} src=\"Puzzle.jpg\"/></body>");
 
+    let deferred_before = fixture.stat(IMAGE_REWRITES_DEFERRED);
     let output = fixture.parse(HTML_URL, &html);
-    let img_srcs = collect_img_srcs(output.as_bytes());
+    let mut img_srcs = collect_img_srcs(output.as_bytes());
     // output should have exactly one image file (Puzzle.jpg).
     assert_eq!(1, img_srcs.len());
+    // Lazy convergence: first view mints unversioned URLs; serve
+    // once so partitions upgrade, then re-render to the steady
+    // state the assertions below pin.
+    if fixture.stat(IMAGE_REWRITES_DEFERRED) > deferred_before {
+        for src in &img_srcs {
+            if src.contains(".pagespeed.") {
+                let absolute = GoogleUrl::resolve(&GoogleUrl::new(HTML_URL), src)
+                    .spec()
+                    .to_string();
+                fixture
+                    .serve_url(&absolute)
+                    .unwrap_or_else(|| panic!("serve {absolute}"));
+            }
+        }
+        let converged = fixture.parse(HTML_URL, &html);
+        img_srcs = collect_img_srcs(converged.as_bytes());
+        assert_eq!(1, img_srcs.len());
+    }
     let img_gurl = GoogleUrl::resolve(&GoogleUrl::new(HTML_URL), &img_srcs[0]);
     assert!(img_gurl.is_web_valid());
     let base = GoogleUrl::new(REWRITE_IMAGE_DOMAIN);
@@ -510,7 +557,26 @@ fn test_single_rewrite_without_abs(
 
     let html_input = format!("<img src='{initial_url}'{initial_attributes}>");
     let output = fixture.parse(&page_url, &html_input);
+    assert_single_rewrite_output(
+        &output,
+        initial_url,
+        output_type,
+        final_attributes,
+        expect_rewritten,
+        expect_inline,
+    );
+}
 
+/// Asserts one single-rewrite output (`TestSingleRewrite` checks).
+#[allow(clippy::too_many_arguments)]
+fn assert_single_rewrite_output(
+    output: &str,
+    initial_url: &str,
+    output_type: &str,
+    final_attributes: &str,
+    expect_rewritten: bool,
+    expect_inline: bool,
+) {
     // Check for single image file in the rewritten page.
     let image_urls = collect_img_srcs(output.as_bytes());
     assert_eq!(1, image_urls.len());
@@ -553,6 +619,87 @@ fn test_single_rewrite_without_abs(
 
     let html_expected_output = format!("<img src='{rewritten_url}'{final_attributes}>");
     assert_eq!(html_expected_output, output);
+}
+
+/// Converged `TestSingleRewrite` (progressive form for conversion
+/// cases; see below).
+#[allow(clippy::too_many_arguments)]
+fn test_single_rewrite_converged(
+    fixture: &Fixture,
+    name: &str,
+    input_type: &str,
+    output_type: &str,
+    initial_attributes: &str,
+    final_attributes: &str,
+    expect_rewritten: bool,
+    expect_inline: bool,
+) {
+    let initial_url = format!("{TEST_DOMAIN}{name}");
+    test_single_rewrite_converged_without_abs(
+        fixture,
+        &initial_url,
+        name,
+        input_type,
+        output_type,
+        initial_attributes,
+        final_attributes,
+        expect_rewritten,
+        expect_inline,
+    );
+}
+
+/// Rewrites one image through lazy convergence (`TestSingleRewrite`
+/// progressive form): first view mints the unversioned URL, serving
+/// it optimizes and upgrades the partition, and the second view
+/// matches eager exactly. Use for conversion cases (output type
+/// differs from input); same-type recompresses converge trivially.
+#[allow(clippy::too_many_arguments)]
+fn test_single_rewrite_converged_without_abs(
+    fixture: &Fixture,
+    initial_url: &str,
+    name: &str,
+    input_type: &str,
+    output_type: &str,
+    initial_attributes: &str,
+    final_attributes: &str,
+    expect_rewritten: bool,
+    expect_inline: bool,
+) {
+    let page_url = format!("{TEST_DOMAIN}test.html");
+    fixture.add_file_to_mock_fetcher(initial_url, name, input_type, 100);
+
+    let html_input = format!("<img src='{initial_url}'{initial_attributes}>");
+    let deferred_before = fixture.stat(IMAGE_REWRITES_DEFERRED);
+    let first_output = fixture.parse(&page_url, &html_input);
+    let first_urls = collect_img_srcs(first_output.as_bytes());
+    assert_eq!(1, first_urls.len());
+    // Converge only when the first view deferred: serve each
+    // rewritten URL once so partitions upgrade, then assert the
+    // steady state. Declined rewrites assert first view directly
+    // (identical to eager, with zero extra requests).
+    let output = if fixture.stat(IMAGE_REWRITES_DEFERRED) > deferred_before {
+        for src in &first_urls {
+            if src.contains(".pagespeed.") {
+                let absolute = GoogleUrl::resolve(&GoogleUrl::new(&page_url), src)
+                    .spec()
+                    .to_string();
+                fixture
+                    .serve_url(&absolute)
+                    .unwrap_or_else(|| panic!("serve {absolute}"));
+            }
+        }
+        fixture.parse(&page_url, &html_input)
+    } else {
+        first_output
+    };
+    assert_single_rewrite_output(
+        &output,
+        initial_url,
+        output_type,
+        final_attributes,
+        expect_rewritten,
+        expect_inline,
+    );
 }
 
 #[test]
@@ -937,7 +1084,7 @@ fn test_transcode_and_optimize_png(
         .options
         .borrow_mut()
         .set_image_jpeg_recompress_quality(85);
-    test_single_rewrite(
+    test_single_rewrite_converged(
         fixture,
         BIKE_PNG,
         "image/png",
@@ -990,7 +1137,7 @@ fn png_to_webp_with_webp_ua() {
         .borrow_mut()
         .set_image_recompress_quality(85);
     fixture.setup_for_webp();
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         BIKE_PNG,
         "image/png",
@@ -1031,7 +1178,7 @@ fn png_to_webp_with_webp_la_ua() {
         .borrow_mut()
         .set_image_recompress_quality(85);
     fixture.setup_for_webp_lossless();
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         BIKE_PNG,
         "image/png",
@@ -1081,7 +1228,7 @@ fn png_to_webp_with_webp_la_ua_and_flag() {
         .set_image_recompress_quality(85);
     fixture.setup_for_webp_lossless();
 
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         "RedbrushAlpha-0.5.png",
         "image/png",
@@ -1177,7 +1324,7 @@ fn png_to_webp_with_webp_la_ua_and_flag_times_out() {
         .set_image_recompress_quality(85);
     fixture.options.borrow_mut().set_image_webp_timeout_ms(0);
     fixture.setup_for_webp_lossless();
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         BIKE_PNG,
         "image/png",
@@ -1713,10 +1860,13 @@ fn debug_message_image_info() {
     fixture.add_file_to_mock_fetcher("graphic_transparent.png", "CuppaT.png", "image/png", 100);
     fixture.add_file_to_mock_fetcher("animated.gif", "CradleAnimation.gif", "image/gif", 100);
 
-    let output = fixture.parse(
-        &format!("{TEST_DOMAIN}single_attribute"),
-        "<img src=photo_opaque.gif><img src=graphic_transparent.png><img src=animated.gif>",
-    );
+    let page_url = format!("{TEST_DOMAIN}single_attribute");
+    let html = "<img src=photo_opaque.gif><img src=graphic_transparent.png><img src=animated.gif>";
+    let output = fixture.parse(&page_url, html);
+    // Lazy convergence: serve once so conversions and declines
+    // land, then assert the steady state.
+    serve_rendered_urls(&fixture, &page_url, &output);
+    let output = fixture.parse(&page_url, html);
 
     let expected = concat!(
         "<img src=xphoto_opaque.gif.pagespeed.ic.0.png>",
@@ -1786,10 +1936,12 @@ fn debug_message_unauthorized() {
     fixture.add_file_to_mock_fetcher(AUTHORIZED, "IronChef2.gif", "image/gif", 100);
     fixture.add_file_to_mock_fetcher(UNAUTHORIZED, "IronChef2.gif", "image/gif", 100);
 
-    let output = fixture.parse(
-        &format!("{TEST_DOMAIN}unauthorized_domain"),
-        &format!("<img src={AUTHORIZED}><img src={UNAUTHORIZED}>"),
-    );
+    let page_url = format!("{TEST_DOMAIN}unauthorized_domain");
+    let html = format!("<img src={AUTHORIZED}><img src={UNAUTHORIZED}>");
+    let output = fixture.parse(&page_url, &html);
+    // Lazy convergence: serve once so the conversion lands.
+    serve_rendered_urls(&fixture, &page_url, &output);
+    let output = fixture.parse(&page_url, &html);
 
     let driver = fixture.driver_for(&format!("{TEST_DOMAIN}unauthorized_domain"));
     let unauth_gurl = GoogleUrl::new(UNAUTHORIZED);
@@ -1863,7 +2015,7 @@ fn test_inlining(
         .borrow_mut()
         .soft_enable_filter_for_testing(Filter::RecompressPng);
 
-    test_single_rewrite(
+    test_single_rewrite_converged(
         fixture,
         file_name,
         input_type,
@@ -2066,7 +2218,7 @@ fn test_resolution_limit(
         ""
     };
 
-    test_single_rewrite(
+    test_single_rewrite_converged(
         fixture,
         image_file,
         content_type,
@@ -2231,7 +2383,7 @@ fn animated_gif_to_webp_with_webp_animated_ua() {
         .borrow_mut()
         .set_image_recompress_quality(85);
     fixture.setup_for_webp_animated();
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         "CradleAnimation.gif",
         "image/gif",
@@ -2267,7 +2419,7 @@ fn animated_gif_to_webp_with_webp_la_ua() {
         .borrow_mut()
         .set_image_recompress_quality(85);
     fixture.setup_for_webp_lossless();
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         "CradleAnimation.gif",
         "image/gif",
@@ -2302,7 +2454,7 @@ fn animated_gif_to_webp_not_enabled() {
         .borrow_mut()
         .set_image_recompress_quality(85);
     fixture.setup_for_webp_animated();
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         "CradleAnimation.gif",
         "image/gif",
@@ -2349,7 +2501,7 @@ fn gif_to_webp_lossless_with_webp_animated_ua() {
         .borrow_mut()
         .set_image_recompress_quality(85);
     fixture.setup_for_webp_animated();
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         "IronChef2.gif",
         "image/gif",
@@ -2395,8 +2547,12 @@ fn animated_no_cache_reuse() {
 
     // WebP capable browser --- made a WebP image.
     fixture.setup_for_webp_animated();
+    let webp_page = format!("{TEST_DOMAIN}webp_broswer");
+    let webp_first = fixture.parse(&webp_page, "<img src=a.jpeg>");
+    // Lazy convergence: serve once so the webp conversion lands.
+    serve_rendered_urls(&fixture, &webp_page, &webp_first);
     assert_eq!(
-        fixture.parse(&format!("{TEST_DOMAIN}webp_broswer"), "<img src=a.jpeg>"),
+        fixture.parse(&webp_page, "<img src=a.jpeg>"),
         "<img src=xa.jpeg.pagespeed.ic.0.webp>"
     );
 
@@ -2407,11 +2563,13 @@ fn animated_no_cache_reuse() {
         .borrow_mut()
         .headers_mut()
         .remove_all("Accept");
+    let plain_page = format!("{TEST_DOMAIN}non-webp_broswer");
+    let plain_first = fixture.parse(&plain_page, "<img src=a.jpeg>");
+    // Lazy convergence: the declined rewrite settles back to the
+    // original (no webp results leak across the UA boundary).
+    serve_rendered_urls(&fixture, &plain_page, &plain_first);
     assert_eq!(
-        fixture.parse(
-            &format!("{TEST_DOMAIN}non-webp_broswer"),
-            "<img src=a.jpeg>"
-        ),
+        fixture.parse(&plain_page, "<img src=a.jpeg>"),
         "<img src=a.jpeg>"
     );
 }
@@ -2893,6 +3051,9 @@ fn cache_control_header_check_for_non_webp_ua() {
     fixture.add_file_to_mock_fetcher(&initial_image_url, PUZZLE_JPG, "image/jpeg", 100);
     let start_time_ms = fixture.server.now_ms();
     let output = fixture.parse(&page_url, &html_input);
+    // Lazy convergence: serve once so the webp conversion lands.
+    serve_rendered_urls(&fixture, &page_url, &output);
+    let output = fixture.parse(&page_url, &html_input);
 
     let image_urls = collect_img_srcs(output.as_bytes());
     assert_eq!(1, image_urls.len());
@@ -3131,7 +3292,7 @@ fn image_rewrite_inline_preserve_urls_explicit() {
     const RESIZED_DIMS: &str = " width=48 height=64";
     // In this case, since we have explicitly requested inline images,
     // we will get them despite the preserve URLs setting.
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         "IronChef2.gif",
         "image/gif",
@@ -3758,7 +3919,7 @@ fn inline_test_with_resize_with_optimize() {
     // With resize, the image shrinks quite a bit, and we can inline it
     // given the 10K threshold explicitly set above.  This also strips the
     // size information, which is now embedded in the image itself anyway.
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         CHEF_GIF,
         "image/gif",
@@ -3806,6 +3967,10 @@ fn inline_test_with_resize_keep_dims() {
     fixture.add_file_to_mock_fetcher(&initial_url, CHEF_GIF, "image/gif", 100);
     const RESIZED_DIMS: &str = " width=48 height=64";
     let html_input = format!("<td background='{initial_url}'{RESIZED_DIMS}></td>");
+    let output = fixture.parse(&page_url, &html_input);
+    // Lazy convergence: serve once so the resized bytes (which fit
+    // the inline budget) land, then the re-render inlines.
+    serve_rendered_urls(&fixture, &page_url, &output);
     let output = fixture.parse(&page_url, &html_input);
     // Image should have been resized
     assert!(
@@ -3876,7 +4041,7 @@ fn inline_no_resize() {
     const ORIG_DIMS: &str = " width=24 height=24";
     const RESIZED_DIMS: &str = " width=20 height=12";
     // At natural size, we should inline and erase dimensions.
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         CHROMIUM24,
         "image/webp",
@@ -3887,7 +4052,7 @@ fn inline_no_resize() {
         true,
     );
     // Image is inlined but not resized, so preserve dimensions.
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         CHROMIUM24,
         "image/webp",
@@ -3916,7 +4081,7 @@ fn inline_larger_resize() {
     const ORIG_DIMS: &str = " width=65 height=70";
     const RESIZED_DIMS: &str = " width=64 height=69";
     // At natural size, we should inline and erase dimensions.
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         CUPPA_O_PNG,
         "image/png",
@@ -3927,7 +4092,7 @@ fn inline_larger_resize() {
         true,
     );
     // Image is inlined but not resized, so preserve dimensions.
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         CUPPA_O_PNG,
         "image/png",
@@ -4006,7 +4171,7 @@ fn gif_to_png_test_with_resize_with_optimize() {
         .soft_enable_filter_for_testing(Filter::ConvertGifToPng);
     const RESIZED_DIMS: &str = " width=48 height=64";
     // With resize and optimization. Translating gif to png.
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         CHEF_GIF,
         "image/gif",
@@ -4057,7 +4222,7 @@ fn gif_to_png_test_without_resize_with_optimize() {
         .borrow_mut()
         .soft_enable_filter_for_testing(Filter::ConvertGifToPng);
     // Without resize and with optimization
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         CHEF_GIF,
         "image/gif",
@@ -4102,7 +4267,7 @@ fn gif_to_jpeg_test_without_resize_with_optimize() {
         .borrow_mut()
         .set_image_recompress_quality(85);
     // Without resize and with optimization
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         CHEF_GIF,
         "image/gif",
@@ -4140,7 +4305,7 @@ fn gif_to_webp_test_with_resize_with_optimize() {
     fixture.setup_for_webp_lossless();
     const RESIZED_DIMS: &str = " width=48 height=64";
     // With resize and optimization
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         CHEF_GIF,
         "image/gif",
@@ -4180,7 +4345,7 @@ fn gif_to_webp_test_without_resize_with_optimize() {
         .set_image_recompress_quality(85);
     fixture.setup_for_webp_lossless();
     // Without resize and with optimization
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         CHEF_GIF,
         "image/gif",
@@ -4220,7 +4385,7 @@ fn rewrites_dropped_due_to_no_saving_no_resize_test() {
         .borrow_mut()
         .soft_enable_filter_for_testing(Filter::RecompressPng);
     const ORIGINAL_DIMS: &str = " width=65 height=70";
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         CUPPA_O_PNG,
         "image/png",
@@ -4299,7 +4464,7 @@ fn inline_test_with_resize_with_optimize_and_url_logging() {
     // With resize, the image shrinks quite a bit, and we can inline it
     // given the 10K threshold explicitly set above.  This also strips the
     // size information, which is now embedded in the image itself anyway.
-    test_single_rewrite(
+    test_single_rewrite_converged(
         &fixture,
         CHEF_GIF,
         "image/gif",
@@ -4477,12 +4642,24 @@ fn test_corrupt_url(fixture: &Fixture, junk: &str, append_junk: bool) {
         .soft_enable_filter_for_testing(Filter::RecompressJpeg);
 
     const HTML: &str = "<img src=\"a.jpg\"><img src=\"b.png\"><img src=\"c.gif\">";
+    let first_output = fixture.parse(TEST_DOMAIN, HTML);
+    let first_urls = collect_img_srcs(first_output.as_bytes());
+    assert_eq!(3, first_urls.len());
+    // Lazy transient: conversions pending serve, so the gif keeps
+    // its input extension until first served.
+    assert!(first_urls[2].ends_with(".gif"));
+    let base = GoogleUrl::new(TEST_DOMAIN);
+    let absolute = |src: &str| GoogleUrl::resolve(&base, src).spec().to_string();
+    for src in &first_urls {
+        let url = absolute(src);
+        fixture
+            .serve_url(&url)
+            .unwrap_or_else(|| panic!("serve {url}"));
+    }
+    // Converged render matches eager (gif converted).
     let normal_output = fixture.parse(TEST_DOMAIN, HTML);
     let image_urls = collect_img_srcs(normal_output.as_bytes());
     assert_eq!(3, image_urls.len());
-
-    let base = GoogleUrl::new(TEST_DOMAIN);
-    let absolute = |src: &str| GoogleUrl::resolve(&base, src).spec().to_string();
     let (url1, url2, url3) = (
         absolute(&image_urls[0]),
         absolute(&image_urls[1]),
@@ -4969,7 +5146,22 @@ fn successful_rewrite_records_admin_row() {
     let srcs = collect_img_srcs(&output);
     assert_eq!(1, srcs.len());
     assert!(srcs[0].contains(".pagespeed."), "{}", srcs[0]);
-    let records = driver.take_image_records();
+    // Lazy render records nothing; the first serve optimizes and
+    // records on its own driver.
+    assert!(driver.take_image_records().is_empty());
+    let serve_driver = fixture.driver_for("http://rewrite_image.test/Puzzle.jpg");
+    serve_driver.add_filter(Rc::new(ImageRewriteFilter::new(serve_driver.clone())));
+    let absolute = GoogleUrl::resolve(
+        &GoogleUrl::new("http://rewrite_image.test/RewriteImage.html"),
+        &srcs[0],
+    )
+    .spec()
+    .to_string();
+    let ctx = serve_driver.request_context().borrow().clone();
+    let mut fetch = BufferingFetch::new(&absolute, ctx);
+    assert!(serve_driver.fetch_resource(&absolute, &mut fetch));
+    assert!(fetch.success());
+    let records = serve_driver.take_image_records();
     assert_eq!(1, records.len());
     let record = &records[0];
     assert!(
@@ -4990,4 +5182,133 @@ fn successful_rewrite_records_admin_row() {
     assert_eq!(7, line.split('\t').count(), "{line}");
     // Takes drain.
     assert!(driver.take_image_records().is_empty());
+}
+
+/// Lazy image bytes: first view mints the unversioned URL without
+/// optimizing (real MD5 hasher, so eager would hash differently).
+#[test]
+fn lazy_image_renders_unversioned_first_view() {
+    use ps_html::filters::image_rewrite::IMAGE_REWRITES;
+    let fixture = Fixture::with_hasher(Arc::new(ps_cache::hash::Md5Hasher::new()));
+    fixture.add_recompress_image_filters();
+    fixture.add_file_to_mock_fetcher(
+        &format!("{TEST_DOMAIN}pic.jpg"),
+        PUZZLE_JPG,
+        "image/jpeg",
+        100,
+    );
+    let page_url = format!("{TEST_DOMAIN}lazy.html");
+    let output = fixture.parse(&page_url, "<img src=\"pic.jpg\">");
+    assert!(
+        output.contains("pagespeed.ic.0.jpg"),
+        "unversioned first view: {output}"
+    );
+    assert_eq!(1, fixture.stat(IMAGE_REWRITES_DEFERRED));
+    // Nothing optimized yet: serving must do the work.
+    assert_eq!(0, fixture.stat(IMAGE_REWRITES));
+}
+
+/// Lazy image bytes: first serve optimizes, later renders converge
+/// to the versioned URL, and repeat serves never re-optimize.
+#[test]
+fn lazy_image_serve_optimizes_and_converges() {
+    use ps_html::filters::image_rewrite::IMAGE_REWRITES;
+    let fixture = Fixture::with_hasher(Arc::new(ps_cache::hash::Md5Hasher::new()));
+    fixture.add_recompress_image_filters();
+    fixture.add_file_to_mock_fetcher(
+        &format!("{TEST_DOMAIN}pic.jpg"),
+        PUZZLE_JPG,
+        "image/jpeg",
+        100,
+    );
+    let page_url = format!("{TEST_DOMAIN}lazy.html");
+    let html = "<img src=\"pic.jpg\">";
+    let first = fixture.parse(&page_url, html);
+    let srcs = collect_img_srcs(first.as_bytes());
+    assert_eq!(1, srcs.len());
+    assert!(srcs[0].contains("pagespeed.ic.0.jpg"), "{}", srcs[0]);
+    let unversioned = GoogleUrl::resolve(&GoogleUrl::new(&page_url), &srcs[0])
+        .spec()
+        .to_string();
+    // First serve optimizes (one rewrite, real bytes out).
+    let (body, headers) = fixture.serve_url(&unversioned).expect("serve unversioned");
+    assert!(!body.is_empty());
+    assert_eq!(
+        "image/jpeg",
+        headers
+            .determine_content_type()
+            .map(|content| content.mime_type())
+            .unwrap_or("")
+    );
+    assert_eq!(1, fixture.stat(IMAGE_REWRITES));
+    // Re-render converges to the versioned URL.
+    let second = fixture.parse(&page_url, html);
+    let srcs2 = collect_img_srcs(second.as_bytes());
+    assert_eq!(1, srcs2.len());
+    assert!(
+        srcs2[0].contains("pagespeed.ic.") && !srcs2[0].contains("pagespeed.ic.0."),
+        "converged: {}",
+        srcs2[0]
+    );
+    // Repeat serves never re-optimize (versioned or straggler).
+    let versioned = GoogleUrl::resolve(&GoogleUrl::new(&page_url), &srcs2[0])
+        .spec()
+        .to_string();
+    let (body2, _) = fixture.serve_url(&versioned).expect("serve versioned");
+    assert_eq!(body, body2);
+    let (body3, _) = fixture.serve_url(&unversioned).expect("serve straggler");
+    assert_eq!(body, body3);
+    assert_eq!(1, fixture.stat(IMAGE_REWRITES));
+}
+
+/// Lazy image bytes: garbage fails fast on the original URL (no
+/// unversioned request storm).
+#[test]
+fn lazy_image_garbage_fails_fast() {
+    use ps_html::filters::image_rewrite::IMAGE_REWRITES_DROPPED_MIME_TYPE_UNKNOWN;
+    let fixture = Fixture::with_hasher(Arc::new(ps_cache::hash::Md5Hasher::new()));
+    fixture.add_recompress_image_filters();
+    fixture.set_response_with_default_headers(
+        &format!("{TEST_DOMAIN}bogus.png"),
+        "image/png",
+        b"definitely not image bytes",
+        100,
+    );
+    let page_url = format!("{TEST_DOMAIN}lazy.html");
+    let output = fixture.parse(&page_url, "<img src=\"bogus.png\">");
+    assert!(output.contains("src=\"bogus.png\""), "{output}");
+    assert!(!output.contains(".pagespeed."), "{output}");
+    assert_eq!(0, fixture.stat(IMAGE_REWRITES_DEFERRED));
+    assert_eq!(1, fixture.stat(IMAGE_REWRITES_DROPPED_MIME_TYPE_UNKNOWN));
+}
+
+/// Lazy image bytes: inlinable images still inline on first view
+/// (small and bounded, so they optimize eagerly).
+#[test]
+fn lazy_image_inlining_preserved_first_view() {
+    let fixture = Fixture::with_hasher(Arc::new(ps_cache::hash::Md5Hasher::new()));
+    fixture.add_recompress_image_filters();
+    fixture
+        .options
+        .borrow_mut()
+        .soft_enable_filter_for_testing(Filter::InlineImages);
+    fixture
+        .options
+        .borrow_mut()
+        .set_image_inline_max_bytes(1000000);
+    fixture.add_file_to_mock_fetcher(
+        &format!("{TEST_DOMAIN}tiny.png"),
+        CUPPA_PNG,
+        "image/png",
+        100,
+    );
+    let page_url = format!("{TEST_DOMAIN}lazy.html");
+    let output = fixture.parse(&page_url, "<img src=\"tiny.png\">");
+    assert!(
+        output.contains("data:image/png;base64,"),
+        "inlined first view: {}",
+        &output[..output.len().min(120)]
+    );
+    // Eager path taken: nothing deferred.
+    assert_eq!(0, fixture.stat(IMAGE_REWRITES_DEFERRED));
 }

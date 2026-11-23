@@ -42,6 +42,9 @@ pub const IMAGE_REWRITES: &str = "image_rewrites";
 pub const IMAGE_NOREWRITES_HIGH_RESOLUTION: &str = "image_norewrites_high_resolution";
 /// Intentional drops (`kImageRewritesDroppedIntentionally`).
 pub const IMAGE_REWRITES_DROPPED_INTENTIONALLY: &str = "image_rewrites_dropped_intentionally";
+/// Deferred byte generations (lazy HTML renders; the first
+/// `.pagespeed.` request optimizes through the fetch path).
+pub const IMAGE_REWRITES_DEFERRED: &str = "image_rewrites_deferred";
 /// Name-decode drops (`kImageRewritesDroppedDecodeFailure`).
 pub const IMAGE_REWRITES_DROPPED_DECODE_FAILURE: &str = "image_rewrites_dropped_decode_failure";
 /// Write drops (`kImageRewritesDroppedServerWriteFail`).
@@ -410,6 +413,15 @@ impl SingleRewriteBehavior for ImageRewriteBehavior {
         output: &mut crate::output_resource::OutputResource,
         partition: &mut CachedResult,
     ) -> RewriteResult {
+        // HTML-embedded images mint the unversioned URL now and
+        // optimize on first serve (the cold critical path); CSS
+        // images stay eager (amortized by cached CSS output, with
+        // intricate claim/inline interplay), as do fetch
+        // reconstructions (place `Fetch`), which serve bytes
+        // directly and must optimize inline.
+        if matches!(self.place, RewritePlace::HtmlAttr | RewritePlace::Srcset) {
+            return rewrite_single_deferred(self, driver, input, output, partition);
+        }
         rewrite_loaded_resource(self, driver, input, output, partition)
     }
 }
@@ -726,6 +738,255 @@ fn should_resize(
 }
 
 /// Rewrites one loaded image (`RewriteLoadedResourceImpl`).
+/// Mints an unversioned (hash-`0`) image URL without optimizing
+/// bytes (lazy HTML render): the input stays readable from cache,
+/// and the first `.pagespeed.` request reconstructs, stores, and
+/// upgrades the partition to the versioned URL through the
+/// existing fetch path. Inlining still decides on the input bytes
+/// (identical to eager); dimensions, previews, and savings catch
+/// up once the image has served.
+fn rewrite_single_deferred(
+    behavior: &ImageRewriteBehavior,
+    driver: &Rc<ResourceDriver>,
+    input: &InputResource,
+    output: &mut crate::output_resource::OutputResource,
+    partition: &mut CachedResult,
+) -> RewriteResult {
+    let rewrite_start = std::time::Instant::now();
+    let result = rewrite_single_deferred_inner(behavior, driver, input, output, partition);
+    // Latency accounting mirrors eager (TooBusy returns before any
+    // recording there too), except deferred successes bill TOTAL
+    // only: OK-latency measures completed optimizations, which
+    // happen at serve time.
+    if result != RewriteResult::TooBusy {
+        let latency_ms = rewrite_start.elapsed().as_millis() as f64;
+        if result != RewriteResult::Ok {
+            driver
+                .server_context()
+                .histogram(IMAGE_REWRITE_LATENCY_FAILED_MS)
+                .add(latency_ms);
+        }
+        driver
+            .server_context()
+            .histogram(IMAGE_REWRITE_LATENCY_TOTAL_MS)
+            .add(latency_ms);
+    }
+    result
+}
+
+/// Defers one image rewrite; split for latency accounting.
+fn rewrite_single_deferred_inner(
+    behavior: &ImageRewriteBehavior,
+    driver: &Rc<ResourceDriver>,
+    input: &InputResource,
+    output: &mut crate::output_resource::OutputResource,
+    partition: &mut CachedResult,
+) -> RewriteResult {
+    use ps_image::format::ImageType;
+    // Load shedding keeps eager semantics (retried, unremembered).
+    let drop_percentage = driver.options().rewrite_random_drop_percentage();
+    if drop_percentage > 0 && behavior.place != RewritePlace::Css {
+        let roll = driver.server_context().simple_random_next() % 100;
+        if drop_percentage > roll as i64 {
+            return RewriteResult::TooBusy;
+        }
+    }
+    crate::rewrite_context::add_link_rel_canonical(driver, input, output.response_headers_mut());
+    let options = driver.options().clone();
+    let mut resource_context = behavior.resource_context.clone();
+    let name = output.full_name().name().to_string();
+    if ImageUrlEncoder
+        .decode(name.as_bytes(), &mut resource_context)
+        .is_none()
+    {
+        driver
+            .server_context()
+            .variable(IMAGE_REWRITES_DROPPED_INTENTIONALLY)
+            .add(1);
+        driver
+            .server_context()
+            .variable(IMAGE_REWRITES_DROPPED_DECODE_FAILURE)
+            .add(1);
+        return RewriteResult::Failed;
+    }
+    // Garbage fails fast on the original URL (no unversioned
+    // request storm): same verdict and stats as eager sniffing.
+    let contents = input.contents();
+    let original_image_type = ps_image::format::sniff(&contents);
+    if original_image_type == ImageType::Unknown {
+        driver
+            .server_context()
+            .variable(IMAGE_REWRITES_DROPPED_INTENTIONALLY)
+            .add(1);
+        driver
+            .server_context()
+            .variable(IMAGE_REWRITES_DROPPED_MIME_TYPE_UNKNOWN)
+            .add(1);
+        return RewriteResult::Failed;
+    }
+    // One decode (no pixel ops): corrupt inputs fail here like
+    // eager, and the analysis feeds the same debug messages and
+    // dimension records.
+    let original_size = contents.len();
+    let analysis = match ps_image::image::analyze(&contents) {
+        Ok(analysis) => analysis,
+        Err(_) => {
+            driver
+                .server_context()
+                .variable(IMAGE_REWRITES_DROPPED_INTENTIONALLY)
+                .add(1);
+            driver
+                .server_context()
+                .variable(IMAGE_REWRITES_DROPPED_DECODE_FAILURE)
+                .add(1);
+            return RewriteResult::Failed;
+        }
+    };
+    let image_dim = ImageDim {
+        width: Some(analysis.width),
+        height: Some(analysis.height),
+    };
+    if (analysis.width as i64) * (analysis.height as i64) * 4
+        > options.image_resolution_limit_bytes()
+    {
+        driver
+            .server_context()
+            .variable(IMAGE_REWRITES_DROPPED_INTENTIONALLY)
+            .add(1);
+        driver
+            .server_context()
+            .variable(IMAGE_NOREWRITES_HIGH_RESOLUTION)
+            .add(1);
+        return RewriteResult::Failed;
+    }
+    // Inlining needs optimized bytes with no URL to trigger
+    // serve: images that will inline optimize eagerly (they fit
+    // the inline budget, so the work is small and bounded). The
+    // probe mirrors the render path exactly
+    // (`finish_rewrite_image_url` gates).
+    if behavior.place == RewritePlace::HtmlAttr {
+        if partition.inlined_data.is_none() {
+            save_if_inlinable(&contents, original_image_type, &options, partition);
+        }
+        let (inline_result, _) = try_inline(
+            driver,
+            true,
+            true,
+            options.image_inline_max_bytes(),
+            partition,
+        );
+        if inline_result == InlineResult::Success {
+            return rewrite_loaded_resource(behavior, driver, input, output, partition);
+        }
+    }
+    let debug_url = url_for_debug_messages(driver, input.url());
+    let mut desired_dim = ImageDim::default();
+    let resize_needed = analysis.width >= 1
+        && analysis.height >= 1
+        && should_resize(
+            &resource_context,
+            original_image_type,
+            &image_dim,
+            &options,
+            &mut desired_dim,
+        );
+    // Without a pending resize, disabled optimization means the
+    // eager transcode never runs (Failed): mirror the verdict
+    // after recording dims, messages, and inlining below.
+    let optimization_disabled = !options.image_optimization_enabled() && !resize_needed;
+    if analysis.width < 1 || analysis.height < 1 {
+        if driver.debug_mode() {
+            partition.debug_message.push(format!(
+                "Cannot resize {}: Image must be at least 1x1",
+                debug_url
+            ));
+        }
+    } else if !resize_needed && driver.debug_mode() {
+        partition.debug_message.push(format!(
+            "Image {} does not appear to need resizing.",
+            debug_url
+        ));
+    } else if resize_needed && driver.debug_mode() {
+        // Predict eager's success message (dims decided, bytes
+        // pending); a serve-time resize failure upgrades the
+        // partition without it.
+        partition.debug_message.push(format!(
+            "Resized image {} from {}x{} to {}x{}",
+            debug_url,
+            analysis.width,
+            analysis.height,
+            desired_dim.width.unwrap_or(0),
+            desired_dim.height.unwrap_or(0),
+        ));
+    }
+    // Dimensions mirror eager when no resize is pending; pending
+    // resizes predict the desired dims and self-heal at serve.
+    let post_resize_dim = if resize_needed {
+        ImageDim {
+            width: desired_dim.width,
+            height: desired_dim.height,
+        }
+    } else {
+        image_dim
+    };
+    if has_valid_dimensions(&post_resize_dim) {
+        partition.image_file_dims = Some((
+            post_resize_dim.width.unwrap_or(0),
+            post_resize_dim.height.unwrap_or(0),
+        ));
+    }
+    if (original_image_type == ImageType::Gif || original_image_type == ImageType::Png)
+        && driver.debug_mode()
+    {
+        partition.debug_message.push(format!(
+            "Image {} has{} transparent pixels, is{} sensitive to compression noise, and has{} animation.",
+            debug_url,
+            if analysis.transparency { "" } else { " no" },
+            if analysis.photo { " not" } else { "" },
+            if analysis.animated { "" } else { " no" },
+        ));
+    }
+    // Mirror eager naming: no pending resize drops the dimensions
+    // from the output name; pending resizes keep them so the serve
+    // reconstructs (or self-heals) the same URL.
+    if !resize_needed {
+        resource_context.desired_image_dims = ImageDim::default();
+        let decoded = ImageUrlEncoder.decode(name.as_bytes(), &mut ImageResourceContext::default());
+        if let Some(url) = decoded {
+            let renamed = ImageUrlEncoder.encode(&url, &resource_context);
+            output.set_name(&String::from_utf8_lossy(&renamed));
+        }
+    }
+    // The output type is the input type until optimization decides
+    // otherwise (conversions correct the extension at serve).
+    output.set_type(image_type_to_content_type(original_image_type));
+    if partition.inlined_data.is_none() {
+        save_if_inlinable(&contents, original_image_type, &options, partition);
+    }
+    partition.optimized_size = original_size as i64;
+    if optimization_disabled {
+        // Disabled optimization means the eager transcode never
+        // runs: same Failed verdict (dims, messages, and inlining
+        // above already recorded).
+        driver
+            .server_context()
+            .variable(IMAGE_REWRITES_DROPPED_INTENTIONALLY)
+            .add(1);
+        return RewriteResult::Failed;
+    }
+    // Mint the unversioned URL: output bytes (and their hash) do
+    // not exist yet by design.
+    if !output.has_hash() {
+        output.set_hash("0");
+    }
+    partition.url = output.url().to_string();
+    driver
+        .server_context()
+        .variable(IMAGE_REWRITES_DEFERRED)
+        .add(1);
+    RewriteResult::Ok
+}
+
 fn rewrite_loaded_resource(
     behavior: &ImageRewriteBehavior,
     driver: &Rc<ResourceDriver>,

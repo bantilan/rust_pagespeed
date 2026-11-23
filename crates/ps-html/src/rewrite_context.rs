@@ -419,6 +419,9 @@ struct FetchState {
     /// handler-served messages).
     #[allow(dead_code)]
     original_url: String,
+    /// HTTP cache key of the requested URL (banks unversioned
+    /// reconstructions without re-decoding).
+    requested_key: String,
     /// Whether the rewrite produced bytes.
     success: bool,
 }
@@ -1211,9 +1214,11 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
         self.set_partition_key();
         let requested_hash = output.full_name().hash().to_string();
         let original_url = output.url().to_string();
+        let requested_key = output.http_cache_key();
         self.fetch = Some(FetchState {
             requested_hash,
             original_url,
+            requested_key,
             success: false,
         });
         self.fetch_output = Some(output);
@@ -1602,6 +1607,15 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
             let mut fixed = headers;
             self.fix_fetch_fallback_headers(&mut fixed);
             let code = fixed.status_code();
+            if requested == "0" && code == 200 {
+                // Unversioned (deferred) request: bank the fresh
+                // bytes briefly under the requested URL so
+                // slow-to-rerender references (notably CSS-embedded
+                // images) keep working without re-optimizing per
+                // request. Headers arrive fallback-shortened, so the
+                // entry can never outlive its input window.
+                self.store_unversioned_output(&fixed, &body);
+            }
             fetch.response_headers_mut().copy_from(&fixed);
             self.adjust_cache_control(fetch);
             let ok = self.send_fallback_response(&body, fetch);
@@ -1624,6 +1638,33 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
         fetch.headers_complete();
         fetch.handle_done(false);
         false
+    }
+
+    /// Banks reconstructed bytes under an unversioned request URL
+    /// (deferred image serves): the fallback-shortened headers
+    /// bound the entry, so non-positive TTLs store nothing.
+    fn store_unversioned_output(&self, headers: &ps_http::response::ResponseHeaders, body: &[u8]) {
+        if headers.cache_ttl_ms() <= 0 {
+            return;
+        }
+        let Some(state) = self.fetch.as_ref() else {
+            return;
+        };
+        let mut value = ps_http::value::HttpValue::new();
+        value.set_headers(headers.clone());
+        value.write_body(body);
+        let options = self.driver.options();
+        self.driver.server_context().http_cache().put_value(
+            &state.requested_key,
+            self.driver.cache_fragment(),
+            ps_http::response::RequestProperties::default(),
+            ps_http::response::HttpOptions {
+                respect_vary: options.respect_vary(),
+                implicit_cache_ttl_ms: options.implicit_cache_ttl_ms(),
+            },
+            &value,
+            self.driver.server_context().now_ms(),
+        );
     }
 }
 

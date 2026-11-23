@@ -61,6 +61,36 @@ pool they fetch direct, exactly as before.
 `background_jobs_queue_full`, `background_jobs_shutdown`
 (`crates/ps-html/src/rewrite_stats.rs`).
 
+## Lazy image bytes
+
+HTML-embedded images (`HtmlAttr`, `Srcset` places) defer pixel
+work out of HTML render: the first view mints an unversioned
+(hash-`0`) URL from the input hash after one decode (gates, debug
+messages, dimensions, and input-based inlining all mirror eager),
+and the first `.pagespeed.` request reconstructs through the
+existing fetch path, stores, and upgrades the partition to the
+versioned URL. Later renders are eager-identical. Inlinable
+images still optimize eagerly (bounded by the inline budget, so
+no URL ever exists to trigger their serve). CSS images stay eager
+(amortized by cached CSS output).
+
+First-view transients (all self-healing via serve): hash `0`
+instead of the content hash, input extension instead of converted
+(`.jpg` where eager shows `.webp`), and `.ic.0` claims where eager
+shows `.ce.` (no-saving images converge to `.ce.` after the serve
+records the decline). Unversioned serves bank bytes briefly under
+the requested URL (fallback-shortened headers bound the entry),
+so slow-to-rerender references never re-optimize per request.
+Failures serve original bytes and converge partitions to
+unoptimizable, exactly like eager.
+
+New counter: `image_rewrites_deferred`. Deferred successes bill
+`image_rewrite_latency_total_ms` only (OK-latency still measures
+completed optimizations, at serve time).
+
+Benchmark (`cold_image_page/8_jpegs_no_pool`, 8× 236 KB JPEGs,
+cold server per iteration): eager 180.5 ms, lazy 45.3 ms (4.0×).
+
 ## Intentional differences from C++
 
 - **Fetch only; compute stays inline.** Image conversion, CSS/JS

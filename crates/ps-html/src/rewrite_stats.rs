@@ -82,6 +82,7 @@ pub fn init_stats(statistics: &Statistics) {
     statistics.add_variable("image_rewrites"); // kImageRewrites
     statistics.add_variable("image_rewrites_dropped_decode_failure"); // kImageRewritesDroppedDecodeFailure
     statistics.add_timed_variable("image_rewrites_dropped_due_to_load", "Statistics"); // kImageRewritesDroppedDueToLoad
+    statistics.add_variable("image_rewrites_deferred"); // lazy HTML render (no C++ counterpart)
     statistics.add_variable("image_rewrites_dropped_intentionally"); // kImageRewritesDroppedIntentionally
     statistics.add_variable("image_rewrites_dropped_mime_type_unknown"); // kImageRewritesDroppedMIMETypeUnknown
     statistics.add_variable("image_rewrites_dropped_nosaving_noresize"); // kImageRewritesDroppedNoSavingNoResize
@@ -216,6 +217,7 @@ mod tests {
             "num_resource_fetch_failures",
             "css_filter_blocks_rewritten",
             "cache_hits",
+            "image_rewrites_deferred",
             "rewrite_cached_output_hits",
             "background_jobs_submitted",
             "background_jobs_completed",

@@ -223,6 +223,94 @@ fn bench_warm_hit(criterion: &mut Criterion) {
     group.finish();
 }
 
+/// Cold HTML page with 8 JPEGs (cold server per iteration, no
+/// pool): isolates render compute (lazy defers pixel work to first
+/// serve; eager optimizes inline).
+fn bench_cold_image_page(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("cold_image_page");
+    let jpeg = std::sync::Arc::new(
+        std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/data/Puzzle.jpg"
+        ))
+        .expect("fixture"),
+    );
+    group.bench_function("8_jpegs_no_pool", |bencher| {
+        bencher.iter_batched(
+            || ImageWorld::new(std::sync::Arc::clone(&jpeg)),
+            |world| black_box(world.drive()),
+            criterion::BatchSize::SmallInput,
+        );
+    });
+    group.finish();
+}
+
+/// Cold server with 8 scripted JPEGs and image filters on.
+struct ImageWorld {
+    server: Rc<ServerContext>,
+    options: Rc<RefCell<RewriteOptions>>,
+    html: Vec<u8>,
+}
+
+impl ImageWorld {
+    fn new(jpeg: Arc<Vec<u8>>) -> Self {
+        let options = Rc::new(RefCell::new(RewriteOptions::new()));
+        options.borrow_mut().filters_mut().enable(Filter::RecompressJpeg);
+        options
+            .borrow_mut()
+            .filters_mut()
+            .enable(Filter::RecompressPng);
+        let fetcher = Arc::new(SlowFetcher {
+            delay: Duration::ZERO,
+            inner: MockUrlFetcher::new(),
+        });
+        let mut html = b"<head></head><body>".to_vec();
+        for index in 0..8 {
+            let url = format!("http://test.com/i{index}.jpg");
+            let mut headers = ResponseHeaders::new(HttpOptions::default_for_tests());
+            headers.set_first_line(1, 1, 200, "OK");
+            headers
+                .headers_mut()
+                .add(header::CONTENT_TYPE, "image/jpeg");
+            headers.set_date_and_caching(START_MS, 300_000, "");
+            headers.compute_caching();
+            fetcher.inner.set_response(&url, headers, &jpeg);
+            html.extend_from_slice(format!("<img src=\"{url}\">").as_bytes());
+        }
+        html.extend_from_slice(b"</body>");
+        let server = Rc::new(ServerContext::new_with_metadata(
+            Arc::new(MemoryCache::new()),
+            Arc::new(MemoryCache::new()),
+            fetcher as Arc<dyn AsyncFetcher>,
+            START_MS,
+        ));
+        ImageWorld {
+            server,
+            options,
+            html,
+        }
+    }
+
+    /// Drives one full HTML request.
+    fn drive(&self) {
+        let resource_driver = Rc::new(ResourceDriver::new(
+            self.server.clone(),
+            self.options.clone(),
+            PAGE_URL,
+        ));
+        let ctx = ChainContext::new(true, true);
+        let mut driver = Driver::new(
+            &self.options.borrow(),
+            &ctx,
+            Vec::new(),
+            Some(resource_driver),
+        );
+        driver.start_parse(PAGE_URL.as_bytes(), false);
+        driver.write(&self.html);
+        driver.finish();
+    }
+}
+
 /// Eight concurrent cold requests sharing one pool (async) vs eight
 /// independent direct fetches (sync); 100ms origin, 10ms deadline.
 fn bench_concurrent_cold(criterion: &mut Criterion) {
@@ -274,6 +362,7 @@ criterion_group!(
     benches,
     bench_cold_first_request,
     bench_warm_hit,
-    bench_concurrent_cold
+    bench_concurrent_cold,
+    bench_cold_image_page
 );
 criterion_main!(benches);
