@@ -4,10 +4,15 @@
 //! evidence wins: stamped original hashes match the critical set,
 //! unstamped images match the reported LCP URL. Without any
 //! evidence the first eligible image is the heuristic hero; when
-//! evidence names other images, the first image is left alone
-//! rather than preloaded on a contradicted guess. At most one
-//! preload is inserted, skipped when the author already preloads
-//! the target (element or Link header).
+//! evidence names other images, the first image waits rather than
+//! spending the single preload on a contradicted guess — but if
+//! nothing learned materializes by end of document (text-LCP
+//! reports, empty critical sets, stale evidence), the first
+//! non-logo eligible image is promoted as the fallback hero, so
+//! measurements that match nothing never leave the visual hero
+//! bare (a background LCP measurement still owns the decision).
+//! At most one preload is inserted, skipped when the author
+//! already preloads the target (element or Link header).
 //!
 //! CSS-background LCP (`bg` reports carry the loaded URL but no
 //! element) preloads from evidence at end of document when no
@@ -57,6 +62,9 @@ pub struct PrioritizeLcpImagesFilter {
     link_headers_scanned: bool,
     picture_sources: HashMap<NodeId, PictureSource>,
     noscript_depth: u32,
+    /// First non-logo eligible image (id, src, absolute URL) for the
+    /// end-of-document fallback hero.
+    first_hero_candidate: Option<(NodeId, Vec<u8>, String)>,
 }
 
 impl PrioritizeLcpImagesFilter {
@@ -74,6 +82,7 @@ impl PrioritizeLcpImagesFilter {
             link_headers_scanned: false,
             picture_sources: HashMap::new(),
             noscript_depth: 0,
+            first_hero_candidate: None,
         }
     }
 
@@ -425,6 +434,33 @@ impl PrioritizeLcpImagesFilter {
         dom.append_child(self.head_element, preload);
         self.prioritized_count += 1;
     }
+
+    /// Prioritizes the first non-logo eligible image when nothing
+    /// else spent the budget: text-LCP reports, empty critical sets,
+    /// and stale evidence naming absent images must not leave the
+    /// visual hero bare. A background measurement owns the decision
+    /// even when its hint is skipped (author-covered or
+    /// format-mismatched), so the fallback stands down for those;
+    /// otherwise it no-ops whenever an inline hero, a learned image,
+    /// or the background hint already spent the single-preload
+    /// budget.
+    fn maybe_prioritize_fallback_hero(&mut self, dom: &mut Dom) {
+        if self.prioritized_count >= MAX_PRIORITIZED_IMAGES {
+            return;
+        }
+        // A background LCP measurement owns the decision whether or
+        // not its hint was usable.
+        let evidence = self.evidence();
+        if evidence.lcp_kind == beacon_finder::LCP_KIND_BACKGROUND
+            && !evidence.lcp_image_url.is_empty()
+        {
+            return;
+        }
+        let Some((id, src, absolute_url)) = self.first_hero_candidate.clone() else {
+            return;
+        };
+        self.prioritize_image(dom, id, &src, &absolute_url);
+    }
 }
 
 impl HtmlFilter for PrioritizeLcpImagesFilter {
@@ -446,6 +482,7 @@ impl HtmlFilter for PrioritizeLcpImagesFilter {
         self.link_headers_scanned = false;
         self.picture_sources.clear();
         self.noscript_depth = 0;
+        self.first_hero_candidate = None;
     }
 
     fn start_element(&mut self, dom: &mut Dom, _lexer: &Lexer, id: NodeId) {
@@ -528,16 +565,28 @@ impl HtmlFilter for PrioritizeLcpImagesFilter {
             // element byte-identical (author priorities preserved)
             // without consuming the hero candidacy.
             return;
-        } else if !self.saw_eligible_image && !evidence_available {
-            // No evidence at all: the first eligible image is the
-            // heuristic hero.
-            self.prioritize_image(dom, id, &src, &absolute_url);
-        } else if !self.saw_eligible_image {
-            // Evidence exists but names other images: leave the
-            // first image alone rather than spending the single
-            // preload on a contradicted guess.
         } else {
-            Self::add_lazy_loading_hint(dom, id);
+            // First non-logo eligible image feeds the
+            // end-of-document fallback hero (used only when nothing
+            // learned and no background measurement spends the
+            // budget).
+            if self.first_hero_candidate.is_none() {
+                self.first_hero_candidate = Some((id, src.clone(), absolute_url.clone()));
+            }
+            if !self.saw_eligible_image && !evidence_available {
+                // No evidence at all: the first eligible image is the
+                // heuristic hero.
+                self.prioritize_image(dom, id, &src, &absolute_url);
+            } else if !self.saw_eligible_image {
+                // Evidence exists but names other images: leave the
+                // first image alone for now. If nothing learned
+                // materializes by end of document, the fallback hero
+                // below still prioritizes it: measurements that
+                // match nothing must not veto the visual hero and
+                // leave the single preload budget unspent.
+            } else {
+                Self::add_lazy_loading_hint(dom, id);
+            }
         }
         self.saw_eligible_image = true;
     }
@@ -553,6 +602,7 @@ impl HtmlFilter for PrioritizeLcpImagesFilter {
 
     fn end_document(&mut self, dom: &mut Dom, _lexer: &Lexer) {
         self.maybe_preload_background_lcp(dom);
+        self.maybe_prioritize_fallback_hero(dom);
     }
 }
 

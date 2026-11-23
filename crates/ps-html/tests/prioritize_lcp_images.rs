@@ -447,3 +447,107 @@ fn measured_lcp_logo_still_prioritized() {
     // The non-critical content image still lazy-loads.
     assert_eq!(1, count(&out, b"loading=\"lazy\""));
 }
+
+#[test]
+fn text_lcp_evidence_falls_back_to_visual_hero() {
+    // Measurements naming no image (text LCP, empty critical set)
+    // must not veto the visual hero: the first eligible image is
+    // promoted at end of document instead of leaving the budget
+    // unspent.
+    let harness = Harness::new();
+    harness.seed_lcp_report(&[], ps_html::beacon_finder::LCP_KIND_TEXT, "");
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><img src=\"a.png\"><img src=\"b.png\"></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"a.png\"") >= 1);
+    assert_eq!(2, count(&out, b"fetchpriority=\"high\""));
+    assert_eq!(1, count(&out, b"loading=\"lazy\""));
+}
+
+#[test]
+fn stale_evidence_naming_absent_image_falls_back() {
+    // Evidence for an image that is not on this page (stale variant,
+    // renamed asset) likewise falls back to the visual hero.
+    let harness = Harness::new();
+    harness.seed_beacon("http://lcp.test/gone.png");
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><img src=\"a.png\"><img src=\"b.png\"></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"a.png\"") >= 1);
+    assert_eq!(2, count(&out, b"fetchpriority=\"high\""));
+}
+
+#[test]
+fn fallback_hero_skips_logo_candidate() {
+    // The fallback promotes the first *non-logo* eligible image.
+    let harness = Harness::new();
+    harness.seed_lcp_report(&[], ps_html::beacon_finder::LCP_KIND_TEXT, "");
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><header><img class=\"logo\" src=\"logo.png\" alt=\"Acme logo\"></header><main><img src=\"content.png\"></main></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"content.png\"") >= 1);
+    assert_eq!(0, count(&out, b"href=\"logo.png\""));
+    assert_eq!(0, count(&out, b"loading=\"lazy\""));
+}
+
+#[test]
+fn fallback_does_not_double_spend_learned_budget() {
+    // A learned hero still spends the only budget; the fallback
+    // stays quiet.
+    let harness = Harness::new();
+    harness.seed_beacon("http://lcp.test/b.png");
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><img src=\"a.png\"><img src=\"b.png\"><img src=\"c.png\"></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"b.png\"") >= 1);
+    assert_eq!(2, count(&out, b"fetchpriority=\"high\""));
+    // Contradicted first image bare, post-hero image lazy.
+    assert_eq!(1, count(&out, b"loading=\"lazy\""));
+}
+
+#[test]
+fn logo_inside_banner_region_still_skipped() {
+    // Ancestor region classes (`mainBanner`) wrap the whole header
+    // and must not veto the logo: only the element's own class/id
+    // discriminates. Shape mirrors the mobile-app landing template.
+    let harness = Harness::new();
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><header class=\"mainBanner\"><div class=\"container\"><figure><a href=\"./index.html\"><img class=\"img-logo\" src=\"images/logo.png\" alt=\"\"></a></figure></div></header><main><img class=\"img-iPhone\" src=\"images/iphone/2.png\" alt=\"\"></main></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"images/iphone/2.png\"") >= 1);
+    assert_eq!(0, count(&out, b"href=\"images/logo.png\""));
+    assert_eq!(2, count(&out, b"fetchpriority=\"high\""));
+    assert_eq!(0, count(&out, b"loading=\"lazy\""));
+}
+
+#[test]
+fn element_hero_class_still_vetoes_despite_header() {
+    // The veto survives where it belongs: on the element itself,
+    // even inside a header with a logo-named file.
+    let harness = Harness::new();
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><header><img class=\"hero-banner\" src=\"logo-reveal.jpg\"></header><main><img src=\"content.png\"></main></body></html>",
+    );
+    // Hero-banner image keeps candidacy (vetoed as logo) and takes
+    // the inline hero slot as first eligible.
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"logo-reveal.jpg\"") >= 1);
+    assert_eq!(1, count(&out, b"loading=\"lazy\""));
+}

@@ -48,7 +48,10 @@ const BRANDING_MARKERS: &[&str] = &[
     "site-title",
 ];
 
-/// Hero/content counter-signal markers (class/id, element or ancestor).
+/// Hero/content counter-signal markers (class/id on the element
+/// itself only: ancestor region classes like `mainBanner` routinely
+/// wrap the whole header — logo included — so they cannot
+/// discriminate the element).
 const NON_LOGO_MARKERS: &[&str] = &[
     "hero", "banner", "featured", "slider", "carousel", "jumbotron", "billboard", "cover-image",
     "coverimage", "article-image", "post-thumbnail",
@@ -119,13 +122,12 @@ pub fn detect_logo(dom: &mut Dom, img_id: NodeId, src: &[u8]) -> LogoVerdict {
     }
 
     // Ancestor group (capped): placement + containers + org scope.
-    let (ancestor_score, ancestor_veto) = ancestor_signals(dom, img_id);
+    // No ancestor veto: region classes describe layout, not the
+    // element (see NON_LOGO_MARKERS).
+    let ancestor_score = ancestor_signals(dom, img_id);
     if ancestor_score > 0.0 {
         score += ancestor_score;
         groups += 1;
-    }
-    if ancestor_veto {
-        score -= 0.60;
     }
 
     // Element-level hero/content veto.
@@ -280,10 +282,9 @@ fn has_non_logo_marker(values: &[Vec<u8>]) -> bool {
     })
 }
 
-/// Ancestor placement score (capped) plus hero veto.
-fn ancestor_signals(dom: &mut Dom, id: NodeId) -> (f32, bool) {
+/// Ancestor placement score (capped, no veto).
+fn ancestor_signals(dom: &mut Dom, id: NodeId) -> f32 {
     let mut score = 0.0f32;
-    let mut veto = false;
     let mut cursor = dom.arena_node(id).parent();
     while let Some(parent) = cursor {
         if dom.element_name_equals(parent, b"header") {
@@ -292,9 +293,6 @@ fn ancestor_signals(dom: &mut Dom, id: NodeId) -> (f32, bool) {
             score += 0.15;
         }
         let values = element_values(dom, parent);
-        if has_non_logo_marker(&values) {
-            veto = true;
-        }
         let class_score = class_id_score(&values);
         // Ancestor classes corroborate placement (branding-class hit
         // or WP markers); plain "logo" substrings count less here
@@ -321,7 +319,7 @@ fn ancestor_signals(dom: &mut Dom, id: NodeId) -> (f32, bool) {
         }
         cursor = dom.arena_node(parent).parent();
     }
-    (score.min(0.30), veto)
+    score.min(0.30)
 }
 
 /// Whether the image sits in article/figure content (discounted).
