@@ -238,7 +238,7 @@ fn resource_combinable(
 /// JavaScript combining filter (`JsCombineFilter`).
 pub struct JsCombineFilter {
     driver: Rc<ResourceDriver>,
-    patterns: Rc<TokenizerPatterns>,
+    patterns: &'static TokenizerPatterns,
     script_depth: usize,
     current_js_script: Option<NodeId>,
     pending: Vec<PendingScript>,
@@ -251,7 +251,7 @@ impl JsCombineFilter {
     pub fn new(driver: Rc<ResourceDriver>) -> Self {
         JsCombineFilter {
             driver,
-            patterns: Rc::new(TokenizerPatterns::new()),
+            patterns: TokenizerPatterns::shared(),
             script_depth: 0,
             current_js_script: None,
             pending: Vec::new(),

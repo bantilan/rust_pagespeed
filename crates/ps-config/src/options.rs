@@ -13,6 +13,7 @@
 //! (filters-6), and `Signature()`/`OptionSignature` computation.
 #![forbid(unsafe_code)]
 
+use crate::cookies::{CookiePatternSet, CookiePolicy};
 use crate::filter::{
     Filter, FilterState, RewriteLevel, ADD_HEAD_FILTERS, REQUIRES_SCRIPT_EXECUTION,
 };
@@ -20,9 +21,9 @@ use crate::property::{
     lookup_by_id, lookup_by_name, nginx_option_scope, strip_mod_pagespeed_prefix, PropDefault,
     PropKind, Property, PROPERTIES,
 };
-use crate::cookies::{CookiePatternSet, CookiePolicy};
 use crate::scope::Scope;
 use crate::wildcard::WildcardGroup;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 /// Master enabled state (`EnabledEnum`).
@@ -538,9 +539,12 @@ pub struct NginxSystemOptions {
     pub file_cache_clean_interval_ms: i64,
     /// `FileCacheSizeKb` (default 100 MiB).
     pub file_cache_clean_size_kb: i64,
-    /// `LRUCacheByteLimit` (default 0: LRU disabled by size).
+    /// `LRUCacheByteLimit` (default 16 KiB: metadata partitions and
+    /// small resources stay in memory; larger entries live on disk
+    /// only, so a few giant bodies cannot evict thousands of hot
+    /// partition tables).
     pub lru_cache_byte_limit: i64,
-    /// `LRUCacheKbPerProcess` (default 0: no per-process LRU).
+    /// `LRUCacheKbPerProcess` (default 8 MiB per worker process).
     pub lru_cache_kb_per_process: i64,
     /// `CacheFlushFilename` (empty when unset).
     pub cache_flush_filename: String,
@@ -621,8 +625,13 @@ impl Default for NginxSystemOptions {
             blocking_fetch_timeout_ms: 5000,
             file_cache_clean_interval_ms: 3_600_000,
             file_cache_clean_size_kb: 102_400,
-            lru_cache_byte_limit: 0,
-            lru_cache_kb_per_process: 0,
+            // Deliberate divergence from C++ (0/0, file-only): the
+            // bounded in-memory tier is on by default, so warm
+            // metadata and small resources serve from memory (~0.1µs)
+            // instead of disk (~6µs warm, far worse cold). Both knobs
+            // stay configurable; explicit zeros restore file-only.
+            lru_cache_byte_limit: 16 * 1024,
+            lru_cache_kb_per_process: 8 * 1024,
             cache_flush_filename: String::new(),
             compress_metadata_cache: true,
             ipro_max_response_bytes: 10 * 1024 * 1024,
@@ -760,6 +769,13 @@ pub struct RewriteOptions {
     experiment_index: Option<usize>,
     polyfill_filenames: HashSet<String>,
     modified: bool,
+    /// Memoized [`RewriteOptions::signature`], cleared by every
+    /// mutator (including [`RewriteOptions::filters_mut`] and
+    /// [`RewriteOptions::allow_resources_mut`], whose callers mutate
+    /// through the returned reference after this method returns —
+    /// eager clearing is correct because the borrow checker forbids
+    /// interleaving `signature()` with the outstanding `&mut`).
+    signature_cache: RefCell<Option<String>>,
 }
 
 impl RewriteOptions {
@@ -779,6 +795,7 @@ impl RewriteOptions {
 
     /// Mutably borrows the filter state.
     pub fn filters_mut(&mut self) -> &mut FilterState {
+        self.invalidate_signature();
         &mut self.filters
     }
 
@@ -790,6 +807,7 @@ impl RewriteOptions {
 
     /// Sets the master enabled state (`set_enabled`).
     pub fn set_enabled_state(&mut self, state: EnabledState) {
+        self.invalidate_signature();
         self.enabled_state = state;
         self.enabled_set = true;
         self.modified = true;
@@ -853,6 +871,7 @@ impl RewriteOptions {
         value: &str,
         max_scope: Scope,
     ) -> Result<(), SetError> {
+        self.invalidate_signature();
         let prop = Self::require_prop(name).map_err(|outcome| SetError {
             outcome,
             message: String::new(),
@@ -884,6 +903,7 @@ impl RewriteOptions {
     /// Request-only properties have no directive name; the server layer
     /// sets them per request. Anything else is rejected.
     pub fn set_request_property(&mut self, id: &str, value: &str) -> Result<(), SetError> {
+        self.invalidate_signature();
         let prop = lookup_by_id(id).ok_or_else(|| SetError {
             outcome: SetOutcome::NameUnknown,
             message: String::new(),
@@ -906,6 +926,7 @@ impl RewriteOptions {
     /// Keeps derived state (level, enabled flag, preserve flags) in sync
     /// when their backing properties are set directly.
     fn sync_special(&mut self, id: &str) {
+        self.invalidate_signature();
         match id {
             // "l" RewriteLevel.
             "l" => {
@@ -955,6 +976,7 @@ impl RewriteOptions {
         arg: &str,
         max_scope: Scope,
     ) -> Result<(), SetError> {
+        self.invalidate_signature();
         if lookup_by_name(name).is_some() {
             return self.set_option(name, arg, max_scope);
         }
@@ -963,6 +985,7 @@ impl RewriteOptions {
 
     /// Special one-arg directives (table lookup already missed).
     fn parse_special_1(&mut self, name: &str, arg: &str, max_scope: Scope) -> Result<(), SetError> {
+        self.invalidate_signature();
         if name.eq_ignore_ascii_case("Allow") {
             self.allow_resources.allow(arg);
         } else if name.eq_ignore_ascii_case("DisableFilters") {
@@ -975,11 +998,17 @@ impl RewriteOptions {
             self.domains.push(arg.to_string());
         } else if name.eq_ignore_ascii_case("HtmlCacheIgnoreCookie") {
             if let Err(error) = self.html_cache_ignore_cookies.add(arg) {
-                return invalid(&format!("Invalid HtmlCacheIgnoreCookie: {}", error.message()));
+                return invalid(&format!(
+                    "Invalid HtmlCacheIgnoreCookie: {}",
+                    error.message()
+                ));
             }
         } else if name.eq_ignore_ascii_case("HtmlCacheBypassCookie") {
             if let Err(error) = self.html_cache_bypass_cookies.add(arg) {
-                return invalid(&format!("Invalid HtmlCacheBypassCookie: {}", error.message()));
+                return invalid(&format!(
+                    "Invalid HtmlCacheBypassCookie: {}",
+                    error.message()
+                ));
             }
         } else if name.eq_ignore_ascii_case("ProxySuffix") {
             self.proxy_suffix = arg.to_string();
@@ -1035,6 +1064,7 @@ impl RewriteOptions {
 
     /// Two-arg dispatch (`ParseAndSetOptionFromName2`).
     pub fn parse_and_set_2(&mut self, name: &str, arg1: &str, arg2: &str) -> Result<(), SetError> {
+        self.invalidate_signature();
         if name.eq_ignore_ascii_case("AddResourceHeader") {
             return self.add_resource_header(arg1, arg2);
         } else if name.eq_ignore_ascii_case("CustomFetchHeader") {
@@ -1106,6 +1136,7 @@ impl RewriteOptions {
         arg2: &str,
         arg3: &str,
     ) -> Result<(), SetError> {
+        self.invalidate_signature();
         if name.eq_ignore_ascii_case("UrlValuedAttribute") {
             match Category::parse(arg3) {
                 Some(category) => {
@@ -1153,6 +1184,7 @@ impl RewriteOptions {
 
     /// Validated resource-header add (`ValidateAndAddResourceHeader`).
     fn add_resource_header(&mut self, name: &str, value: &str) -> Result<(), SetError> {
+        self.invalidate_signature();
         let name = name.trim();
         let value = value.trim();
         validate_http_header(name, value)?;
@@ -1184,6 +1216,7 @@ impl RewriteOptions {
     /// merge per key, and the extend-cache/preserve conflicts resolve via
     /// the merge override.
     pub fn merge(&mut self, src: &RewriteOptions) {
+        self.invalidate_signature();
         let mut modify = src.modified;
         let latched = self.forbid_all_disabled();
         let enabled_before: HashSet<Filter> = if latched {
@@ -1378,6 +1411,7 @@ impl RewriteOptions {
 
     /// Merges only process-scope options (`MergeOnlyProcessScopeOptions`).
     pub fn merge_process_scope_only(&mut self, src: &RewriteOptions) {
+        self.invalidate_signature();
         for prop in PROPERTIES {
             if prop.scope == Scope::LegacyProcess || prop.scope == Scope::ProcessStrict {
                 if let Some(value) = src.values.get(prop.id) {
@@ -1391,6 +1425,7 @@ impl RewriteOptions {
     /// Disables filters requiring script execution
     /// (`DisableFiltersRequiringScriptExecution`).
     pub fn disable_filters_requiring_script_execution(&mut self) {
+        self.invalidate_signature();
         for f in REQUIRES_SCRIPT_EXECUTION {
             self.filters.disable(*f);
         }
@@ -1402,6 +1437,7 @@ impl RewriteOptions {
     /// filters, head-element filters, critical-CSS selection, and
     /// URL modification (relative URLs may break).
     pub fn disable_filters_that_cant_run_in_ajax(&mut self) {
+        self.invalidate_signature();
         self.disable_filters_requiring_script_execution();
         for f in ADD_HEAD_FILTERS {
             self.filters.disable(*f);
@@ -1416,6 +1452,7 @@ impl RewriteOptions {
     ///
     /// `allow_options` gates everything after the bare `PageSpeed=` switch.
     pub fn scan_query(&mut self, name: &str, value: &str, allow_options: bool) -> QueryStatus {
+        self.invalidate_signature();
         let value = trim_url_quotes(value);
         if name == "ModPagespeed" || name == "PageSpeed" {
             if let Some(state) = EnabledState::parse(value) {
@@ -1593,6 +1630,7 @@ impl RewriteOptions {
 
     /// Mutably borrows the allow/disallow resource patterns.
     pub fn allow_resources_mut(&mut self) -> &mut WildcardGroup {
+        self.invalidate_signature();
         &mut self.allow_resources
     }
 
@@ -1625,6 +1663,7 @@ impl RewriteOptions {
     /// Disables lazyload for a class-name pattern
     /// (`DisableLazyloadForClassName`).
     pub fn disable_lazyload_for_class_name(&mut self, pattern: &str) {
+        self.invalidate_signature();
         self.lazyload_enabled_classes.disallow(pattern);
     }
 
@@ -1711,6 +1750,7 @@ impl RewriteOptions {
 
     /// Sets the rewritten-HTML cache cap.
     pub fn set_max_html_cache_time_ms(&mut self, value: i64) {
+        self.invalidate_signature();
         self.values.insert("hc", Value::Int(value));
         self.modified = true;
     }
@@ -1925,6 +1965,7 @@ impl RewriteOptions {
 
     /// Sets the introspective-JS flag.
     pub fn set_avoid_renaming_introspective_javascript(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("aris", Value::Bool(value));
         self.modified = true;
     }
@@ -1940,6 +1981,7 @@ impl RewriteOptions {
 
     /// Sets the no-transform flag.
     pub fn set_disable_rewrite_on_no_transform(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("drnt", Value::Bool(value));
         self.modified = true;
     }
@@ -1973,6 +2015,7 @@ impl RewriteOptions {
 
     /// Sets the staleness window.
     pub fn set_metadata_cache_staleness_threshold_ms(&mut self, ms: i64) {
+        self.invalidate_signature();
         self.values.insert("mcst", Value::Int(ms));
         self.modified = true;
     }
@@ -1989,6 +2032,7 @@ impl RewriteOptions {
 
     /// Sets HTML caching.
     pub fn set_html_cache(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("fhc", Value::Bool(value));
         self.modified = true;
     }
@@ -2005,6 +2049,7 @@ impl RewriteOptions {
 
     /// Sets cache-timestamp diagnostics.
     pub fn set_show_cache_timestamp(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("fhcs", Value::Bool(value));
         self.modified = true;
     }
@@ -2021,6 +2066,7 @@ impl RewriteOptions {
 
     /// Sets the HTML cache lifetime cap.
     pub fn set_html_cache_ttl_sec(&mut self, value: i64) {
+        self.invalidate_signature();
         self.values.insert("fhct", Value::Int(value));
         self.modified = true;
     }
@@ -2044,6 +2090,7 @@ impl RewriteOptions {
 
     /// Sets the common-cookie allowlist switch.
     pub fn set_html_cache_ignore_common_cookies(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("fhcc", Value::Bool(value));
         self.modified = true;
     }
@@ -2148,14 +2195,33 @@ impl RewriteOptions {
         true
     }
 
+    /// Drops the memoized signature (every mutator calls this first).
+    pub(crate) fn invalidate_signature(&self) {
+        self.signature_cache.borrow_mut().take();
+    }
+
     /// Serializes configured state (`signature`).
     ///
     /// NOTE: the bytes are implementation-local (the C++ text format
     /// is not reproduced): only stability across identical configs
     /// and sensitivity to any change are contractual. Partition keys
     /// built on it never leave the local metadata cache.
+    ///
+    /// The value is memoized and recomputed only after a mutation,
+    /// so per-request clones of a server-level config share one
+    /// computation across all of a request's partition keys.
     #[must_use]
     pub fn signature(&self) -> String {
+        if let Some(cached) = self.signature_cache.borrow().clone() {
+            return cached;
+        }
+        let computed = self.compute_signature();
+        *self.signature_cache.borrow_mut() = Some(computed.clone());
+        computed
+    }
+
+    /// Rebuilds the signature from every field (see [`Self::signature`]).
+    fn compute_signature(&self) -> String {
         let mut parts = Vec::new();
         let mut ids: Vec<&str> = self.values.keys().copied().collect();
         ids.sort_unstable();
@@ -2230,6 +2296,7 @@ impl RewriteOptions {
 
     /// Sets the preemptive-JS flag.
     pub fn set_in_place_preemptive_rewrite_javascript(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("ipprj", Value::Bool(value));
         self.modified = true;
     }
@@ -2247,6 +2314,7 @@ impl RewriteOptions {
     /// Registers a JS library for canonicalization
     /// (`RegisterLibrary`).
     pub fn register_library(&mut self, bytes: i64, md5: &str, url: &str) -> bool {
+        self.invalidate_signature();
         register_library(&mut self.libraries, bytes, md5, url)
     }
 
@@ -2282,6 +2350,7 @@ impl RewriteOptions {
 
     /// Sets the font-CSS inline cap.
     pub fn set_google_font_css_inline_max_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.values.insert("gfci", Value::Int(bytes));
         self.modified = true;
     }
@@ -2298,6 +2367,7 @@ impl RewriteOptions {
 
     /// Sets the caching-headers flag.
     pub fn set_modify_caching_headers(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("mch", Value::Bool(value));
         self.modified = true;
     }
@@ -2314,6 +2384,7 @@ impl RewriteOptions {
 
     /// Sets in-place rewriting.
     pub fn set_in_place_rewriting_enabled(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("ipro", Value::Bool(value));
         self.modified = true;
     }
@@ -2330,6 +2401,7 @@ impl RewriteOptions {
 
     /// Sets IPRO waiting.
     pub fn set_in_place_wait_for_optimized(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("ipwo", Value::Bool(value));
         self.modified = true;
     }
@@ -2346,6 +2418,7 @@ impl RewriteOptions {
 
     /// Sets the IPRO s-maxage.
     pub fn set_in_place_s_maxage_sec(&mut self, value: i64) {
+        self.invalidate_signature();
         self.values.insert("ipsm", Value::Int(value));
         self.modified = true;
     }
@@ -2384,6 +2457,7 @@ impl RewriteOptions {
 
     /// Sets the IPRO rewrite deadline.
     pub fn set_in_place_rewrite_deadline_ms(&mut self, value: i64) {
+        self.invalidate_signature();
         self.values.insert("iprdm", Value::Int(value));
         self.modified = true;
     }
@@ -2400,6 +2474,7 @@ impl RewriteOptions {
 
     /// Sets uncacheable rewriting.
     pub fn set_rewrite_uncacheable_resources(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("rur", Value::Bool(value));
         self.modified = true;
     }
@@ -2416,6 +2491,7 @@ impl RewriteOptions {
 
     /// Sets the file-input cache TTL.
     pub fn set_load_from_file_cache_ttl_ms(&mut self, value: i64) {
+        self.invalidate_signature();
         self.values.insert("lfct", Value::Int(value));
         self.modified = true;
     }
@@ -2432,6 +2508,7 @@ impl RewriteOptions {
 
     /// Sets the IE private-not-vary flag.
     pub fn set_private_not_vary_for_ie(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("pnvie", Value::Bool(value));
         self.modified = true;
     }
@@ -2444,6 +2521,7 @@ impl RewriteOptions {
 
     /// Sets the downstream-cache purge prefix.
     pub fn set_downstream_cache_purge_location_prefix(&mut self, prefix: &str) {
+        self.invalidate_signature();
         self.downstream_purge_prefix = prefix.to_string();
         self.modified = true;
     }
@@ -2460,6 +2538,7 @@ impl RewriteOptions {
 
     /// Sets the debug-output cap.
     pub fn set_debug_output_max_bytes(&mut self, limit: i64) {
+        self.invalidate_signature();
         self.values.insert("dob", Value::Int(limit));
         self.modified = true;
     }
@@ -2486,6 +2565,7 @@ impl RewriteOptions {
     /// Sets the CSS outlining threshold
     /// (`set_css_outline_min_bytes`, directory scope).
     pub fn set_css_outline_min_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.values.insert("co", Value::Int(bytes));
         self.modified = true;
     }
@@ -2502,6 +2582,7 @@ impl RewriteOptions {
 
     /// Sets the always-rewrite-CSS flag.
     pub fn set_always_rewrite_css(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("arc", Value::Bool(value));
         self.modified = true;
     }
@@ -2518,6 +2599,7 @@ impl RewriteOptions {
 
     /// Sets the CSS parse cap.
     pub fn set_css_parse_max_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.values.insert("cpmb", Value::Int(bytes));
         self.modified = true;
     }
@@ -2534,6 +2616,7 @@ impl RewriteOptions {
 
     /// Sets the flatten-imports cap.
     pub fn set_css_flatten_max_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.values.insert("cf", Value::Int(bytes));
         self.modified = true;
     }
@@ -2580,18 +2663,21 @@ impl RewriteOptions {
 
     /// Sets the image-inline cap.
     pub fn set_image_inline_max_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.values.insert("ii", Value::Int(bytes));
         self.modified = true;
     }
 
     /// Sets the CSS-inline cap.
     pub fn set_css_inline_max_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.values.insert("ci", Value::Int(bytes));
         self.modified = true;
     }
 
     /// Sets the CSS image-inline cap.
     pub fn set_css_image_inline_max_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.values.insert("cii", Value::Int(bytes));
         self.modified = true;
     }
@@ -2613,6 +2699,7 @@ impl RewriteOptions {
 
     /// Sets an image int64 option by id.
     fn set_image_int(&mut self, id: &'static str, value: i64) {
+        self.invalidate_signature();
         self.values.insert(id, Value::Int(value));
         self.modified = true;
     }
@@ -2627,6 +2714,7 @@ impl RewriteOptions {
 
     /// Sets an image bool option by id.
     fn set_image_bool(&mut self, id: &'static str, value: bool) {
+        self.invalidate_signature();
         self.values.insert(id, Value::Bool(value));
         self.modified = true;
     }
@@ -2640,6 +2728,7 @@ impl RewriteOptions {
 
     /// Sets the recompress quality.
     pub fn set_image_recompress_quality(&mut self, quality: i64) {
+        self.invalidate_signature();
         self.set_image_int("irq", quality);
     }
 
@@ -2652,6 +2741,7 @@ impl RewriteOptions {
 
     /// Sets the JPEG recompress quality.
     pub fn set_image_jpeg_recompress_quality(&mut self, quality: i64) {
+        self.invalidate_signature();
         self.set_image_int("iq", quality);
     }
 
@@ -2664,6 +2754,7 @@ impl RewriteOptions {
 
     /// Sets the small-screen JPEG quality.
     pub fn set_image_jpeg_recompress_quality_for_small_screens(&mut self, quality: i64) {
+        self.invalidate_signature();
         self.set_image_int("iqss", quality);
     }
 
@@ -2676,6 +2767,7 @@ impl RewriteOptions {
 
     /// Sets the Save-Data JPEG quality.
     pub fn set_image_jpeg_quality_for_save_data(&mut self, quality: i64) {
+        self.invalidate_signature();
         self.set_image_int("iqsd", quality);
     }
 
@@ -2688,6 +2780,7 @@ impl RewriteOptions {
 
     /// Sets the webp recompress quality.
     pub fn set_image_webp_recompress_quality(&mut self, quality: i64) {
+        self.invalidate_signature();
         self.set_image_int("iw", quality);
     }
 
@@ -2700,6 +2793,7 @@ impl RewriteOptions {
 
     /// Sets the small-screen webp quality.
     pub fn set_image_webp_recompress_quality_for_small_screens(&mut self, quality: i64) {
+        self.invalidate_signature();
         self.set_image_int("iwss", quality);
     }
 
@@ -2712,6 +2806,7 @@ impl RewriteOptions {
 
     /// Sets the animated-webp quality.
     pub fn set_image_webp_animated_recompress_quality(&mut self, quality: i64) {
+        self.invalidate_signature();
         self.set_image_int("iwa", quality);
     }
 
@@ -2724,6 +2819,7 @@ impl RewriteOptions {
 
     /// Sets the Save-Data webp quality.
     pub fn set_image_webp_quality_for_save_data(&mut self, quality: i64) {
+        self.invalidate_signature();
         self.set_image_int("iwsd", quality);
     }
 
@@ -2827,6 +2923,7 @@ impl RewriteOptions {
 
     /// Sets the progressive-scan count.
     pub fn set_image_jpeg_num_progressive_scans(&mut self, scans: i64) {
+        self.invalidate_signature();
         self.set_image_int("ijps", scans);
     }
 
@@ -2839,6 +2936,7 @@ impl RewriteOptions {
 
     /// Sets the small-screen scan count.
     pub fn set_image_jpeg_num_progressive_scans_for_small_screens(&mut self, scans: i64) {
+        self.invalidate_signature();
         self.set_image_int("ijpst", scans);
     }
 
@@ -2862,6 +2960,7 @@ impl RewriteOptions {
 
     /// Sets the optimized-percent floor.
     pub fn set_image_limit_optimized_percent(&mut self, percent: i64) {
+        self.invalidate_signature();
         self.set_image_int("ip", percent);
     }
 
@@ -2874,6 +2973,7 @@ impl RewriteOptions {
 
     /// Sets the resize-area floor.
     pub fn set_image_limit_resize_area_percent(&mut self, percent: i64) {
+        self.invalidate_signature();
         self.set_image_int("ia", percent);
     }
 
@@ -2886,6 +2986,7 @@ impl RewriteOptions {
 
     /// Sets the resolution ceiling.
     pub fn set_image_resolution_limit_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.set_image_int("irlb", bytes);
     }
 
@@ -2897,6 +2998,7 @@ impl RewriteOptions {
 
     /// Sets the webp deadline.
     pub fn set_image_webp_timeout_ms(&mut self, timeout_ms: i64) {
+        self.invalidate_signature();
         self.set_image_int("wt", timeout_ms);
     }
 
@@ -2908,6 +3010,7 @@ impl RewriteOptions {
 
     /// Sets the AVIF deadline.
     pub fn set_image_avif_timeout_ms(&mut self, timeout_ms: i64) {
+        self.invalidate_signature();
         self.set_image_int("at", timeout_ms);
     }
 
@@ -2920,6 +3023,7 @@ impl RewriteOptions {
 
     /// Sets the AVIF concurrency bound.
     pub fn set_image_avif_max_concurrent_conversions(&mut self, max: i64) {
+        self.invalidate_signature();
         self.set_image_int("ac", max);
     }
 
@@ -2932,6 +3036,7 @@ impl RewriteOptions {
 
     /// Sets the preview-image index cap.
     pub fn set_max_inlined_preview_images_index(&mut self, index: i64) {
+        self.invalidate_signature();
         self.set_image_int("mdii", index);
     }
 
@@ -2944,6 +3049,7 @@ impl RewriteOptions {
 
     /// Sets the low-res preview floor.
     pub fn set_min_image_size_low_resolution_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.set_image_int("nislr", bytes);
     }
 
@@ -2956,6 +3062,7 @@ impl RewriteOptions {
 
     /// Sets the low-res preview ceiling.
     pub fn set_max_image_size_low_resolution_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.set_image_int("xislr", bytes);
     }
 
@@ -2968,6 +3075,7 @@ impl RewriteOptions {
 
     /// Sets the low-res size cap.
     pub fn set_max_low_res_image_size_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.set_image_int("lris", bytes);
     }
 
@@ -2980,6 +3088,7 @@ impl RewriteOptions {
 
     /// Sets the low-res/full-res percentage cap.
     pub fn set_max_low_res_to_full_res_image_size_percentage(&mut self, percent: i64) {
+        self.invalidate_signature();
         self.set_image_int("lrhrs", percent);
     }
 
@@ -2992,6 +3101,7 @@ impl RewriteOptions {
 
     /// Sets the progressive-JPEG floor.
     pub fn set_progressive_jpeg_min_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.set_image_int("jp", bytes);
     }
 
@@ -3004,6 +3114,7 @@ impl RewriteOptions {
 
     /// Sets the no-transform flag.
     pub fn set_no_transform_optimized_images(&mut self, value: bool) {
+        self.invalidate_signature();
         self.set_image_bool("ntoi", value);
     }
 
@@ -3016,6 +3127,7 @@ impl RewriteOptions {
 
     /// Sets the critical-only flag.
     pub fn set_inline_only_critical_images(&mut self, value: bool) {
+        self.invalidate_signature();
         self.set_image_bool("ioci", value);
     }
 
@@ -3028,6 +3140,7 @@ impl RewriteOptions {
 
     /// Sets critical-image beaconing.
     pub fn set_critical_images_beacon_enabled(&mut self, value: bool) {
+        self.invalidate_signature();
         self.set_image_bool("cibe", value);
     }
 
@@ -3040,6 +3153,7 @@ impl RewriteOptions {
 
     /// Sets the reinstrumentation interval.
     pub fn set_beacon_reinstrument_time_sec(&mut self, value: i64) {
+        self.invalidate_signature();
         self.set_image_int("brts", value);
     }
 
@@ -3052,11 +3166,13 @@ impl RewriteOptions {
 
     /// Sets the unrewritten flag.
     pub fn set_cache_small_images_unrewritten(&mut self, value: bool) {
+        self.invalidate_signature();
         self.set_image_bool("csiu", value);
     }
 
     /// Sets the blank-preview flag.
     pub fn set_use_blank_image_for_inline_preview(&mut self, value: bool) {
+        self.invalidate_signature();
         self.set_image_bool("biip", value);
     }
 
@@ -3069,6 +3185,7 @@ impl RewriteOptions {
 
     /// Sets the serve-webp flag.
     pub fn set_serve_rewritten_webp_urls_to_any_agent(&mut self, value: bool) {
+        self.invalidate_signature();
         self.set_image_bool("swaa", value);
     }
 
@@ -3085,6 +3202,7 @@ impl RewriteOptions {
 
     /// Sets the Vary policy.
     pub fn set_allow_vary_on(&mut self, value: AllowVaryOn) {
+        self.invalidate_signature();
         let text = if value.auto {
             "Auto".to_string()
         } else {
@@ -3153,6 +3271,7 @@ impl RewriteOptions {
 
     /// Sets the preemptive-rewrite flag.
     pub fn set_in_place_preemptive_rewrite_images(&mut self, value: bool) {
+        self.invalidate_signature();
         self.set_image_bool("ippri", value);
     }
 
@@ -3165,6 +3284,7 @@ impl RewriteOptions {
 
     /// Sets the CSS-image preemptive-rewrite flag.
     pub fn set_in_place_preemptive_rewrite_css_images(&mut self, value: bool) {
+        self.invalidate_signature();
         self.set_image_bool("ipprci", value);
     }
 
@@ -3187,6 +3307,7 @@ impl RewriteOptions {
 
     /// Sets the random-drop percentage.
     pub fn set_rewrite_random_drop_percentage(&mut self, percent: i64) {
+        self.invalidate_signature();
         self.values.insert("rrdp", Value::Int(percent));
         self.modified = true;
     }
@@ -3203,6 +3324,7 @@ impl RewriteOptions {
 
     /// Sets the preemptive-CSS flag.
     pub fn set_in_place_preemptive_rewrite_css(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("ipprc", Value::Bool(value));
         self.modified = true;
     }
@@ -3219,6 +3341,7 @@ impl RewriteOptions {
 
     /// Sets the combined-JS cap.
     pub fn set_max_combined_js_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.values.insert("xcj", Value::Int(bytes));
         self.modified = true;
     }
@@ -3235,6 +3358,7 @@ impl RewriteOptions {
 
     /// Sets the JS outlining threshold.
     pub fn set_js_outline_min_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.values.insert("jo", Value::Int(bytes));
         self.modified = true;
     }
@@ -3251,6 +3375,7 @@ impl RewriteOptions {
 
     /// Sets the combined-CSS cap.
     pub fn set_max_combined_css_bytes(&mut self, bytes: i64) {
+        self.invalidate_signature();
         self.values.insert("xcc", Value::Int(bytes));
         self.modified = true;
     }
@@ -3271,6 +3396,7 @@ impl RewriteOptions {
     /// Allows an id pattern for CSS combining
     /// (`PermitIdsForCssCombining`).
     pub fn permit_ids_for_css_combining(&mut self, pattern: &str) {
+        self.invalidate_signature();
         self.css_combining_ids.allow(pattern);
         self.modified = true;
     }
@@ -3287,6 +3413,7 @@ impl RewriteOptions {
 
     /// Disallows a URL pattern (`Disallow`).
     pub fn disallow(&mut self, pattern: &str) {
+        self.invalidate_signature();
         self.allow_resources.disallow(pattern);
         self.modified = true;
     }
@@ -3294,6 +3421,7 @@ impl RewriteOptions {
     /// Disallows a pattern except when inlining
     /// (`AllowOnlyWhenInlining`).
     pub fn allow_only_when_inlining(&mut self, pattern: &str) {
+        self.invalidate_signature();
         self.disallow(pattern);
         self.allow_when_inlining(pattern);
     }
@@ -3329,6 +3457,7 @@ impl RewriteOptions {
 
     /// Disables a filter (`DisableFilter`).
     pub fn disable_filter(&mut self, filter: Filter) {
+        self.invalidate_signature();
         self.filters.disable(filter);
         self.modified = true;
     }
@@ -3341,6 +3470,7 @@ impl RewriteOptions {
     /// No static reading of the option sets explains that revival,
     /// so the port revives here to match observed behavior.
     pub fn enable_filter(&mut self, filter: Filter) {
+        self.invalidate_signature();
         self.filters.undisable(filter);
         self.filters.enable(filter);
         self.modified = true;
@@ -3349,6 +3479,7 @@ impl RewriteOptions {
     /// Enables the cache-extension filters
     /// (`EnableExtendCacheFilters`; never PDFs).
     pub fn enable_extend_cache_filters(&mut self) {
+        self.invalidate_signature();
         self.enable_filter(Filter::ExtendCacheCss);
         self.enable_filter(Filter::ExtendCacheImages);
         self.enable_filter(Filter::ExtendCacheScripts);
@@ -3358,6 +3489,7 @@ impl RewriteOptions {
     /// (`SoftEnableFilterForTesting`): preserve-urls can still
     /// override it.
     pub fn soft_enable_filter_for_testing(&mut self, filter: Filter) {
+        self.invalidate_signature();
         if self.filters.level() == RewriteLevel::AllFilters {
             self.filters.unforbid(filter);
             self.filters.undisable(filter);
@@ -3382,6 +3514,7 @@ impl RewriteOptions {
 
     /// Sets the rewrite level (`SetRewriteLevel`).
     pub fn set_rewrite_level(&mut self, level: RewriteLevel) {
+        self.invalidate_signature();
         self.values.insert("l", Value::Level(level));
         self.sync_special("l");
         self.modified = true;
@@ -3391,6 +3524,7 @@ impl RewriteOptions {
     /// applies only when no level was explicitly set, and never
     /// marks the options modified.
     pub fn set_default_rewrite_level(&mut self, level: RewriteLevel) {
+        self.invalidate_signature();
         if !self.values.contains_key("l") {
             self.filters.set_level(level);
         }
@@ -3401,6 +3535,7 @@ impl RewriteOptions {
     /// ceiling (or negative, or zero where zero means unlimited)
     /// takes the ceiling's value.
     pub fn limit_size_thresholds_to(&mut self, ceiling: &RewriteOptions) {
+        self.invalidate_signature();
         for (id, zero_is_unlimited) in [
             ("ii", false),
             ("cii", false),
@@ -3425,6 +3560,7 @@ impl RewriteOptions {
 
     /// Sets the css-preserve-urls flag.
     pub fn set_css_preserve_urls(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("cpu", Value::Bool(value));
         self.sync_special("cpu");
         self.modified = true;
@@ -3432,6 +3568,7 @@ impl RewriteOptions {
 
     /// Sets the js-preserve-urls flag.
     pub fn set_js_preserve_urls(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("jpu", Value::Bool(value));
         self.sync_special("jpu");
         self.modified = true;
@@ -3439,6 +3576,7 @@ impl RewriteOptions {
 
     /// Sets the image-preserve-urls flag.
     pub fn set_image_preserve_urls(&mut self, value: bool) {
+        self.invalidate_signature();
         self.values.insert("ipu", Value::Bool(value));
         self.sync_special("ipu");
         self.modified = true;
@@ -3465,6 +3603,7 @@ impl RewriteOptions {
     /// Allows inlining a category without explicit authorization
     /// (`AddInlineUnauthorizedResourceType`).
     pub fn add_inline_unauthorized_resource_type(&mut self, category: Category) {
+        self.invalidate_signature();
         if !self.inline_unauthorized_types.contains(&category) {
             self.inline_unauthorized_types.push(category);
             self.modified = true;
@@ -3486,12 +3625,14 @@ impl RewriteOptions {
 
     /// Allows a pattern for inlining (`AllowWhenInlining`).
     pub fn allow_when_inlining(&mut self, pattern: &str) {
+        self.invalidate_signature();
         self.allow_when_inlining_resources.allow(pattern);
     }
 
     /// Blocks known-troublesome resources and lazyload-hostile classes
     /// (`DisallowTroublesomeResources`).
     pub fn disallow_troublesome_resources(&mut self) {
+        self.invalidate_signature();
         self.allow_resources.disallow("*js_tinyMCE*");
         self.allow_resources.disallow("*tiny_mce*");
         self.allow_resources.disallow("*tinymce*");
@@ -3530,12 +3671,14 @@ impl RewriteOptions {
 
     /// Authorizes a domain (`AddDomain`).
     pub fn add_domain(&mut self, domain: &str) {
+        self.invalidate_signature();
         self.domains.push(domain.to_string());
         self.modified = true;
     }
 
     /// Shards a domain (`AddShard`).
     pub fn add_shard(&mut self, domain: &str, shards: &str) {
+        self.invalidate_signature();
         if !shards.is_empty() {
             self.shards.push((domain.to_string(), shards.to_string()));
         }
@@ -3544,6 +3687,7 @@ impl RewriteOptions {
 
     /// Maps rewrite domains (`AddRewriteDomainMapping`).
     pub fn add_rewrite_domain_mapping(&mut self, to_domain: &str, from_domains: &str) {
+        self.invalidate_signature();
         self.domain_mappings.push(DomainMapping {
             kind: DomainMappingKind::Rewrite,
             from: from_domains.to_string(),
@@ -3556,6 +3700,7 @@ impl RewriteOptions {
     /// Maps a proxy domain (`AddProxyDomainMapping`): origin fetches
     /// are served under the proxy prefix.
     pub fn add_proxy_domain_mapping(&mut self, proxy_domain: &str, origin_domain: &str) {
+        self.invalidate_signature();
         self.domain_mappings.push(DomainMapping {
             kind: DomainMappingKind::Proxy,
             from: proxy_domain.to_string(),
@@ -3567,6 +3712,7 @@ impl RewriteOptions {
 
     /// Registers a custom URL-valued attribute (`AddUrlValuedAttribute`).
     pub fn add_url_valued_attribute(&mut self, element: &str, attribute: &str, category: Category) {
+        self.invalidate_signature();
         self.url_valued_attrs
             .push((element.to_string(), attribute.to_string(), category));
         self.modified = true;
@@ -3622,6 +3768,7 @@ impl RewriteOptions {
     /// Only a single character naming an existing spec position takes
     /// effect; anything else is ignored, as in C++.
     pub fn set_experiment_state_str(&mut self, index: &str) {
+        self.invalidate_signature();
         if index.len() == 1 {
             let slot = index.as_bytes()[0].wrapping_sub(b'a') as usize;
             if slot < self.experiment_specs.len() {
@@ -4754,7 +4901,9 @@ mod tests {
             .unwrap();
         options.merge(&child);
         assert_eq!(
-            options.file_load_policy().map_url_to_filename("http://example.com/a.js"),
+            options
+                .file_load_policy()
+                .map_url_to_filename("http://example.com/a.js"),
             Some("/var/other/a.js".to_string())
         );
         options.parse_and_set_2("ShardDomain", "a.com", "").unwrap();
@@ -5911,6 +6060,44 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn signature_memoized_until_mutation() {
+        // The signature computes once and every mutation path
+        // invalidates it; stale signatures would collapse cache keys
+        // across different configs.
+        let mut options = RewriteOptions::new();
+        let base = options.signature();
+        assert_eq!(options.signature(), base);
+        // Table mutation.
+        options
+            .set_option("ModifyCachingHeaders", "false", Scope::Server)
+            .unwrap();
+        let mutated = options.signature();
+        assert_ne!(mutated, base);
+        assert_eq!(options.signature(), mutated);
+        // Filter-state mutation through the &mut escape.
+        options.filters_mut().enable(Filter::InlineCss);
+        let filtered = options.signature();
+        assert_ne!(filtered, mutated);
+        assert_eq!(options.signature(), filtered);
+        // Typed setter.
+        options.set_modify_caching_headers(true);
+        assert_ne!(options.signature(), filtered);
+        // Wildcard mutation through the &mut escape.
+        let before = options.signature();
+        options.allow_resources_mut().allow("*example*");
+        assert_ne!(options.signature(), before);
+        // Merge.
+        let mut extra = RewriteOptions::new();
+        extra.filters_mut().enable(Filter::InlineJavascript);
+        let before = options.signature();
+        options.merge(&extra);
+        assert_ne!(options.signature(), before);
+        // Clones share the value (identical configs, one computation).
+        let clone = options.clone();
+        assert_eq!(clone.signature(), options.signature());
+    }
+
     fn signature_and_secret_tables() {
         assert!(EXCLUDED_FROM_SIGNATURE.contains(&"tifrwd"));
         assert!(EXCLUDED_FROM_SIGNATURE.contains(&"noop"));

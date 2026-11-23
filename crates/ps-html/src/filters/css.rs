@@ -201,7 +201,7 @@ fn inline_cache_key(
 ) -> String {
     let mut payload = raw.to_vec();
     payload.push(b'\n');
-    payload.extend_from_slice(driver.options().signature().as_bytes());
+    payload.extend_from_slice(driver.options_signature().as_bytes());
     let mut resolved: Vec<String> = uris
         .iter()
         .map(|uri| {
@@ -272,7 +272,7 @@ fn cannot_import_message(action: &str, url: &str, is_authorized: bool) -> String
 }
 
 /// Per-context behavior.
-struct CssBehavior {
+pub(crate) struct CssBehavior {
     driver: Rc<ResourceDriver>,
     /// Root applicable media (link/style element).
     root_media: Vec<Vec<u8>>,
@@ -283,6 +283,22 @@ struct CssBehavior {
 }
 
 impl CssBehavior {
+    /// Rebuilds the behavior on a background worker from a snapshot
+    /// (same inputs, fresh driver).
+    pub(crate) fn for_background(
+        driver: Rc<ResourceDriver>,
+        root_media: Vec<Vec<u8>>,
+        root_charset: Vec<u8>,
+        root_charset_failure: Option<String>,
+    ) -> Self {
+        CssBehavior {
+            driver,
+            root_media,
+            root_charset,
+            root_charset_failure,
+        }
+    }
+
     /// Rewrites one input (`RewriteSingle` + `Harvest` for the
     /// minify-only path).
     fn rewrite_css(
@@ -512,7 +528,7 @@ fn flatten_cache_key(driver: &ResourceDriver, input: &InputResource, media: &[Ve
         "cf-flatten:{}:{}:{}:{}",
         input.url(),
         suffix,
-        driver.options().signature(),
+        driver.options_signature(),
         input.contents_hash(),
     )
 }
@@ -751,6 +767,14 @@ impl SingleRewriteBehavior for CssBehavior {
         partition: &mut CachedResult,
     ) -> RewriteResult {
         self.rewrite_css(driver, input, output, partition)
+    }
+
+    fn background_snapshot(&self) -> Option<crate::html_async::BackgroundBehavior> {
+        Some(crate::html_async::BackgroundBehavior::Css {
+            root_media: self.root_media.clone(),
+            root_charset: self.root_charset.clone(),
+            root_charset_failure: self.root_charset_failure.clone(),
+        })
     }
 
     fn send_fallback_response(

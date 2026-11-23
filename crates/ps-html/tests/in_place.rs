@@ -732,6 +732,84 @@ fn wait_for_optimized_slow_origin_falls_back_then_warms() {
 }
 
 #[test]
+fn saturated_pool_ipro_sheds_without_inline_fetch() {
+    // Queue-full on the bounded origin path sheds (Pending) instead
+    // of fetching inline past the deadline: the fetch fails fast
+    // (the server falls back to its native method for the origin
+    // bytes), the origin is never touched, and the rejection is
+    // counted.
+    let fixture = Fixture::build_with_origin_latency(false, Duration::from_millis(300));
+    fixture
+        .options
+        .borrow_mut()
+        .set_in_place_wait_for_optimized(true);
+    fixture
+        .options
+        .borrow_mut()
+        .set_in_place_rewrite_deadline_ms(30);
+    fixture
+        .options
+        .borrow_mut()
+        .set_option("RewriteDeadlinePerFlushMs", "30000", Scope::Server)
+        .unwrap();
+    fixture.init();
+    let pool = BackgroundPool::new(
+        PoolConfig {
+            threads: 1,
+            queue_bound: 1,
+        },
+        &fixture.server.statistics_shared(),
+    );
+    fixture.server.set_background_pool(Arc::clone(&pool));
+    // Park the worker (gate A, started-signal proves it is inside)
+    // and fill the queue (gate B); the IPRO submit below sheds.
+    let (gate_tx, gate_rx) = std::sync::mpsc::channel::<()>();
+    let gate_rx = Arc::new(std::sync::Mutex::new(gate_rx));
+    let (started_tx, started_rx) = std::sync::mpsc::channel::<()>();
+    {
+        let gate_rx = Arc::clone(&gate_rx);
+        pool.submit("ipro-shed-gate-a", move || {
+            let _ = started_tx.send(());
+            let _ = gate_rx.lock().unwrap().recv();
+            0u8
+        })
+        .unwrap();
+    }
+    started_rx.recv().unwrap();
+    {
+        let gate_rx = Arc::clone(&gate_rx);
+        pool.submit("ipro-shed-gate-b", move || {
+            let _ = gate_rx.lock().unwrap().recv();
+            0u8
+        })
+        .unwrap();
+    }
+    let start = Instant::now();
+    let driver = fixture.driver_for("http://www.example.com/cacheable.jpg");
+    let ctx = driver.request_context().borrow().clone();
+    let mut fetch = BufferingFetch::new("http://www.example.com/cacheable.jpg", ctx);
+    assert!(driver.fetch_resource("http://www.example.com/cacheable.jpg", &mut fetch));
+    assert!(fetch.done());
+    assert!(!fetch.success());
+    assert!(
+        start.elapsed() < Duration::from_millis(250),
+        "saturated IPRO must shed, not fetch inline"
+    );
+    assert_eq!(fixture.fetcher.fetch_count(), 0);
+    assert_eq!(
+        fixture
+            .server
+            .statistics()
+            .get_variable("background_jobs_queue_full")
+            .unwrap()
+            .get(),
+        1
+    );
+    drop(gate_tx);
+    pool.shutdown();
+}
+
+#[test]
 fn wait_for_optimize_with_disabled_filter() {
     // Wait for optimized but if the resource fails to optimize
     // we should get back the original resource.

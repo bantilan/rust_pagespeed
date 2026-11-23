@@ -457,7 +457,7 @@ impl HtmlCacheSession {
             "{}\n{}\n{}\n{}\n",
             self.url,
             self.driver.cache_fragment(),
-            options.signature(),
+            self.driver.options_signature(),
             request.to_http_string_without_cookies(),
         );
         identity.push_str(&format!("origin-ttl:{}\n", policy.cache_ttl_ms()));
@@ -491,7 +491,7 @@ impl HtmlCacheSession {
         let mut beacon_identity = None;
         if super::beacon_finder::beaconing_active(options) {
             let server = self.driver.server_context();
-            let oh = server.hasher().hash(options.signature().as_bytes());
+            let oh = server.hasher().hash(self.driver.options_signature().as_bytes());
             let finder =
                 super::beacon_finder::BeaconFinder::new(server.metadata_cache());
             let lookup = finder.load(&self.url, &oh, &self.device_suffix);

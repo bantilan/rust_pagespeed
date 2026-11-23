@@ -35,14 +35,39 @@ pub const FILTER_ID: &str = "ci";
 pub const NUM_CSS_INLINED: &str = "num_css_inlined";
 
 /// Per-context behavior (charsets vary by element and page).
-struct CssInlineBehavior {
+pub(crate) struct CssInlineBehavior {
     driver: Rc<ResourceDriver>,
     attrs_charset: Vec<u8>,
     htmls_charset: Vec<u8>,
     size_threshold_bytes: i64,
 }
 
+impl CssInlineBehavior {
+    /// Rebuilds the behavior on a background worker from a snapshot.
+    pub(crate) fn for_background(
+        driver: Rc<ResourceDriver>,
+        attrs_charset: Vec<u8>,
+        htmls_charset: Vec<u8>,
+        size_threshold_bytes: i64,
+    ) -> Self {
+        CssInlineBehavior {
+            driver,
+            attrs_charset,
+            htmls_charset,
+            size_threshold_bytes,
+        }
+    }
+}
+
 impl InlineBehavior for CssInlineBehavior {
+    fn background_snapshot(&self) -> Option<crate::html_async::BackgroundBehavior> {
+        Some(crate::html_async::BackgroundBehavior::InlineCss {
+            attrs_charset: self.attrs_charset.clone(),
+            htmls_charset: self.htmls_charset.clone(),
+            size_threshold_bytes: self.size_threshold_bytes,
+        })
+    }
+
     fn id(&self) -> &'static str {
         FILTER_ID
     }

@@ -29,11 +29,11 @@ use ps_stats::core::{Statistics, UpDownCounter, Variable};
 
 use super::domain_lawyer::DomainLawyer;
 use super::element::NodeId;
+use super::file_input_resource::FileInputResource;
 use super::filters::domain_rewrite::{rewrite_url, RewriteResult as DomainRewriteResult};
 use super::filters::url_left_trim::UrlLeftTrimFilter;
 use super::output_resource::{OutputResource, OutputResourceKind};
 use super::parser::Dom;
-use super::file_input_resource::FileInputResource;
 use super::resource::{DataUrlInputResource, InputResource, Resource};
 use super::resource_slot::HtmlResourceSlot;
 use super::rewrite_filter::RewriteFilter;
@@ -225,6 +225,40 @@ impl ServerContext {
             fetcher,
             start_ms,
         )
+    }
+
+    /// Builds a worker-side context over shared handles (background
+    /// HTML-rewrite jobs): the exact shared HTTP cache (config must
+    /// match the requesting context — a fresh `HttpCache` over the
+    /// same backend would diverge), metadata, fetcher, statistics,
+    /// and hasher. The clock is a frozen snapshot and the namer is
+    /// the standard one (production always uses it).
+    pub(crate) fn new_shared(
+        http_cache: Arc<HttpCache>,
+        metadata: Arc<dyn CacheBackend>,
+        fetcher: Arc<dyn AsyncFetcher>,
+        statistics: Arc<Statistics>,
+        hasher: Arc<dyn Hasher>,
+        start_ms: i64,
+    ) -> Self {
+        ServerContext {
+            http_cache,
+            metadata_cache: metadata,
+            fetcher,
+            timer: Rc::new(RefCell::new(MockTimer::new(start_ms))),
+            statistics,
+            contents_hasher: Md5Hasher::with_size(21),
+            hasher,
+            lock_hasher: Md5Hasher::with_size(20),
+            url_namer: Rc::new(StandardUrlNamer),
+            simple_random: Rc::new(RefCell::new(SimpleRandom::new())),
+            ua_normalizers: vec![
+                Rc::new(AndroidUserAgentNormalizer::new()) as Rc<dyn UserAgentNormalizer>,
+                Rc::new(IEUserAgentNormalizer::new()) as Rc<dyn UserAgentNormalizer>,
+            ],
+            critical_selector_finder: RefCell::new(None),
+            background_pool: std::sync::OnceLock::new(),
+        }
     }
 
     /// Builds a context with an explicit metadata cache (tests that
@@ -809,6 +843,30 @@ impl ResourceDriver {
         }
     }
 
+    /// Whether this driver is serving an in-place resource (as
+    /// opposed to rewriting HTML).
+    #[must_use]
+    pub fn is_ipro_serving(&self) -> bool {
+        self.ipro_serving.get()
+    }
+
+    /// Wait budget for background work issued while rewriting HTML:
+    /// the remaining per-flush deadline, or zero when deadlines are
+    /// disabled. Unlike [`Self::fetch_wait_budget_ms`] (which returns
+    /// `None` for "wait forever" under an explicit disable, C++
+    /// parity for the resource path), the HTML path is never
+    /// unbounded: with deadlines disabled the HTML request does not
+    /// wait at all (fire-and-forget; the background completion warms
+    /// the next request), because background optimization must never
+    /// stall page delivery.
+    #[must_use]
+    pub fn html_wait_budget_ms(&self) -> i64 {
+        match self.fetch_wait_budget_ms() {
+            Some(remaining) => remaining.max(0),
+            None => 0,
+        }
+    }
+
     /// Deducts waited milliseconds from the flush-window budget.
     pub fn deduct_fetch_wait_ms(&self, spent_ms: i64) {
         if let Some(budget) = self.fetch_budget_ms.borrow_mut().as_mut() {
@@ -1376,6 +1434,18 @@ impl ResourceDriver {
         )
     }
 
+    /// Borrows the options signature for this request.
+    ///
+    /// The signature is memoized inside [`RewriteOptions`] itself and
+    /// recomputed only after a mutation, so all of a request's
+    /// partition keys, beacon identities, and CSS payload hashes
+    /// share one computation — including across live-driver options
+    /// mutations, which invalidate the cache.
+    #[must_use]
+    pub fn options_signature(&self) -> String {
+        self.options().signature()
+    }
+
     /// Hashes the options signature for partition keys
     /// (`partition_signature_hash`, hashed with the lock hasher so
     /// test naming hashers cannot flatten it).
@@ -1383,7 +1453,7 @@ impl ResourceDriver {
     pub fn partition_signature_hash(&self) -> String {
         self.server
             .lock_hasher()
-            .hash(self.options().signature().as_bytes())
+            .hash(self.options_signature().as_bytes())
     }
 
     /// Writes rewritten bytes to an output (`Write`), caching the
@@ -1984,5 +2054,53 @@ impl ResourceDriver {
                 true
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ps_http::mock::MockUrlFetcher;
+
+    fn driver_with(options: RewriteOptions) -> Rc<ResourceDriver> {
+        let server = Rc::new(ServerContext::new(
+            Arc::new(ps_cache::cache::MemoryCache::new()),
+            Arc::new(MockUrlFetcher::new()),
+            0,
+        ));
+        Rc::new(ResourceDriver::new(
+            server,
+            Rc::new(RefCell::new(options)),
+            "http://test.com/page.html",
+        ))
+    }
+
+    #[test]
+    fn options_signature_memo_matches_direct() {
+        let driver = driver_with(RewriteOptions::new());
+        let direct = driver.options().signature();
+        // First call computes, later calls reuse.
+        assert_eq!(driver.options_signature(), direct);
+        assert_eq!(driver.options_signature(), direct);
+        assert_eq!(
+            driver.partition_signature_hash(),
+            driver.partition_signature_hash()
+        );
+    }
+
+    #[test]
+    fn options_signature_separates_cache_keys() {
+        let plain = driver_with(RewriteOptions::new());
+        let mut altered = RewriteOptions::new();
+        altered
+            .filters_mut()
+            .enable(ps_config::filter::Filter::InlineCss);
+        let altered = driver_with(altered);
+        // Different rewrite options must key partitions apart.
+        assert_ne!(
+            plain.partition_signature_hash(),
+            altered.partition_signature_hash()
+        );
+        assert_ne!(plain.options_signature(), altered.options_signature());
     }
 }

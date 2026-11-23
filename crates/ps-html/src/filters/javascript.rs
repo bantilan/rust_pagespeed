@@ -80,16 +80,26 @@ enum ScriptType {
 }
 
 /// Per-context behavior (source-map mode varies by filter).
-struct JavascriptBehavior {
+pub(crate) struct JavascriptBehavior {
     // Unread: rewrite entry points take the driver explicitly;
     // the stored handle stays for C++ `JavascriptFilter` parity.
     #[allow(dead_code)]
     driver: Rc<ResourceDriver>,
-    patterns: Rc<TokenizerPatterns>,
+    patterns: &'static TokenizerPatterns,
     output_source_map: bool,
 }
 
 impl JavascriptBehavior {
+    /// Rebuilds the behavior on a background worker from a snapshot
+    /// (patterns are the shared process-wide table).
+    pub(crate) fn for_background(driver: Rc<ResourceDriver>, output_source_map: bool) -> Self {
+        JavascriptBehavior {
+            driver,
+            patterns: TokenizerPatterns::shared(),
+            output_source_map,
+        }
+    }
+
     /// Minifies one input into its output(s) (`RewriteJavascript`).
     #[allow(clippy::too_many_lines)]
     fn rewrite_javascript(
@@ -391,12 +401,18 @@ impl SingleRewriteBehavior for JavascriptBehavior {
     ) -> RewriteResult {
         self.rewrite_javascript(driver, input, output, partition)
     }
+
+    fn background_snapshot(&self) -> Option<crate::html_async::BackgroundBehavior> {
+        Some(crate::html_async::BackgroundBehavior::Javascript {
+            output_source_map: self.output_source_map,
+        })
+    }
 }
 
 /// JavaScript rewriting filter (`JavascriptFilter`).
 pub struct JavascriptFilter {
     driver: Rc<ResourceDriver>,
-    patterns: Rc<TokenizerPatterns>,
+    patterns: &'static TokenizerPatterns,
     script_type: ScriptType,
     output_source_map: bool,
 }
@@ -407,7 +423,7 @@ impl JavascriptFilter {
     pub fn new(driver: Rc<ResourceDriver>) -> Self {
         JavascriptFilter {
             driver,
-            patterns: Rc::new(TokenizerPatterns::new()),
+            patterns: TokenizerPatterns::shared(),
             script_type: ScriptType::None,
             output_source_map: false,
         }
@@ -418,7 +434,7 @@ impl JavascriptFilter {
     pub fn new_source_map(driver: Rc<ResourceDriver>) -> Self {
         JavascriptFilter {
             driver,
-            patterns: Rc::new(TokenizerPatterns::new()),
+            patterns: TokenizerPatterns::shared(),
             script_type: ScriptType::None,
             output_source_map: true,
         }
@@ -490,7 +506,7 @@ impl JavascriptFilter {
         }
         let behavior = JavascriptBehavior {
             driver: self.driver.clone(),
-            patterns: self.patterns.clone(),
+            patterns: self.patterns,
             output_source_map: self.output_source_map,
         };
         let mut context = SingleRewriteContext::new(self.driver.clone(), behavior);
@@ -709,7 +725,7 @@ impl RewriteFilter for JavascriptFilter {
     ) -> bool {
         let behavior = JavascriptBehavior {
             driver: driver.clone(),
-            patterns: self.patterns.clone(),
+            patterns: self.patterns,
             output_source_map: self.output_source_map,
         };
         let mut context = SingleRewriteContext::new(driver.clone(), behavior);

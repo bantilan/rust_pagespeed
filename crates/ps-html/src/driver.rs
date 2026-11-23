@@ -70,7 +70,7 @@ impl Driver {
                 let properties = driver.request_properties();
                 Some(FlushEarlyPersist {
                     metadata: server.metadata_cache().clone(),
-                    options_hash: server.hasher().hash(options.signature().as_bytes()),
+                    options_hash: server.hasher().hash(driver.options_signature().as_bytes()),
                     device_suffix:
                         ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
                             properties.device_type(),
@@ -398,7 +398,7 @@ impl Driver {
             return (FinderAvailability::Disabled, std::collections::HashSet::new());
         }
         let server = driver.server_context();
-        let options_hash = server.hasher().hash(options.signature().as_bytes());
+        let options_hash = server.hasher().hash(driver.options_signature().as_bytes());
         let properties = driver.request_properties();
         let device_suffix =
             ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(

@@ -65,6 +65,11 @@ impl CacheExtenderBehavior {
     pub(crate) fn for_nested(driver: Rc<ResourceDriver>, role: InputRole) -> Self {
         CacheExtenderBehavior { driver, role }
     }
+
+    /// Rebuilds the behavior on a background worker from a snapshot.
+    pub(crate) fn for_background(driver: Rc<ResourceDriver>, role: InputRole) -> Self {
+        CacheExtenderBehavior { driver, role }
+    }
 }
 
 impl SingleRewriteBehavior for CacheExtenderBehavior {
@@ -126,6 +131,10 @@ impl SingleRewriteBehavior for CacheExtenderBehavior {
             add_link_rel_canonical(driver, input, output.response_headers_mut());
         }
         rewrite_loaded_resource(driver, input, output, partition)
+    }
+
+    fn background_snapshot(&self) -> Option<crate::html_async::BackgroundBehavior> {
+        Some(crate::html_async::BackgroundBehavior::CacheExtender { role: self.role })
     }
 }
 

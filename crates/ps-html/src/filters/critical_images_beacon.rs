@@ -88,7 +88,7 @@ impl CriticalImagesBeaconFilter {
         }
         let server = Rc::clone(self.driver.server_context());
         let options = self.driver.options();
-        let oh = server.hasher().hash(options.signature().as_bytes());
+        let oh = server.hasher().hash(self.driver.options_signature().as_bytes());
         self.options_hash = oh.clone();
         let device = properties.device_type();
         let suffix =
@@ -284,8 +284,7 @@ impl CriticalImagesBeaconFilter {
     /// (split for unit tests).
     fn finish_document(&mut self) {
         let server = Rc::clone(self.driver.server_context());
-        let options = self.driver.options();
-        let oh = server.hasher().hash(options.signature().as_bytes());
+        let oh = server.hasher().hash(self.driver.options_signature().as_bytes());
         let properties = self.driver.request_properties();
         let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
             properties.device_type(),

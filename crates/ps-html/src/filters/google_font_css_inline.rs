@@ -32,14 +32,39 @@ use crate::server_context::{
 pub const FILTER_ID: &str = "gf";
 
 /// Per-context behavior (charsets vary by element and page).
-struct GoogleFontCssInlineBehavior {
+pub(crate) struct GoogleFontCssInlineBehavior {
     driver: Rc<ResourceDriver>,
     attrs_charset: Vec<u8>,
     htmls_charset: Vec<u8>,
     size_threshold_bytes: i64,
 }
 
+impl GoogleFontCssInlineBehavior {
+    /// Rebuilds the behavior on a background worker from a snapshot.
+    pub(crate) fn for_background(
+        driver: Rc<ResourceDriver>,
+        attrs_charset: Vec<u8>,
+        htmls_charset: Vec<u8>,
+        size_threshold_bytes: i64,
+    ) -> Self {
+        GoogleFontCssInlineBehavior {
+            driver,
+            attrs_charset,
+            htmls_charset,
+            size_threshold_bytes,
+        }
+    }
+}
+
 impl InlineBehavior for GoogleFontCssInlineBehavior {
+    fn background_snapshot(&self) -> Option<crate::html_async::BackgroundBehavior> {
+        Some(crate::html_async::BackgroundBehavior::InlineGoogleFontCss {
+            attrs_charset: self.attrs_charset.clone(),
+            htmls_charset: self.htmls_charset.clone(),
+            size_threshold_bytes: self.size_threshold_bytes,
+        })
+    }
+
     fn id(&self) -> &'static str {
         FILTER_ID
     }

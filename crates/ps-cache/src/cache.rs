@@ -216,11 +216,30 @@ pub struct LruCache {
     healthy: Mutex<bool>,
 }
 
+/// One LRU node: value plus intrusive doubly-linked-list links as
+/// arena indices (`None` at the ends). `live` is false for free-list
+/// slots awaiting reuse.
+#[derive(Debug, Default)]
+struct LruNode {
+    key: String,
+    value: Vec<u8>,
+    prev: Option<usize>,
+    next: Option<usize>,
+    live: bool,
+}
+
 #[derive(Debug, Default)]
 struct LruState {
-    /// Front = most recently used.
-    order: Vec<String>,
-    entries: HashMap<String, Vec<u8>>,
+    /// Key → arena slot for O(1) lookup.
+    index: HashMap<String, usize>,
+    /// Node arena with a free list (head = most recently used).
+    nodes: Vec<LruNode>,
+    /// Reusable arena slots from deleted/evicted entries.
+    free: Vec<usize>,
+    /// Most recently used slot.
+    head: Option<usize>,
+    /// Least recently used slot.
+    tail: Option<usize>,
     used_bytes: usize,
     stats: LruStats,
 }
@@ -251,7 +270,7 @@ impl LruCache {
     /// Number of elements (`num_elements`).
     #[must_use]
     pub fn num_elements(&self) -> usize {
-        lock(&self.state).entries.len()
+        lock(&self.state).index.len()
     }
 
     /// Counter snapshot.
@@ -263,8 +282,11 @@ impl LruCache {
     /// Clears entries but keeps stats (`Clear`).
     pub fn clear(&self) {
         let mut state = lock(&self.state);
-        state.order.clear();
-        state.entries.clear();
+        state.index.clear();
+        state.nodes.clear();
+        state.free.clear();
+        state.head = None;
+        state.tail = None;
         state.used_bytes = 0;
     }
 
@@ -278,7 +300,7 @@ impl LruCache {
     pub fn delete_with_prefix_for_testing(&self, prefix: &str) {
         let mut state = lock(&self.state);
         let victims: Vec<String> = state
-            .entries
+            .index
             .keys()
             .filter(|key| key.starts_with(prefix))
             .cloned()
@@ -292,7 +314,10 @@ impl LruCache {
     #[must_use]
     pub fn get_no_freshen(&self, key: &str) -> Option<Vec<u8>> {
         let mut state = lock(&self.state);
-        let found = state.entries.get(key).cloned();
+        let found = state
+            .index
+            .get(key)
+            .map(|slot| state.nodes[*slot].value.clone());
         match found {
             Some(value) => {
                 state.stats.hits += 1;
@@ -305,33 +330,84 @@ impl LruCache {
         }
     }
 
-    /// Structural self-check (`SanityCheck`): order/map agreement plus the
-    /// byte-accounting invariant.
+    /// Structural self-check (`SanityCheck`): list/index agreement plus
+    /// the byte-accounting invariant (bounded walk: a cycle fails the
+    /// length check rather than hanging).
     pub fn sanity_check(&self) {
         let state = lock(&self.state);
-        assert_eq!(state.order.len(), state.entries.len());
         let mut bytes = 0;
-        for key in &state.order {
-            let value = state.entries.get(key).expect("order/map agreement");
-            bytes += key.len() + value.len();
+        let mut count = 0;
+        let mut cursor = state.head;
+        while let Some(slot) = cursor {
+            assert!(count <= state.index.len(), "lru list cycle");
+            let node = &state.nodes[slot];
+            assert!(node.live, "dead node linked");
+            assert_eq!(state.index.get(&node.key), Some(&slot), "index agreement");
+            if count == 0 {
+                assert_eq!(node.prev, None, "head has no predecessor");
+            }
+            bytes += node.key.len() + node.value.len();
+            count += 1;
+            cursor = node.next;
         }
+        assert_eq!(count, state.index.len(), "list/index length");
         assert_eq!(state.used_bytes, bytes);
         assert!(state.used_bytes <= self.max_bytes);
+        match state.tail {
+            Some(tail) => assert_eq!(state.nodes[tail].next, None, "tail has no successor"),
+            None => assert!(state.index.is_empty(), "empty list has no tail"),
+        }
     }
 
-    fn move_to_front(state: &mut LruState, key: &str) {
-        if let Some(pos) = state.order.iter().position(|k| k == key) {
-            state.order.remove(pos);
+    /// Unlinks a live slot from the recency list (frees nothing).
+    fn unlink(state: &mut LruState, slot: usize) {
+        let (prev, next) = {
+            let node = &state.nodes[slot];
+            debug_assert!(node.live);
+            (node.prev, node.next)
+        };
+        match prev {
+            Some(left) => state.nodes[left].next = next,
+            None => state.head = next,
         }
-        state.order.insert(0, key.to_string());
+        match next {
+            Some(right) => state.nodes[right].prev = prev,
+            None => state.tail = prev,
+        }
+        state.nodes[slot].prev = None;
+        state.nodes[slot].next = None;
+    }
+
+    /// Moves a live slot to the head (most recently used).
+    fn move_to_front_slot(state: &mut LruState, slot: usize) {
+        if state.head == Some(slot) {
+            return;
+        }
+        Self::unlink(state, slot);
+        let old_head = state.head;
+        state.nodes[slot].next = old_head;
+        if let Some(head) = old_head {
+            state.nodes[head].prev = Some(slot);
+        } else {
+            state.tail = Some(slot);
+        }
+        state.head = Some(slot);
+    }
+
+    /// Removes a slot from the list and index, freeing its arena slot.
+    fn remove_slot(state: &mut LruState, slot: usize) {
+        debug_assert!(state.nodes[slot].live);
+        // Unlink before clearing: the links live in the node.
+        Self::unlink(state, slot);
+        let node = std::mem::take(&mut state.nodes[slot]);
+        state.index.remove(&node.key);
+        state.used_bytes -= node.key.len() + node.value.len();
+        state.free.push(slot);
     }
 
     fn delete_locked(state: &mut LruState, key: &str) {
-        if let Some(value) = state.entries.remove(key) {
-            state.used_bytes -= key.len() + value.len();
-            if let Some(pos) = state.order.iter().position(|k| k == key) {
-                state.order.remove(pos);
-            }
+        if let Some(slot) = state.index.get(key).copied() {
+            Self::remove_slot(state, slot);
             state.stats.deletes += 1;
         }
     }
@@ -341,24 +417,34 @@ impl LruCache {
             return false; // strict `<` in C++: exact-fit rejected.
         }
         while state.used_bytes + needed > max_bytes {
-            let Some(oldest) = state.order.pop() else {
+            let Some(oldest) = state.tail else {
                 break;
             };
-            if let Some(value) = state.entries.remove(&oldest) {
-                state.used_bytes -= oldest.len() + value.len();
-                state.stats.evictions += 1;
-            }
+            Self::remove_slot(state, oldest);
+            state.stats.evictions += 1;
         }
         true
+    }
+
+    /// Allocates an arena slot, reusing a freed one when available.
+    fn alloc_slot(state: &mut LruState) -> usize {
+        match state.free.pop() {
+            Some(slot) => slot,
+            None => {
+                state.nodes.push(LruNode::default());
+                state.nodes.len() - 1
+            }
+        }
     }
 }
 
 impl Cache for LruCache {
     fn get(&self, key: &str) -> Lookup {
         let mut state = lock(&self.state);
-        match state.entries.get(key).cloned() {
-            Some(value) => {
-                Self::move_to_front(&mut state, key);
+        match state.index.get(key).copied() {
+            Some(slot) => {
+                let value = state.nodes[slot].value.clone();
+                Self::move_to_front_slot(&mut state, slot);
                 state.stats.hits += 1;
                 Lookup::hit(value)
             }
@@ -371,28 +457,36 @@ impl Cache for LruCache {
 
     fn put(&self, key: &str, value: &[u8]) {
         let mut state = lock(&self.state);
-        if let Some(old) = state.entries.get(key) {
-            if old.as_slice() == value {
-                Self::move_to_front(&mut state, key);
+        if let Some(slot) = state.index.get(key).copied() {
+            if state.nodes[slot].value.as_slice() == value {
+                Self::move_to_front_slot(&mut state, slot);
                 state.stats.identical_reinserts += 1;
                 return;
             }
             // Replacement: delete-counted removal, then fresh insert.
-            let old_len = old.len();
-            state.used_bytes -= key.len() + old_len;
-            state.entries.remove(key);
-            if let Some(pos) = state.order.iter().position(|k| k == key) {
-                state.order.remove(pos);
-            }
+            Self::remove_slot(&mut state, slot);
             state.stats.deletes += 1;
         }
         let needed = key.len() + value.len();
         if !Self::evict_for(&mut state, self.max_bytes, needed) {
             return; // too big to fit: silently dropped, as in C++.
         }
+        let slot = Self::alloc_slot(&mut state);
+        state.nodes[slot] = LruNode {
+            key: key.to_string(),
+            value: value.to_vec(),
+            prev: None,
+            next: state.head,
+            live: true,
+        };
+        if let Some(head) = state.head {
+            state.nodes[head].prev = Some(slot);
+        } else {
+            state.tail = Some(slot);
+        }
+        state.head = Some(slot);
+        state.index.insert(key.to_string(), slot);
         state.used_bytes += needed;
-        state.entries.insert(key.to_string(), value.to_vec());
-        state.order.insert(0, key.to_string());
         state.stats.inserts += 1;
     }
 
@@ -1525,6 +1619,65 @@ mod tests {
         assert_eq!(cache.stats().hits, 2);
         assert_eq!(cache.stats().misses, 1);
         cache.sanity_check();
+    }
+
+    #[test]
+    fn lru_stress_keeps_invariants() {
+        // Deterministic pseudo-random workload over a small cache:
+        // every operation preserves list/index/byte agreement.
+        let cache = LruCache::new(500);
+        let mut seed: u64 = 0x1234_5678;
+        let mut next = move || {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (seed >> 33) as usize
+        };
+        // Model the visible contents for hit/miss assertions.
+        let mut model: std::collections::HashMap<String, Vec<u8>> =
+            std::collections::HashMap::new();
+        for step in 0..5000 {
+            let key = format!("k{}", next() % 60);
+            match next() % 10 {
+                0..=5 => {
+                    let value = vec![(step & 0xff) as u8; 1 + next() % 8];
+                    cache.put(&key, &value);
+                    // Mirror capacity: drop model entries the cache
+                    // must have evicted (LRU order unknown here, so
+                    // only assert presence right after our own put
+                    // when the entry fits at all).
+                    if key.len() + value.len() < cache.max_bytes() {
+                        model.insert(key.clone(), value);
+                    }
+                    // Prune the model to what fits (conservative:
+                    // keep the freshest 40 puts; eviction only drops
+                    // older entries).
+                    if model.len() > 40 {
+                        let victim = model.keys().next().cloned().unwrap();
+                        model.remove(&victim);
+                    }
+                }
+                6..=8 => {
+                    let lookup = cache.get(&key);
+                    if model.get(&key).is_some() {
+                        // May have been evicted (model is
+                        // approximate); a hit must match bytes.
+                        if lookup.state == KeyState::Available {
+                            assert_eq!(lookup.value.as_deref(), model.get(&key).map(Vec::as_slice));
+                        }
+                    }
+                }
+                _ => {
+                    cache.delete(&key);
+                    model.remove(&key);
+                }
+            }
+            if step % 500 == 0 {
+                cache.sanity_check();
+            }
+        }
+        cache.sanity_check();
+        assert!(cache.size_bytes() <= cache.max_bytes());
     }
 
     #[test]

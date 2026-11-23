@@ -111,6 +111,22 @@ impl Default for TokenizerPatterns {
     }
 }
 
+/// Process-wide compiled patterns, built once on first use.
+///
+/// Compilation costs ~1ms (eight regexes); every JavaScript filter
+/// used to pay it per request (~4 builds per HTML page). The table
+/// is immutable after construction and `Regex` is `Send + Sync`,
+/// so sharing one instance across requests and threads is safe.
+static SHARED_PATTERNS: std::sync::OnceLock<TokenizerPatterns> = std::sync::OnceLock::new();
+
+impl TokenizerPatterns {
+    /// Borrows the shared table, compiling it once (`shared`).
+    #[must_use]
+    pub fn shared() -> &'static TokenizerPatterns {
+        SHARED_PATTERNS.get_or_init(TokenizerPatterns::new)
+    }
+}
+
 /// Parse states (`JsTokenizer::ParseState`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ParseState {
@@ -1025,4 +1041,31 @@ fn match_numeric_literal(input: &[u8]) -> Option<usize> {
         return None;
     }
     Some(best)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shared_patterns_are_one_instance() {
+        // Regression: filters must reuse the process-wide table
+        // instead of compiling eight regexes per request (~1ms).
+        let first = TokenizerPatterns::shared() as *const TokenizerPatterns;
+        let second = TokenizerPatterns::shared() as *const TokenizerPatterns;
+        assert_eq!(first, second);
+        // The shared table tokenizes identically to a fresh build.
+        let fresh = TokenizerPatterns::new();
+        let input = b"var x = 1; // hi\n";
+        let mut a = Tokenizer::new(TokenizerPatterns::shared(), input);
+        let mut b = Tokenizer::new(&fresh, input);
+        loop {
+            let ta = a.next_token();
+            let tb = b.next_token();
+            assert_eq!(ta, tb);
+            if ta.0 == crate::keywords::TokenType::EndOfInput {
+                break;
+            }
+        }
+    }
 }

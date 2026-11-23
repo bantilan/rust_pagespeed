@@ -42,8 +42,15 @@ impl ps_html::writer::ByteSink for VecSink {
 /// HTML rewrite sink: streams response bytes through the sync
 /// driver into a shared base fetch (the live `ProxyFetch` write
 /// side, minus origin fetching).
+///
+/// The rewrite driver (filter chain + parser state) builds lazily on
+/// the first body byte, *after* the HTML-cache lookup: cache HITs
+/// serve stored bytes and swallow the origin body without ever
+/// constructing filters or parsing.
 pub struct HtmlSink<'a> {
-    driver: ps_html::driver::Driver,
+    driver: Option<ps_html::driver::Driver>,
+    /// Deferred driver inputs (consumed by the first write).
+    deferred: Option<DeferredDriver>,
     output: Rc<RefCell<Vec<u8>>>,
     fetch: Arc<SharedBaseFetch>,
     slot: &'a Mutex<Option<crate::pipe::PipeChannel>>,
@@ -53,12 +60,24 @@ pub struct HtmlSink<'a> {
     html_cache_request: Option<ps_http::request::RequestHeaders>,
 }
 
+/// Owned inputs for a lazily-built rewrite driver.
+struct DeferredDriver {
+    options: ps_config::options::RewriteOptions,
+    url: String,
+    content_is_xml_like: bool,
+}
+
 impl<'a> HtmlSink<'a> {
     /// Builds a sink over request options (`ProxyFetch` ctor
     /// shape): beacon results on (system default), property
     /// cache on (metadata-backed beacon cohort).
     /// `resource_driver` instantiates the driver-bound CSS/JS
     /// filters (`None` keeps the minify subsets).
+    ///
+    /// The filter chain builds on the first body byte (see
+    /// [`HtmlSink::html_cache_lookup`]): constructing eagerly here
+    /// would charge every HTML-cache HIT for parsing and ~27 filters
+    /// it never uses.
     #[must_use]
     pub fn new(
         options: &ps_config::options::RewriteOptions,
@@ -69,21 +88,16 @@ impl<'a> HtmlSink<'a> {
         resource_driver: Option<Rc<ps_html::server_context::ResourceDriver>>,
     ) -> Self {
         let output = Rc::new(RefCell::new(Vec::new()));
-        let context = ps_html::chain::ChainContext::new(true, true);
-        let mut driver = ps_html::driver::Driver::new(
-            options,
-            &context,
-            VecSink {
-                output: Rc::clone(&output),
-            },
-            resource_driver.clone(),
-        );
-        driver.start_parse(url.as_bytes(), content_is_xml_like);
         let html_cache = resource_driver
             .clone()
             .map(|driver| ps_html::html_cache::HtmlCacheSession::new(driver, url));
         HtmlSink {
-            driver,
+            driver: None,
+            deferred: Some(DeferredDriver {
+                options: options.clone(),
+                url: url.to_string(),
+                content_is_xml_like,
+            }),
             output,
             fetch: Arc::clone(fetch),
             slot,
@@ -92,6 +106,34 @@ impl<'a> HtmlSink<'a> {
             html_cache_line: None,
             html_cache_request: None,
         }
+    }
+
+    /// Builds the rewrite driver on first body byte (idempotent).
+    fn ensure_driver(&mut self) {
+        if self.driver.is_some() {
+            return;
+        }
+        let Some(deferred) = self.deferred.take() else {
+            return;
+        };
+        let context = ps_html::chain::ChainContext::new(true, true);
+        let mut driver = ps_html::driver::Driver::new(
+            &deferred.options,
+            &context,
+            VecSink {
+                output: Rc::clone(&self.output),
+            },
+            self.resource_driver.clone(),
+        );
+        driver.start_parse(deferred.url.as_bytes(), deferred.content_is_xml_like);
+        self.driver = Some(driver);
+    }
+
+    /// Whether the rewrite driver was built (false on pure HITs).
+    #[must_use]
+    #[cfg(test)]
+    pub fn driver_built(&self) -> bool {
+        self.driver.is_some()
     }
 
     /// Moves rewritten bytes into the base fetch.
@@ -166,12 +208,18 @@ impl<'a> HtmlSink<'a> {
 
 impl BodySink for HtmlSink<'_> {
     fn write(&mut self, bytes: &[u8]) {
-        self.driver.write(bytes);
+        self.ensure_driver();
+        if let Some(driver) = self.driver.as_mut() {
+            driver.write(bytes);
+        }
         self.pump_output();
     }
 
     fn flush(&mut self) {
-        self.driver.flush();
+        self.ensure_driver();
+        if let Some(driver) = self.driver.as_mut() {
+            driver.flush();
+        }
         // Rearm the per-flush fetch-wait budget (C++ rearms the
         // rewrite deadline every flush window).
         if let Some(driver) = self.resource_driver.as_ref() {
@@ -182,7 +230,18 @@ impl BodySink for HtmlSink<'_> {
     }
 
     fn done(&mut self) {
-        self.driver.finish();
+        // Pure HITs never built a driver (already served): finishing
+        // one here would construct filters just to discard them.
+        let served_hit = self
+            .html_cache
+            .as_ref()
+            .is_some_and(|session| session.is_hit());
+        if !served_hit {
+            self.ensure_driver();
+        }
+        if let Some(driver) = self.driver.as_mut() {
+            driver.finish();
+        }
         self.pump_output();
         if let Some(session) = self.html_cache.as_mut() {
             let empty;
@@ -591,6 +650,97 @@ mod tests {
     }
 
     #[test]
+    fn html_sink_builds_filters_only_past_lookup() {
+        use crate::fetch::{BaseFetchType, SharedBaseFetch};
+        use crate::pipe;
+        use ps_config::options::RewriteOptions;
+        use ps_http::request::Method;
+        use ps_http::response::HttpOptions;
+        // Regression: HTML-cache HITs must bypass filter construction
+        // and parsing entirely; MISSes build the driver on first byte.
+        let metadata: std::sync::Arc<dyn ps_cache::cache::Cache> =
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new());
+        let make_sink = |metadata: std::sync::Arc<dyn ps_cache::cache::Cache>| {
+            let slot: &'static Mutex<Option<pipe::PipeChannel>> =
+                Box::leak(Box::new(Mutex::new(None)));
+            let (ps_side, _ngx_side) = SharedBaseFetch::new_pair(
+                "http://h/p",
+                std::ptr::null_mut(),
+                BaseFetchType::HtmlTransform,
+                crate::caching::PreserveCachingHeaders::DontPreserve,
+                HttpOptions::default(),
+            );
+            let html = crate::rewrite::html_context(
+                std::sync::Arc::new(ps_cache::cache::MemoryCache::new()),
+                metadata,
+                std::sync::Arc::new(ps_stats::core::Statistics::new()),
+                0,
+                std::sync::Arc::new(crate::rewrite::UnavailableFetcher),
+            );
+            let mut options = RewriteOptions::new();
+            options
+                .set_option("HtmlCache", "on", ps_config::scope::Scope::Server)
+                .unwrap();
+            options
+                .set_option("HtmlCacheTtlSec", "60", ps_config::scope::Scope::Server)
+                .unwrap();
+            let driver = std::rc::Rc::new(ps_html::server_context::ResourceDriver::new(
+                html,
+                std::rc::Rc::new(std::cell::RefCell::new(options.clone())),
+                "http://h/p",
+            ));
+            HtmlSink::new(&options, "http://h/p", false, &ps_side, slot, Some(driver))
+        };
+        let mut request = ps_http::request::RequestHeaders::new();
+        request.set_method(Method::Get);
+        request.set_version(1, 1);
+        request.headers_mut().add("Host", "h");
+        let mut origin = ps_http::response::ResponseHeaders::new(HttpOptions::default_for_tests());
+        origin.set_status_and_reason(200);
+        origin.headers_mut().add("Content-Type", "text/html");
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|age| age.as_millis() as i64)
+            .unwrap_or(0);
+        origin
+            .headers_mut()
+            .add("Date", &ps_http::time::format_http_date(now_ms));
+        origin
+            .headers_mut()
+            .add("Cache-Control", "public, max-age=300");
+        origin.compute_caching();
+        let purge = ps_cache::purge::PurgeSet::new(25_000);
+        // Construction alone builds no filters.
+        let mut first = make_sink(std::sync::Arc::clone(&metadata));
+        assert!(!first.driver_built());
+        // Lookup MISS still builds nothing; the first byte does.
+        assert!(first
+            .html_cache_lookup(&origin, &request, &purge, None, now_ms)
+            .is_none());
+        assert!(!first.driver_built());
+        first.write(b"<html>hi</html>");
+        assert!(first.driver_built());
+        BodySink::done(&mut first);
+        assert!(first.take_html_cache_line().is_some());
+        // A HIT serve (plus a defensive done) never builds filters.
+        // (Later wall time: the entry was created after `now_ms`.)
+        let later_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|age| age.as_millis() as i64)
+            .unwrap_or(now_ms)
+            .max(now_ms);
+        let mut second = make_sink(std::sync::Arc::clone(&metadata));
+        let entry = second
+            .html_cache_lookup(&origin, &request, &purge, None, later_ms)
+            .expect("hit");
+        assert!(!second.driver_built());
+        second.serve_html_cache_hit(&entry, later_ms);
+        // Served: the origin body is swallowed downstream, so no
+        // driver, parse, or filter ever runs for this request.
+        assert!(!second.driver_built());
+    }
+
+    #[test]
     fn html_sink_caches_analytics_cookies_and_names_bypassers() {
         use crate::fetch::{BaseFetchType, SharedBaseFetch};
         use crate::pipe;
@@ -642,8 +792,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|age| age.as_millis() as i64)
             .unwrap_or(0);
-        let mut origin =
-            ps_http::response::ResponseHeaders::new(HttpOptions::default_for_tests());
+        let mut origin = ps_http::response::ResponseHeaders::new(HttpOptions::default_for_tests());
         origin.set_status_and_reason(200);
         origin.headers_mut().add("Content-Type", "text/html");
         origin

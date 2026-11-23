@@ -133,6 +133,7 @@ pub const IMAGE_RELATED_FILTERS: &[Filter] = &[
 impl RewriteOptions {
     /// Disables every filter (`DisableAllFilters`).
     pub fn disable_all_filters(&mut self) {
+        self.invalidate_signature();
         *self.filters_mut().enabled_set_mut() = FilterSet::new();
         self.filters_mut().set_level(RewriteLevel::PassThrough);
         for filter in Filter::ALL {
@@ -143,6 +144,7 @@ impl RewriteOptions {
     /// Disables the image-rewrite filters
     /// (`ImageRewriteFilter::DisableRelatedFilters`).
     pub fn disable_image_related_filters(&mut self) {
+        self.invalidate_signature();
         for filter in IMAGE_RELATED_FILTERS {
             self.disable_filter(*filter);
         }
@@ -152,6 +154,7 @@ impl RewriteOptions {
     /// (`UpdateRewriteOptionsWithClientOptions`): false when the
     /// header is absent or asks for default handling.
     pub fn update_with_client_options(&mut self, header: Option<&str>) -> bool {
+        self.invalidate_signature();
         let Some((mode, _quality)) = parse_client_options(header) else {
             return false;
         };

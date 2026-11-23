@@ -142,6 +142,13 @@ pub trait SingleRewriteBehavior {
         partition: &mut CachedResult,
     ) -> RewriteResult;
 
+    /// Snapshots this behavior's per-context state for a background
+    /// HTML rewrite (`None` keeps the sync path: combiners and other
+    /// unported behaviors still optimize inline, never skipped).
+    fn background_snapshot(&self) -> Option<super::html_async::BackgroundBehavior> {
+        None
+    }
+
     /// Sends fallback bytes past the content-type gate
     /// (`SendFallbackResponse`; filters re-resolve URLs here).
     fn send_fallback_response(
@@ -541,7 +548,7 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
     }
 
     /// Attaches a fetch slot (`AddSlot` with a `FetchResourceSlot`).
-    fn add_fetch_slot(&mut self, input: InputResource) {
+    pub(crate) fn add_fetch_slot(&mut self, input: InputResource) {
         let handle: ResourceHandle = Rc::new(input.clone());
         self.attach(
             ContextSlot::Fetch(Rc::new(RefCell::new(FetchResourceSlot::new(Some(handle))))),
@@ -696,6 +703,10 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
         if all_valid {
             self.partitions = tables;
             self.create_outputs_for_hit();
+            self.driver
+                .server_context()
+                .variable("rewrite_cached_output_hits")
+                .add(1);
             CacheDecision::Hit
         } else if can_revalidate {
             self.partitions = tables;
@@ -830,6 +841,16 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
 
     /// Revalidates stale inputs (`OutputCacheRevalidate`, inline).
     fn output_cache_revalidate(&mut self, dom: &mut Dom, positions: Vec<(usize, usize)>) {
+        // HTML requests with a worker pool refresh in the background
+        // and serve the stale optimized URLs now (stale-while-
+        // revalidate): refetching inline would stall the page on
+        // origin latency. The render stays out of the HTML cache so
+        // the refreshed rewrite versions the next render.
+        if !self.driver.is_ipro_serving() && self.try_schedule_async() {
+            self.driver.note_detached_rewrite();
+            self.output_cache_hit(dom, false);
+            return;
+        }
         let mut ok = true;
         for (partition_index, input_position) in positions {
             let slot_index = self.partitions.partition[partition_index].input[input_position]
@@ -875,29 +896,84 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
 
     /// Handles a metadata miss (`OutputCacheMiss`, lock-free).
     fn output_cache_miss(&mut self, dom: &mut Dom) {
+        // HTML requests with a worker pool detach the rewrite: the
+        // optimization runs in the background while this render
+        // serves original URLs immediately (C++ deadline-detach
+        // parity). The fetch/IPRO serving paths always run inline:
+        // they owe the caller bytes, not a page.
+        if !self.driver.is_ipro_serving() && self.try_schedule_async() {
+            self.ok_to_write_partitions = false;
+            // Detached renders serve fallback content: the HTML cache
+            // must not freeze this render. The background completion
+            // warms the caches for a complete later rewrite instead.
+            self.driver.note_detached_rewrite();
+            self.finalize(dom);
+            return;
+        }
+        if !self.fetch_partition_rewrite() {
+            // Deadline-pending inputs serve fallback content: the
+            // HTML cache must not freeze this render.
+            self.driver
+                .server_context()
+                .variable("rewrite_cached_output_missed_deadline")
+                .add(1);
+            self.driver.note_detached_rewrite();
+        }
+        self.finalize(dom);
+    }
+
+    /// Attempts a fire-and-forget background rewrite for this miss.
+    /// True serves original URLs now (scheduled, or shed under pool
+    /// saturation — a later request retries); false runs the sync
+    /// path (no pool, pool shutdown, unschedulable behavior/input).
+    fn try_schedule_async(&self) -> bool {
+        if self.slots.len() != 1 || self.inputs.len() != 1 {
+            return false;
+        }
+        let Some(snapshot) = self.behavior.background_snapshot() else {
+            return false;
+        };
+        let input = &self.inputs[0];
+        // Font-service inputs rebuild through claimants, which a
+        // worker-side driver cannot see: keep them sync.
+        if matches!(input, InputResource::Font(_)) {
+            return false;
+        }
+        match super::html_async::schedule_single_rewrite(
+            &self.driver,
+            snapshot,
+            input,
+            &self.partition_key,
+        ) {
+            super::html_async::ScheduleOutcome::Scheduled
+            | super::html_async::ScheduleOutcome::Shed => true,
+            super::html_async::ScheduleOutcome::SyncFallback => false,
+        }
+    }
+
+    /// Fetches every slot input, partitions over the loaded inputs,
+    /// and rewrites each partition — the sync miss core shared by
+    /// HTML completion and background workers (`FetchInputs` ->
+    /// `Activate` -> `PartitionAsync` -> `Rewrite`). Locks are mute
+    /// in the sync model. Returns whether the inputs concluded (held
+    /// inputs conclude nothing, so their contexts write nothing —
+    /// C++ drops uncompleted contexts at detach).
+    fn fetch_partition_rewrite(&mut self) -> bool {
         self.outputs.clear();
         self.partitions.clear();
-        // Locks are mute in the sync model. Fetch every slot input
-        // first, then partition over the loaded inputs, then rewrite
-        // each partition (`FetchInputs` -> `Activate` ->
-        // `PartitionAsync` -> `Rewrite`). Held inputs conclude
-        // nothing, so their contexts write nothing (C++ drops
-        // uncompleted contexts at detach).
         for index in 0..self.inputs.len() {
             self.fetch_slot_input(index);
         }
-        if self.inputs.iter().any(InputResource::load_pending) {
+        let conclusive = !self.inputs.iter().any(InputResource::load_pending);
+        if !conclusive {
             self.ok_to_write_partitions = false;
-            // Deadline-pending inputs serve fallback content: the
-            // HTML cache must not freeze this render.
-            self.driver.note_detached_rewrite();
         }
         self.partition();
         if self.partitions.partition.is_empty() {
-            // Zero partitions: recheck dependency, then finalize.
+            // Zero partitions: record the recheck dependency; the
+            // caller finalizes (sync) or writes (worker).
             self.add_recheck_dependency();
-            self.finalize(dom);
-            return;
+            return conclusive;
         }
         let count = self.partitions.partition.len();
         for index in 0..count {
@@ -906,7 +982,20 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
                 break;
             }
         }
-        self.finalize(dom);
+        conclusive
+    }
+
+    /// Runs the miss core to partitions on a pool worker (no
+    /// rendering): fetch, partition, rewrite, partition write.
+    /// Returns whether partitions were written.
+    pub(crate) fn run_background_to_partitions(&mut self, partition_key: &str) -> bool {
+        self.partition_key = partition_key.to_string();
+        self.fetch_partition_rewrite();
+        if !self.ok_to_write_partitions || self.was_too_busy {
+            return false;
+        }
+        self.write_partition();
+        true
     }
 
     /// Runs single-input partitioning (`SingleRewriteContext::Partition`).
@@ -1729,6 +1818,12 @@ pub trait InlineBehavior {
         reason: &mut String,
     ) -> bool;
 
+    /// Snapshots this behavior's per-context state for a background
+    /// HTML rewrite (`None` keeps the sync path).
+    fn background_snapshot(&self) -> Option<super::html_async::BackgroundBehavior> {
+        None
+    }
+
     /// Renders inlined bytes into the element (`RenderInline`).
     #[allow(clippy::too_many_arguments)]
     fn render_inline(
@@ -1951,6 +2046,10 @@ impl<B: InlineBehavior> InlineRewriteContext<B> {
         }
         if all_valid {
             self.partitions = tables;
+            self.driver
+                .server_context()
+                .variable("rewrite_cached_output_hits")
+                .add(1);
             CacheDecision::Hit
         } else if can_revalidate {
             self.partitions = tables;
@@ -2038,6 +2137,13 @@ impl<B: InlineBehavior> InlineRewriteContext<B> {
 
     /// Revalidates stale inputs, else misses.
     fn output_cache_revalidate(&mut self, dom: &mut Dom, positions: Vec<(usize, usize)>) {
+        // Background refresh plus stale serve (see the single-input
+        // path): refetching inline would stall the page.
+        if !self.driver.is_ipro_serving() && self.try_schedule_async() {
+            self.driver.note_detached_rewrite();
+            self.output_cache_hit(dom);
+            return;
+        }
         let mut ok = true;
         for (partition_index, input_position) in positions {
             ok &= self.revalidate_input(partition_index, input_position);
@@ -2082,6 +2188,64 @@ impl<B: InlineBehavior> InlineRewriteContext<B> {
 
     /// Fetches, partitions, and rewrites on a miss.
     fn output_cache_miss(&mut self, dom: &mut Dom) {
+        // HTML requests with a worker pool detach the rewrite (see
+        // the single-input path): the element keeps its original
+        // reference now, and the background completion inlines it on
+        // the next render.
+        if !self.driver.is_ipro_serving() && self.try_schedule_async() {
+            self.ok_to_write_partitions = false;
+            self.driver.note_detached_rewrite();
+            self.finalize(dom);
+            return;
+        }
+        if !self.fetch_and_partition() {
+            self.ok_to_write_partitions = false;
+            self.driver
+                .server_context()
+                .variable("rewrite_cached_output_missed_deadline")
+                .add(1);
+            self.driver.note_detached_rewrite();
+        }
+        // No output resource exists, so the rewrite always "fails"
+        // structurally; the bytes (or the reason) ride the partition.
+        if self.partitions.partition[0].inlined_data.is_some() {
+            if let Some(slot) = self.slot.as_ref() {
+                slot.set_was_optimized(true);
+                slot.set_disable_further_processing(true);
+            }
+        }
+        self.partitions.partition[0].optimizable = false;
+        self.finalize(dom);
+    }
+
+    /// Attempts a fire-and-forget background inline for this miss
+    /// (same contract as the single-input path).
+    fn try_schedule_async(&self) -> bool {
+        let Some(input) = self.input.as_ref() else {
+            return false;
+        };
+        let Some(snapshot) = self.behavior.background_snapshot() else {
+            return false;
+        };
+        if matches!(input, InputResource::Font(_)) {
+            return false;
+        }
+        match super::html_async::schedule_inline_rewrite(
+            &self.driver,
+            snapshot,
+            input,
+            &self.partition_key,
+        ) {
+            super::html_async::ScheduleOutcome::Scheduled
+            | super::html_async::ScheduleOutcome::Shed => true,
+            super::html_async::ScheduleOutcome::SyncFallback => false,
+        }
+    }
+
+    /// Fetches the input and builds the inline partition — the miss
+    /// core shared by HTML completion and background workers.
+    /// Returns whether the input concluded.
+    fn fetch_and_partition(&mut self) -> bool {
         self.partitions.clear();
         if let Some(input) = self.input.as_mut() {
             if !(input.loaded() && input.http_status_ok()) {
@@ -2094,21 +2258,29 @@ impl<B: InlineBehavior> InlineRewriteContext<B> {
                 );
             }
         }
-        if self.input.as_ref().is_some_and(InputResource::load_pending) {
-            self.ok_to_write_partitions = false;
-            self.driver.note_detached_rewrite();
-        }
+        let conclusive = !self.input.as_ref().is_some_and(InputResource::load_pending);
         self.partition();
-        // No output resource exists, so the rewrite always "fails"
-        // structurally; the bytes (or the reason) ride the partition.
-        if self.partitions.partition[0].inlined_data.is_some() {
-            if let Some(slot) = self.slot.as_ref() {
-                slot.set_was_optimized(true);
-                slot.set_disable_further_processing(true);
-            }
+        conclusive
+    }
+
+    /// Runs the inline miss core to partitions on a pool worker (no
+    /// rendering). Returns whether partitions were written.
+    pub(crate) fn run_background_inline(
+        &mut self,
+        input: InputResource,
+        partition_key: &str,
+    ) -> bool {
+        self.partition_key = partition_key.to_string();
+        self.input = Some(input);
+        if !self.fetch_and_partition() {
+            return false;
+        }
+        if self.partitions.partition.is_empty() {
+            return false;
         }
         self.partitions.partition[0].optimizable = false;
-        self.finalize(dom);
+        self.write_partition();
+        true
     }
 
     /// Builds the inline partition (`Partition`, hash omitted).

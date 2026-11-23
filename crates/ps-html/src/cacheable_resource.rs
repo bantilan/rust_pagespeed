@@ -468,6 +468,35 @@ fn run_fetch_job<H: ResourceHooks>(
     }
 }
 
+/// Waits for a background fetch under the driver's budget and
+/// deducts the time waited. The HTML path always bounds its wait
+/// ([`ResourceDriver::html_wait_budget_ms`], never unbounded), so a
+/// slow background optimization degrades to fallback content instead
+/// of stalling page delivery; in-place serving keeps the configured
+/// (possibly unbounded, C++-parity) wait.
+fn wait_for_fetch(
+    driver: &ResourceDriver,
+    handle: &super::background::JobHandle,
+) -> Option<Arc<FetchJobResult>> {
+    let start = std::time::Instant::now();
+    let result = if driver.is_ipro_serving() {
+        match driver.fetch_wait_budget_ms() {
+            None => handle.wait_unbounded(),
+            Some(ms) if ms <= 0 => None,
+            Some(ms) => handle.wait_timeout(std::time::Duration::from_millis(ms as u64)),
+        }
+    } else {
+        let budget_ms = driver.html_wait_budget_ms();
+        if budget_ms <= 0 {
+            None
+        } else {
+            handle.wait_timeout(std::time::Duration::from_millis(budget_ms as u64))
+        }
+    };
+    driver.deduct_fetch_wait_ms(start.elapsed().as_millis() as i64);
+    result
+}
+
 /// Deadline-bounded origin fetch, for serving paths that bypass
 /// `CacheableResource` (in-place serving fetches origins directly).
 #[derive(Debug)]
@@ -565,8 +594,15 @@ pub(crate) fn fetch_origin_bounded(
         run_fetch_job(&job_plan, fetcher.as_ref(), http_cache.as_ref(), &hooks)
     }) {
         Ok(handle) => handle,
-        // Pool saturated or gone: degrade to inline, like the
-        // resource path (slower, never failed).
+        // Pool saturated: shed (the pool already counted the
+        // rejection) so serving never parks past its budget;
+        // the caller takes its failure path and a later
+        // request retries once workers drain.
+        Err(super::background::SubmitError::QueueFull) => {
+            return OriginFetch::Pending;
+        }
+        // Pool gone: degrade to inline, like the resource
+        // path (slower, never failed).
         Err(_) => {
             let result = run_fetch_job(
                 &plan,
@@ -585,13 +621,7 @@ pub(crate) fn fetch_origin_bounded(
             }));
         }
     };
-    let start = std::time::Instant::now();
-    let result: Option<Arc<FetchJobResult>> = match driver.fetch_wait_budget_ms() {
-        None => handle.wait_unbounded(),
-        Some(ms) if ms <= 0 => None,
-        Some(ms) => handle.wait_timeout(std::time::Duration::from_millis(ms as u64)),
-    };
-    driver.deduct_fetch_wait_ms(start.elapsed().as_millis() as i64);
+    let result = wait_for_fetch(driver, &handle);
     let Some(result) = result else {
         server.variable("background_jobs_timeouts").add(1);
         return OriginFetch::Pending;
@@ -1098,14 +1128,50 @@ impl<H: ResourceHooks> CacheableResourceBase<H> {
     }
 
     /// Triggers a background refresh when expiry looms
-    /// (`RefreshIfImminentlyExpiring`).
-    pub fn refresh_if_imminently_expiring(&mut self) {
+    /// (`RefreshIfImminentlyExpiring`). With a worker pool the refresh
+    /// runs fire-and-forget on a pool thread (the served bytes are the
+    /// still-valid cached copy); without one it refreshes inline, as
+    /// before.
+    pub fn refresh_if_imminently_expiring(&mut self)
+    where
+        H: Clone + Send + 'static,
+    {
         if self.server().http_cache().force_caching() {
             return;
         }
-        if self.headers.clone().is_imminently_expiring(self.now_ms()) {
+        if !self.headers.clone().is_imminently_expiring(self.now_ms()) {
+            return;
+        }
+        if let Some(pool) = self.server().background_pool() {
+            self.schedule_async_refresh(&pool);
+        } else {
             self.freshen(None);
         }
+    }
+
+    /// Submits a fire-and-forget cache refresh (deduped with ordinary
+    /// fetches by URL, so a concurrent load shares the job). Queue
+    /// saturation sheds silently: the cached copy still serves, and a
+    /// later request retries.
+    fn schedule_async_refresh(&self, pool: &Arc<super::background::BackgroundPool>)
+    where
+        H: Clone + Send + 'static,
+    {
+        let mut driver_ctx = self.driver.request_context().borrow_mut();
+        let Some(plan) = self.plan_fetch(&mut driver_ctx, None) else {
+            return;
+        };
+        drop(driver_ctx);
+        let key = format!(
+            "fetch:{}\n{:?}\n{:?}",
+            plan.fetch_url, plan.req_headers, plan.fallback
+        );
+        let hooks = self.hooks.clone();
+        let fetcher = self.server().fetcher().clone();
+        let http_cache = self.server().http_cache_shared();
+        let _ = pool.submit::<FetchJobResult, _>(&key, move || {
+            run_fetch_job(&plan, fetcher.as_ref(), http_cache.as_ref(), &hooks)
+        });
     }
 
     /// Records validity watermarks (`FillInPartitionInputInfo`).
@@ -1346,8 +1412,18 @@ impl<H: ResourceHooks> CacheableResourceBase<H> {
             run_fetch_job(&job_plan, fetcher.as_ref(), http_cache.as_ref(), &hooks)
         }) {
             Ok(handle) => handle,
-            // Pool saturated or gone: run inline so the request
-            // still completes (degraded, never failed).
+            // Pool saturated: shed the fetch instead of running it
+            // inline (inline would park past the flush deadline).
+            // The pool already counted the rejection; serve
+            // fallback now and retry once workers drain.
+            Err(super::background::SubmitError::QueueFull) => {
+                self.last_load_pending = true;
+                self.headers.clear();
+                callback.done(false, false);
+                return;
+            }
+            // Pool gone: run inline so the request still
+            // completes (degraded, never failed).
             Err(_) => {
                 let outcome = execute_fetch(&plan, self.server().fetcher().as_ref());
                 self.last_load_pending = outcome.pending;
@@ -1377,15 +1453,7 @@ impl<H: ResourceHooks> CacheableResourceBase<H> {
                 return;
             }
         };
-        let start = std::time::Instant::now();
-        let result: Option<std::sync::Arc<FetchJobResult>> =
-            match self.driver.fetch_wait_budget_ms() {
-                None => handle.wait_unbounded(),
-                Some(ms) if ms <= 0 => None,
-                Some(ms) => handle.wait_timeout(std::time::Duration::from_millis(ms as u64)),
-            };
-        self.driver
-            .deduct_fetch_wait_ms(start.elapsed().as_millis() as i64);
+        let result = wait_for_fetch(&self.driver, &handle);
         let Some(result) = result else {
             // Deadline exceeded (or shutdown): serve fallback now;
             // the job still warms the cache for the next request.

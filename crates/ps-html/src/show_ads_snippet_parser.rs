@@ -19,7 +19,7 @@ pub type AttributeMap = BTreeMap<Vec<u8>, Vec<u8>>;
 /// Strict snippet parser (`ShowAdsSnippetParser`).
 #[derive(Debug)]
 pub struct ShowAdsSnippetParser {
-    patterns: TokenizerPatterns,
+    patterns: &'static TokenizerPatterns,
 }
 
 impl ShowAdsSnippetParser {
@@ -27,7 +27,7 @@ impl ShowAdsSnippetParser {
     #[must_use]
     pub fn new() -> Self {
         ShowAdsSnippetParser {
-            patterns: TokenizerPatterns::new(),
+            patterns: TokenizerPatterns::shared(),
         }
     }
 

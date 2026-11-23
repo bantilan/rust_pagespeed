@@ -30,9 +30,13 @@ budget (`RewriteDeadlinePerFlushMs` per flush, rearmed by
   Timeouts never touch failure memory and mark inputs pending, so
   contexts skip writing partitions — C++ drops uncompleted
   contexts the same way.
-- Pool missing, saturated, shut down, or the URL unmappable: run
-  the direct sync path. Degraded, never failed. Held fetches stay
+- Pool missing, shut down, or the URL unmappable: run the
+  direct sync path. Degraded, never failed. Held fetches stay
   inconclusive (`pending`, never stored).
+- Pool saturated: shed the fetch (`QueueFull`, counted) and serve
+  the fallback immediately without waiting; a later request
+  retries once workers drain. Saturation never parks past the
+  deadline.
 
 Simultaneous identical fetches collapse onto one job (dedup key:
 fetch URL + serialized request headers + fallback shape), so a
@@ -59,7 +63,10 @@ pool they fetch direct, exactly as before.
 `background_jobs_submitted`, `background_jobs_completed`,
 `background_jobs_timeouts`, `background_jobs_dedup_hits`,
 `background_jobs_queue_full`, `background_jobs_shutdown`
-(`crates/ps-html/src/rewrite_stats.rs`).
+(`crates/ps-html/src/rewrite_stats.rs`), plus
+`html_async_rewrite_scheduled` (HTML misses detached to the pool)
+and `html_async_rewrite_completed` (worker-side rewrites run to
+partitions).
 
 ## Lazy image bytes
 
@@ -91,19 +98,42 @@ completed optimizations, at serve time).
 Benchmark (`cold_image_page/8_jpegs_no_pool`, 8× 236 KB JPEGs,
 cold server per iteration): eager 180.5 ms, lazy 45.3 ms (4.0×).
 
+## Fire-and-forget HTML rewrites
+
+Metadata HITs render optimized URLs inline with no fetching. On a
+metadata MISS, an HTML request with a pool installed snapshots the
+rewrite's Send-owned inputs (options, URLs, behavior parameters)
+and submits a deduped `html-rewrite:` job
+(`crates/ps-html/src/html_async.rs`), then serves original URLs
+immediately — no waiting, no deadline involved. The render marks
+itself detached, so the HTML cache never publishes unoptimized
+bytes. The pool worker rebuilds an equivalent driver from the
+snapshot (same options, shared caches/fetcher/statistics/hasher)
+and runs the exact sync miss core — fetch, partition, rewrite,
+partition write — without rendering. The next HTML request HITs.
+Stale (revalidatable) metadata serves the stale optimized URLs now
+and refreshes in the background the same way.
+
+Coverage: CSS, JavaScript, image, cache-extender, and the three
+inline behaviors. Combiners, font-service inputs, shutdown pools,
+and the fetch/IPRO serving paths keep the sync behavior, so no
+optimization is ever skipped — only deferred off the critical
+path. Saturation sheds to fallback (`QueueFull`, counted); a later
+request retries.
+
 ## Intentional differences from C++
 
-- **Fetch only; compute stays inline.** Image conversion, CSS/JS
-  optimization, and rewriting run on the requesting thread. C++
-  schedules whole rewrite closures on its thread pool, but the
-  port's `rewrite_single` takes `&Rc<ResourceDriver>` (`!Send`),
-  so compute backgrounding needs per-behavior refactors. Fetch
-  dominates cold-request latency (network vs microseconds of
-  minification), which is why the deadline bounds the fetch.
-- **Bounded blocking, not full async.** The worker thread waits up
-  to the deadline per flush window; C++ never blocks (async
-  scheduler). Worst case per flush is the configured deadline
-  (default 10ms), not the full origin latency.
+- **Detached HTML rewrites; bounded resource waits.** HTML metadata
+  misses never wait: they schedule whole-rewrite jobs and serve
+  fallback URLs at once (C++ deadline-detach parity). Blocking
+  waits remain only where bytes are owed — fetch/IPRO serving and
+  the sync-fallback behaviors — bounded by the per-flush deadline
+  (default 10ms). Worst case per HTML flush is the deadline only
+  when a fallback behavior runs; scheduled rewrites add nothing.
+- **Disabled deadlines mean no HTML waiting.** With
+  `RewriteDeadlinePerFlushMs <= 0` the HTML path is pure
+  fire-and-forget; only in-place serving with waiting enabled
+  keeps the C++ unbounded wait.
 - **Deadline-bounded IPRO origins fail fast.** A slow origin past
   the deadline behaves like a failed origin fetch (existing
   failure path); the server/proxy layer serves the original by its
@@ -133,18 +163,32 @@ from the dev machine:
 | `warm_hit` (steady-state metadata hit) | 68.9µs | 70.0µs |
 | `concurrent_cold` (8 threads, 100ms origin) | 101.8ms | 11.3ms |
 
+(Pre-detach numbers: HTML metadata misses now schedule
+fire-and-forget instead of waiting out the deadline, so the async
+cold legs serve in microseconds. Re-run `cargo bench` to refresh.)
+
 Bulk workload
 (`crates/ps-html/examples/async_workload.rs`, 50 pages,
 20ms origin, 10ms deadline, 1 pool thread):
 
-| | Sync | Async |
+| | Sync (no pool) | Async (pool) |
 |---|---|---|
-| Cold pass (50 requests) | 1037ms | 531ms |
-| Warm pass (50 requests) | 5ms | 6ms |
+| Cold pass (50 requests) | 1022ms | 3ms |
+| Warm pass (50 requests) | 3ms | 4ms |
 | Origin fetches | 50 | 50 |
-| Timeouts / completions | 0 / 0 | 50 / 50 |
-| Max RSS (`/usr/bin/time -v`) | 6384 KB | 6904 KB |
-| CPU | 3% | 3% |
+| Timeouts / completions | 0 / 0 | 0 / 50 |
+
+Stage breakdown
+(`crates/ps-html/examples/timing_breakdown.rs`, release):
+
+| Stage | Before | After |
+|---|---|---|
+| Options signature (per call) | 1220ns | 59ns |
+| Filter-chain construction (`Driver::new`) | 1937µs | 136µs |
+| HTML rewrite, cold metadata (10 resources) | 2498µs | 557µs |
+| HTML rewrite, warm metadata | 2449µs | 531µs |
+| HTML-cache MISS + store | — | 45µs |
+| HTML-cache HIT lookup (no filters/parse) | — | 42µs |
 
 Run it with:
 
@@ -162,6 +206,7 @@ cargo build --release -p ps-html --example async_workload
 - No mid-stream failure staging or async staleness freshening yet
   (`serve_stale_rewritten` revalidates inline, bounded by the
   deadline when a pool is registered).
-- Queue-full and shutdown degrade to inline execution, which can
-  exceed the deadline under saturation (visible via
-  `background_jobs_queue_full` / `background_jobs_shutdown`).
+- Shutdown degrades to inline execution (visible via
+  `background_jobs_shutdown`); queue-full instead sheds fast
+  (visible via `background_jobs_queue_full`), so only a server
+  going away ever waits past the deadline.

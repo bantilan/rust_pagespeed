@@ -522,11 +522,21 @@ mod tests {
     #[test]
     fn setup_assembly() {
         let mut caches = SystemCaches::new();
+        // Defaults enable the bounded in-memory tier (writethrough
+        // LRU over file, compressed metadata).
         let mut options = NgxOptions::new();
         options.system.file_cache_path = "/c".to_string();
         caches.register_config(&options.system.clone(), false, false, 0);
-        // File-only backend, compressed metadata by default.
         let assembled = caches.setup_caches(&options).expect("registered");
+        assert!(assembled.http_cache.name().contains("WriteThrough"));
+        assert!(assembled.metadata_cache.name().contains("WriteThrough"));
+        // Explicit zeros restore the file-only C++ shape.
+        let mut file_only = NgxOptions::new();
+        file_only.system.file_cache_path = "/f".to_string();
+        file_only.system.lru_cache_kb_per_process = 0;
+        file_only.system.lru_cache_byte_limit = 0;
+        caches.register_config(&file_only.system.clone(), false, false, 0);
+        let assembled = caches.setup_caches(&file_only).expect("registered");
         assert_eq!(assembled.http_cache.name(), "HTTPCache(FileCache)");
         assert_eq!(assembled.metadata_cache.name(), "Compressed(FileCache)");
         // Unknown paths fail.

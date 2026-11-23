@@ -67,7 +67,7 @@ pub struct JsMinifyFilter {
     /// read as text and must not change).
     literal_stack: Vec<Keyword>,
     /// Shared tokenizer patterns.
-    patterns: ps_js::tokenizer::TokenizerPatterns,
+    patterns: &'static ps_js::tokenizer::TokenizerPatterns,
 }
 
 impl Default for JsMinifyFilter {
@@ -75,7 +75,7 @@ impl Default for JsMinifyFilter {
         JsMinifyFilter {
             in_script: false,
             literal_stack: Vec::new(),
-            patterns: ps_js::tokenizer::TokenizerPatterns::new(),
+            patterns: ps_js::tokenizer::TokenizerPatterns::shared(),
         }
     }
 }

@@ -424,6 +424,18 @@ impl SingleRewriteBehavior for ImageRewriteBehavior {
         }
         rewrite_loaded_resource(self, driver, input, output, partition)
     }
+
+    fn background_snapshot(&self) -> Option<crate::html_async::BackgroundBehavior> {
+        Some(crate::html_async::BackgroundBehavior::Image {
+            resource_context: self.resource_context.clone(),
+            place: self.place,
+            image_index: self.image_index,
+            in_noscript_element: self.in_noscript_element,
+            css_image_inline_max_bytes: self.css_image_inline_max_bytes,
+            is_resized_using_rendered_dimensions: self.is_resized_using_rendered_dimensions,
+            base_url: self.base_url.spec().to_string(),
+        })
+    }
 }
 
 /// Stats-backed conversion recorder.

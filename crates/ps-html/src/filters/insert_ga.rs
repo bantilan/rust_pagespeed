@@ -130,7 +130,7 @@ enum ParseState {
 #[derive(Debug)]
 pub struct InsertGAFilter {
     config: InsertGAConfig,
-    patterns: TokenizerPatterns,
+    patterns: &'static TokenizerPatterns,
     script_element: Option<NodeId>,
     found_snippet: bool,
     added_analytics_js: bool,
@@ -147,7 +147,7 @@ impl InsertGAFilter {
     pub fn new(config: InsertGAConfig) -> Self {
         InsertGAFilter {
             config,
-            patterns: TokenizerPatterns::new(),
+            patterns: TokenizerPatterns::shared(),
             script_element: None,
             found_snippet: false,
             added_analytics_js: false,
