@@ -512,16 +512,26 @@ impl HtmlCacheSession {
                 options,
                 header.as_deref(),
             );
-            // Sampling cadence applies to recorded evidence; virgin
-            // variants stay eligible (gated downstream integration
-            // still decides for itself).
+            // Sampling cadence applies to recorded evidence, and only
+            // when this request could actually contribute one: clients
+            // that cannot beacon (curl, bots, latency probes) would
+            // otherwise bypass forever on a perpetually-due record
+            // they can never settle. Virgin variants stay eligible
+            // (gated downstream integration still decides for itself).
+            let can_sample = self
+                .driver
+                .request_properties()
+                .supports_critical_images_beacon();
             let due = match downstream {
                 super::beacon_finder::DownstreamBeacon::MustMatch(_) => {
                     super::beacon_finder::should_beacon(now_ms, record, downstream)
                 }
-                _ => record.is_some_and(|record| {
-                    super::beacon_finder::should_beacon(now_ms, Some(record), downstream)
-                }),
+                _ => {
+                    can_sample
+                        && record.is_some_and(|record| {
+                            super::beacon_finder::should_beacon(now_ms, Some(record), downstream)
+                        })
+                }
             };
             if due {
                 return Err(HtmlCacheBypassReason::Other);
@@ -1214,8 +1224,12 @@ mod tests {
 
     #[test]
     fn sampling_due_and_unsettled_renders_bypass() {
-        // Sampling-due variants bypass even with learned evidence.
+        // Sampling-due variants bypass even with learned evidence
+        // (beacon-capable client, so the sample is productive).
         let harness = Harness::new();
+        harness.driver.set_user_agent(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        );
         harness
             .options
             .borrow_mut()

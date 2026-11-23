@@ -282,12 +282,15 @@ fn beacon_arrival_rekeys_variant() {
     assert_eq!(b"<html>learned</html>", entry.body.as_slice());
 }
 
-/// Sampling-due requests bypass so collection keeps running, even
-/// with learned evidence on record.
+/// Sampling-due requests from beacon-capable clients bypass so
+/// collection keeps running, even with learned evidence on record.
 #[test]
 fn sampling_due_bypasses_preserving_collection() {
     let harness = VaryHarness::new();
     enable_beaconing(&harness);
+    harness.driver.set_user_agent(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+    );
     let mut evidence = seed_learned_beacon(&harness);
     // Force the sampling horizon into the past (due now).
     use ps_html::beacon_finder as finder;
@@ -306,6 +309,42 @@ fn sampling_due_bypasses_preserving_collection() {
     assert_eq!(1, harness.counter("html_cache_bypasses"));
     assert_eq!(0, harness.counter("html_cache_misses"));
     assert_eq!(0, harness.counter("html_cache_inserts"));
+}
+
+/// Clients that cannot beacon (curl, bots, latency probes) never
+/// bypass for sampling: they could never settle a due record, so
+/// due-ness does not apply and they cache normally.
+#[test]
+fn non_beacon_clients_ignore_sampling_due() {
+    let harness = VaryHarness::new();
+    enable_beaconing(&harness);
+    // Default driver UA cannot beacon; force the record due anyway.
+    let mut evidence = seed_learned_beacon(&harness);
+    use ps_html::beacon_finder as finder;
+    let server = Rc::clone(&harness.server);
+    let oh = server
+        .hasher()
+        .hash(harness.options.borrow().signature().as_bytes());
+    evidence.next_beacon_ms = START_MS - 1;
+    finder::BeaconFinder::new(server.metadata_cache()).store(
+        PAGE_URL,
+        &oh,
+        "@Desktop",
+        &evidence,
+    );
+    let origin = ok_origin();
+    let request = get_request();
+    let mut session = harness.session();
+    assert!(session
+        .lookup(&origin, &request, &harness.purge, None, START_MS)
+        .is_none());
+    assert_eq!(0, harness.counter("html_cache_bypasses"));
+    assert_eq!(1, harness.counter("html_cache_misses"));
+    session.write(b"<html>probe</html>");
+    settle_driver_identity(&harness);
+    let finish = session.finish(&request, START_MS + 1000);
+    assert!(finish.detail_line.is_some());
+    assert_eq!(1, harness.counter("html_cache_inserts"));
 }
 
 /// Detached rewrites never publish: a render that served fallback
