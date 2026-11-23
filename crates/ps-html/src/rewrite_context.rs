@@ -888,6 +888,9 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
         }
         if self.inputs.iter().any(InputResource::load_pending) {
             self.ok_to_write_partitions = false;
+            // Deadline-pending inputs serve fallback content: the
+            // HTML cache must not freeze this render.
+            self.driver.note_detached_rewrite();
         }
         self.partition();
         if self.partitions.partition.is_empty() {
@@ -2093,6 +2096,7 @@ impl<B: InlineBehavior> InlineRewriteContext<B> {
         }
         if self.input.as_ref().is_some_and(InputResource::load_pending) {
             self.ok_to_write_partitions = false;
+            self.driver.note_detached_rewrite();
         }
         self.partition();
         // No output resource exists, so the rewrite always "fails"

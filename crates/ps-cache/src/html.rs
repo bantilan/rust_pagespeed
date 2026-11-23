@@ -59,8 +59,10 @@ pub struct HtmlEligibility {
     pub origin_ok: bool,
     /// No Set-Cookie(2) on the origin response.
     pub no_origin_cookies: bool,
-    /// Response varies on nothing (Vary absent).
-    pub vary_absent: bool,
+    /// Response does not `Vary: *` (named Vary fields are safe:
+    /// every request header participates in the cache key, so each
+    /// variant addresses its own entry).
+    pub vary_star_absent: bool,
     /// No experiment active.
     pub no_experiment: bool,
     /// PrioritizeCriticalCss not evaluating/admin.
@@ -89,7 +91,7 @@ impl HtmlEligibility {
             && self.is_get
             && self.origin_ok
             && self.no_origin_cookies
-            && self.vary_absent
+            && self.vary_star_absent
             && self.no_experiment
             && self.critical_css_ok
             && self.request_headers_ok
@@ -261,7 +263,7 @@ mod tests {
             is_get: true,
             origin_ok: true,
             no_origin_cookies: true,
-            vary_absent: true,
+            vary_star_absent: true,
             no_experiment: true,
             critical_css_ok: true,
             request_headers_ok: true,
@@ -280,7 +282,7 @@ mod tests {
             Box::new(|e| e.is_get = false),
             Box::new(|e| e.origin_ok = false),
             Box::new(|e| e.no_origin_cookies = false),
-            Box::new(|e| e.vary_absent = false),
+            Box::new(|e| e.vary_star_absent = false),
             Box::new(|e| e.no_experiment = false),
             Box::new(|e| e.critical_css_ok = false),
             Box::new(|e| e.request_headers_ok = false),

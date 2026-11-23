@@ -663,6 +663,7 @@ pub struct ResourceDriver {
     beacon_evidence_identity: RefCell<Option<Vec<u8>>>,
     fetch_budget_ms: RefCell<Option<i64>>,
     ipro_serving: Cell<bool>,
+    detached_rewrites: Cell<u64>,
 }
 
 /// One successful image rewrite, as listed by the admin images
@@ -772,6 +773,7 @@ impl ResourceDriver {
             beacon_evidence_identity: RefCell::new(None),
             fetch_budget_ms: RefCell::new(None),
             ipro_serving: Cell::new(false),
+            detached_rewrites: Cell::new(0),
         };
         driver.rebuild_lawyer();
         driver
@@ -843,6 +845,20 @@ impl ResourceDriver {
     #[must_use]
     pub fn beacon_evidence_identity(&self) -> Option<Vec<u8>> {
         self.beacon_evidence_identity.borrow().clone()
+    }
+
+    /// Records a detached rewrite (a context that finalized with
+    /// deadline-pending inputs and served fallback content). The
+    /// HTML cache refuses to publish such renders
+    /// (`num_detached_rewrites`).
+    pub fn note_detached_rewrite(&self) {
+        self.detached_rewrites.set(self.detached_rewrites.get() + 1);
+    }
+
+    /// Detached rewrites finalized on this driver.
+    #[must_use]
+    pub fn detached_rewrites(&self) -> u64 {
+        self.detached_rewrites.get()
     }
 
     /// Reads the request user agent (`user_agent`).

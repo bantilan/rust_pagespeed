@@ -9,16 +9,18 @@
 //! comment. Counter bumps (`html_cache_*`) go through the shared
 //! registry, so every worker reports global totals.
 //!
-//! Divergences from C++, all deliberate: the port's stricter
-//! `vary_absent` gate replaces C++'s `Vary: *`-only check;
+//! Divergences from C++, all deliberate: only `Vary: *`
+//! bypasses (named Vary fields address per-variant entries,
+//! since every request header participates in the cache key);
 //! per-request `Vary` on the request side follows the ported
 //! `request_headers_cacheable` helper verbatim; request cookies
 //! pass through the allowlist policy in `ps_config::cookies`
 //! (common analytics/tracking cookies cache like cookie-free
 //! requests, with values excluded from the cache key) instead of
-//! bypassing outright; detached-rewrite tracking is omitted (port
-//! rewrites are synchronous, so no rewrite ever detaches resource
-//! work past a deadline).
+//! bypassing outright; unlearned beacon variants cache (C++
+//! bypasses until first learning) under an unlearned identity
+//! marker, so later evidence versions them away instead of
+//! blocking publication.
 #![forbid(unsafe_code)]
 
 use ps_cache::html as html_codec;
@@ -57,7 +59,8 @@ pub struct HtmlCacheSession {
 /// leave the parser).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HtmlCacheBypassReason {
-    /// Non-cookie gate (method, status, Vary, freshness, beacon …).
+    /// Non-cookie gate (method, status, `Vary: *`, freshness,
+    /// beacon sampling, oversize …).
     Other,
     /// First offending request-cookie name (truncated to
     /// [`ps_config::cookies::MAX_REASON_NAME_LEN`] characters).
@@ -303,9 +306,14 @@ impl HtmlCacheSession {
                     (Some(_), None) => false,
                     (None, _) => true,
                 };
+                // Detached rewrites (deadline-pending inputs serving
+                // fallback content) never publish: the background
+                // completion warms the caches for a complete later
+                // rewrite instead.
                 if !body.is_empty()
                     && evidence_settled
                     && publication_ok
+                    && self.driver.detached_rewrites() == 0
                     && !contains_sampled_beacon_init(&body)
                 {
                     let expires_ms = html_codec::store_expiry_ms(origin_expiry_ms, now_ms, ttl_ms);
@@ -417,7 +425,7 @@ impl HtmlCacheSession {
             origin_ok: origin.status_code() == 200,
             no_origin_cookies: !origin.headers().has("Set-Cookie")
                 && !origin.headers().has("Set-Cookie2"),
-            vary_absent: !origin.headers().has("Vary"),
+            vary_star_absent: !origin_varies_star(origin),
             no_experiment: !options.running_experiment(),
             critical_css_ok: !options.enabled(Filter::PrioritizeCriticalCss),
             request_headers_ok: strict.is_ok(),
@@ -471,11 +479,15 @@ impl HtmlCacheSession {
             identity.push_str(value);
             identity.push('\n');
         }
-        // Beacon learning participation: when beaconing drives
-        // rewrites, sampling-due requests and pre-learning
-        // variants bypass, while learned evidence (including LCP)
-        // joins the identity so each accepted beacon invalidates
-        // the variant.
+        // Beacon learning participation: learned evidence
+        // (including LCP) joins the identity so each accepted
+        // beacon versions the variant away; sampling-due requests
+        // bypass so collection keeps running. Unlike C++ (which
+        // bypasses until first learning), unlearned variants cache
+        // under the empty-evidence marker: their first rewrite
+        // samples through the beacon filter (whose nonce keeps that
+        // rewrite out of the store), and arriving evidence rekeys
+        // later requests instead of blocking publication.
         let mut beacon_identity = None;
         if super::beacon_finder::beaconing_active(options) {
             let server = self.driver.server_context();
@@ -500,14 +512,32 @@ impl HtmlCacheSession {
                 options,
                 header.as_deref(),
             );
-            let learned = record.is_some_and(|record| record.valid_beacons >= 1);
-            if !learned
-                || super::beacon_finder::should_beacon(now_ms, record, downstream)
-            {
+            // Sampling cadence applies to recorded evidence; virgin
+            // variants stay eligible (gated downstream integration
+            // still decides for itself).
+            let due = match downstream {
+                super::beacon_finder::DownstreamBeacon::MustMatch(_) => {
+                    super::beacon_finder::should_beacon(now_ms, record, downstream)
+                }
+                _ => record.is_some_and(|record| {
+                    super::beacon_finder::should_beacon(now_ms, Some(record), downstream)
+                }),
+            };
+            if due {
                 return Err(HtmlCacheBypassReason::Other);
             }
-            let record = record.expect("learned evidence has a record");
-            let encoded = super::beacon_finder::encode_evidence(record);
+            let empty;
+            let effective = match record {
+                Some(record) => record,
+                // Missing/corrupt evidence keys as the empty record
+                // (matching the filter's snapshot); first evidence
+                // rekeys the variant.
+                None => {
+                    empty = super::beacon_finder::BeaconEvidence::default();
+                    &empty
+                }
+            };
+            let encoded = super::beacon_finder::encode_evidence(effective);
             identity.push_str("\nbeacon:");
             identity.push_str(
                 &String::from_utf8(encoded.clone()).expect("evidence codec emits UTF-8"),
@@ -527,6 +557,20 @@ impl HtmlCacheSession {
     fn count(&self, name: &str, delta: i64) {
         self.driver.server_context().variable(name).add(delta);
     }
+}
+
+/// Whether an origin response varies on everything (`Vary: *`):
+/// any `Vary` line carrying a `*` token vetoes caching (named
+/// fields are safe — every request header participates in the
+/// cache key — but `*` names no keyable dimension). Token-based
+/// rather than C++'s whole-value match, so technically-invalid
+/// `Vary: <fields>, *` combinations fail closed too.
+fn origin_varies_star(origin: &ResponseHeaders) -> bool {
+    origin.headers().lookup("Vary").is_some_and(|values| {
+        values
+            .iter()
+            .any(|value| value.split(',').any(|token| token.trim() == "*"))
+    })
 }
 
 /// Strict request gates (`Authorization`, request `Vary`): any
@@ -834,9 +878,16 @@ mod tests {
                 }),
             ),
             (
-                "vary",
+                "vary-star",
                 Box::new(|_, _, origin| {
-                    origin.headers_mut().add("Vary", "Accept-Encoding");
+                    origin.headers_mut().add("Vary", "*");
+                    origin.compute_caching();
+                }),
+            ),
+            (
+                "vary-star-embedded",
+                Box::new(|_, _, origin| {
+                    origin.headers_mut().add("Vary", "Accept-Encoding, *");
                     origin.compute_caching();
                 }),
             ),
@@ -1116,38 +1167,49 @@ mod tests {
         assert!(finder::beaconing_active(&harness.driver.options()));
         let request = harness.get_request();
         let origin = harness.ok_origin();
-        // Pre-learning variants bypass (nothing stored to hit).
+        // Pre-learning variants are eligible: miss, store under the
+        // unlearned marker, and hit — first evidence rekeys them.
         let mut cold = harness.session();
         assert!(cold
             .lookup(&origin, &request, &harness.purge, None, START_MS)
             .is_none());
-        assert_eq!(1, harness.counter("html_cache_bypasses"));
+        assert_eq!(0, harness.counter("html_cache_bypasses"));
+        assert_eq!(1, harness.counter("html_cache_misses"));
         assert_eq!(1, harness.counter(finder::NOT_FOUND_COUNT));
+        cold.write(b"<html/>");
+        settle_driver_identity(&harness);
+        let cold_finish = cold.finish(&request, START_MS + 500);
+        assert!(cold_finish.detail_line.is_some());
+        let mut cold_hit = harness.session();
+        assert!(cold_hit
+            .lookup(&origin, &request, &harness.purge, None, START_MS + 600)
+            .is_some());
+        assert_eq!(1, harness.counter("html_cache_hits"));
         // A learned, settled variant misses, stores, and hits.
         seed_learned_beacon(&harness);
         let mut first = harness.session();
         assert!(first
             .lookup(&origin, &request, &harness.purge, None, START_MS)
             .is_none());
-        assert_eq!(1, harness.counter("html_cache_misses"));
+        assert_eq!(2, harness.counter("html_cache_misses"));
         assert_eq!(1, harness.counter(finder::VALID_COUNT));
         first.write(b"<html/>");
         settle_driver_identity(&harness);
         let finish = first.finish(&request, START_MS + 1000);
         assert!(finish.detail_line.is_some());
-        assert_eq!(1, harness.counter("html_cache_inserts"));
+        assert_eq!(2, harness.counter("html_cache_inserts"));
         let mut second = harness.session();
         assert!(second
             .lookup(&origin, &request, &harness.purge, None, START_MS + 2000)
             .is_some());
-        assert_eq!(1, harness.counter("html_cache_hits"));
+        assert_eq!(2, harness.counter("html_cache_hits"));
         // A new accepted beacon invalidates the variant (miss).
         seed_learned_beacon(&harness);
         let mut third = harness.session();
         assert!(third
             .lookup(&origin, &request, &harness.purge, None, START_MS + 3000)
             .is_none());
-        assert_eq!(2, harness.counter("html_cache_misses"));
+        assert_eq!(3, harness.counter("html_cache_misses"));
     }
 
     #[test]
@@ -1352,9 +1414,10 @@ mod tests {
         );
         let finish = session.finish(&authed, START_MS + 1000);
         assert!(finish.bypass_line.is_none());
-        // Non-cookie gates attribute `Other`, also without lines.
+        // Non-cookie gates attribute `Other`, also without lines
+        // (named Vary is eligible; only `Vary: *` bypasses).
         let mut varied = harness.ok_origin();
-        varied.headers_mut().add("Vary", "Cookie");
+        varied.headers_mut().add("Vary", "*");
         varied.compute_caching();
         let mut second = harness.session();
         assert!(second
