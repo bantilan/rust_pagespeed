@@ -5,7 +5,7 @@
 //! caches, finders, and serving land in later slices; this file grows
 //! into the full context.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -194,19 +194,20 @@ impl Default for SimpleRandom {
 
 /// Shared rewrite host (`ServerContext`).
 pub struct ServerContext {
-    http_cache: HttpCache,
+    http_cache: Arc<HttpCache>,
     metadata_cache: Arc<dyn CacheBackend>,
-    fetcher: Rc<dyn AsyncFetcher>,
+    fetcher: Arc<dyn AsyncFetcher>,
     timer: Rc<RefCell<MockTimer>>,
     statistics: Arc<Statistics>,
     contents_hasher: Md5Hasher,
-    hasher: Rc<dyn Hasher>,
+    hasher: Arc<dyn Hasher>,
     lock_hasher: Md5Hasher,
     url_namer: Rc<dyn UrlNamer>,
     simple_random: Rc<RefCell<SimpleRandom>>,
     ua_normalizers: Vec<Rc<dyn UserAgentNormalizer>>,
     critical_selector_finder:
         RefCell<Option<Rc<dyn super::critical_selector_finder::CriticalSelectorFinder>>>,
+    background_pool: std::sync::OnceLock<Arc<super::background::BackgroundPool>>,
 }
 
 impl ServerContext {
@@ -215,7 +216,7 @@ impl ServerContext {
     #[must_use]
     pub fn new(
         backend: Arc<dyn CacheBackend>,
-        fetcher: Rc<dyn AsyncFetcher>,
+        fetcher: Arc<dyn AsyncFetcher>,
         start_ms: i64,
     ) -> Self {
         Self::new_with_metadata(
@@ -232,18 +233,18 @@ impl ServerContext {
     pub fn new_with_metadata(
         backend: Arc<dyn CacheBackend>,
         metadata: Arc<dyn CacheBackend>,
-        fetcher: Rc<dyn AsyncFetcher>,
+        fetcher: Arc<dyn AsyncFetcher>,
         start_ms: i64,
     ) -> Self {
         let statistics = Arc::new(Statistics::new());
         // Full console roster (`RewriteStats::InitStats` plus every
         // filter/cache/fetcher `InitStats`).
         super::rewrite_stats::init_stats(&statistics);
-        let hasher: Rc<dyn Hasher> = Rc::new(Md5Hasher::new());
+        let hasher: Arc<dyn Hasher> = Arc::new(Md5Hasher::new());
         let mut http_cache = HttpCache::new(backend);
         http_cache.set_hasher(hasher.clone());
         ServerContext {
-            http_cache,
+            http_cache: Arc::new(http_cache),
             metadata_cache: metadata,
             fetcher,
             timer: Rc::new(RefCell::new(MockTimer::new(start_ms))),
@@ -259,6 +260,7 @@ impl ServerContext {
                 Rc::new(IEUserAgentNormalizer::new()) as Rc<dyn UserAgentNormalizer>,
             ],
             critical_selector_finder: RefCell::new(None),
+            background_pool: std::sync::OnceLock::new(),
         }
     }
 
@@ -270,12 +272,30 @@ impl ServerContext {
     /// Borrows the HTTP cache.
     #[must_use]
     pub fn http_cache(&self) -> &HttpCache {
-        &self.http_cache
+        self.http_cache.as_ref()
     }
 
-    /// Mutably borrows the HTTP cache (host applies its config).
+    /// Shares the HTTP cache (background completion stores here).
+    #[must_use]
+    pub fn http_cache_shared(&self) -> Arc<HttpCache> {
+        Arc::clone(&self.http_cache)
+    }
+
+    /// Mutably borrows the HTTP cache (host applies its config
+    /// before sharing; reconfiguring a shared cache is a bug).
     pub fn http_cache_mut(&mut self) -> &mut HttpCache {
-        &mut self.http_cache
+        Arc::get_mut(&mut self.http_cache).expect("http_cache already shared")
+    }
+
+    /// Installs the background rewrite pool (factory-owned, once).
+    pub fn set_background_pool(&self, pool: Arc<super::background::BackgroundPool>) {
+        let _ = self.background_pool.set(pool);
+    }
+
+    /// Borrows the background rewrite pool, if installed.
+    #[must_use]
+    pub fn background_pool(&self) -> Option<Arc<super::background::BackgroundPool>> {
+        self.background_pool.get().cloned()
     }
 
     /// Borrows the UA normalizers (`user_agent_normalizers`).
@@ -303,7 +323,7 @@ impl ServerContext {
 
     /// Borrows the fetcher.
     #[must_use]
-    pub fn fetcher(&self) -> &Rc<dyn AsyncFetcher> {
+    pub fn fetcher(&self) -> &Arc<dyn AsyncFetcher> {
         &self.fetcher
     }
 
@@ -361,14 +381,14 @@ impl ServerContext {
 
     /// Borrows the naming hasher (`hasher`, output URLs).
     #[must_use]
-    pub fn hasher(&self) -> &Rc<dyn Hasher> {
+    pub fn hasher(&self) -> &Arc<dyn Hasher> {
         &self.hasher
     }
 
     /// Installs a hasher (`set_hasher`, tests use constants).
-    pub fn set_hasher(&mut self, hasher: Rc<dyn Hasher>) {
+    pub fn set_hasher(&mut self, hasher: Arc<dyn Hasher>) {
         self.hasher = hasher.clone();
-        self.http_cache.set_hasher(hasher);
+        self.http_cache_mut().set_hasher(hasher);
     }
 
     /// Borrows the lock hasher (`lock_hasher`, partition keys and
@@ -641,6 +661,8 @@ pub struct ResourceDriver {
     request_headers: RefCell<RequestHeaders>,
     image_records: RefCell<Vec<ImageRewriteRecord>>,
     beacon_evidence_identity: RefCell<Option<Vec<u8>>>,
+    fetch_budget_ms: RefCell<Option<i64>>,
+    ipro_serving: Cell<bool>,
 }
 
 /// One successful image rewrite, as listed by the admin images
@@ -702,6 +724,19 @@ const MAX_DEBUG_COMMENTS_PER_LIST: usize = 32;
 /// Comment delimiter bytes (`kCommentDelimiterBytes`, `<!--` + `-->`).
 const COMMENT_DELIMITER_BYTES: i64 = 7;
 
+/// RAII marker for in-place serving: while alive, fetch waits use
+/// the IPRO deadline when waiting is enabled.
+pub struct IproScope<'a> {
+    driver: &'a ResourceDriver,
+    previous: bool,
+}
+
+impl Drop for IproScope<'_> {
+    fn drop(&mut self) {
+        self.driver.ipro_serving.set(self.previous);
+    }
+}
+
 impl ResourceDriver {
     /// Builds a driver view over a server context.
     #[must_use]
@@ -735,9 +770,53 @@ impl ResourceDriver {
             request_headers: RefCell::new(RequestHeaders::new()),
             image_records: RefCell::new(Vec::new()),
             beacon_evidence_identity: RefCell::new(None),
+            fetch_budget_ms: RefCell::new(None),
+            ipro_serving: Cell::new(false),
         };
         driver.rebuild_lawyer();
         driver
+    }
+
+    /// Wait budget for one background fetch: `None` means unbounded
+    /// (deadline disabled, C++ parity), otherwise milliseconds
+    /// remaining in this flush window (possibly zero). Serving an
+    /// in-place resource with waiting enabled swaps in the IPRO
+    /// deadline (C++
+    /// `InPlaceRewriteContext::GetRewriteDeadlineAlarmMs`).
+    pub fn fetch_wait_budget_ms(&self) -> Option<i64> {
+        let options = self.options();
+        let configured = if self.ipro_serving.get() && options.in_place_wait_for_optimized() {
+            options.in_place_rewrite_deadline_ms()
+        } else {
+            options.rewrite_deadline_per_flush_ms()
+        };
+        if configured <= 0 {
+            return None;
+        }
+        let mut budget = self.fetch_budget_ms.borrow_mut();
+        Some((*budget.get_or_insert(configured)).max(0))
+    }
+
+    /// Marks IPRO serving for this driver until the guard drops
+    /// (restores nesting correctly).
+    pub fn enter_ipro_scope(&self) -> IproScope<'_> {
+        let previous = self.ipro_serving.replace(true);
+        IproScope {
+            driver: self,
+            previous,
+        }
+    }
+
+    /// Deducts waited milliseconds from the flush-window budget.
+    pub fn deduct_fetch_wait_ms(&self, spent_ms: i64) {
+        if let Some(budget) = self.fetch_budget_ms.borrow_mut().as_mut() {
+            *budget -= spent_ms.max(0);
+        }
+    }
+
+    /// Restores the full flush-window budget (C++ rearms per window).
+    pub fn reset_fetch_budget(&self) {
+        *self.fetch_budget_ms.borrow_mut() = None;
     }
 
     /// Records a successful image rewrite for the admin images page

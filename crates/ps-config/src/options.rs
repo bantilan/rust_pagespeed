@@ -2361,6 +2361,17 @@ impl RewriteOptions {
         }
     }
 
+    /// Per-flush rewrite wait budget (`rewrite_deadline_per_flush_ms`,
+    /// C++ `RewriteDeadlineMs`, default 10): bounds how long request
+    /// processing waits for background work before falling back.
+    #[must_use]
+    pub fn rewrite_deadline_per_flush_ms(&self) -> i64 {
+        match self.get_by_name("RewriteDeadlinePerFlushMs") {
+            Some(Value::Int(limit)) => limit,
+            _ => 10,
+        }
+    }
+
     /// IPRO rewrite deadline (`in_place_rewrite_deadline_ms`,
     /// default 10; sync execution has no deadlines).
     #[must_use]
@@ -6098,6 +6109,18 @@ mod tests {
             .parse_and_set_1("htmlcacheignorecookie", "x", Scope::Server)
             .unwrap();
         assert_eq!(1, lower.html_cache_ignore_cookies().len());
+    }
+
+    #[test]
+    fn rewrite_deadline_defaults_and_sets() {
+        use super::Scope;
+        let mut options = RewriteOptions::new();
+        // C++ NDEBUG default.
+        assert_eq!(options.rewrite_deadline_per_flush_ms(), 10);
+        options
+            .set_option("RewriteDeadlinePerFlushMs", "50", Scope::Server)
+            .unwrap();
+        assert_eq!(options.rewrite_deadline_per_flush_ms(), 50);
     }
 
     #[test]

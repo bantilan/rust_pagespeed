@@ -49,7 +49,7 @@ const NO_OTHER_CONTEXTS: u32 = 128;
 struct Fixture {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     http_backend: Arc<MemoryCache>,
     metadata_backend: Arc<MemoryCache>,
     user_agent: RefCell<String>,
@@ -77,7 +77,7 @@ impl Fixture {
     fn build(namer: Option<Rc<dyn ps_html::url_namer::UrlNamer>>, mock: bool) -> Self {
         let http_backend = Arc::new(MemoryCache::new());
         let metadata_backend = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let mut server = ServerContext::new_with_metadata(
             http_backend.clone(),
             metadata_backend.clone(),
@@ -85,7 +85,7 @@ impl Fixture {
             START_MS,
         );
         if mock {
-            server.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+            server.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         }
         if let Some(namer) = namer {
             server.set_url_namer(namer);
@@ -265,7 +265,7 @@ impl Fixture {
             self.fetcher.clone(),
             START_MS,
         );
-        fresh.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+        fresh.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         fresh.set_url_namer(self.server.url_namer().clone());
         let server = Rc::new(fresh);
         let options = Rc::new(RefCell::new(self.options.borrow().clone()));

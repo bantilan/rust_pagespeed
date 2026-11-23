@@ -28,7 +28,7 @@ const START_MS: i64 = 1_700_000_000_000;
 struct Fixture {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     debug_message: RefCell<String>,
 }
 
@@ -45,7 +45,7 @@ impl Fixture {
     fn build(mock: bool) -> Self {
         let http_backend = Arc::new(MemoryCache::new());
         let metadata_backend = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let mut server = ServerContext::new_with_metadata(
             http_backend,
             metadata_backend,
@@ -53,7 +53,7 @@ impl Fixture {
             START_MS,
         );
         if mock {
-            server.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+            server.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         }
         let options = Rc::new(RefCell::new(RewriteOptions::new()));
         options.borrow_mut().set_js_outline_min_bytes(0);

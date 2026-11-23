@@ -539,7 +539,7 @@ mod tests {
             .map(|age| age.as_millis() as i64)
             .unwrap_or(0)
             - 3_600_000;
-        let fetcher = Rc::new(
+        let fetcher = Arc::new(
             FileFetcher::new(
                 scratch.dir.to_str().unwrap(),
                 &["test.com".to_string()],

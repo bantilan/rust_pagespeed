@@ -172,6 +172,11 @@ impl BodySink for HtmlSink<'_> {
 
     fn flush(&mut self) {
         self.driver.flush();
+        // Rearm the per-flush fetch-wait budget (C++ rearms the
+        // rewrite deadline every flush window).
+        if let Some(driver) = self.resource_driver.as_ref() {
+            driver.reset_fetch_budget();
+        }
         self.pump_output();
         self.fetch.handle_flush(self.slot);
     }
@@ -465,7 +470,7 @@ mod tests {
             std::sync::Arc::new(ps_cache::cache::MemoryCache::new()),
             std::sync::Arc::new(ps_stats::core::Statistics::new()),
             0,
-            std::rc::Rc::new(crate::rewrite::UnavailableFetcher),
+            std::sync::Arc::new(crate::rewrite::UnavailableFetcher),
         );
         let driver = std::rc::Rc::new(ps_html::server_context::ResourceDriver::new(
             html,
@@ -513,7 +518,7 @@ mod tests {
                 metadata,
                 std::sync::Arc::new(ps_stats::core::Statistics::new()),
                 0,
-                std::rc::Rc::new(crate::rewrite::UnavailableFetcher),
+                std::sync::Arc::new(crate::rewrite::UnavailableFetcher),
             );
             let mut options = RewriteOptions::new();
             options
@@ -609,7 +614,7 @@ mod tests {
                 metadata,
                 std::sync::Arc::new(ps_stats::core::Statistics::new()),
                 0,
-                std::rc::Rc::new(crate::rewrite::UnavailableFetcher),
+                std::sync::Arc::new(crate::rewrite::UnavailableFetcher),
             );
             let mut options = RewriteOptions::new();
             options

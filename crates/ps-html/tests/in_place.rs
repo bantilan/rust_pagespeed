@@ -5,8 +5,11 @@
 //! deltas, rewrite counts, and response bytes/headers/TTLs/etags
 //! port exactly, but `HTTPCache`/`LRUCache` op tallies have no
 //! counterpart (split backends here vs C++'s shared LRU).
-//! NOTE: `wait_for_optimize_timeout` (rewrite deadlines),
-//! `mid_stream_fetch_failure_*` (async failure staging), and
+//! NOTE: `wait_for_optimize_timeout` ports as
+//! `wait_for_optimized_slow_origin_falls_back_then_warms` (the
+//! IPRO deadline bounds origin fetches; optimization compute
+//! itself stays inline).
+//! `mid_stream_fetch_failure_*` (async failure staging) and
 //! `load_from_file` (file input resources) are deferred to those
 //! subsystems. Stale/freshen phases port via sync revalidation
 //! (the mock clock stands in for `set_timer`). NOTE:
@@ -14,14 +17,17 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use ps_cache::cache::{Cache, MemoryCache};
 use ps_config::filter::Filter;
 use ps_config::options::{AllowVaryOn, RewriteOptions};
+use ps_config::scope::Scope;
+use ps_html::background::{BackgroundPool, PoolConfig};
 use ps_html::fake_filter::{FakeFilter, FakeImageFilter};
 use ps_html::server_context::{ResourceDriver, ServerContext};
 use ps_http::content_type::ContentType;
-use ps_http::fetch::{AsyncFetch, BufferingFetch};
+use ps_http::fetch::{AsyncFetch, AsyncFetcher, BufferingFetch};
 use ps_http::mock::MockUrlFetcher;
 use ps_http::request::RequestHeaders;
 use ps_http::response::{HttpOptions, ResponseHeaders};
@@ -38,7 +44,7 @@ const ETAG_0: &str = "W/\"PSA-0\"";
 struct Fixture {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     http_backend: Arc<MemoryCache>,
     metadata_backend: Arc<MemoryCache>,
     img_filter: Rc<FakeImageFilter>,
@@ -49,6 +55,22 @@ struct Fixture {
     response_headers: RefCell<ResponseHeaders>,
     fetch_base: Cell<u64>,
     shards: RefCell<Vec<(String, String)>>,
+}
+
+/// Origin-latency wrapper: scripting and counts stay on the
+/// inner mock; only the served latency changes.
+struct LatencyFetcher {
+    inner: Arc<MockUrlFetcher>,
+    delay: Duration,
+}
+
+impl AsyncFetcher for LatencyFetcher {
+    fn fetch(&self, url: &str, fetch: &mut dyn AsyncFetch) {
+        if !self.delay.is_zero() {
+            std::thread::sleep(self.delay);
+        }
+        self.inner.fetch(url, fetch);
+    }
 }
 
 impl Fixture {
@@ -62,17 +84,31 @@ impl Fixture {
     }
 
     fn build(md5: bool) -> Self {
+        Self::build_with_origin_latency(md5, Duration::ZERO)
+    }
+
+    /// Builds a fixture whose origin answers after `latency`
+    /// (deadline tests; the mock keeps scripting and counts).
+    fn build_with_origin_latency(md5: bool, latency: Duration) -> Self {
         let http_backend = Arc::new(MemoryCache::new());
         let metadata_backend = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
+        let server_fetcher: Arc<dyn AsyncFetcher> = if latency.is_zero() {
+            fetcher.clone()
+        } else {
+            Arc::new(LatencyFetcher {
+                inner: fetcher.clone(),
+                delay: latency,
+            })
+        };
         let mut server = ServerContext::new_with_metadata(
             http_backend.clone(),
             metadata_backend.clone(),
-            fetcher.clone(),
+            server_fetcher,
             START_MS,
         );
         if !md5 {
-            server.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+            server.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         }
         Fixture {
             server: Rc::new(server),
@@ -618,6 +654,81 @@ fn wait_for_optimized_first_request() {
     // Second fetch hits the metadata cache and the rewritten
     // resource is served out.
     fixture.check_warm_cache("second_fetch_2");
+}
+
+#[test]
+fn wait_for_optimized_slow_origin_falls_back_then_warms() {
+    // `wait_for_optimize_timeout` behavior: with waiting enabled, a
+    // slow origin fails fast at the IPRO deadline (the flush
+    // deadline stays huge, proving the override selects the IPRO
+    // value end to end); the background completion then warms the
+    // origin entry so the next request serves optimized bytes.
+    let fixture = Fixture::build_with_origin_latency(false, Duration::from_millis(300));
+    fixture
+        .options
+        .borrow_mut()
+        .set_in_place_wait_for_optimized(true);
+    fixture
+        .options
+        .borrow_mut()
+        .set_in_place_rewrite_deadline_ms(30);
+    fixture
+        .options
+        .borrow_mut()
+        .set_option("RewriteDeadlinePerFlushMs", "30000", Scope::Server)
+        .unwrap();
+    fixture.init();
+    let pool = BackgroundPool::new(
+        PoolConfig {
+            threads: 2,
+            queue_bound: 16,
+        },
+        &fixture.server.statistics_shared(),
+    );
+    fixture.server.set_background_pool(Arc::clone(&pool));
+
+    // First request: bounded wait, failed fetch (the server falls
+    // back to its native method for the origin bytes).
+    let start = Instant::now();
+    let driver = fixture.driver_for("http://www.example.com/cacheable.jpg");
+    let ctx = driver.request_context().borrow().clone();
+    let mut fetch = BufferingFetch::new("http://www.example.com/cacheable.jpg", ctx);
+    assert!(driver.fetch_resource("http://www.example.com/cacheable.jpg", &mut fetch));
+    assert!(fetch.done());
+    assert!(!fetch.success());
+    assert!(
+        start.elapsed() < Duration::from_millis(250),
+        "first request must fail fast at the IPRO deadline"
+    );
+
+    // Background completion warms the origin entry; the next
+    // request rewrites and serves optimized bytes, fetching the
+    // origin exactly once overall.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let completed = fixture
+            .server
+            .statistics()
+            .get_variable("background_jobs_completed")
+            .unwrap()
+            .get();
+        if completed >= 1 {
+            break;
+        }
+        assert!(Instant::now() < deadline, "background fetch never ran");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    fixture.reset_headers_and_stats();
+    fixture.fetch_and_check_response(
+        "http://www.example.com/cacheable.jpg",
+        b"good:ic",
+        true,
+        Some(TTL_MS),
+        Some(ETAG_AJ),
+        START_MS,
+    );
+    assert_eq!(fixture.fetcher.fetch_count(), 1);
+    pool.shutdown();
 }
 
 #[test]

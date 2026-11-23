@@ -33,7 +33,7 @@ use harness::SharedSink;
 
 fn fixture() -> (
     Rc<ResourceDriver>,
-    Rc<MockUrlFetcher>,
+    Arc<MockUrlFetcher>,
     Rc<RefCell<RewriteOptions>>,
 ) {
     fixture_with_namer(None)
@@ -43,11 +43,11 @@ fn fixture_with_namer(
     namer: Option<Rc<dyn ps_html::url_namer::UrlNamer>>,
 ) -> (
     Rc<ResourceDriver>,
-    Rc<MockUrlFetcher>,
+    Arc<MockUrlFetcher>,
     Rc<RefCell<RewriteOptions>>,
 ) {
     let backend: Arc<dyn ps_cache::cache::Cache> = Arc::new(MemoryCache::new());
-    let fetcher = Rc::new(MockUrlFetcher::new());
+    let fetcher = Arc::new(MockUrlFetcher::new());
     let mut server = ServerContext::new(backend, fetcher.clone(), 1_700_000_000_000);
     if let Some(namer) = namer {
         server.set_url_namer(namer);
@@ -135,7 +135,7 @@ fn invalid_base_refuses() {
     let (driver, _fetcher, _options) = fixture();
     drop(driver);
     let backend: Arc<dyn ps_cache::cache::Cache> = Arc::new(MemoryCache::new());
-    let fetcher = Rc::new(MockUrlFetcher::new());
+    let fetcher = Arc::new(MockUrlFetcher::new());
     let server = Rc::new(ServerContext::new(backend, fetcher, 1_700_000_000_000));
     let options = Rc::new(RefCell::new(RewriteOptions::new()));
     let driver = Rc::new(ResourceDriver::new(server, options, "not a url"));

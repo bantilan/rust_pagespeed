@@ -122,6 +122,9 @@ pub struct DriverFactory {
     pub scheduler: Arc<Scheduler>,
     /// Scheduler-thread ownership.
     pub scheduler_thread: SchedulerThreadState,
+    /// Background rewrite pool (worker-only; spawned on first
+    /// server init so no thread state crosses fork).
+    pub background_pool: Option<Arc<ps_html::background::BackgroundPool>>,
     /// Fetchers by config key (`fetcher_map_`/`base_fetcher_map_`
     /// collapsed: slurping is unsupported so both keys agree).
     pub fetchers: HashMap<String, NativeFetcher>,
@@ -192,6 +195,7 @@ impl DriverFactory {
             html_parse_message_handler: NgxMessageHandler::new(),
             scheduler: Arc::new(Scheduler::new()),
             scheduler_thread: SchedulerThreadState::new(),
+            background_pool: None,
             fetchers: HashMap::new(),
             caches: SystemCaches::new(),
             statistics: Arc::new(ps_stats::core::Statistics::new()),
@@ -274,6 +278,31 @@ impl DriverFactory {
     #[must_use]
     pub fn scheduler(&self) -> Arc<Scheduler> {
         Arc::clone(&self.scheduler)
+    }
+
+    /// Creates the background rewrite pool on first use (worker
+    /// servers call this at child init; threads never cross fork).
+    pub fn ensure_background_pool(&mut self) -> Arc<ps_html::background::BackgroundPool> {
+        if self.background_pool.is_none() {
+            let _ = self.finalize_thread_counts();
+            let config = ps_html::background::PoolConfig {
+                threads: self.num_rewrite_threads.max(1) as usize,
+                queue_bound: 1024,
+            };
+            self.background_pool = Some(ps_html::background::BackgroundPool::new(
+                config,
+                &self.statistics,
+            ));
+        }
+        Arc::clone(self.background_pool.as_ref().expect("just ensured"))
+    }
+
+    /// Stops the background pool (idempotent; in-flight work
+    /// finishes within its own bounds, waiters release).
+    fn stop_background_pool(&mut self) {
+        if let Some(pool) = self.background_pool.take() {
+            pool.shutdown();
+        }
     }
 
     /// Stops the scheduler thread (the deleter: quit, wake, join).
@@ -473,6 +502,7 @@ impl Drop for DriverFactory {
     /// in between with their slices).
     fn drop(&mut self) {
         self.shutdown();
+        self.stop_background_pool();
         self.stop_scheduler_thread();
     }
 }

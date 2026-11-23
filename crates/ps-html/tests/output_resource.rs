@@ -27,7 +27,7 @@ fn fixture() -> (
     Rc<RefCell<RewriteOptions>>,
 ) {
     let backend: Arc<dyn ps_cache::cache::Cache> = Arc::new(MemoryCache::new());
-    let fetcher = Rc::new(MockUrlFetcher::new());
+    let fetcher = Arc::new(MockUrlFetcher::new());
     let server = Rc::new(ServerContext::new(backend, fetcher, 1_700_000_000_000));
     let options = Rc::new(RefCell::new(RewriteOptions::new()));
     let driver = Rc::new(ResourceDriver::new(

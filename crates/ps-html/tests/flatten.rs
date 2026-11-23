@@ -74,7 +74,7 @@ const FLATTEN_COMPLEX_QUERIES_FLAG: u32 = 1 << 20;
 struct Fixture {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     debug_message: RefCell<String>,
     html_headers: RefCell<Option<ResponseHeaders>>,
 }
@@ -118,14 +118,14 @@ impl Fixture {
     fn build(options: Rc<RefCell<RewriteOptions>>) -> Self {
         let http_backend = Arc::new(MemoryCache::new());
         let metadata_backend = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let mut server = ServerContext::new_with_metadata(
             http_backend,
             metadata_backend,
             fetcher.clone(),
             START_MS,
         );
-        server.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+        server.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         let fixture = Fixture {
             server: Rc::new(server),
             options,
@@ -279,7 +279,7 @@ impl Fixture {
             self.fetcher.clone(),
             START_MS,
         );
-        fresh.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+        fresh.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         let server = Rc::new(fresh);
         let options = Rc::new(RefCell::new(self.options.borrow().clone()));
         let driver = Rc::new(ResourceDriver::new(server, options, url));

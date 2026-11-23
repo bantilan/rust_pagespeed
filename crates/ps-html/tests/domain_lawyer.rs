@@ -1949,7 +1949,7 @@ fn rebuild_lawyer_threads_proxy_mappings_with_cdn_leg() {
     let server = Rc::new(ServerContext::new_with_metadata(
         Arc::new(MemoryCache::new()),
         Arc::new(MemoryCache::new()),
-        Rc::new(MockUrlFetcher::new()),
+        Arc::new(MockUrlFetcher::new()),
         0,
     ));
     let driver = ResourceDriver::new(server, options, "http://proxy.com/");
@@ -1989,7 +1989,7 @@ fn rebuild_lawyer_threads_rewrite_direction() {
     let server = Rc::new(ServerContext::new_with_metadata(
         Arc::new(MemoryCache::new()),
         Arc::new(MemoryCache::new()),
-        Rc::new(MockUrlFetcher::new()),
+        Arc::new(MockUrlFetcher::new()),
         0,
     ));
     let driver = ResourceDriver::new(server, options, "http://origin.com/");
@@ -2023,7 +2023,7 @@ fn rebuild_lawyer_threads_origin_mappings() {
     let server = Rc::new(ServerContext::new_with_metadata(
         Arc::new(MemoryCache::new()),
         Arc::new(MemoryCache::new()),
-        Rc::new(MockUrlFetcher::new()),
+        Arc::new(MockUrlFetcher::new()),
         0,
     ));
     let driver = ResourceDriver::new(server, options, "http://example.com/");

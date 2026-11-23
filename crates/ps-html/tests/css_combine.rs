@@ -43,7 +43,7 @@ const XHTML_DTD: &str = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitio
 struct Fixture {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     http_backend: Arc<MemoryCache>,
     metadata_backend: Arc<MemoryCache>,
     mime_is_xhtml: RefCell<Option<bool>>,
@@ -62,7 +62,7 @@ impl Fixture {
     fn build(mock: bool) -> Self {
         let http_backend = Arc::new(MemoryCache::new());
         let metadata_backend = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let mut server = ServerContext::new_with_metadata(
             http_backend.clone(),
             metadata_backend.clone(),
@@ -70,7 +70,7 @@ impl Fixture {
             START_MS,
         );
         if mock {
-            server.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+            server.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         }
         let options = Rc::new(RefCell::new(RewriteOptions::new()));
         options

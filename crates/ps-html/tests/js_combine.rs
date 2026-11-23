@@ -129,7 +129,7 @@ impl HtmlFilter for ScriptCollector {
 struct Fixture {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     http_backend: Arc<MemoryCache>,
     metadata_backend: Arc<MemoryCache>,
     other_domain: String,
@@ -149,7 +149,7 @@ impl Fixture {
     fn new(extra: ExtraFilters, use_test_namer: bool) -> Self {
         let http_backend = Arc::new(MemoryCache::new());
         let metadata_backend = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let mut server = ServerContext::new_with_metadata(
             http_backend.clone(),
             metadata_backend.clone(),

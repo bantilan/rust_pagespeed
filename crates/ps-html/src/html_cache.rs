@@ -705,7 +705,7 @@ mod tests {
             let server = Rc::new(crate::server_context::ServerContext::new_with_metadata(
                 http,
                 metadata,
-                Rc::new(MockUrlFetcher::new()),
+                Arc::new(MockUrlFetcher::new()),
                 START_MS,
             ));
             let options = Rc::new(RefCell::new(RewriteOptions::new()));

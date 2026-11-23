@@ -38,7 +38,7 @@ const INTROSPECTIVE_JS: &str = "<script type='text/javascript' src='introspectiv
 struct Fixture {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     http_backend: Arc<MemoryCache>,
     metadata_backend: Arc<MemoryCache>,
     experimental: bool,
@@ -59,7 +59,7 @@ impl Fixture {
     fn with_hasher(experimental: bool, mock: bool) -> Self {
         let http_backend = Arc::new(MemoryCache::new());
         let metadata_backend = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let mut server = ServerContext::new_with_metadata(
             http_backend.clone(),
             metadata_backend.clone(),
@@ -67,7 +67,7 @@ impl Fixture {
             START_MS,
         );
         if mock {
-            server.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+            server.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         }
         let options = Rc::new(RefCell::new(RewriteOptions::new()));
         options

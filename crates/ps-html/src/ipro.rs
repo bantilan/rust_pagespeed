@@ -8,9 +8,12 @@
 //!
 //! Sync-model notes: the background rewrite runs inline before
 //! responding, but the served bytes match C++ (originals stream
-//! on miss; waiting mode serves optimized at once). Rewrite
-//! deadlines, mid-stream failure staging, staleness freshening,
-//! and load-from-file inputs have no sync equivalent and wait
+//! on miss; waiting mode serves optimized at once). Origin fetches
+//! run through the background pool when one is registered, bounded
+//! by the IPRO deadline with waiting enabled (else the flush
+//! deadline); without a pool they fetch direct, as before.
+//! Mid-stream failure staging, staleness freshening, and
+//! load-from-file inputs have no sync equivalent and wait
 //! for those subsystems. Origin (non-proxy) fallback waits for
 //! the server-integration layer; serving here always proxies.
 //! Only test servants implement nested rewrites (see
@@ -27,6 +30,7 @@ use ps_http::names::header;
 use ps_http::request::Method;
 use ps_http::response::{RequestProperties, ResponseHeaders, ValidatorOption, VaryOption};
 
+use crate::cacheable_resource::{fetch_origin_bounded, OriginFetch};
 use crate::image_url_encoder::{ImageResourceContext, ImageUrlEncoder, LibWebpLevel};
 use crate::metadata::{decode_partitions, encode_partitions, CachedResult, OutputPartitions};
 use crate::rewrite_filter::RewriteFilter;
@@ -50,6 +54,9 @@ pub fn fetch_in_place_resource(
     fetch: &mut dyn AsyncFetch,
     proxy_mode: bool,
 ) -> bool {
+    // Fetch waits inside use the IPRO deadline when waiting is
+    // enabled (C++ `GetRewriteDeadlineAlarmMs` override).
+    let _ipro_scope = driver.enter_ipro_scope();
     let gurl = GoogleUrl::new(url);
     if !gurl.is_web_valid() {
         return false;
@@ -86,12 +93,24 @@ fn serve_head(
         fetch.handle_done(true);
         return true;
     }
-    let mut scratch = scratch_fetch_for_origin(driver, url);
-    driver.server_context().fetcher().fetch(url, &mut scratch);
-    if !scratch.success() {
-        return fail_fetch(driver, fetch);
-    }
-    let mut headers = scratch.response_headers().clone();
+    let ctx = driver.request_context().borrow().clone();
+    let mut headers = match fetch_origin_bounded(driver, url, &ctx) {
+        OriginFetch::Direct => {
+            let mut scratch = scratch_fetch_for_origin(driver, url);
+            driver.server_context().fetcher().fetch(url, &mut scratch);
+            if !scratch.success() {
+                return fail_fetch(driver, fetch);
+            }
+            scratch.response_headers().clone()
+        }
+        OriginFetch::Ready(fetched) => {
+            if !fetched.success {
+                return fail_fetch(driver, fetch);
+            }
+            fetched.headers
+        }
+        OriginFetch::Pending => return fail_fetch(driver, fetch),
+    };
     fix_fetched_headers(driver, &mut headers);
     fetch.response_headers_mut().copy_from(&headers);
     fetch.headers_complete();
@@ -322,19 +341,30 @@ fn revalidate_input(
     url: &str,
     cached: &CachedResult,
 ) -> Option<(ResponseHeaders, Vec<u8>, bool)> {
-    let mut scratch = scratch_fetch_for_origin(driver, url);
-    driver.server_context().fetcher().fetch(url, &mut scratch);
-    if !scratch.success() {
-        return None;
-    }
-    let body = scratch.body().to_vec();
+    let ctx = driver.request_context().borrow().clone();
+    let (body, mut headers) = match fetch_origin_bounded(driver, url, &ctx) {
+        OriginFetch::Direct => {
+            let mut scratch = scratch_fetch_for_origin(driver, url);
+            driver.server_context().fetcher().fetch(url, &mut scratch);
+            if !scratch.success() {
+                return None;
+            }
+            (scratch.body().to_vec(), scratch.response_headers().clone())
+        }
+        OriginFetch::Ready(fetched) => {
+            if !fetched.success {
+                return None;
+            }
+            (fetched.body, fetched.headers)
+        }
+        OriginFetch::Pending => return None,
+    };
     let hash = driver.server_context().hasher().hash(&body);
     let unchanged = cached
         .input
         .first()
         .and_then(|info| info.input_content_hash.as_deref())
         == Some(hash.as_str());
-    let mut headers = scratch.response_headers().clone();
     fix_fetched_headers(driver, &mut headers);
     if unchanged {
         // Contents identical: refresh the HTTP entry, the
@@ -379,7 +409,9 @@ fn revalidate(
                 // the injected window, like a miss.
                 serve_with_window(driver, fetch, &headers, &body)
             } else {
-                reconstruct_from_response(driver, url, fetch, mkey, headers, body, proxy_mode)
+                reconstruct_from_response(
+                    driver, url, fetch, mkey, headers, body, proxy_mode, false,
+                )
             }
         }
     }
@@ -552,16 +584,33 @@ fn reconstruct(
     proxy_mode: bool,
 ) -> bool {
     if let Some((headers, body)) = find_original(driver, url) {
-        return reconstruct_from_response(driver, url, fetch, mkey, headers, body, proxy_mode);
+        return reconstruct_from_response(
+            driver, url, fetch, mkey, headers, body, proxy_mode, false,
+        );
     }
-    let mut scratch = scratch_fetch_for_origin(driver, url);
-    driver.server_context().fetcher().fetch(url, &mut scratch);
-    if !scratch.success() {
-        return fail_fetch(driver, fetch);
-    }
-    let mut headers = scratch.response_headers().clone();
+    let ctx = driver.request_context().borrow().clone();
+    let (body, mut headers, origin_cached) = match fetch_origin_bounded(driver, url, &ctx) {
+        OriginFetch::Direct => {
+            let mut scratch = scratch_fetch_for_origin(driver, url);
+            driver.server_context().fetcher().fetch(url, &mut scratch);
+            if !scratch.success() {
+                return fail_fetch(driver, fetch);
+            }
+            (
+                scratch.body().to_vec(),
+                scratch.response_headers().clone(),
+                false,
+            )
+        }
+        OriginFetch::Ready(fetched) => {
+            if !fetched.success {
+                return fail_fetch(driver, fetch);
+            }
+            (fetched.body, fetched.headers, fetched.cached)
+        }
+        OriginFetch::Pending => return fail_fetch(driver, fetch),
+    };
     fix_fetched_headers(driver, &mut headers);
-    let body = scratch.body().to_vec();
     // Oversized responses stream through unrecorded (the
     // mid-stream overflow, observed whole) — but only
     // rewritable ones stream; anything else fails in
@@ -584,10 +633,20 @@ fn reconstruct(
         fetch.handle_done(ok);
         return true;
     }
-    reconstruct_from_response(driver, url, fetch, mkey, headers, body, proxy_mode)
+    reconstruct_from_response(
+        driver,
+        url,
+        fetch,
+        mkey,
+        headers,
+        body,
+        proxy_mode,
+        origin_cached,
+    )
 }
 
 /// Records, rewrites, and serves a fetched response.
+#[allow(clippy::too_many_arguments)]
 fn reconstruct_from_response(
     driver: &Rc<ResourceDriver>,
     url: &str,
@@ -596,10 +655,12 @@ fn reconstruct_from_response(
     headers: ResponseHeaders,
     body: Vec<u8>,
     proxy_mode: bool,
+    origin_cached: bool,
 ) -> bool {
     // The HTTP layer records cacheable origin responses (except
-    // codings it cannot adapt) regardless of rewriting.
-    if !headers.has_content_coding_other_than_single_gzip() {
+    // codings it cannot adapt) regardless of rewriting. A
+    // background job already stored its own fetch: no re-put.
+    if !origin_cached && !headers.has_content_coding_other_than_single_gzip() {
         put_original(driver, url, &headers, &body);
     }
     let Some(content_type) = can_in_place_rewrite(driver, fetch, &headers) else {

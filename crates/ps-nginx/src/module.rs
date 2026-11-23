@@ -1276,8 +1276,8 @@ unsafe fn child_init_servers(cycle: *mut ngx_cycle_t, main: &mut MainConf) {
                              server (unmapped root); origins fetch over HTTP",
                         );
                     }
-                    let fetcher: Rc<dyn ps_http::fetch::AsyncFetcher> =
-                        Rc::new(crate::origin_fetch::ChainedFetcher::new(
+                    let fetcher: Arc<dyn ps_http::fetch::AsyncFetcher> =
+                        Arc::new(crate::origin_fetch::ChainedFetcher::new(
                             file,
                             crate::origin_fetch::OriginFetcher::new(
                                 context.options.system.blocking_fetch_timeout_ms,
@@ -1291,6 +1291,12 @@ unsafe fn child_init_servers(cycle: *mut ngx_cycle_t, main: &mut MainConf) {
                         now_ms,
                         fetcher,
                     ));
+                    // Background fetch execution shares the worker
+                    // pool (first server spawns it; idempotent after).
+                    if let Some(html) = context.html_context.as_ref() {
+                        let pool = main.driver_factory.ensure_background_pool();
+                        html.set_background_pool(pool);
+                    }
                     context.http_cache = Some(assembled.http_cache);
                     context.metadata_cache = Some(assembled.metadata_cache);
                 }

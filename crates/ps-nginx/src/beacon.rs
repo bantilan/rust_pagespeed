@@ -225,7 +225,7 @@ mod tests {
             std::sync::Arc::clone(&metadata),
             std::sync::Arc::new(ps_stats::core::Statistics::new()),
             0,
-            std::rc::Rc::new(crate::rewrite::UnavailableFetcher),
+            std::sync::Arc::new(crate::rewrite::UnavailableFetcher),
         );
         let server = html;
         // No options hash: stats-only, nothing stored.

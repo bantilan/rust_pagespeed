@@ -28,7 +28,7 @@ impl Harness {
         let server = Rc::new(ServerContext::new_with_metadata(
             http,
             metadata,
-            Rc::new(ps_http::mock::MockUrlFetcher::new()),
+            Arc::new(ps_http::mock::MockUrlFetcher::new()),
             1_700_000_000_000,
         ));
         Harness {

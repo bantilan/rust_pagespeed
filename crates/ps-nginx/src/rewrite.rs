@@ -40,7 +40,7 @@ pub fn html_context(
     metadata: Arc<dyn Cache>,
     statistics: Arc<ps_stats::core::Statistics>,
     start_ms: i64,
-    fetcher: Rc<dyn AsyncFetcher>,
+    fetcher: Arc<dyn AsyncFetcher>,
 ) -> Rc<HtmlServerContext> {
     let mut context =
         HtmlServerContext::new_with_metadata(http_backend, metadata, fetcher, start_ms);
@@ -84,7 +84,7 @@ mod tests {
             metadata,
             Arc::clone(&statistics),
             1000,
-            Rc::new(UnavailableFetcher),
+            Arc::new(UnavailableFetcher),
         );
         assert_eq!(1000, context.now_ms());
         reset_context_clock(&context, 2000);

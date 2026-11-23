@@ -287,7 +287,7 @@ fn driver_bound_css_inlines_small_link() {
 
     let http_backend = Arc::new(MemoryCache::new());
     let metadata_backend = Arc::new(MemoryCache::new());
-    let fetcher = Rc::new(MockUrlFetcher::new());
+    let fetcher = Arc::new(MockUrlFetcher::new());
     let server = Rc::new(ServerContext::new_with_metadata(
         http_backend,
         metadata_backend,
@@ -390,7 +390,7 @@ fn resource_driver_for(
     let server = Rc::new(ServerContext::new_with_metadata(
         Arc::new(MemoryCache::new()),
         Arc::new(MemoryCache::new()),
-        Rc::new(MockUrlFetcher::new()),
+        Arc::new(MockUrlFetcher::new()),
         1_700_000_000_000,
     ));
     Rc::new(ps_html::server_context::ResourceDriver::new(
@@ -800,6 +800,311 @@ fn insert_dns_prefetch_runs_through_driver() {
     assert_eq!(output.matches("dns-prefetch").count(), 3, "{output}");
 }
 
+/// Shared-server fixture: independent resource drivers over one
+/// metadata cache, like independent production requests.
+fn shared_server_fixture(
+    options: Rc<RefCell<RewriteOptions>>,
+) -> (
+    Rc<ps_html::server_context::ServerContext>,
+    Rc<ps_html::server_context::ResourceDriver>,
+) {
+    use ps_cache::cache::MemoryCache;
+    use ps_html::server_context::ServerContext;
+    use ps_http::mock::MockUrlFetcher;
+    use std::sync::Arc;
+
+    let server = Rc::new(ServerContext::new_with_metadata(
+        Arc::new(MemoryCache::new()),
+        Arc::new(MemoryCache::new()),
+        Arc::new(MockUrlFetcher::new()),
+        1_700_000_000_000,
+    ));
+    let driver = Rc::new(ps_html::server_context::ResourceDriver::new(
+        server.clone(),
+        options,
+        "http://test.com/dns.html",
+    ));
+    (server, driver)
+}
+
+/// Computes the flush-early key the driver uses (mirrors the arm).
+fn flush_key(
+    driver: &Rc<ps_html::server_context::ResourceDriver>,
+    options: &RewriteOptions,
+    url: &str,
+) -> String {
+    let server = driver.server_context();
+    let options_hash = server.hasher().hash(options.signature().as_bytes());
+    let properties = driver.request_properties();
+    let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
+        properties.device_type(),
+    );
+    ps_html::flush_early::flush_early_key(url, &options_hash, suffix)
+}
+
+fn dns_options() -> Rc<RefCell<RewriteOptions>> {
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(Filter::InsertDnsPrefetch);
+    options
+}
+
+fn drive_dns_page(
+    options: &Rc<RefCell<RewriteOptions>>,
+    driver: Rc<ps_html::server_context::ResourceDriver>,
+    url: &str,
+) -> String {
+    let sink = SharedSink::default();
+    let mut rewrite = Driver::new(&options.borrow(), &ctx(), sink.clone(), Some(driver));
+    rewrite.start_parse(url.as_bytes(), false);
+    rewrite.write(b"<head><script></script></head><body><script src='http://a.com/1.js'/><script src='http://b.com/2.js'/><script src='http://c.com/3.js'/></body>");
+    rewrite.finish();
+    String::from_utf8(sink.bytes()).unwrap()
+}
+
+#[test]
+fn dns_prefetch_persists_across_drivers() {
+    // Independent drivers over one metadata cache, like production
+    // requests: the first two views store rotations, the third
+    // inserts from the stable stored list.
+    let options = dns_options();
+    let (server, _) = shared_server_fixture(options.clone());
+    let fresh_driver = || {
+        Rc::new(ps_html::server_context::ResourceDriver::new(
+            server.clone(),
+            options.clone(),
+            "http://test.com/dns.html",
+        ))
+    };
+    // Chrome UA on each driver (fresh instances strands none).
+    let first = fresh_driver();
+    first.set_user_agent(CHROME_UA);
+    assert!(!drive_dns_page(&options, first, "http://test.com/dns.html").contains("dns-prefetch"));
+    let second = fresh_driver();
+    second.set_user_agent(CHROME_UA);
+    assert!(!drive_dns_page(&options, second, "http://test.com/dns.html").contains("dns-prefetch"));
+    let third = fresh_driver();
+    third.set_user_agent(CHROME_UA);
+    let output = drive_dns_page(&options, third, "http://test.com/dns.html");
+    for domain in ["a.com", "b.com", "c.com"] {
+        assert!(
+            output.contains(&format!("<link rel=\"dns-prefetch\" href=\"//{domain}\">")),
+            "{output}"
+        );
+    }
+}
+
+#[test]
+fn dns_prefetch_state_is_page_isolated() {
+    let options = dns_options();
+    let (server, _) = shared_server_fixture(options.clone());
+    let fresh_driver = || {
+        let driver = Rc::new(ps_html::server_context::ResourceDriver::new(
+            server.clone(),
+            options.clone(),
+            "http://test.com/dns.html",
+        ));
+        driver.set_user_agent(CHROME_UA);
+        driver
+    };
+    // Warm one page through three views (insertion fires).
+    for _ in 0..3 {
+        drive_dns_page(&options, fresh_driver(), "http://test.com/dns.html");
+    }
+    // A different page starts cold: no leaked hints.
+    let output = drive_dns_page(&options, fresh_driver(), "http://test.com/other.html");
+    assert!(!output.contains("dns-prefetch"), "{output}");
+}
+
+#[test]
+fn dns_prefetch_corrupt_state_fails_safe() {
+    use ps_cache::cache::{KeyState, Lookup};
+
+    let options = dns_options();
+    let (server, _) = shared_server_fixture(options.clone());
+    let fresh_driver = || {
+        let driver = Rc::new(ps_html::server_context::ResourceDriver::new(
+            server.clone(),
+            options.clone(),
+            "http://test.com/dns.html",
+        ));
+        driver.set_user_agent(CHROME_UA);
+        driver
+    };
+    // Poison the real key, then behave like a first view.
+    let probe = fresh_driver();
+    let key = flush_key(&probe, &options.borrow(), "http://test.com/dns.html");
+    server.metadata_cache().put(&key, b"garbage-bytes");
+    let output = drive_dns_page(&options, fresh_driver(), "http://test.com/dns.html");
+    assert!(!output.contains("dns-prefetch"), "{output}");
+    // The rewrite heals the entry for the next view.
+    assert!(
+        matches!(
+            server.metadata_cache().get(&key),
+            Lookup { state: KeyState::Available, value: Some(_) }
+        ),
+        "entry rewritten"
+    );
+}
+
+#[test]
+fn dns_prefetch_disabled_writes_nothing() {
+    use ps_cache::cache::{KeyState, Lookup};
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    let (server, _) = shared_server_fixture(options.clone());
+    let driver = Rc::new(ps_html::server_context::ResourceDriver::new(
+        server.clone(),
+        options.clone(),
+        "http://test.com/dns.html",
+    ));
+    driver.set_user_agent(CHROME_UA);
+    let sink = SharedSink::default();
+    let mut rewrite = Driver::new(&options.borrow(), &ctx(), sink.clone(), Some(driver.clone()));
+    rewrite.start_parse(b"http://test.com/dns.html", false);
+    rewrite.write(b"<head></head><body><script src='http://a.com/1.js'/></body>");
+    rewrite.finish();
+    let key = flush_key(&driver, &options.borrow(), "http://test.com/dns.html");
+    assert!(
+        matches!(
+            server.metadata_cache().get(&key),
+            Lookup { state: KeyState::NotFound, .. }
+        ),
+        "no entry without the slot"
+    );
+}
+
+#[test]
+fn slow_fetch_falls_back_then_warms_html_rewrites() {
+    use ps_cache::cache::MemoryCache;
+    use ps_html::background::{BackgroundPool, PoolConfig};
+    use ps_http::mock::MockUrlFetcher;
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+
+    struct SlowFetcher {
+        delay: Duration,
+        inner: MockUrlFetcher,
+    }
+
+    impl ps_http::fetch::AsyncFetcher for SlowFetcher {
+        fn fetch(&self, url: &str, fetch: &mut dyn ps_http::fetch::AsyncFetch) {
+            std::thread::sleep(self.delay);
+            self.inner.fetch(url, fetch);
+        }
+    }
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options.borrow_mut().filters_mut().enable(Filter::InlineCss);
+    options
+        .borrow_mut()
+        .set_option("RewriteDeadlinePerFlushMs", "30", Scope::Server)
+        .unwrap();
+    let fetcher = Arc::new(SlowFetcher {
+        delay: Duration::from_millis(300),
+        inner: MockUrlFetcher::new(),
+    });
+    let mut headers = ps_http::response::ResponseHeaders::new(
+        ps_http::response::HttpOptions::default_for_tests(),
+    );
+    headers.set_first_line(1, 1, 200, "OK");
+    headers
+        .headers_mut()
+        .add(ps_http::names::header::CONTENT_TYPE, "text/css");
+    headers.set_date_and_caching(1_700_000_000_000, 300_000, "");
+    headers.compute_caching();
+    fetcher
+        .inner
+        .set_response("http://test.com/a.css", headers, b"div{display:block}");
+    let server = Rc::new(ps_html::server_context::ServerContext::new_with_metadata(
+        Arc::new(MemoryCache::new()),
+        Arc::new(MemoryCache::new()),
+        fetcher as Arc<dyn ps_http::fetch::AsyncFetcher>,
+        1_700_000_000_000,
+    ));
+    let pool = BackgroundPool::new(
+        PoolConfig {
+            threads: 2,
+            queue_bound: 16,
+        },
+        &server.statistics_shared(),
+    );
+    server.set_background_pool(Arc::clone(&pool));
+    let drive = |server: &Rc<ps_html::server_context::ServerContext>,
+                 options: &Rc<RefCell<RewriteOptions>>|
+     -> String {
+        let resource_driver = Rc::new(ps_html::server_context::ResourceDriver::new(
+            server.clone(),
+            options.clone(),
+            "http://test.com/page.html",
+        ));
+        let sink = SharedSink::default();
+        let mut driver = Driver::new(
+            &options.borrow(),
+            &ctx(),
+            sink.clone(),
+            Some(resource_driver),
+        );
+        driver.start_parse(b"http://test.com/page.html", false);
+        driver.write(
+            b"<head><link rel='stylesheet' href='http://test.com/a.css'></head><body></body>",
+        );
+        driver.finish();
+        String::from_utf8(sink.bytes()).unwrap()
+    };
+    // First request: bounded wait, original link kept.
+    let start = Instant::now();
+    let probe = |label: &str| {
+        for name in [
+            "background_jobs_completed",
+            "num_resource_fetch_successes",
+            "num_resource_fetch_failures",
+            "cache_hits",
+            "cache_misses",
+        ] {
+            eprintln!(
+                "{label} {name} = {}",
+                server
+                    .statistics()
+                    .get_variable(name)
+                    .map(|v| v.get())
+                    .unwrap_or(-1)
+            );
+        }
+    };
+    let first = drive(&server, &options);
+    probe("after-first");
+    assert!(
+        start.elapsed() < Duration::from_millis(250),
+        "first request must not block on the fetch"
+    );
+    assert!(first.contains("a.css"), "{first}");
+    assert!(!first.contains("<style>"), "{first}");
+    // Background completion warms everything; the next request inlines.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let completed = server
+            .statistics()
+            .get_variable("background_jobs_completed")
+            .unwrap()
+            .get();
+        if completed >= 1 {
+            break;
+        }
+        assert!(Instant::now() < deadline, "background fetch never ran");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let second = drive(&server, &options);
+    probe("after-second");
+    assert!(
+        second.contains("<style>div{display:block}</style>"),
+        "{second}"
+    );
+    pool.shutdown();
+}
+
 #[test]
 fn domain_rewrite_runs_through_driver() {
     use ps_html::filters::domain_rewrite::DOMAIN_REWRITES;
@@ -834,4 +1139,51 @@ fn domain_rewrite_runs_through_driver() {
     let output = String::from_utf8_lossy(&sink.bytes()).into_owned();
     assert!(output.contains("http://to.com/a.png"), "{output}");
     assert_eq!(stat(&resource_driver, DOMAIN_REWRITES), 1);
+}
+
+#[test]
+fn sync_css_inline_baseline_inlines_first_request() {
+    use ps_cache::cache::MemoryCache;
+    use ps_http::mock::MockUrlFetcher;
+    use std::sync::Arc;
+
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options.borrow_mut().filters_mut().enable(Filter::InlineCss);
+    let fetcher = Arc::new(MockUrlFetcher::new());
+    let mut headers = ps_http::response::ResponseHeaders::new(
+        ps_http::response::HttpOptions::default_for_tests(),
+    );
+    headers.set_first_line(1, 1, 200, "OK");
+    headers
+        .headers_mut()
+        .add(ps_http::names::header::CONTENT_TYPE, "text/css");
+    headers.set_date_and_caching(1_700_000_000_000, 300_000, "");
+    headers.compute_caching();
+    fetcher.set_response("http://test.com/a.css", headers, b"div{display:block}");
+    let server = Rc::new(ps_html::server_context::ServerContext::new_with_metadata(
+        Arc::new(MemoryCache::new()),
+        Arc::new(MemoryCache::new()),
+        fetcher as Arc<dyn ps_http::fetch::AsyncFetcher>,
+        1_700_000_000_000,
+    ));
+    let resource_driver = Rc::new(ps_html::server_context::ResourceDriver::new(
+        server,
+        options.clone(),
+        "http://test.com/page.html",
+    ));
+    let sink = SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ctx(),
+        sink.clone(),
+        Some(resource_driver),
+    );
+    driver.start_parse(b"http://test.com/page.html", false);
+    driver.write(b"<head><link rel='stylesheet' href='http://test.com/a.css'></head><body></body>");
+    driver.finish();
+    let output = String::from_utf8(sink.bytes()).unwrap();
+    assert!(
+        output.contains("<style>div{display:block}</style>"),
+        "sync baseline must inline: {output}"
+    );
 }

@@ -31,7 +31,7 @@ const START_MS: i64 = 1_700_000_000_000;
 struct Fixture {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     http_backend: Arc<MemoryCache>,
     metadata_backend: Arc<MemoryCache>,
     shards: RefCell<Vec<(String, String)>>,
@@ -41,14 +41,14 @@ impl Fixture {
     fn new() -> Self {
         let http_backend = Arc::new(MemoryCache::new());
         let metadata_backend = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let mut server = ServerContext::new_with_metadata(
             http_backend.clone(),
             metadata_backend.clone(),
             fetcher.clone(),
             START_MS,
         );
-        server.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+        server.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         Fixture {
             server: Rc::new(server),
             options: Rc::new(RefCell::new(RewriteOptions::new())),

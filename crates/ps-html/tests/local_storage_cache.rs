@@ -59,7 +59,7 @@ const HASH_150X150: &str = "jSr1gEyima";
 struct Fixture {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     request_headers: RefCell<RequestHeaders>,
 }
 
@@ -67,7 +67,7 @@ impl Fixture {
     fn build(mock_hasher: bool) -> Self {
         let http_backend = Arc::new(MemoryCache::new());
         let metadata_backend = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let mut server = ServerContext::new_with_metadata(
             http_backend,
             metadata_backend,
@@ -75,7 +75,7 @@ impl Fixture {
             START_MS,
         );
         if mock_hasher {
-            server.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+            server.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         }
         let options = Rc::new(RefCell::new(RewriteOptions::new()));
         options.borrow_mut().enable_filter(Filter::InlineCss);

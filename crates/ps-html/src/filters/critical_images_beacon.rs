@@ -324,7 +324,7 @@ mod tests {
         let server = Rc::new(ServerContext::new_with_metadata(
             http,
             metadata,
-            Rc::new(MockUrlFetcher::new()),
+            Arc::new(MockUrlFetcher::new()),
             1_700_000_000_000,
         ));
         let options = Rc::new(RefCell::new(ps_config::options::RewriteOptions::new()));

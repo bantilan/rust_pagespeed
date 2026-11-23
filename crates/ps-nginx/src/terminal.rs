@@ -570,7 +570,7 @@ mod tests {
             metadata,
             Arc::new(ps_stats::core::Statistics::new()),
             0,
-            std::rc::Rc::new(crate::rewrite::UnavailableFetcher),
+            std::sync::Arc::new(crate::rewrite::UnavailableFetcher),
         );
         let options = ps_config::options::RewriteOptions::new();
         let request_headers = ps_http::request::RequestHeaders::new();

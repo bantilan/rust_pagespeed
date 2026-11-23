@@ -81,7 +81,7 @@ impl Fixture {
         let server = ServerContext::new_with_metadata(
             backend,
             metadata,
-            Rc::new(UaSensitiveFetcher { base: mock.clone() }) as Rc<dyn AsyncFetcher>,
+            Arc::new(UaSensitiveFetcher { base: mock.clone() }) as Arc<dyn AsyncFetcher>,
             START_MS,
         );
         let options = Rc::new(RefCell::new(RewriteOptions::new()));

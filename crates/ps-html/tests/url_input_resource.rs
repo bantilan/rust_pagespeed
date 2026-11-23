@@ -32,14 +32,14 @@ const START_MS: i64 = 1_700_000_000_000;
 
 struct Fixture {
     server: Rc<ServerContext>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     options: Rc<RefCell<RewriteOptions>>,
 }
 
 impl Fixture {
     fn new() -> Self {
         let backend: Arc<dyn ps_cache::cache::Cache> = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let server = Rc::new(ServerContext::new(backend, fetcher.clone(), START_MS));
         let options = Rc::new(RefCell::new(RewriteOptions::new()));
         Fixture {

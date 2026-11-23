@@ -155,6 +155,12 @@ pub fn init_stats(statistics: &Statistics) {
     statistics.add_variable("num_proactively_freshen_user_facing_request"); // kProactivelyFreshenUserFacingRequest
     statistics.add_variable("num_resource_fetch_failures"); // kNumResourceFetchFailures
     statistics.add_variable("num_resource_fetch_successes"); // kNumResourceFetchSuccesses
+    statistics.add_variable("background_jobs_submitted");
+    statistics.add_variable("background_jobs_completed");
+    statistics.add_variable("background_jobs_dedup_hits");
+    statistics.add_variable("background_jobs_timeouts");
+    statistics.add_variable("background_jobs_queue_full");
+    statistics.add_variable("background_jobs_shutdown");
     statistics.add_variable("num_rewrites_abandoned_for_lock_contention"); // kNumRewritesAbandonedForLockContention
     statistics.add_timed_variable("num_rewrites_executed", "Statistics"); // kRewritesExecuted
     statistics.add_timed_variable("queued-fetch-count", "Statistics"); // kQueuedFetchCount
@@ -211,6 +217,12 @@ mod tests {
             "css_filter_blocks_rewritten",
             "cache_hits",
             "rewrite_cached_output_hits",
+            "background_jobs_submitted",
+            "background_jobs_completed",
+            "background_jobs_dedup_hits",
+            "background_jobs_timeouts",
+            "background_jobs_queue_full",
+            "background_jobs_shutdown",
         ] {
             assert!(
                 statistics.get_variable(name).is_some(),

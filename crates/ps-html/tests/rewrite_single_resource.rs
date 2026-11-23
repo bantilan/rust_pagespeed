@@ -212,16 +212,16 @@ struct Fixture {
     options: Rc<RefCell<RewriteOptions>>,
     rewrites: Rc<RefCell<u32>>,
     custom_encoder: bool,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
 }
 
 impl Fixture {
     fn new(custom_encoder: bool) -> Self {
         let backend: Arc<dyn ps_cache::cache::Cache> = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let mut server = ServerContext::new(backend.clone(), fetcher.clone(), START_MS);
         // C++ tests hash through a constant `MockHasher` ("0").
-        server.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+        server.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         let server = Rc::new(server);
         let options = Rc::new(RefCell::new(RewriteOptions::new()));
         Fixture {
@@ -233,7 +233,7 @@ impl Fixture {
         }
     }
 
-    fn fetcher(&self) -> Rc<MockUrlFetcher> {
+    fn fetcher(&self) -> Arc<MockUrlFetcher> {
         self.fetcher.clone()
     }
 

@@ -12,6 +12,7 @@ mod harness;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use harness::SharedSink;
 use ps_config::options::RewriteOptions;
@@ -36,7 +37,7 @@ const INPUT: &str = "<link href=\"v1\" src=\"v2\"/><link href=\"v3\" src=\"v4\"/
 fn test_driver() -> Rc<ResourceDriver> {
     let backend: std::sync::Arc<dyn ps_cache::cache::Cache> =
         std::sync::Arc::new(ps_cache::cache::MemoryCache::new());
-    let fetcher = Rc::new(ps_http::mock::MockUrlFetcher::new());
+    let fetcher = Arc::new(ps_http::mock::MockUrlFetcher::new());
     let server = Rc::new(ServerContext::new(backend, fetcher, 1_700_000_000_000));
     let options = Rc::new(RefCell::new(RewriteOptions::new()));
     Rc::new(ResourceDriver::new(server, options, DOC_URL))

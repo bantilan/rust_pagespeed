@@ -50,7 +50,7 @@ enum Chain {
 struct Fixture {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     finder: Rc<FakeCriticalSelectorFinder>,
     user_agent: RefCell<String>,
     xhtml: Cell<bool>,
@@ -60,14 +60,14 @@ impl Fixture {
     fn new() -> Self {
         let http_backend = Arc::new(MemoryCache::new());
         let metadata_backend = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let mut server = ServerContext::new_with_metadata(
             http_backend,
             metadata_backend,
             fetcher.clone(),
             START_MS,
         );
-        server.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+        server.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         let server = Rc::new(server);
         let finder = Rc::new(FakeCriticalSelectorFinder::with_selectors(&["div", "*"]));
         server.set_critical_selector_finder(finder.clone());

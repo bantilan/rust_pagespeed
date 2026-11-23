@@ -17,7 +17,6 @@ use crate::value::HttpValue;
 use ps_cache::cache::{Cache, KeyState, Lookup};
 use ps_cache::hash::{Hasher, Md5Hasher};
 use ps_cache::ttl::{FailurePolicy, FetchStatus};
-use std::rc::Rc;
 use std::sync::Arc;
 
 /// ETag prefix for cache-generated tags (`kEtagPrefix`).
@@ -80,7 +79,7 @@ pub struct HttpCacheStats {
 /// HTTP cache (`HTTPCache`).
 pub struct HttpCache {
     backend: Arc<dyn Cache>,
-    hasher: Rc<dyn Hasher>,
+    hasher: Arc<dyn Hasher>,
     stats: std::sync::Mutex<HttpCacheStats>,
     version_prefix: String,
     force_caching: bool,
@@ -108,7 +107,7 @@ impl HttpCache {
     pub fn new(backend: Arc<dyn Cache>) -> HttpCache {
         HttpCache {
             backend,
-            hasher: Rc::new(Md5Hasher::new()),
+            hasher: Arc::new(Md5Hasher::new()),
             stats: std::sync::Mutex::new(HttpCacheStats::default()),
             version_prefix: ps_cache::keys::http_version_prefix(),
             force_caching: false,
@@ -122,7 +121,7 @@ impl HttpCache {
     }
 
     /// Swaps the content hasher (`set_hasher`).
-    pub fn set_hasher(&mut self, hasher: Rc<dyn Hasher>) {
+    pub fn set_hasher(&mut self, hasher: Arc<dyn Hasher>) {
         self.hasher = hasher;
     }
 

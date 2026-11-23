@@ -13,6 +13,7 @@
 
 pub mod ads_attribute;
 pub mod ads_util;
+pub mod background;
 pub mod base_tracker;
 pub mod cacheable_resource;
 pub mod chain;

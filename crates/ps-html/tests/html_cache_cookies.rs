@@ -34,7 +34,7 @@ impl CookiesHarness {
         let server = Rc::new(ServerContext::new_with_metadata(
             http,
             metadata,
-            Rc::new(MockUrlFetcher::new()),
+            Arc::new(MockUrlFetcher::new()),
             START_MS,
         ));
         let options = Rc::new(RefCell::new(RewriteOptions::new()));

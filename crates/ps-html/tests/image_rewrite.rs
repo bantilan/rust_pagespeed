@@ -56,7 +56,7 @@ fn read_image(name: &str) -> Vec<u8> {
 struct Fixture {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     http_backend: Arc<MemoryCache>,
     metadata_backend: Arc<MemoryCache>,
     user_agent: RefCell<String>,
@@ -65,14 +65,14 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
-        Self::with_hasher(Rc::new(ps_cache::hash::MockHasher::new()))
+        Self::with_hasher(Arc::new(ps_cache::hash::MockHasher::new()))
     }
 
     /// Builds the fixture around an explicit hasher (`UseMd5Hasher`).
-    fn with_hasher(hasher: Rc<dyn ps_cache::hash::Hasher>) -> Self {
+    fn with_hasher(hasher: Arc<dyn ps_cache::hash::Hasher>) -> Self {
         let http_backend = Arc::new(MemoryCache::new());
         let metadata_backend = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let mut server = ServerContext::new_with_metadata(
             http_backend.clone(),
             metadata_backend.clone(),
@@ -4769,7 +4769,7 @@ fn serve_webp_from_cold_cache() {
 
     // First rewrite an HTML file with an image for a webp-compatible browser,
     // and collect the image URL.
-    let fixture = Fixture::with_hasher(Rc::new(ps_cache::hash::Md5Hasher::new()));
+    let fixture = Fixture::with_hasher(Arc::new(ps_cache::hash::Md5Hasher::new()));
     fixture.add_recompress_image_filters();
     fixture
         .options

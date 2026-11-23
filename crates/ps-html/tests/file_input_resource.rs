@@ -44,7 +44,7 @@ fn mapped_driver(dir: &std::path::Path) -> Rc<ResourceDriver> {
     let server = Rc::new(ServerContext::new_with_metadata(
         http,
         metadata,
-        Rc::new(MockUrlFetcher::new()),
+        Arc::new(MockUrlFetcher::new()),
         START_MS,
     ));
     let options = Rc::new(RefCell::new(RewriteOptions::new()));
@@ -130,7 +130,7 @@ fn rules_and_regexps_apply() {
     let server = Rc::new(ServerContext::new_with_metadata(
         http,
         metadata,
-        Rc::new(MockUrlFetcher::new()),
+        Arc::new(MockUrlFetcher::new()),
         START_MS,
     ));
     let options = Rc::new(RefCell::new(RewriteOptions::new()));
@@ -228,7 +228,7 @@ fn regexp_mappings_map() {
     let server = Rc::new(ServerContext::new_with_metadata(
         http,
         metadata,
-        Rc::new(MockUrlFetcher::new()),
+        Arc::new(MockUrlFetcher::new()),
         START_MS,
     ));
     let options = Rc::new(RefCell::new(RewriteOptions::new()));

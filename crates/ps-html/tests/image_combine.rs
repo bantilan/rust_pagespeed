@@ -32,7 +32,7 @@ const CHEF_GIF: &str = "IronChef2.gif";
 struct Fixture {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
-    fetcher: Rc<MockUrlFetcher>,
+    fetcher: Arc<MockUrlFetcher>,
     user_agent: RefCell<String>,
     request_headers: RefCell<RequestHeaders>,
 }
@@ -41,14 +41,14 @@ impl Fixture {
     fn new() -> Self {
         let http_backend = Arc::new(MemoryCache::new());
         let metadata_backend = Arc::new(MemoryCache::new());
-        let fetcher = Rc::new(MockUrlFetcher::new());
+        let fetcher = Arc::new(MockUrlFetcher::new());
         let mut server = ServerContext::new_with_metadata(
             http_backend,
             metadata_backend,
             fetcher.clone(),
             START_MS,
         );
-        server.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+        server.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         let options = Rc::new(RefCell::new(RewriteOptions::new()));
         // We setup the options before filters so the CSS filter is
         // created aware of these.
@@ -185,7 +185,7 @@ impl Fixture {
             self.fetcher.clone(),
             START_MS,
         );
-        fresh.set_hasher(Rc::new(ps_cache::hash::MockHasher::new()));
+        fresh.set_hasher(Arc::new(ps_cache::hash::MockHasher::new()));
         let server = Rc::new(fresh);
         let options = Rc::new(RefCell::new(self.options.borrow().clone()));
         let driver = Rc::new(ResourceDriver::new(server, options, url));
