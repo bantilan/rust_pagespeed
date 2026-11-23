@@ -162,6 +162,9 @@ pub struct HtmlRewriteShared {
     pub statistics: Arc<Statistics>,
     /// Naming hasher.
     pub hasher: Arc<dyn Hasher>,
+    /// Message sink for completion records (`None` keeps the
+    /// request-thread-only reporting).
+    pub message_sink: Option<Arc<dyn super::server_context::MessageSink>>,
 }
 
 /// Scheduling verdict for the HTML-thread caller.
@@ -205,6 +208,7 @@ pub fn snapshot_shared(driver: &ResourceDriver) -> HtmlRewriteShared {
         fetcher: server.fetcher().clone(),
         statistics: server.statistics_shared(),
         hasher: server.hasher().clone(),
+        message_sink: server.message_sink(),
     }
 }
 
@@ -290,6 +294,7 @@ fn run_rewrite_job(snapshot: HtmlRewriteSnapshot, shared: HtmlRewriteShared) -> 
         fetcher,
         statistics,
         hasher,
+        message_sink,
     } = shared;
     let server = Rc::new(ServerContext::new_shared(
         http_cache,
@@ -326,6 +331,17 @@ fn run_rewrite_job(snapshot: HtmlRewriteSnapshot, shared: HtmlRewriteShared) -> 
     let wrote = run_behavior_rewrite(&driver, snapshot.behavior, input, &snapshot.partition_key);
     if wrote {
         statistics.add_variable(HTML_ASYNC_COMPLETED).add(1);
+    }
+    // Report worker-side image records (request-thread drivers
+    // drain their own; without this the admin images page misses
+    // every background optimization).
+    if let Some(sink) = message_sink.as_ref() {
+        for record in driver.take_image_records() {
+            sink.message(
+                ps_config::message_handler::MessageLevel::Info,
+                record.message_line(),
+            );
+        }
     }
     wrote
 }
@@ -514,6 +530,8 @@ mod tests {
         (server, Rc::new(RefCell::new(options)))
     }
 
+    const START_MS_FOR_SINK_TEST: i64 = 1_700_000_000_000;
+
     fn drive_html(
         server: &Rc<ServerContext>,
         options: &Rc<RefCell<RewriteOptions>>,
@@ -633,6 +651,100 @@ mod tests {
         assert!(second.contains("display"), "inlined bytes render: {second}");
         assert_eq!(detached, 0);
         pool.shutdown();
+    }
+
+    #[test]
+    fn worker_image_rewrite_reports_record_to_sink() {
+        use ps_config::filter::Filter;
+        use std::sync::Mutex;
+
+        /// Collecting test sink.
+        #[derive(Debug, Default)]
+        struct CollectingSink {
+            lines: Mutex<Vec<String>>,
+        }
+
+        impl super::super::server_context::MessageSink for CollectingSink {
+            fn message(
+                &self,
+                _level: ps_config::message_handler::MessageLevel,
+                text: String,
+            ) {
+                self.lines.lock().unwrap().push(text);
+            }
+        }
+
+        // Worker-side eager image optimization (the CSS/fetch shape)
+        // must report its admin row through the installed sink;
+        // request-thread drivers drain their own, so without this
+        // every background optimization would vanish from the admin
+        // images page.
+        let image_url = "http://test.com/Puzzle.jpg";
+        let fetcher = MockUrlFetcher::new();
+        let server_probe = Rc::new(ServerContext::new_with_metadata(
+            Arc::new(MemoryCache::new()),
+            Arc::new(MemoryCache::new()),
+            Arc::new(MockUrlFetcher::new()),
+            START_MS_FOR_SINK_TEST,
+        ));
+        let mut headers = ResponseHeaders::new(HttpOptions::default_for_tests());
+        server_probe.set_default_long_cache_headers(
+            ps_http::content_type::mime_to_content_type("image/jpeg"),
+            "",
+            "",
+            &mut headers,
+        );
+        let image_bytes = include_bytes!("../tests/data/Puzzle.jpg");
+        fetcher.set_response(image_url, headers, image_bytes);
+        let server = Rc::new(ServerContext::new_with_metadata(
+            Arc::new(MemoryCache::new()),
+            Arc::new(MemoryCache::new()),
+            Arc::new(fetcher),
+            START_MS_FOR_SINK_TEST,
+        ));
+        let sink = Arc::new(CollectingSink::default());
+        server.set_message_sink(sink.clone());
+        let mut options = RewriteOptions::new();
+        options.soft_enable_filter_for_testing(Filter::RecompressJpeg);
+        options.soft_enable_filter_for_testing(Filter::RecompressPng);
+        options.soft_enable_filter_for_testing(Filter::ConvertJpegToWebp);
+        let options = Rc::new(RefCell::new(options));
+        let driver = Rc::new(ResourceDriver::new(
+            server.clone(),
+            options.clone(),
+            "http://test.com/page.html",
+        ));
+        let shared = snapshot_shared(&driver);
+        assert!(shared.message_sink.is_some());
+        let snapshot = HtmlRewriteSnapshot {
+            behavior: BackgroundBehavior::Image {
+                resource_context: ImageResourceContext::default(),
+                place: super::super::filters::image_rewrite::RewritePlace::Fetch,
+                image_index: 0,
+                in_noscript_element: false,
+                css_image_inline_max_bytes: 0,
+                is_resized_using_rendered_dimensions: false,
+                base_url: "http://test.com/page.html".to_string(),
+            },
+            input_url: image_url.to_string(),
+            input_authorized: true,
+            partition_key: "test-sink-partition".to_string(),
+            base_url: "http://test.com/page.html".to_string(),
+            options: options.borrow().clone(),
+            user_agent: String::new(),
+            response_charset: None,
+            now_ms: START_MS_FOR_SINK_TEST,
+        };
+        assert!(run_rewrite_job(snapshot, shared));
+        let lines = sink.lines.lock().unwrap();
+        assert_eq!(1, lines.len(), "{lines:?}");
+        assert!(lines[0].starts_with("PS_IMAGE_DETAIL\t"), "{}", lines[0]);
+        assert!(lines[0].contains("Puzzle.jpg"), "{}", lines[0]);
+        // The partition landed in the shared metadata cache too.
+        assert_eq!(
+            server.metadata_cache().get("test-sink-partition").state,
+            ps_cache::cache::KeyState::Available
+        );
     }
 
     #[test]

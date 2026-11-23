@@ -171,6 +171,35 @@ impl Default for NgxMessageHandler {
     }
 }
 
+/// Buffer-only message sink for pool workers
+/// (`ps_html::MessageSink`): background completions report here so
+/// the admin pages see fire-and-forget optimizations. Deliberately
+/// skips the error log (a raw `ngx_log_t` must never be touched
+/// from pool threads, whose lifetime the log does not bound).
+#[derive(Debug, Clone)]
+pub struct BufferMessageSink {
+    buffer: std::sync::Arc<std::sync::Mutex<ps_admin::log_buffer::LogBuffer>>,
+}
+
+impl BufferMessageSink {
+    /// Wraps the shared message buffer.
+    #[must_use]
+    pub fn new(
+        buffer: std::sync::Arc<std::sync::Mutex<ps_admin::log_buffer::LogBuffer>>,
+    ) -> Self {
+        BufferMessageSink { buffer }
+    }
+}
+
+impl ps_html::server_context::MessageSink for BufferMessageSink {
+    fn message(&self, level: MessageLevel, text: String) {
+        self.buffer
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .message(level, format_message(&text));
+    }
+}
+
 impl ps_config::message_handler::MessageHandler for &NgxMessageHandler {
     /// Forwards through a shared borrow (the inherent emit is
     /// `&self` already): lets request paths pass the server
@@ -296,6 +325,18 @@ mod tests {
     fn handler_defaults_to_null_log() {
         let handler = NgxMessageHandler::new();
         assert!(handler.log().is_null());
+    }
+
+    #[test]
+    fn buffer_sink_reports_without_log() {
+        use ps_html::server_context::MessageSink;
+        let buffer = std::sync::Arc::new(std::sync::Mutex::new(
+            ps_admin::log_buffer::LogBuffer::new(1 << 20),
+        ));
+        let sink = BufferMessageSink::new(std::sync::Arc::clone(&buffer));
+        sink.message(MessageLevel::Info, "PS_IMAGE_DETAIL\t1".to_string());
+        let dump = buffer.lock().unwrap().dump();
+        assert!(dump.contains("PS_IMAGE_DETAIL\t1"), "{dump}");
     }
 
     #[test]

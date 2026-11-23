@@ -1293,9 +1293,16 @@ unsafe fn child_init_servers(cycle: *mut ngx_cycle_t, main: &mut MainConf) {
                     ));
                     // Background fetch execution shares the worker
                     // pool (first server spawns it; idempotent after).
+                    // Workers also report completion records to the
+                    // shared message buffer (admin images page).
                     if let Some(html) = context.html_context.as_ref() {
                         let pool = main.driver_factory.ensure_background_pool();
                         html.set_background_pool(pool);
+                        html.set_message_sink(std::sync::Arc::new(
+                            crate::message::BufferMessageSink::new(std::sync::Arc::clone(
+                                &main.driver_factory.message_buffer,
+                            )),
+                        ));
                     }
                     context.http_cache = Some(assembled.http_cache);
                     context.metadata_cache = Some(assembled.metadata_cache);

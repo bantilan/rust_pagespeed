@@ -192,6 +192,16 @@ impl Default for SimpleRandom {
     }
 }
 
+/// Message sink for background completions (`MessageHandler`
+/// shape without the nginx log): pool workers report image
+/// rewrite records here so the admin images page sees
+/// fire-and-forget optimizations, not just request-thread ones.
+/// Implemented by the server layer over its message buffer.
+pub trait MessageSink: Send + Sync + std::fmt::Debug {
+    /// Buffers one message line.
+    fn message(&self, level: ps_config::message_handler::MessageLevel, text: String);
+}
+
 /// Shared rewrite host (`ServerContext`).
 pub struct ServerContext {
     http_cache: Arc<HttpCache>,
@@ -208,6 +218,7 @@ pub struct ServerContext {
     critical_selector_finder:
         RefCell<Option<Rc<dyn super::critical_selector_finder::CriticalSelectorFinder>>>,
     background_pool: std::sync::OnceLock<Arc<super::background::BackgroundPool>>,
+    message_sink: std::sync::OnceLock<Arc<dyn MessageSink>>,
 }
 
 impl ServerContext {
@@ -258,6 +269,7 @@ impl ServerContext {
             ],
             critical_selector_finder: RefCell::new(None),
             background_pool: std::sync::OnceLock::new(),
+            message_sink: std::sync::OnceLock::new(),
         }
     }
 
@@ -295,6 +307,7 @@ impl ServerContext {
             ],
             critical_selector_finder: RefCell::new(None),
             background_pool: std::sync::OnceLock::new(),
+            message_sink: std::sync::OnceLock::new(),
         }
     }
 
@@ -330,6 +343,17 @@ impl ServerContext {
     #[must_use]
     pub fn background_pool(&self) -> Option<Arc<super::background::BackgroundPool>> {
         self.background_pool.get().cloned()
+    }
+
+    /// Installs the background message sink (server-owned, once).
+    pub fn set_message_sink(&self, sink: Arc<dyn MessageSink>) {
+        let _ = self.message_sink.set(sink);
+    }
+
+    /// Borrows the background message sink, if installed.
+    #[must_use]
+    pub fn message_sink(&self) -> Option<Arc<dyn MessageSink>> {
+        self.message_sink.get().cloned()
     }
 
     /// Borrows the UA normalizers (`user_agent_normalizers`).
