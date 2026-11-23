@@ -24,6 +24,17 @@ pub struct Driver {
     plan: ChainPlan,
     skipped: Vec<(Phase, ChainFilter)>,
     amp_verdict: Rc<RefCell<Option<bool>>>,
+    flush_early_info: Rc<RefCell<crate::flush_early::FlushEarlyInfo>>,
+    flush_early_persist: Option<FlushEarlyPersist>,
+    flush_early_key: Option<String>,
+}
+
+/// Metadata-cache persistence for flush-early page state (the
+/// port's DOM-cohort round trip): identity inputs plus backend.
+struct FlushEarlyPersist {
+    metadata: std::sync::Arc<dyn ps_cache::cache::Cache>,
+    options_hash: String,
+    device_suffix: String,
 }
 
 impl Driver {
@@ -48,6 +59,27 @@ impl Driver {
         let flush_early_info = Rc::new(RefCell::new(
             crate::flush_early::FlushEarlyInfo::default(),
         ));
+        // Cross-request persistence, like C++ `write_property_cache_dom_cohort`
+        // (set by the DNS filter): without the slot or a driver there
+        // is nothing to persist.
+        let wants_persist = plan.pre.contains(&ChainFilter::InsertDnsPrefetch)
+            || plan.post.contains(&ChainFilter::InsertDnsPrefetch);
+        let flush_early_persist = match (&resource_driver, wants_persist) {
+            (Some(driver), true) => {
+                let server = driver.server_context();
+                let properties = driver.request_properties();
+                Some(FlushEarlyPersist {
+                    metadata: server.metadata_cache().clone(),
+                    options_hash: server.hasher().hash(options.signature().as_bytes()),
+                    device_suffix:
+                        ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
+                            properties.device_type(),
+                        )
+                        .to_string(),
+                })
+            }
+            _ => None,
+        };
         for slot in &plan.listeners {
             match slot {
                 ChainFilter::AmpDocument => {
@@ -344,6 +376,9 @@ impl Driver {
             plan,
             skipped,
             amp_verdict,
+            flush_early_info,
+            flush_early_persist,
+            flush_early_key: None,
         }
     }
 
@@ -400,6 +435,26 @@ impl Driver {
     /// Starts a document (see [`Parser::start_parse`]).
     pub fn start_parse(&mut self, url: &[u8], content_is_xml_like: bool) {
         self.parser.start_parse(url, content_is_xml_like);
+        // Prime flush-early state from the previous rewrite of this
+        // page variant (C++ `flush_early_info()` lazy decode): misses
+        // and corrupt entries behave like a first view.
+        if let Some(persist) = &self.flush_early_persist {
+            let key = crate::flush_early::flush_early_key(
+                &String::from_utf8_lossy(url),
+                &persist.options_hash,
+                &persist.device_suffix,
+            );
+            if let ps_cache::cache::Lookup {
+                state: ps_cache::cache::KeyState::Available,
+                value: Some(blob),
+            } = persist.metadata.get(&key)
+            {
+                if let Some(info) = crate::flush_early::decode_flush_early(&blob) {
+                    *self.flush_early_info.borrow_mut() = info;
+                }
+            }
+            self.flush_early_key = Some(key);
+        }
     }
 
     /// AMP verdict once decided (`is_amp_document`; `None` undecided).
@@ -425,6 +480,12 @@ impl Driver {
     /// Ends input (see [`Parser::finish`]).
     pub fn finish(&mut self) {
         self.parser.finish();
+        // Persist rotated flush-early state for the next rewrite of
+        // this page variant (C++ `WriteDomCohortIntoPropertyCache`).
+        if let (Some(persist), Some(key)) = (&self.flush_early_persist, &self.flush_early_key) {
+            let bytes = crate::flush_early::encode_flush_early(&self.flush_early_info.borrow());
+            persist.metadata.put(key, &bytes);
+        }
     }
 
     /// Whether the size cap tripped (see [`Parser::size_limit_exceeded`]).
