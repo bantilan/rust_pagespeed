@@ -14,6 +14,13 @@
 //! image spent the single-preload budget: a head-level
 //! `as=image` hint with high fetch priority, format-checked
 //! against the request (learned bytes are format-specific).
+//!
+//! Confident website logos ([`super::logo_detection`]) sit out
+//! automatic prioritization: no hero slot, no preload, no
+//! `fetchpriority`, and no lazy hint — unless learned evidence
+//! proves the logo is the LCP element, which still wins.
+//! Detection is always on; it needs no configuration.
+//! Author-defined priorities are never modified on skipped logos.
 #![forbid(unsafe_code)]
 
 use crate::beacon_finder::{self, Availability, BeaconEvidence, BeaconFinder};
@@ -472,6 +479,17 @@ impl HtmlFilter for PrioritizeLcpImagesFilter {
         let Some((src, absolute_url)) = self.eligible_image(dom, id) else {
             return;
         };
+        // Confident website logos skip automatic prioritization (no
+        // hero slot, no preload, no fetchpriority, no lazy hint):
+        // they are small above-the-fold identity marks, never the
+        // content image LCP should chase. Skipped logos also leave
+        // `saw_eligible_image` clear so a later real image can still
+        // be the heuristic hero. Learned evidence below still wins:
+        // a logo that measurements prove is the LCP element keeps
+        // its prioritization, and author attributes are never
+        // touched either way.
+        let is_confident_logo =
+            super::logo_detection::detect_logo(dom, id, &src).is_logo;
         // Prefer accepted LCP evidence over document position.
         let evidence = self.evidence();
         let evidence_available = self.evidence_available(&evidence);
@@ -505,6 +523,11 @@ impl HtmlFilter for PrioritizeLcpImagesFilter {
             }
             // Learned-critical images past the hero slot are left
             // alone, never lazy.
+        } else if is_confident_logo {
+            // Ordinary logo, no measurements behind it: leave the
+            // element byte-identical (author priorities preserved)
+            // without consuming the hero candidacy.
+            return;
         } else if !self.saw_eligible_image && !evidence_available {
             // No evidence at all: the first eligible image is the
             // heuristic hero.

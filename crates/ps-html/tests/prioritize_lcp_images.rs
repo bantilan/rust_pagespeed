@@ -283,3 +283,167 @@ fn background_lcp_author_preload_wins() {
     // The author's hint stands; no duplicate is inserted.
     assert_eq!(1, count(&out, b"rel=\"preload\""));
 }
+
+#[test]
+fn wordpress_custom_logo_skipped_hero_passes_to_content() {
+    // Classic WP markup: cropped filename carries no "logo" word, so
+    // class + branding-ancestor + home-link signals must carry it.
+    let harness = Harness::new();
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><header><div class=\"site-branding\"><a class=\"custom-logo-link\" rel=\"home\" href=\"/\"><img class=\"custom-logo\" src=\"cropped-x-270x270.png\" width=\"270\" height=\"70\" alt=\"Acme Corp\"></a></div></header><main><img src=\"content.png\"></main></body></html>",
+    );
+    // The content image (not the first-element logo) is the hero.
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"content.png\"") >= 1);
+    assert_eq!(0, count(&out, b"href=\"cropped-x-270x270.png\""));
+    assert_eq!(2, count(&out, b"fetchpriority=\"high\""));
+    // The skipped logo is left alone: no lazy hint either.
+    assert_eq!(0, count(&out, b"loading=\"lazy\""));
+}
+
+#[test]
+fn wordpress_block_logo_skipped() {
+    let harness = Harness::new();
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><header><figure class=\"wp-block-site-logo\"><a href=\"/\"><img src=\"logo-300x100.png\"></a></figure></header><main><img src=\"content.png\"></main></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"content.png\"") >= 1);
+    assert_eq!(0, count(&out, b"loading=\"lazy\""));
+}
+
+#[test]
+fn custom_header_svg_logo_skipped() {
+    let harness = Harness::new();
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><header><nav><img id=\"site-logo\" src=\"/assets/logo.svg\" alt=\"Acme logo\"></nav></header><main><img src=\"content.png\"></main></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"content.png\"") >= 1);
+    assert_eq!(0, count(&out, b"loading=\"lazy\""));
+}
+
+#[test]
+fn logo_inside_picture_skipped() {
+    let harness = Harness::new();
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><header><picture><source srcset=\"logo.webp\" type=\"image/webp\"><img src=\"logo.png\" class=\"logo\"></picture></header><main><img src=\"content.png\"></main></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"content.png\"") >= 1);
+    assert_eq!(0, count(&out, b"loading=\"lazy\""));
+}
+
+#[test]
+fn schema_org_itemprop_logo_skipped() {
+    let harness = Harness::new();
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><div itemscope itemtype=\"https://schema.org/Organization\"><img itemprop=\"logo\" src=\"mark.png\"></div><main><img src=\"content.png\"></main></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"content.png\"") >= 1);
+    assert_eq!(0, count(&out, b"loading=\"lazy\""));
+}
+
+#[test]
+fn bare_itemprop_without_context_stays_candidate() {
+    // A single attribute never decides alone: itemprop with zero
+    // corroboration keeps the image eligible.
+    let harness = Harness::new();
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><img itemprop=\"logo\" src=\"mark.png\"></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"mark.png\"") >= 1);
+}
+
+#[test]
+fn filename_only_logo_stays_candidate() {
+    // A bare filename mention is not enough to suppress.
+    let harness = Harness::new();
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><img src=\"logo.png\"></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"logo.png\"") >= 1);
+}
+
+#[test]
+fn hero_mentioning_logo_still_prioritized() {
+    // Hero counter-signals veto the URL mention.
+    let harness = Harness::new();
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><main><img class=\"hero-banner\" src=\"hero-logo-reveal.jpg\"></main></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"hero-logo-reveal.jpg\"") >= 1);
+    assert_eq!(2, count(&out, b"fetchpriority=\"high\""));
+}
+
+#[test]
+fn article_logo_image_not_confused() {
+    // A logo-named file in article content keeps candidacy (weak
+    // single signal, content discount): it still becomes the hero.
+    let harness = Harness::new();
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><article><img src=\"company-logo.png\"><img src=\"photo.jpg\"></article></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"company-logo.png\"") >= 1);
+    assert_eq!(1, count(&out, b"loading=\"lazy\""));
+}
+
+#[test]
+fn logo_with_author_priority_left_byte_identical() {
+    // Explicit developer priorities survive: the author's preload
+    // stands alone and the author's fetchpriority is untouched.
+    let harness = Harness::new();
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><link rel=\"preload\" as=\"image\" href=\"logo.png\"></head><body><header><img class=\"logo\" src=\"logo.png\" fetchpriority=\"high\"></header></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert_eq!(1, count(&out, b"fetchpriority=\"high\""));
+    assert_eq!(0, count(&out, b"loading=\"lazy\""));
+    assert_eq!(0, count(&out, b"data-pagespeed-no-defer"));
+}
+
+#[test]
+fn measured_lcp_logo_still_prioritized() {
+    // Reliable LCP measurements override logo exclusion.
+    let harness = Harness::new();
+    harness.seed_lcp_report(
+        &[],
+        ps_html::beacon_finder::LCP_KIND_IMG,
+        "http://lcp.test/logo.png",
+    );
+    let driver = harness.driver();
+    let out = harness.render(
+        &driver,
+        b"<html><head><title>t</title></head><body><header><img class=\"logo\" src=\"logo.png\"></header><main><img src=\"content.png\"></main></body></html>",
+    );
+    assert_eq!(1, count(&out, b"rel=\"preload\""));
+    assert!(count(&out, b"href=\"logo.png\"") >= 1);
+    assert_eq!(2, count(&out, b"fetchpriority=\"high\""));
+    // The non-critical content image still lazy-loads.
+    assert_eq!(1, count(&out, b"loading=\"lazy\""));
+}

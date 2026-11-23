@@ -51,6 +51,7 @@ pub mod js_outline;
 pub mod lazyload_images;
 pub mod prioritize_lcp_images;
 pub mod local_storage_cache;
+pub mod logo_detection;
 pub mod make_show_ads_async;
 pub mod meta_tag;
 pub mod move_css_to_head;
