@@ -51,6 +51,10 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(missing_docs)]
 
+/// Bounded shared byte caching (Linux robust pthread mutexes).
+#[cfg(target_os = "linux")]
+pub mod byte_cache;
+
 /// Recoverable fixed-size shared regions (Linux robust pthread mutexes).
 #[cfg(target_os = "linux")]
 pub mod region;

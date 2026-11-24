@@ -10,6 +10,7 @@ hmac = "0.12"
 sha1 = "0.10"
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 ps-config = { path = "../ps-config" }
+ps-shm = { path = "../ps-shm" }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

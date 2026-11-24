@@ -15,7 +15,7 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 const MAGIC: u64 = 0x3130_3052_4853_5350; // PSSHR001, little endian
-const VERSION: u64 = 1;
+const VERSION: u64 = 2; // v2 reserves the atomic epoch and binds pthread state to a boot.
 const HEADER: usize = 128;
 const ALIGN: usize = 64;
 const MAX_BYTES: usize = 1024 * 1024 * 1024;
@@ -37,7 +37,8 @@ impl RegionLayout {
         if shards == 0 || shards > 256 || payload_bytes == 0 {
             return Err(invalid("invalid shard count or empty payload"));
         }
-        if size_of::<libc::pthread_mutex_t>() > ALIGN || align_of::<libc::pthread_mutex_t>() > ALIGN
+        if size_of::<libc::pthread_mutex_t>() > ALIGN - 8
+            || align_of::<libc::pthread_mutex_t>() > ALIGN
         {
             return Err(invalid("unsupported pthread mutex ABI"));
         }
@@ -90,6 +91,16 @@ impl RegionLayout {
         {
             header[i * 8..i * 8 + 8].copy_from_slice(&value.to_le_bytes());
         }
+        // Distinguish native pthread layouts across libc implementations even
+        // when their public sizes happen to match on the same machine.
+        let libc_abi: u64 = if cfg!(target_env = "gnu") {
+            1
+        } else if cfg!(target_env = "musl") {
+            2
+        } else {
+            0
+        };
+        header[120..128].copy_from_slice(&libc_abi.to_le_bytes());
         header
     }
 }
@@ -107,6 +118,7 @@ fn invalid(message: &str) -> io::Error {
 pub struct SharedRegion {
     map: MmapRaw,
     layout: RegionLayout,
+    header: [u8; HEADER],
 }
 
 impl std::fmt::Debug for SharedRegion {
@@ -122,6 +134,15 @@ impl SharedRegion {
     /// uses a bounded flock only at open; data operations never acquire a file
     /// lock or perform filesystem reads. Invalid existing files fail closed.
     pub fn open(path: &Path, layout: RegionLayout) -> io::Result<Self> {
+        // Persistent pthread owner words must never be reused after a machine
+        // reboot: the old kernel cannot deliver owner-death recovery then.
+        let boot = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
+        let boot = boot.trim();
+        if boot.len() != 36 {
+            return Err(invalid("invalid Linux boot identity"));
+        }
+        let mut header = layout.header();
+        header[80..116].copy_from_slice(boot.as_bytes());
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -152,14 +173,18 @@ impl SharedRegion {
             return Err(invalid("shared-region file length mismatch"));
         }
         let map = MmapOptions::new().len(layout.total).map_raw(&file)?;
-        let region = Self { map, layout };
+        let region = Self {
+            map,
+            layout,
+            header,
+        };
         if new {
             region.initialize()?;
         } else {
             // SAFETY: mapped/header bounds checked; initialization is serialized
             // by flock. The published header is immutable for this file's life.
             let header = unsafe { std::slice::from_raw_parts(region.map.as_ptr(), HEADER) };
-            if header != layout.header() {
+            if header != region.header {
                 return Err(invalid("shared-region header/ABI mismatch"));
             }
         }
@@ -198,11 +223,7 @@ impl SharedRegion {
             // Publish last. Failed/aborted initialization leaves a nonempty
             // invalid file, which future openers reject rather than resetting
             // potentially live pthread objects. Operators can replace it offline.
-            std::ptr::copy_nonoverlapping(
-                self.layout.header().as_ptr(),
-                self.map.as_mut_ptr(),
-                HEADER,
-            );
+            std::ptr::copy_nonoverlapping(self.header.as_ptr(), self.map.as_mut_ptr(), HEADER);
         }
         Ok(())
     }
@@ -219,6 +240,41 @@ impl SharedRegion {
         self.map
             .as_mut_ptr()
             .wrapping_add(HEADER + shard * self.layout.stride + ALIGN)
+    }
+
+    // Mutation failures must invalidate cached payloads even while a holder
+    // owns the shard mutex. This atomic occupies reserved bytes after the native
+    // pthread object, disjoint from every guarded payload slice.
+    fn epoch_cell(&self, shard: usize) -> io::Result<&std::sync::atomic::AtomicU64> {
+        if shard >= self.layout.shards {
+            return Err(invalid("shard index out of bounds"));
+        }
+        let offset = HEADER + shard * self.layout.stride + ALIGN - 8;
+        // SAFETY: 8-aligned in the reserved tail of the mutex cache line; the
+        // checked native mutex is at most 56 bytes. Only atomic access occurs
+        // here, and payload references start at byte 64. Mapping outlives self.
+        Ok(unsafe {
+            std::sync::atomic::AtomicU64::from_ptr(self.map.as_mut_ptr().add(offset).cast())
+        })
+    }
+
+    pub(crate) fn epoch(&self, shard: usize) -> io::Result<u64> {
+        Ok(self
+            .epoch_cell(shard)?
+            .load(std::sync::atomic::Ordering::SeqCst))
+    }
+
+    pub(crate) fn invalidate(&self, shard: usize) -> io::Result<()> {
+        // Never wrap: exhausted epochs disable admissions/hits until a new
+        // segment is selected. No old epoch may become current again.
+        // Keep support for toolchains predating AtomicU64::try_update.
+        #[allow(deprecated)]
+        let _ = self.epoch_cell(shard)?.fetch_update(
+            std::sync::atomic::Ordering::SeqCst,
+            std::sync::atomic::Ordering::SeqCst,
+            |value| value.checked_add(1),
+        );
+        Ok(())
     }
 
     /// Attempts once, without waiting: `None` means another holder is active.
@@ -443,6 +499,35 @@ mod tests {
         // Same length, unfinished initialization (zero header): never silently reset.
         file.seek(SeekFrom::Start(0)).unwrap();
         file.write_all(&[0u8; HEADER]).unwrap();
+        assert!(SharedRegion::open(&temp.path(), layout()).is_err());
+    }
+
+    #[test]
+    fn atomic_invalidation_is_shared_and_never_wraps() {
+        let temp = Temp::new();
+        let region = SharedRegion::open(&temp.path(), layout()).unwrap();
+        let other = SharedRegion::open(&temp.path(), layout()).unwrap();
+        let guard = region.try_lock(0).unwrap().unwrap();
+        region.invalidate(0).unwrap();
+        assert_eq!(1, other.epoch(0).unwrap());
+        assert!(guard.bytes().iter().all(|b| *b == 0));
+        region
+            .epoch_cell(0)
+            .unwrap()
+            .store(u64::MAX - 1, std::sync::atomic::Ordering::SeqCst);
+        region.invalidate(0).unwrap();
+        region.invalidate(0).unwrap();
+        assert_eq!(u64::MAX, other.epoch(0).unwrap());
+    }
+
+    #[test]
+    fn another_machine_boot_cannot_reuse_pthread_state() {
+        use std::io::{Seek, SeekFrom, Write};
+        let temp = Temp::new();
+        drop(SharedRegion::open(&temp.path(), layout()).unwrap());
+        let mut file = OpenOptions::new().write(true).open(temp.path()).unwrap();
+        file.seek(SeekFrom::Start(80)).unwrap();
+        file.write_all(&[b'x'; 36]).unwrap();
         assert!(SharedRegion::open(&temp.path(), layout()).is_err());
     }
 

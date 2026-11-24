@@ -86,13 +86,13 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Test attach, incompatible/corrupt headers, permissions, owner death and simultaneous initialization.
 - [x] Run checks; update ledger; commit independently functional primitives (commit command/result recorded below).
 
-### Phase 2 — Shared-memory cache backend [IN PROGRESS]
+### Phase 2 — Shared-memory cache backend [COMPLETED]
 
-- [ ] Implement full-key lookup, insert, replace, delete and bounded eviction over Phase 1.
-- [ ] Define oversized-entry/admission/eviction behavior and expose diagnostics.
-- [ ] Verify independent processes, collisions, churn, writer death and bounded memory.
-- [ ] Add safe `ps-cache` adapter with existing Cache trait semantics.
-- [ ] Run checks; update ledger; commit tested backend (not yet enabled).
+- [x] Implement full-key lookup, insert, replace, delete and bounded eviction over Phase 1.
+- [x] Define oversized-entry/admission/eviction behavior and expose diagnostics.
+- [x] Verify independent processes, collisions, churn, writer death and bounded memory.
+- [x] Add safe `ps-cache` adapter with existing Cache trait semantics.
+- [x] Run checks; update ledger; commit tested backend (not yet enabled).
 
 ### Phase 3 — L1/L2/L3 integration/coherence [PENDING]
 
@@ -172,9 +172,11 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Next Session Resume Point
 
-**State:** Phase 0 committed (`4d23d3e`); Phase 1 region implementation fully verified, milestone commit follows. Cache/Nginx behavior unchanged. Phase 2 first incomplete task.
+**State:** Phases 0–2 implemented and verified; Phase 2 milestone commit is the latest `Add bounded shared byte cache and safe cache adapter` commit (inspect git log for its hash). Phase 0=`4d23d3e`, Phase 1=`ff67357`. Existing production cache assembly and defaults are unchanged. No shared cache is enabled; nothing deployed/pushed.
 
-**Exact next action:** implement bounded `ps_shm::byte_cache` over SharedRegion, with complete-key comparisons, explicit busy/admission results, bounded LRU replacement, deletion and oversized replacement invalidation. Start with fixed slots per shard (document memory-utilization tradeoff), keeping every copy under the shard guard so killed-writer recovery can clear a shard safely. Add an unwired ps-cache adapter and separate-process/concurrency/eviction tests. Do not wire Nginx or change defaults until Phase 3.
+**Exact next action (Phase 3, first incomplete task):** re-read this ledger, inspect status/log, run `cargo test -p ps-shm -p ps-cache`. Then design and implement an opt-in L1/L2/L3 assembly API (config parsing can remain Phase 6). Resolve resettable-counter incarnation/lifetime safety *before* using generations to cache persistent shared values. Inspect `SharedCounters::open` and `caches.rs:SharedCacheCoherence/path_backend` and add a regression reproducing creator death + surviving attached reader + new opener, and full restart with old shared L2 bytes. The existing lifetime-flock protocol does not retain a lock in every attached reader, so blindly reusing its generations is unsafe for L2 persistence. Preserve complete-key/TTL/purge/option validation and avoid filesystem reads on shared hits. Do not mark Phase 3 complete without multi-worker stale-backfill/delete/failed-admission tests.
+
+**Latest build state:** release build passes; ps-shm and ps-cache tests pass; Nginx unit tests pass. No incomplete code edits. Known lint suppressions are command-scoped for two existing ps-cache lints. Phases 3–10 remain pending, with phase-specific acceptance checkboxes above.
 
 
 ## Phase 0 audit findings (persisted before implementation)
@@ -191,7 +193,7 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Phase 0 verification results
 
-- `cargo test -p ps-shm -p ps-cache -p ps-html -p ps-nginx > docs/performance/shared-memory/baseline-tests.log 2>&1`: exit 0; **2,046 passed, 0 failed**, 69 test-result groups including empty doc groups.
+- `cargo test -p ps-shm -p ps-cache -p ps-html -p ps-nginx > docs/performance/shared-memory/baseline-tests.log 2>&1`: exit 0; **2,045 primary cases passed, 0 failed** (plus one nested subprocess report), 69 test-result groups including empty doc groups.
 - `cargo build -p ps-nginx --release > docs/performance/shared-memory/baseline-build.log 2>&1`: exit 0; ordinary optimized release, 0.51 s incremental build.
 - `python3 tools/benchmark_shared_memory.py --nginx /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/objs/nginx --module /home/gamingph/Projects/Rust/pagespeed-rust/target/release/libps_nginx.so --output docs/performance/shared-memory/baseline.json --samples 100 --cold-runs 5`: exit 0. Five fresh application-cache cold runs and 100 warm HIT/MISS requests per page; same static pages/config, OS caches warm. Moto cold **6.185 ms**, HIT **1.322 ms**, MISS **4.768 ms**. Aroma cold **10.026 ms**, HIT **1.463 ms**, MISS **7.293 ms**. Raw samples, normalized output hashes, module checksum and Nginx version in baseline.json. No live reload/purge.
 - Added reproducible `tools/benchmark_shared_memory.py` and `docs/performance/shared-memory/nginx-template.conf`. Existing implementation code remains unchanged.
@@ -219,7 +221,45 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 ## Phase 1 completion
 
 - `python3` loop invoking `cargo test -p ps-shm region::tests -- --test-threads=4` ten times: **100 region test executions passed**, 0 failed; log `docs/performance/shared-memory/phase1-stress.log`.
-- `cargo test -p ps-cache -p ps-nginx --lib > docs/performance/shared-memory/phase1-dependent-tests.log 2>&1`: exit 0; 338 passed, 0 failed.
+- `cargo test -p ps-cache -p ps-nginx --lib > docs/performance/shared-memory/phase1-dependent-tests.log 2>&1`: exit 0; 337 primary cases passed, 0 failed (plus one nested subprocess report).
 - `rustfmt --edition 2021 --check crates/ps-shm/src/region.rs crates/ps-shm/src/lib.rs` and `git diff --check`: passing before commit.
 - Remaining limits: Linux-only primitive, no cache values/eviction yet, no Nginx integration, no new shared-memory defaults. A nonempty unpublished/corrupt initialization file intentionally fails closed until replaced offline; production fallback will be wired in Phase 6. Runtime owner death is tested and recoverable.
 - Phase 1 commit command: `git add Cargo.lock crates/ps-shm/Cargo.toml crates/ps-shm/src/lib.rs crates/ps-shm/src/region.rs SHARED_MEMORY_IMPLEMENTATION.md tools/benchmark_shared_memory.py docs/performance/shared-memory/baseline.json; git add -f docs/performance/shared-memory/phase1-*.log; git commit -m "Add recoverable bounded shared-memory region primitives"`. No push.
+
+## Phase 2 confirmed design / next work
+
+- Phase 1 committed as `ff67357`.
+- Initial byte backend uses configurable fixed slots per shard, with complete key+value bytes, serialized lengths/hash/LRU age and publication epoch. This has predictable bounds and no fragmentation/compaction, at a cost of internal slack; variable-size block allocation is a measured follow-up rather than an unverified first implementation. No production default is selected yet.
+- Critical correctness finding: dropping a contended/oversized Cache::put must not leave an older value readable. Oversized replacements delete the old slot. A busy mutation will atomically advance a shard invalidation epoch outside the payload lock; lookups validate each slot epoch before and after copying. This invalidates old entries on failed writes without waiting on HTML. Epoch exhaustion permanently bypasses that shard rather than wrapping. Normal successful puts do not invalidate unrelated entries.
+- The epoch uses the last 8 bytes of the existing 64-byte mutex allocation, outside the native pthread mutex object. Tighten the supported pthread ABI bound to <=56 bytes and document/disjoint-check this use. Mapped epoch access is atomic only; guarded payload references start after the 64-byte allocation.
+- Phase 3 still needs an additional disk/backfill/L1 publication protocol; the byte backend alone does not solve those races.
+
+- Phase 2 draft code now exists in `crates/ps-shm/src/byte_cache.rs`; not yet compiled/verified. Region epoch tail API added with bounds/ABI validation. Next action: add byte-cache regression tests (LRU, oversized/busy mutation invalidation, cross-process keys and crash recovery), then compile. Do not wire cache factory.
+
+## Phase 2 verification progress
+
+- Added safe `ps-cache::shared_memory::SharedMemoryCache` adapter, Linux-only and not factory-wired. It maps shared busy/error lookups to Overload and never introduces unsafe code above ps-shm. Added ps-cache -> ps-shm dependency (no dependency cycle).
+- `cargo test -p ps-shm -p ps-cache > docs/performance/shared-memory/phase2-tests.log 2>&1`: first passing run completed after fixing a test-local function shadow and retaining older compiler compatibility for AtomicU64::fetch_update (scoped deprecation allowance). Extra multiprocess stress test added afterwards; rerun required.
+- Busy invalidation operates only on the reserved atomic tail, outside all guarded payload slices. ABI limit is now <=56-byte native pthread mutex, preserving the 64-byte shard overhead. Slot key hashes are computed once per operation; complete-key comparison remains mandatory.
+- Remaining before commit: rerun tests, clippy, stress and dependent compile.
+- Phase 3 audit issue: existing shared-counter initializer resets on an uncontended lifetime flock; attached readers do not all retain lifetime locks. Reusing these counters blindly for persistent shared L2 could reuse generation numbers after restart or creator death. Before integration, design/test an incarnation/coherence protocol spanning live old/new workers and crash recovery. Do not simply nest adapters with resettable generations and claim correctness.
+
+- Additional lifecycle safety decision before any integration: region format v2 stores Linux boot identity. Persisted pthread owner words from an earlier kernel boot cannot be recovered by the new kernel; attachment now rejects such mappings. A procfs boot-id read occurs only at open. Phase 6 must choose a boot/layout-qualified filename and fall back if procfs is unavailable. Same-boot process restarts/reloads preserve values. Added a simulated different-boot header test and shared epoch saturation test.
+
+- Phase 2 tests passed after the boot check: `cargo test -p ps-shm -p ps-cache`; exact counts recorded at commit below. Plain `cargo clippy ... -- -D warnings` is blocked by pre-existing ps-config/ps-cache lints; left those files unchanged. `cargo clippy -p ps-shm -p ps-cache --all-targets --no-deps -- -D warnings -A clippy::new_without_default -A clippy::unnecessary_get_then_check` passed, with only the two existing ps-cache lints suppressed. Full failing log retained alongside scoped passing log.
+- Header additionally distinguishes GNU versus musl native mutex ABI, not just size/alignment/endian. No shared-memory cache is enabled by these primitives.
+
+## Phase 2 completion and exact verification
+
+- New files: `crates/ps-shm/src/byte_cache.rs`, `crates/ps-cache/src/shared_memory.rs`.
+- Modified: `crates/ps-shm/src/{lib,region}.rs`, `crates/ps-cache/src/lib.rs`, `crates/ps-cache/Cargo.toml`, `Cargo.lock`, this ledger. Raw checks saved under `docs/performance/shared-memory/phase2-*`.
+- `cargo test -p ps-shm -p ps-cache > docs/performance/shared-memory/phase2-tests.log 2>&1`: **95 passed, 0 failed** (31 ps-shm, 64 ps-cache).
+- Python loop invoking `cargo test -p ps-shm -- --test-threads=4` ten times: **310 passed**, 0 failed; `phase2-stress.log`.
+- `cargo test -p ps-nginx --lib > docs/performance/shared-memory/phase2-dependent-tests.log 2>&1`: **274 primary unit cases passed**, plus one nested subprocess harness report, 0 failed.
+- `cargo clippy -p ps-shm -p ps-cache --all-targets --no-deps -- -D warnings -A clippy::new_without_default -A clippy::unnecessary_get_then_check > docs/performance/shared-memory/phase2-clippy-scoped.log 2>&1`: passes. Unsuppressed failures in `phase2-clippy.log` are existing MemoryCache and cache model-test lints; no unrelated fixes made.
+- `cargo build -p ps-nginx --release > docs/performance/shared-memory/phase2-build.log 2>&1`: **passes**, 27.55 s, ordinary optimized release against staged 1.31.8. This is not necessarily ABI-compatible with installed system Nginx; do not deploy blindly.
+- `rustfmt --edition 2021 --check crates/ps-shm/src/{lib,region,byte_cache}.rs crates/ps-cache/src/{lib,shared_memory}.rs`; `git diff --check`: pass before commit.
+- Verified: actual independent processes write/read the same mapping; mixed 4-process/8-thread mutation stress never exposes torn returned values; full-key comparisons defeat forged hash collisions; 10,000-key churn keeps mapping allocation fixed; admission and busy mutations invalidate old values; SIGKILL recovery clears damaged shards; cross-boot headers reject stale pthread state; atomic epoch saturates without wrapping.
+- Cache policy: opaque bytes, no independent TTL decision, fixed slot LRU, explicit TooLarge/Busy/Miss outcomes. Fixed slots trade memory utilization for bounded predictable first implementation. This is NOT evidence of an end-to-end speedup yet: no production assembly/defaults changed. Phase 3 and later phases must assess integration performance and capacity.
+- Baseline/counting clarification: baseline logs include one nested Nginx subprocess test result. Primary baseline count is 2,045, not the naive sum 2,046. The Phase 1 dependent primary count is 337 rather than naive 338. Raw logs retained unchanged.
+- Commit: `git add Cargo.lock SHARED_MEMORY_IMPLEMENTATION.md crates/ps-shm/src/{lib,region,byte_cache}.rs crates/ps-cache/Cargo.toml crates/ps-cache/src/{lib,shared_memory}.rs; git add -f docs/performance/shared-memory/phase2-*.log; git commit -m "Add bounded shared byte cache and safe cache adapter"`. Do not push.
