@@ -87,6 +87,11 @@ pub trait Cache: Send + Sync + std::fmt::Debug {
     /// Removes a key (`Delete`; missing keys are silent successes).
     fn delete(&self, key: &str);
 
+    /// Shared diagnostics sampled on admin requests. Empty means unavailable.
+    fn diagnostics(&self) -> Vec<(&'static str, u64)> {
+        Vec::new()
+    }
+
     /// Backend name for logging/debugging (`Name`).
     fn name(&self) -> String;
 
@@ -1288,6 +1293,10 @@ impl Cache for FallbackCache {
 /// between every writer to the backing store. A snapshot is unavailable while
 /// writes are active; L1 reads then fall through to the persistent backend.
 pub trait CacheCoherence: Send + Sync + std::fmt::Debug {
+    /// Shared domain diagnostics; sampled only on admin requests.
+    fn diagnostics(&self) -> Vec<(&'static str, u64)> {
+        Vec::new()
+    }
     fn snapshot(&self, key: &str) -> Option<i64>;
     /// Builds a memory-layer identity. Implementations with restart incarnations
     /// can include their namespace here without a second key-prefix allocation.

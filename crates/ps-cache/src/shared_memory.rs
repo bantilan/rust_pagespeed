@@ -44,6 +44,9 @@ impl Cache for SharedMemoryCache {
     fn delete(&self, key: &str) {
         let _ = self.backend.delete(key.as_bytes());
     }
+    fn diagnostics(&self) -> Vec<(&'static str, u64)> {
+        self.backend.diagnostics().unwrap_or_default()
+    }
     fn name(&self) -> String {
         "SharedMemoryCache".into()
     }

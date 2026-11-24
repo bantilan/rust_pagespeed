@@ -17,6 +17,7 @@ parser.add_argument('--nginx', required=True)
 parser.add_argument('--module', required=True)
 parser.add_argument('--output', required=True)
 parser.add_argument('--port', type=int, default=18089)
+parser.add_argument('--check-metrics', action='store_true')
 args = parser.parse_args()
 repo = Path(__file__).resolve().parent.parent
 prefix = Path(tempfile.mkdtemp(prefix='ps-shared-lifecycle-'))
@@ -58,7 +59,8 @@ def warm(exclude=0):
     while time.monotonic() < deadline:
         try:
             worker, body = request()
-            if worker != exclude and b'.pagespeed.' in body:
+            marker = body.rsplit(b'PageSpeed Cache:', 1)[-1].split(b'|', 1)[0].strip()
+            if worker != exclude and b'.pagespeed.' in body and marker == b'HIT':
                 normalized = re.sub(rb'<!-- PageSpeed Cache:.*?-->', b'', body)
                 digest = hashlib.sha256(normalized).hexdigest()
                 if last == digest:
@@ -101,6 +103,21 @@ try:
     configure(1024)
     process = start()
     before = warm()
+    if args.check_metrics:
+        samples = {}
+        deadline = time.monotonic() + 5
+        while len(samples) < 2 and time.monotonic() < deadline:
+            pid, body = request('/pagespeed_admin/stats_json')
+            values = json.loads(body)['variables']
+            assert values['shared_cache_domains'] == 1, values
+            assert 0 < values['shared_cache_byte_mapping_bytes'] <= 1024 * 1024, values
+            assert values['shared_cache_owner_claims'] > 0, values
+            assert values['shared_cache_resident_entries'] > 0, values
+            samples[pid] = {key: value for key, value in values.items() if key.startswith('shared_cache_')}
+        assert len(samples) == 2, samples
+        capacities = {value['shared_cache_byte_mapping_bytes'] for value in samples.values()}
+        assert len(capacities) == 1
+        result['metrics_workers'] = samples
     hold = http.client.HTTPConnection('127.0.0.1', args.port, timeout=5)
     hold.request('GET', '/hold.bin', headers={'Host': 'localhost'})
     held = hold.getresponse()
@@ -132,6 +149,12 @@ try:
     process = start()
     restarted = warm()
     assert before[1:] == restarted[1:], (before, restarted)
+    if args.check_metrics:
+        _, body = request('/pagespeed_admin/stats_json')
+        values = json.loads(body)['variables']
+        assert values['shared_cache_domains'] == 1
+        assert 1024 * 1024 < values['shared_cache_byte_mapping_bytes'] <= 2048 * 1024
+        result['metrics_after_restart'] = {key: value for key, value in values.items() if key.startswith('shared_cache_')}
     result.update({'passed': True, 'before': before, 'after_reload': after, 'after_restart': restarted,
                    'held_old_worker': old_worker, 'byte_mappings': mappings,
                    'checkpoint_policy': 'validated existing write-through disk cache; no native mutex checkpoint'})

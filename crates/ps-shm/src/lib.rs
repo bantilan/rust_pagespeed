@@ -68,6 +68,9 @@ pub mod ownership;
 #[cfg(target_os = "linux")]
 pub mod write_tracker;
 
+#[cfg(target_os = "linux")]
+pub mod metrics;
+
 use fs2::FileExt;
 use std::fs::OpenOptions;
 use std::io;
@@ -422,6 +425,11 @@ impl SharedCounters {
                 std::fs::remove_file(entry.path()).ok();
             }
         }
+    }
+
+    /// Exact mapped capacity, including unused dynamic counter slots.
+    pub fn mapped_bytes(&self) -> usize {
+        self.map.len()
     }
 
     /// Fixed names in slot order.

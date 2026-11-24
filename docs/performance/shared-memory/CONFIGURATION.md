@@ -77,3 +77,20 @@ must never be restored as a portable snapshot. Corrupt/truncated shared bytes
 fall back to validated disk entries; missing/expired disk entries are optimized
 again asynchronously. A regression verifies persisted metadata survives a
 corrupt shared mapping. No hit-path flush, fsync, or checkpoint timer was added.
+
+Admin diagnostics are exposed in `/pagespeed_admin/statistics` and
+`/pagespeed_admin/stats_json` as `shared_cache_*` gauges. Byte-cache events,
+ownership/recovery counts and mapping usage come from shared atomic state;
+canonical aliases and worker count do not multiply them. Fixed gauge slots are
+registered before fork. Existing process-local histograms are not aggregated.
+`usage_busy_shards` identifies an incomplete nonblocking resident-usage sample;
+`diagnostics_unavailable` identifies a failed source. Capacity gauges describe
+the current configuration; draining workers can temporarily retain older byte
+mappings. Resident bytes include physically occupied old-incarnation slots until
+eviction and are not a count of reusable logical entries.
+
+Event sources persist for the current boot-qualified domain. Clearing displayed
+statistics does not reset their source: the next admin sample restores cumulative
+values. Mapping gauges separately report byte storage, metrics, owner slots,
+writer tracking, transaction locks and coherent-lifetime counters. All these
+allocations are bounded, including when cache admission or ownership is busy.

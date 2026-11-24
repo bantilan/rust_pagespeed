@@ -878,6 +878,7 @@ fn open_shared_statistics(cache_dirs: &[&str]) -> (ps_stats::core::Statistics, V
     };
     let probe = ps_stats::core::Statistics::new();
     ps_stats::names::init_all(&probe);
+    crate::caches::SystemCaches::register_shared_statistics(&probe);
     let fixed = probe.registered_names();
     match ps_shm::SharedCounters::open(std::path::Path::new(dir), &fixed) {
         Ok(counters) => (
@@ -2776,6 +2777,10 @@ unsafe fn resource_response(
                         }))
                     }
                 };
+                main_conf
+                    .driver_factory
+                    .caches
+                    .refresh_shared_statistics(&main_conf.driver_factory.statistics);
                 let response = match route {
                     routing::Route::Statistics | routing::Route::GlobalStatistics => {
                         crate::terminal::statistics_response(crate::terminal::StatisticsInputs {

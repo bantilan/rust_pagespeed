@@ -19,6 +19,10 @@ impl TransactionalCache {
             locks: Arc::new(SharedRegion::open(path, RegionLayout::new(128, 8)?)?),
         })
     }
+    /// Exact mapped capacity of the shared transaction lock domain.
+    pub fn mapped_bytes(&self) -> usize {
+        self.locks.layout().mapped_bytes()
+    }
     /// Reuse the same mapped transaction domain around another codec stack.
     pub fn with_backend(&self, backend: Arc<dyn Cache>) -> Self {
         Self {

@@ -52,6 +52,7 @@ pub enum OwnershipFinish<T> {
 pub struct OwnershipTable {
     region: SharedRegion,
     revocations: SharedRegion,
+    metrics: crate::metrics::SharedMetrics,
     slots: usize,
     mapping: (u64, u64),
 }
@@ -75,18 +76,62 @@ impl OwnershipTable {
         let mut cancellation = canonical.as_os_str().to_os_string();
         cancellation.push(".revocations-v1");
         let revocations = SharedRegion::open(Path::new(&cancellation), RegionLayout::new(1, 8)?)?;
+        let mut metrics_path = canonical.as_os_str().to_os_string();
+        metrics_path.push(".metrics-v2");
+        let metrics = crate::metrics::SharedMetrics::open(Path::new(&metrics_path), 9)?;
         let metadata = std::fs::metadata(path)?;
         Ok(Self {
             region,
             revocations,
+            metrics,
             slots,
             mapping: (metadata.dev(), metadata.ino()),
         })
     }
 
+    /// Shared event counters since domain creation and exact mapping capacity.
+    pub fn diagnostics(&self) -> io::Result<Vec<(&'static str, u64)>> {
+        let names = [
+            "owner_claims",
+            "owner_duplicates",
+            "owner_busy",
+            "owner_full",
+            "owner_long_keys",
+            "owner_errors_or_exhaustion",
+            "owner_revocations",
+            "owner_stale_publications",
+            "owner_dead_reclaims",
+        ];
+        let mut result = Vec::new();
+        for (index, name) in names.into_iter().enumerate() {
+            result.push((name, self.metrics.get(index)?));
+        }
+        result.push(("owner_slot_capacity", self.slots as u64));
+        result.push((
+            "owner_mapping_bytes",
+            (self.region.layout().mapped_bytes()
+                + self.revocations.layout().mapped_bytes()
+                + self.metrics.mapped_bytes()) as u64,
+        ));
+        Ok(result)
+    }
+
     /// Attempt once. Cache-path domain and effective options must be included
     /// in the caller's exact job key. Current worker identity is read after fork.
     pub fn try_claim(&self, key: &str) -> io::Result<OwnershipClaim> {
+        let result = self.claim_impl(key);
+        let index = match result {
+            Ok(OwnershipClaim::Owned(_)) => 0,
+            Ok(OwnershipClaim::AlreadyOwned) => 1,
+            Ok(OwnershipClaim::Busy) => 2,
+            Ok(OwnershipClaim::Full) => 3,
+            Ok(OwnershipClaim::KeyTooLong) => 4,
+            _ => 5,
+        };
+        let _ = self.metrics.increment(index);
+        result
+    }
+    fn claim_impl(&self, key: &str) -> io::Result<OwnershipClaim> {
         if key.len() > KEY_BYTES {
             return Ok(OwnershipClaim::KeyTooLong);
         }
@@ -116,6 +161,7 @@ impl OwnershipTable {
                 if identity(record)?.liveness() != ProcessLiveness::Dead {
                     return Ok(OwnershipClaim::AlreadyOwned);
                 }
+                self.metrics.increment(8)?;
                 free = Some(slot);
                 break;
             }
@@ -124,6 +170,7 @@ impl OwnershipTable {
             for slot in 0..self.slots {
                 let record = &bytes[slot * RECORD..(slot + 1) * RECORD];
                 if identity(record)?.liveness() == ProcessLiveness::Dead {
+                    self.metrics.increment(8)?;
                     free = Some(slot);
                     break;
                 }
@@ -156,6 +203,7 @@ impl OwnershipTable {
     /// requests retry them. It is intended for contended/panicking cleanup.
     pub fn revoke_through(&self, token: OwnershipToken) -> io::Result<()> {
         if token.mapping == self.mapping {
+            self.metrics.increment(6)?;
             self.revocations.advance_epoch_to(0, token.serial)?;
         }
         Ok(())
@@ -189,6 +237,7 @@ impl OwnershipTable {
         publish: impl FnOnce() -> T,
     ) -> io::Result<OwnershipFinish<T>> {
         if token.mapping != self.mapping || token.slot >= self.slots {
+            let _ = self.metrics.increment(7);
             return Ok(OwnershipFinish::Stale);
         }
         let Some(mut guard) = self.region.try_lock(0)? else {
@@ -199,6 +248,7 @@ impl OwnershipTable {
             || word(record, 0) != token.serial
             || token.serial <= self.revocations.epoch(0)?
         {
+            let _ = self.metrics.increment(7);
             return Ok(OwnershipFinish::Stale);
         }
         let result = publish();

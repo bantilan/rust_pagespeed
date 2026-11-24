@@ -18,12 +18,14 @@ pub struct WriteTracker {
     slots: SharedRegion,
     active: SharedRegion,
     generations: SharedRegion,
+    metrics: crate::metrics::SharedMetrics,
 }
 impl WriteTracker {
     /// Open at configuration time in an application-owned dedicated directory.
     /// Partial/incompatible mappings fail closed; existing files are not reset.
     pub fn open(directory: &Path) -> io::Result<Self> {
         Ok(Self {
+            metrics: crate::metrics::SharedMetrics::open(&directory.join("writer-metrics-v1"), 3)?,
             slots: SharedRegion::open(
                 &directory.join("writer-slots-v1"),
                 RegionLayout::new(WRITER_SLOTS, 8)?,
@@ -44,6 +46,23 @@ impl WriteTracker {
         self.slots.layout().mapped_bytes()
             + self.active.layout().mapped_bytes()
             + self.generations.layout().mapped_bytes()
+            + self.metrics.mapped_bytes()
+    }
+
+    /// Process-shared recovery counters and exact fixed allocation. Counter
+    /// names describe events, not unique processes; repeated repairs may count.
+    pub fn diagnostics(&self) -> io::Result<Vec<(&'static str, u64)>> {
+        let mut disabled = 0;
+        for shard in 0..WRITE_SHARDS {
+            disabled += u64::from(self.generations.epoch(shard)? == u64::MAX);
+        }
+        Ok(vec![
+            ("writer_recovery_events", self.metrics.get(0)?),
+            ("writer_capacity_failures", self.metrics.get(1)?),
+            ("writer_untracked_disk_mutations", self.metrics.get(2)?),
+            ("writer_disabled_memory_shards", disabled),
+            ("writer_mapping_bytes", self.mapped_bytes() as u64),
+        ])
     }
 
     /// Lock-free stable generation, unavailable during a write or exhaustion.
@@ -59,6 +78,7 @@ impl WriteTracker {
     /// Fail closed for memory reads before an exceptional untracked disk write.
     /// Saturated generations never wrap; choose a fresh lifetime domain to reset.
     pub fn disable_memory(&self, shard: usize) -> io::Result<()> {
+        self.metrics.increment(2)?;
         self.generations.advance_epoch_to(shard, u64::MAX)
     }
 
@@ -79,6 +99,7 @@ impl WriteTracker {
                 }));
             }
         }
+        self.metrics.increment(1)?;
         Ok(None)
     }
 
@@ -111,6 +132,9 @@ impl WriteTracker {
                 self.active.clear_tracking_bit(shard, bit)?;
                 repaired = true;
             }
+        }
+        if repaired {
+            self.metrics.increment(0)?;
         }
         Ok(repaired)
     }
@@ -178,7 +202,7 @@ mod tests {
         assert_eq!(tracker.snapshot(3).unwrap(), None);
         drop(second);
         assert_eq!(tracker.snapshot(3).unwrap(), Some(2));
-        assert_eq!(tracker.mapped_bytes(), 41344);
+        assert_eq!(tracker.mapped_bytes(), 41856);
         assert!(tracker.try_begin(WRITE_SHARDS).is_err());
     }
     #[test]

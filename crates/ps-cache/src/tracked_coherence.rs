@@ -26,6 +26,9 @@ impl TrackedCoherence {
     }
 }
 impl CacheCoherence for TrackedCoherence {
+    fn diagnostics(&self) -> Vec<(&'static str, u64)> {
+        self.tracker.diagnostics().unwrap_or_default()
+    }
     fn snapshot(&self, key: &str) -> Option<i64> {
         let shard = Self::shard(key);
         let mut generation = self.tracker.snapshot(shard).ok()?;

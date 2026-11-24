@@ -7,6 +7,10 @@ use std::sync::{
 
 /// Coordinator claims run on pool workers, never HTML scheduling threads.
 pub trait RewriteCoordinator: Send + Sync + std::fmt::Debug {
+    /// Shared ownership counters for admin sampling.
+    fn diagnostics(&self) -> Vec<(&'static str, u64)> {
+        Vec::new()
+    }
     /// The exact options/UA-aware key is scoped by the coordinator's cache domain.
     fn claim(&self, key: &str) -> RewriteClaim;
 }
@@ -109,6 +113,9 @@ mod linux {
         }
     }
     impl RewriteCoordinator for SharedRewriteCoordinator {
+        fn diagnostics(&self) -> Vec<(&'static str, u64)> {
+            self.table.diagnostics().unwrap_or_default()
+        }
         fn claim(&self, key: &str) -> RewriteClaim {
             match self.table.try_claim(key) {
                 Ok(OwnershipClaim::Owned(token)) => RewriteClaim::Owned(Arc::new(SharedLease {

@@ -132,11 +132,11 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Test full restart, killed workers, corrupt/truncated checkpoint and failed writes.
 - [x] Verify no hit-path flush/checkpoint I/O; commit.
 
-### Phase 8 — Admin/aggregated statistics [PENDING]
+### Phase 8 — Admin/aggregated statistics [COMPLETED]
 
-- [ ] Add shared cache capacity/usage/hit/miss/eviction/failure and ownership/recovery counters.
-- [ ] Expose admin diagnostics with accurate aggregation scopes.
-- [ ] Verify shared counters across workers and reset/reload behavior; commit.
+- [x] Add shared cache capacity/usage/hit/miss/eviction/failure and ownership/recovery counters.
+- [x] Expose admin diagnostics with accurate aggregation scopes.
+- [x] Verify shared counters across workers and reset/reload behavior; commit.
 
 ### Phase 9 — Concurrency/multiprocess/regressions [PENDING]
 
@@ -177,7 +177,7 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 **State:** Phases 0–3 implemented and verified (Phase 3 exposes an opt-in assembly API; no production directive/default changed). Latest Phase 3 integration commit is `db778c3`. Phase 4 dependencies: b37464b identity, 6ac47a7 owner table, a707279 leases/revocation. HTML worker integration is the latest tested milestone (inspect git log for its hash). Production directives/defaults remain disabled; coherent cache-writer recovery is pending. Earlier commits: `4d23d3e` baseline/plan, `ff67357` regions, `6aaefe3` bytes/adapter, `6213ac2` lifetime diagnosis, `7cf9997` coherent counter protocol.
 
-**Exact next action:** Phases 0–7 verified (inspect latest commits; Phase 7 lifecycle tool/test/documentation commit follows 71bf7f5). Begin Phase 8 aggregated diagnostics: expose shared byte capacity/usage/hit/miss/eviction/admission/busy/error and ownership/recovery information in admin without mislabeling local histograms. Metrics must count in shared memory or use actual process-shared Statistics handles; do not sum per-worker copies of capacity/usage. Include multi-worker verification and reset/reload semantics. Then Phase 9 final stress/workspace checks and Phase 10 profiling attribution/repeated benchmarks. Initial activation from legacy binaries remains full-stop-only.
+**Exact next action:** Phases 0–8 implemented/verified; inspect latest commit. Phase 9 is running `cargo test --workspace` to phase9-workspace-tests.log and ten ps-shm/ps-cache repetitions to phase9-stress.log; inspect active processes/log completion rather than rerun blindly. On success commit the stress/workspace milestone, recording any unavailable sanitizer limitation. Phase 10 remains: repeat final matched default/shared and multi-worker benchmarks, build profiling feature separately while preserving ordinary module, use stage timings + strace/Callgrind to investigate residual latency, and report limits honestly. Installed localhost request timed out (phase10-localhost-observation.json); do not infer current production timing or attribute historical 13ms from synthetic measurements.
 
 **Phase 4 outcome:** opt-in domains now use robust tracked transactions and recover killed writers. Legacy default coherence remains unchanged until explicit activation. Exceptional tracking-capacity overflow preserves disk mutations and deliberately disables affected memory shards; offline replacement/new tracker domain restores those shards. Surface this in diagnostics and documentation; it is distinct from ordinary killed-owner recovery.
 
@@ -537,3 +537,27 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - `cargo test -p ps-nginx --lib factory::tests > docs/performance/shared-memory/phase7-restart-tests.log 2>&1`: 18 passed. New regression closes all handles, corrupts/truncates the shared byte file, restarts the factory, verifies startup fallback message and unchanged persisted metadata via disk/L1. Other tests cover SIGKILL mutation boundaries, partial headers, permissions, layout mismatch and boot rejection from Phases 1–5.
 - Checkpoint decision: existing write-through disk is authoritative; no additional byte checkpoint format/thread/flush is warranted. Native pthread state is never serialized/restored. Same-boot mappings are opportunistic and boot/layout-validated. Documented in CONFIGURATION.md. No hit-path checkpoint I/O introduced.
 - Scoped rustfmt, Python syntax and git diff --check required before milestone commit. Only factory test code changed since the Phase 6 release module; lifecycle module hash unchanged. No deployment or remote push.
+
+## Phase 8 aggregated diagnostics — design before edits
+
+- Phase 7 committed 634140e. Add a small saturating atomic shared-metrics primitive over reserved region words (safe ps-shm wrapper), then instrument byte-cache events and owner/writer recovery. Counters persist for the current boot/domain; do not reset while workers overlap. Admin samples actual shared values and sets aggregate gauges, rather than summing repeated worker snapshots. Existing local histograms remain labeled/process-local and untouched.
+- Byte usage is scanned under nonblocking shard locks only when diagnostics are requested; expose incomplete-shard count so a contended sample is never presented as exact. Report mapped capacity separately from resident key/value bytes. Stats collection must not cause filesystem/procfs reads on cache hits.
+
+## Phase 8 implementation progress
+
+- Added Linux SharedMetrics (saturating reserved atomic words; no new unsafe above region). Byte cache has persistent shared hit/miss/busy/put/oversize/eviction/delete/error counters and on-demand guarded usage scan. Writer tracker has recovery/capacity/untracked-write counts, disabled-shard gauge and exact mapping bytes. Owner table has owned/duplicate/busy/full/long-key/error/revocation/stale/dead-reclaim counts and capacity. Metrics filenames versioned; payload/coherence formats unchanged.
+- Admin samples shared values through SystemCaches::refresh_shared_statistics and publishes UpDownCounter gauges prefixed shared_cache_. Aliases share one Arc/domain and count once. Fixed gauge slots are reserved in open_shared_statistics before fork; no dynamic-slot exhaustion silently degrades these to local counters. Existing histograms are untouched. Byte sample exposes usage_busy_shards; diagnostics failures expose diagnostics_unavailable. Transaction/counter/owner/writer/byte metric mappings reported separately.
+- Counters are cumulative since the corresponding boot-qualified mapping was created; admin clear changes the presentation gauge only and next sample restores its source value. Capacity is current configuration, not all old mappings held by draining workers. Resident bytes count physical valid-epoch slots, including previous incarnation keys pending eviction; they are not a guarantee of logical reusable values.
+- Initial compile used Variable::set, which does not exist for monotonic counters; corrected to UpDownCounter::set for sampled gauges. Scoped clippy passes. Current unit log phase8-metrics-tests.log passes; final rerun after dead-owner metric additions/build/admin lifecycle is in progress.
+- Added cross-process byte diagnostic assertion to existing independent-process test, eviction/admission/partial-usage tests, alias dedup/no-accumulation gauge tests. Lifecycle tool --check-metrics samples admin stats_json from two worker PIDs, verifies one domain/non-multiplied capacity, and checks the new capacity after reload/restart.
+- Workspace final regression started to phase9-workspace-tests.log on the fixed Phase 8 source snapshot. Inspect phase8-build.log and phase8-admin-lifecycle.log before committing; then finish Phase 9 stress and Phase 10 profiler attribution. No completion claim yet for these phases.
+
+## Phase 8 final verification
+
+- `cargo test -p ps-shm -p ps-cache -p ps-nginx --lib > docs/performance/shared-memory/phase8-metrics-tests.log 2>&1`: exit 0, 407 primary passed (54+72+281), plus two nested reports. Metrics regressions cover cross-process totals, evictions/oversized admission, partial resident samples, canonical alias dedup and repeated gauge sampling without double accumulation.
+- `cargo clippy -p ps-shm -p ps-cache --all-targets --no-deps -- -D warnings -A clippy::new_without_default -A clippy::unnecessary_get_then_check > docs/performance/shared-memory/phase8-clippy.log 2>&1`: exit 0, only existing suppressions.
+- `cargo build -p ps-nginx --release > docs/performance/shared-memory/phase8-build.log 2>&1`: exit 0, optimized. Extra metrics mappings remain outside byte budget and are separately reported.
+- `python3 tools/verify_shared_lifecycle.py --nginx /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/objs/nginx --module target/release/libps_nginx.so --output docs/performance/shared-memory/phase8-admin-lifecycle.json --check-metrics > docs/performance/shared-memory/phase8-admin-lifecycle.log 2>&1`: exit 0. Worker PIDs 3969500/3969501 both expose one shared domain and 790656-byte byte mapping; after size change/restart, one domain/1841280-byte byte mapping. 34 shared metrics in JSON. No per-worker capacity multiplication; normalized HTML identical across reload/restart.
+- First metrics lifecycle comparison found incomplete early HTML (2 optimized refs versus final 15) before background rewrites finished, not an output-corruption defect. Strengthened warm() to require an actual HTML cache HIT in addition to a stable normalized digest, then the check passed. Earlier Phase 7 run was on a lighter load and already had matching fully optimized hashes; do not rely on arbitrary repeated body stability alone.
+- Read-only localhost request to the originally supplied Aerosky URL timed out; no production timing is claimed. Exact request loop and failure recorded in phase10-localhost-observation.json. Profiling the isolated equivalent remains Phase 10.
+- Scoped rustfmt/Python syntax/git diff --check before commit. Workspace/stress runs started on final Phase 8 source; pending results remain Phase 9. No installed deployment or remote push.

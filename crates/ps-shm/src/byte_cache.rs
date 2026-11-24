@@ -66,6 +66,7 @@ pub enum ByteStore {
 pub struct SharedByteCache {
     region: SharedRegion,
     options: ByteCacheOptions,
+    metrics: crate::metrics::SharedMetrics,
 }
 
 fn invalid(message: &str) -> io::Error {
@@ -88,9 +89,12 @@ impl SharedByteCache {
     /// startup attachments retry for at most 500 ms. Existing values persist
     /// across opens; callers must keep higher-level freshness validation.
     pub fn open(path: &Path, options: ByteCacheOptions) -> io::Result<Self> {
+        let mut metrics_path = path.as_os_str().to_os_string();
+        metrics_path.push(".metrics-v1");
         let cache = Self {
             region: SharedRegion::open(path, options.layout()?)?,
             options,
+            metrics: crate::metrics::SharedMetrics::open(Path::new(&metrics_path), 8)?,
         };
         let deadline = Instant::now() + Duration::from_millis(500);
         for shard in 0..options.shards {
@@ -118,6 +122,59 @@ impl SharedByteCache {
     /// Entire fixed mapping allocation, not logical resident value bytes.
     pub fn mapped_bytes(&self) -> usize {
         self.region.layout().mapped_bytes()
+    }
+
+    /// On-demand shared counters and resident usage. Busy shards are omitted
+    /// from usage and explicitly counted; no caller should call partial usage exact.
+    pub fn diagnostics(&self) -> io::Result<Vec<(&'static str, u64)>> {
+        let names = [
+            "hits",
+            "misses",
+            "busy",
+            "puts",
+            "oversized",
+            "evictions",
+            "delete_attempts",
+            "errors",
+        ];
+        let mut result = Vec::new();
+        for (index, name) in names.into_iter().enumerate() {
+            result.push((name, self.metrics.get(index)?));
+        }
+        let (mut entries, mut bytes, mut busy) = (0, 0, 0);
+        for shard in 0..self.options.shards {
+            let Some(guard) = self.region.try_lock(shard)? else {
+                busy += 1;
+                continue;
+            };
+            let epoch = self.region.epoch(shard)?;
+            if epoch == u64::MAX || !self.valid_header(guard.bytes()) {
+                continue;
+            }
+            for index in 0..self.options.entries_per_shard {
+                let offset = self.offset(index);
+                if read(guard.bytes(), offset) != 0 && read(guard.bytes(), offset + 24) == epoch {
+                    let lengths = read(guard.bytes(), offset + 8);
+                    let total = (lengths & 0xffff_ffff) + (lengths >> 32);
+                    if total <= self.options.bytes_per_entry as u64 {
+                        entries += 1;
+                        bytes += total;
+                    }
+                }
+            }
+        }
+        result.extend([
+            ("resident_entries", entries),
+            ("resident_key_value_bytes", bytes),
+            ("usage_busy_shards", busy),
+            ("byte_mapping_bytes", self.mapped_bytes() as u64),
+            ("metrics_mapping_bytes", self.metrics.mapped_bytes() as u64),
+            (
+                "slot_capacity",
+                (self.options.shards * self.options.entries_per_shard) as u64,
+            ),
+        ]);
+        Ok(result)
     }
 
     fn initialize(&self, bytes: &mut [u8]) {
@@ -184,6 +241,17 @@ impl SharedByteCache {
 
     /// Looks up an exact key. Busy shards do not block HTML delivery.
     pub fn get(&self, key: &[u8]) -> io::Result<ByteLookup> {
+        let result = self.get_impl(key);
+        let index = match &result {
+            Ok(ByteLookup::Hit(_)) => 0,
+            Ok(ByteLookup::Miss) => 1,
+            Ok(ByteLookup::Busy) => 2,
+            Err(_) => 7,
+        };
+        let _ = self.metrics.increment(index);
+        result
+    }
+    fn get_impl(&self, key: &[u8]) -> io::Result<ByteLookup> {
         let fingerprint = hash(key);
         let shard = self.shard(fingerprint);
         let Some(mut guard) = self.region.try_lock(shard)? else {
@@ -218,6 +286,17 @@ impl SharedByteCache {
     /// Inserts/replaces, evicting the least recently used slot when full. A
     /// failed admission invalidates the prior value rather than exposing it.
     pub fn put(&self, key: &[u8], value: &[u8]) -> io::Result<ByteStore> {
+        let result = self.put_impl(key, value);
+        let index = match &result {
+            Ok(ByteStore::Stored) => 3,
+            Ok(ByteStore::TooLarge) => 4,
+            Ok(ByteStore::Busy) => 2,
+            Err(_) => 7,
+        };
+        let _ = self.metrics.increment(index);
+        result
+    }
+    fn put_impl(&self, key: &[u8], value: &[u8]) -> io::Result<ByteStore> {
         let fingerprint = hash(key);
         let shard = self.shard(fingerprint);
         let Some(mut guard) = self.region.try_lock(shard)? else {
@@ -258,6 +337,9 @@ impl SharedByteCache {
             }
             return Ok(ByteStore::TooLarge);
         }
+        if existing.is_none() && oldest != 0 {
+            let _ = self.metrics.increment(5);
+        }
         let slot = existing.unwrap_or(victim);
         write(bytes, slot, 0);
         write(
@@ -278,9 +360,18 @@ impl SharedByteCache {
     /// Deletes an exact key. If busy, invalidates the shard atomically so an
     /// older value cannot survive a completed delete operation.
     pub fn delete(&self, key: &[u8]) -> io::Result<()> {
+        let _ = self.metrics.increment(6);
+        let result = self.delete_impl(key);
+        if result.is_err() {
+            let _ = self.metrics.increment(7);
+        }
+        result
+    }
+    fn delete_impl(&self, key: &[u8]) -> io::Result<()> {
         let fingerprint = hash(key);
         let shard = self.shard(fingerprint);
         let Some(mut guard) = self.region.try_lock(shard)? else {
+            self.metrics.increment(2)?;
             return self.region.invalidate(shard);
         };
         let epoch = self.region.epoch(shard)?;
@@ -471,11 +562,44 @@ mod tests {
     }
 
     #[test]
+    fn diagnostics_count_eviction_admission_and_partial_usage() {
+        let temp = Temp::new();
+        let cache = cache(&temp);
+        for index in 0..5 {
+            cache.put(format!("k{index}").as_bytes(), b"value").unwrap();
+        }
+        assert_eq!(cache.get(b"absent").unwrap(), ByteLookup::Miss);
+        cache.put(b"oversized", &[0; 256]).unwrap();
+        let metrics: std::collections::HashMap<_, _> =
+            cache.diagnostics().unwrap().into_iter().collect();
+        assert_eq!(metrics["puts"], 5);
+        assert_eq!(metrics["evictions"], 1);
+        assert_eq!(metrics["misses"], 1);
+        assert_eq!(metrics["oversized"], 1);
+        assert_eq!(metrics["resident_entries"], 4);
+        assert_eq!(metrics["resident_key_value_bytes"], 28);
+        let _guard = cache.region.try_lock(0).unwrap().unwrap();
+        let metrics: std::collections::HashMap<_, _> =
+            cache.diagnostics().unwrap().into_iter().collect();
+        assert_eq!(metrics["usage_busy_shards"], 1);
+        assert_eq!(metrics["resident_entries"], 0);
+    }
+
+    #[test]
     fn independent_process_and_reopen_share_values() {
         let temp = Temp::new();
         let first = cache(&temp);
         assert!(child(&temp, "write").status().unwrap().success());
         expect(&first, b"child", b"from another process");
+        let metrics: std::collections::HashMap<_, _> =
+            first.diagnostics().unwrap().into_iter().collect();
+        assert_eq!(metrics["puts"], 1);
+        assert_eq!(metrics["hits"], 1);
+        assert_eq!(metrics["resident_entries"], 1);
+        assert_eq!(
+            metrics["resident_key_value_bytes"],
+            (b"child".len() + b"from another process".len()) as u64
+        );
         drop(first);
         expect(&cache(&temp), b"child", b"from another process");
     }

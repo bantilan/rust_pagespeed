@@ -181,6 +181,14 @@ struct LifetimeCoherence {
 }
 #[cfg(target_os = "linux")]
 impl CacheCoherence for LifetimeCoherence {
+    fn diagnostics(&self) -> Vec<(&'static str, u64)> {
+        let mut values = self.inner.diagnostics();
+        values.push((
+            "lifetime_counter_mapping_bytes",
+            self._lifetime.mapped_bytes() as u64,
+        ));
+        values
+    }
     fn snapshot(&self, key: &str) -> Option<i64> {
         self.inner.snapshot(key)
     }
@@ -558,6 +566,96 @@ impl SystemCaches {
             path.metadata_transactions = Some(metadata_transactions.clone());
         }
         Ok(())
+    }
+
+    /// Reserve these gauge slots before worker fork so dynamic stats exhaustion
+    /// cannot silently turn aggregate admin snapshots into worker-local counters.
+    pub fn register_shared_statistics(statistics: &ps_stats::core::Statistics) {
+        for name in [
+            "domains",
+            "hits",
+            "misses",
+            "busy",
+            "puts",
+            "oversized",
+            "evictions",
+            "delete_attempts",
+            "errors",
+            "resident_entries",
+            "resident_key_value_bytes",
+            "usage_busy_shards",
+            "byte_mapping_bytes",
+            "metrics_mapping_bytes",
+            "slot_capacity",
+            "writer_recovery_events",
+            "writer_capacity_failures",
+            "writer_untracked_disk_mutations",
+            "writer_disabled_memory_shards",
+            "writer_mapping_bytes",
+            "owner_claims",
+            "owner_duplicates",
+            "owner_busy",
+            "owner_full",
+            "owner_long_keys",
+            "owner_errors_or_exhaustion",
+            "owner_revocations",
+            "owner_stale_publications",
+            "owner_dead_reclaims",
+            "owner_slot_capacity",
+            "owner_mapping_bytes",
+            "diagnostics_unavailable",
+            "transaction_mapping_bytes",
+            "lifetime_counter_mapping_bytes",
+        ] {
+            statistics.add_up_down_counter(&format!("shared_cache_{name}"));
+        }
+    }
+
+    /// Sample domain-wide metrics into admin gauges. Canonical aliases share
+    /// handles and are counted once; capacity is never multiplied by worker count.
+    pub fn refresh_shared_statistics(&self, statistics: &ps_stats::core::Statistics) {
+        let mut seen = HashSet::new();
+        let mut totals = std::collections::BTreeMap::<&'static str, u64>::new();
+        let mut domains = 0;
+        let mut unavailable = 0;
+        for path in self.paths.values() {
+            let Some(shared) = &path.shared_cache else {
+                continue;
+            };
+            let identity = Arc::as_ptr(shared) as *const () as usize;
+            if !seen.insert(identity) {
+                continue;
+            }
+            domains += 1;
+            let mut values = shared.diagnostics();
+            unavailable += u64::from(values.is_empty());
+            if let Some(coherence) = &path.coherence {
+                values.extend(coherence.diagnostics());
+            }
+            if let Some(coordinator) = &path.rewrite_coordinator {
+                values.extend(coordinator.diagnostics());
+            }
+            #[cfg(target_os = "linux")]
+            if let Some(transactions) = &path.metadata_transactions {
+                values.push((
+                    "transaction_mapping_bytes",
+                    transactions.mapped_bytes() as u64,
+                ));
+            }
+            for (name, value) in values {
+                let total = totals.entry(name).or_default();
+                *total = total.saturating_add(value);
+            }
+        }
+        totals.insert("diagnostics_unavailable", unavailable);
+        statistics
+            .add_up_down_counter("shared_cache_domains")
+            .set(domains);
+        for (name, value) in totals {
+            statistics
+                .add_up_down_counter(&format!("shared_cache_{name}"))
+                .set(value.min(i64::MAX as u64) as i64);
+        }
     }
 
     /// Root-phase messages (`RootInit`): one info line per path.
@@ -982,6 +1080,70 @@ mod tests {
             .get("cached")
             .value
             .is_none());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn shared_diagnostics_count_aliases_once_and_keep_domain_totals() {
+        let directory =
+            std::env::temp_dir().join(format!("ps-shared-diagnostics-{}", std::process::id()));
+        let (mut caches, options) = shared_fixture(directory.to_str().unwrap());
+        let mut alias = options.system.clone();
+        alias.file_cache_path.push('/');
+        caches.register_config(&alias, true, false, 0);
+        let context = caches.setup_caches(&options).unwrap();
+        let coordinator = context.rewrite_coordinator.unwrap();
+        let owned = match coordinator.claim("diagnostic-job") {
+            ps_cache::rewrite_coordinator::RewriteClaim::Owned(lease) => lease,
+            _ => panic!("claim failed"),
+        };
+        let _duplicate = coordinator.claim("diagnostic-job");
+        drop(owned);
+        let stats = ps_stats::core::Statistics::new();
+        SystemCaches::register_shared_statistics(&stats);
+        caches.refresh_shared_statistics(&stats);
+        assert_eq!(
+            stats
+                .get_up_down_counter("shared_cache_domains")
+                .unwrap()
+                .get(),
+            1
+        );
+        assert_eq!(
+            stats
+                .get_up_down_counter("shared_cache_owner_claims")
+                .unwrap()
+                .get(),
+            1
+        );
+        assert_eq!(
+            stats
+                .get_up_down_counter("shared_cache_owner_duplicates")
+                .unwrap()
+                .get(),
+            1
+        );
+        assert!(
+            stats
+                .get_up_down_counter("shared_cache_writer_mapping_bytes")
+                .unwrap()
+                .get()
+                > 0
+        );
+        caches.refresh_shared_statistics(&stats);
+        assert_eq!(
+            stats
+                .get_up_down_counter("shared_cache_owner_claims")
+                .unwrap()
+                .get(),
+            1
+        );
+        drop(context.http_backend);
+        drop(context.metadata_cache);
+        drop(context.http_cache);
+        drop(coordinator);
+        drop(caches);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[cfg(target_os = "linux")]
