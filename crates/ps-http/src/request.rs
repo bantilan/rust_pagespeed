@@ -261,6 +261,17 @@ impl RequestHeaders {
             })
     }
 
+    /// Whether the request accepts zstd (`compress_zstd`
+    /// negotiation): proper token parse with quality values,
+    /// unlike the whole-token gzip check above.
+    #[must_use]
+    pub fn accepts_zstd(&self) -> bool {
+        if !self.headers.has(header::ACCEPT_ENCODING) {
+            return false;
+        }
+        crate::zstd::client_accepts_zstd(Some(&self.headers.lookup_joined(header::ACCEPT_ENCODING)))
+    }
+
     /// Whether the request is an Ajax call (`IsXmlHttpRequest`):
     /// `X-Requested-With: XMLHttpRequest`, case-insensitively.
     #[must_use]
@@ -558,6 +569,27 @@ mod tests {
         let props = request.properties();
         assert!(props.has_cookie && !props.has_cookie2 && !props.has_authorization);
         assert!(request.accepts_gzip());
+    }
+
+    #[test]
+    fn accepts_zstd_negotiation() {
+        let with_encoding = |value: Option<&str>| {
+            let mut request = RequestHeaders::new();
+            if let Some(value) = value {
+                request.headers_mut().add("Accept-Encoding", value);
+            }
+            request.accepts_zstd()
+        };
+        assert!(with_encoding(Some("gzip, deflate, br, zstd")));
+        assert!(with_encoding(Some("zstd")));
+        assert!(!with_encoding(Some("gzip, deflate, br")));
+        assert!(!with_encoding(Some("zstd;q=0")));
+        assert!(!with_encoding(None));
+        // Multi-line headers join: an explicit q=0 still wins over *.
+        let mut split = RequestHeaders::new();
+        split.headers_mut().add("Accept-Encoding", "zstd;q=0");
+        split.headers_mut().add("Accept-Encoding", "*;q=1");
+        assert!(!split.accepts_zstd());
     }
 
     #[test]

@@ -55,6 +55,7 @@ pub mod script;
 pub mod self_fetch;
 pub mod send;
 pub mod terminal;
+pub mod zstd_encode;
 
 /// Name under which this module registers itself with NGINX.
 #[must_use]

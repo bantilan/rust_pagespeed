@@ -95,6 +95,13 @@ pub struct BaseFetch {
     detached: bool,
     suppress: bool,
     content_length: Option<i64>,
+    /// `compress_zstd` armed by the caller (filter enabled and client
+    /// negotiates zstd); the encoding decision itself waits for
+    /// response headers at collection time.
+    zstd_armed: bool,
+    /// Live zstd frame once collection commits to encoding (`None`
+    /// while undecided or serving identity).
+    zstd_stream: Option<ps_http::zstd::ZstdStreamEncoder>,
 }
 
 impl BaseFetch {
@@ -106,6 +113,7 @@ impl BaseFetch {
         fetch_type: BaseFetchType,
         preserve_caching_headers: PreserveCachingHeaders,
         http_options: HttpOptions,
+        zstd_armed: bool,
     ) -> Self {
         BaseFetch {
             url: url.to_string(),
@@ -121,7 +129,21 @@ impl BaseFetch {
             detached: false,
             suppress: false,
             content_length: None,
+            zstd_armed,
+            zstd_stream: None,
         }
+    }
+
+    /// Whether zstd encoding was armed at creation.
+    #[must_use]
+    pub fn zstd_armed(&self) -> bool {
+        self.zstd_armed
+    }
+
+    /// Whether collection committed to zstd encoding.
+    #[must_use]
+    pub fn zstd_encoding(&self) -> bool {
+        self.zstd_stream.is_some()
     }
 
     /// Fetch URL.
@@ -276,6 +298,43 @@ impl BaseFetch {
         }
     }
 
+    /// Commits to zstd encoding when armed and the response allows
+    /// it: body-carrying status on a non-HEAD request, no encoding
+    /// yet, compressible (or absent) content type. Mutates the
+    /// response headers and clears the known length (unknown until
+    /// the stream finishes); nginx chunks the response. Safe to
+    /// re-run: a committed stream short-circuits, and encoded
+    /// headers are ineligible by construction.
+    fn decide_zstd_encoding(&mut self, head_request: bool) {
+        use ps_http::names::header;
+        if !self.zstd_armed || self.zstd_stream.is_some() {
+            return;
+        }
+        let eligible = !crate::fetch_body::response_has_no_body(
+            self.response_headers.status_code(),
+            head_request,
+        ) && ps_http::zstd::response_eligible_for_zstd(
+            self.response_headers
+                .headers()
+                .lookup_first(header::CONTENT_TYPE)
+                .as_deref(),
+            self.response_headers
+                .headers()
+                .lookup_first(header::CONTENT_ENCODING)
+                .as_deref(),
+        );
+        if !eligible {
+            return;
+        }
+        // Encoder init is ~infallible (valid level); on failure serve
+        // identity rather than fail the request.
+        if let Ok(stream) = ps_http::zstd::ZstdStreamEncoder::new() {
+            self.zstd_stream = Some(stream);
+            ps_http::zstd::apply_zstd_response_headers(self.response_headers_mut());
+            self.content_length = None;
+        }
+    }
+
     /// Copies response headers into nginx (`CollectHeaders`):
     /// the known content length first (clearing the shortcut the
     /// copy re-adds), then every header. False on pool exhaustion.
@@ -284,13 +343,14 @@ impl BaseFetch {
     ///
     /// `r` must point at a live request.
     pub unsafe fn collect_headers(
-        &self,
+        &mut self,
         r: *mut ngx::ffi::ngx_http_request_t,
         location_field_set: bool,
         set_psol_vary: &mut bool,
     ) -> bool {
         // SAFETY: caller guarantees a live request.
         unsafe {
+            self.decide_zstd_encoding(crate::request::request_header_only(r) != 0);
             if let Some(length) = self.content_length {
                 (*r).headers_out.content_length = std::ptr::null_mut();
                 (*r).headers_out.content_length_n = length;
@@ -344,6 +404,9 @@ impl BaseFetch {
     /// `Again` while more may come, `Ok` once done (setting
     /// `last_buf` exactly once), `Error` on allocation failure.
     /// Panics when called after the last buffer shipped (`CHECK`).
+    /// Once zstd encoding commits, bytes pass through the frame
+    /// encoder here (the tail appends at done); encode failures
+    /// surface as `Error` like allocation failures.
     pub fn copy_buffer_to_nginx(&mut self, allocate: bool) -> CopyOutcome {
         assert!(
             !(self.done_called && self.last_buf_sent),
@@ -358,10 +421,29 @@ impl BaseFetch {
         if !allocate {
             return CopyOutcome::Error;
         }
-        let bytes = std::mem::take(&mut self.buffer);
+        let mut bytes = std::mem::take(&mut self.buffer);
         let flush = self.need_flush;
         self.need_flush = false;
+        if let Some(stream) = self.zstd_stream.as_mut() {
+            let mut encoded = match stream.write_chunk(&bytes) {
+                Ok(out) => out,
+                Err(_) => return CopyOutcome::Error,
+            };
+            if flush {
+                match stream.flush_chunk() {
+                    Ok(out) => encoded.extend(out),
+                    Err(_) => return CopyOutcome::Error,
+                }
+            }
+            bytes = encoded;
+        }
         if self.done_called {
+            if let Some(stream) = self.zstd_stream.take() {
+                match stream.finish() {
+                    Ok(tail) => bytes.extend(tail),
+                    Err(_) => return CopyOutcome::Error,
+                }
+            }
             self.last_buf_sent = true;
             return CopyOutcome::Ok { bytes, flush };
         }
@@ -404,6 +486,8 @@ impl SharedBaseFetch {
     /// `Arc` per side, bumping the live count. The owning
     /// request rides along so pipe events dispatch back to it
     /// (null only in tests, whose events never dispatch).
+    /// `zstd_armed` pre-negotiates `compress_zstd` (filter on and
+    /// client accepts); collection still checks the response.
     #[must_use]
     pub fn new_pair(
         url: &str,
@@ -411,9 +495,16 @@ impl SharedBaseFetch {
         fetch_type: BaseFetchType,
         preserve_caching_headers: PreserveCachingHeaders,
         http_options: HttpOptions,
+        zstd_armed: bool,
     ) -> (Arc<Self>, Arc<Self>) {
         ACTIVE_BASE_FETCHES.fetch_add(1, Ordering::SeqCst);
-        let mut state = BaseFetch::new(url, fetch_type, preserve_caching_headers, http_options);
+        let mut state = BaseFetch::new(
+            url,
+            fetch_type,
+            preserve_caching_headers,
+            http_options,
+            zstd_armed,
+        );
         state.set_request(r);
         let fetch = Arc::new(SharedBaseFetch {
             state: Mutex::new(state),
@@ -862,6 +953,7 @@ mod tests {
             BaseFetchType::PagespeedResource,
             PreserveCachingHeaders::DontPreserve,
             HttpOptions::default_for_tests(),
+            false,
         )
     }
 
@@ -939,6 +1031,7 @@ mod tests {
             BaseFetchType::IproLookup,
             PreserveCachingHeaders::DontPreserve,
             HttpOptions::default_for_tests(),
+            false,
         );
         let mut channel = FakeChannel::default();
         fetch.handle_headers_complete(false, &mut channel);
@@ -1011,6 +1104,124 @@ mod tests {
         fetch.handle_done(&mut channel);
         let _ = fetch.copy_buffer_to_nginx(true);
         let _ = fetch.copy_buffer_to_nginx(true);
+    }
+
+    fn armed_html_fetch() -> BaseFetch {
+        BaseFetch::new(
+            "http://h/p",
+            BaseFetchType::HtmlTransform,
+            PreserveCachingHeaders::DontPreserve,
+            HttpOptions::default_for_tests(),
+            true,
+        )
+    }
+
+    fn serve_html(fetch: &mut BaseFetch, status: u16, content_type: &str) {
+        fetch.response_headers_mut().set_status_and_reason(status);
+        fetch
+            .response_headers_mut()
+            .headers_mut()
+            .add("Content-Type", content_type);
+    }
+
+    #[test]
+    fn zstd_decision_commits_eligible_html() {
+        let mut fetch = armed_html_fetch();
+        serve_html(&mut fetch, 200, "text/html; charset=utf-8");
+        fetch.set_content_length(15398);
+        assert!(!fetch.zstd_encoding());
+        fetch.decide_zstd_encoding(false);
+        assert!(fetch.zstd_encoding());
+        let headers = fetch.response_headers();
+        assert_eq!(
+            headers.headers().lookup1("Content-Encoding"),
+            Some("zstd".to_string())
+        );
+        assert!(headers
+            .headers()
+            .lookup("Vary")
+            .unwrap_or_default()
+            .iter()
+            .any(|v| v == "Accept-Encoding"));
+        assert!(fetch.content_length().is_none());
+        // Re-running is a no-op (no duplicate encoding line).
+        fetch.decide_zstd_encoding(false);
+        assert_eq!(
+            fetch
+                .response_headers()
+                .headers()
+                .lookup("Content-Encoding"),
+            Some(vec!["zstd".to_string()])
+        );
+    }
+
+    #[test]
+    fn zstd_decision_declines() {
+        // Not armed.
+        let mut fetch = resource_fetch();
+        serve_html(&mut fetch, 200, "text/html");
+        fetch.decide_zstd_encoding(false);
+        assert!(!fetch.zstd_encoding());
+        // No body statuses.
+        for status in [204, 304] {
+            let mut fetch = armed_html_fetch();
+            serve_html(&mut fetch, status, "text/html");
+            fetch.decide_zstd_encoding(false);
+            assert!(!fetch.zstd_encoding(), "status {status}");
+        }
+        // HEAD requests keep identity (nginx drops the body).
+        let mut fetch = armed_html_fetch();
+        serve_html(&mut fetch, 200, "text/html");
+        fetch.decide_zstd_encoding(true);
+        assert!(!fetch.zstd_encoding());
+        // Already encoded: never stack.
+        let mut fetch = armed_html_fetch();
+        serve_html(&mut fetch, 200, "text/html");
+        fetch
+            .response_headers_mut()
+            .headers_mut()
+            .add("Content-Encoding", "gzip");
+        fetch.decide_zstd_encoding(false);
+        assert!(!fetch.zstd_encoding());
+        // Incompressible type.
+        let mut fetch = armed_html_fetch();
+        serve_html(&mut fetch, 200, "image/jpeg");
+        fetch.decide_zstd_encoding(false);
+        assert!(!fetch.zstd_encoding());
+        // Declined means untouched headers.
+        assert!(!fetch.response_headers().headers().has("Content-Encoding"));
+    }
+
+    #[test]
+    fn zstd_collection_round_trips() {
+        let mut fetch = armed_html_fetch();
+        serve_html(&mut fetch, 200, "text/html");
+        fetch.decide_zstd_encoding(false);
+        assert!(fetch.zstd_encoding());
+        let mut channel = FakeChannel::default();
+        let first = b"<html><head><title>t</title></head><body>".repeat(20);
+        let second = b"<p>hello compression</p></body></html>".repeat(20);
+        fetch.handle_write(&first, &mut channel);
+        fetch.handle_flush(&mut channel);
+        let mut shipped = Vec::new();
+        match fetch.copy_buffer_to_nginx(true) {
+            CopyOutcome::Again { bytes, flush } => {
+                assert!(flush);
+                shipped.extend(bytes);
+            }
+            other => panic!("expected Again, got {other:?}"),
+        }
+        fetch.handle_write(&second, &mut channel);
+        fetch.handle_done(&mut channel);
+        match fetch.copy_buffer_to_nginx(true) {
+            CopyOutcome::Ok { bytes, .. } => shipped.extend(bytes),
+            other => panic!("expected Ok, got {other:?}"),
+        }
+        assert!(!shipped.is_empty());
+        let joined = [first, second].concat();
+        assert_ne!(shipped, joined);
+        let decoded = zstd::bulk::decompress(&shipped, joined.len()).expect("valid zstd frame");
+        assert_eq!(decoded, joined);
     }
 
     #[test]
@@ -1189,6 +1400,7 @@ mod tests {
             BaseFetchType::PagespeedResource,
             PreserveCachingHeaders::DontPreserve,
             HttpOptions::default_for_tests(),
+            false,
         );
         assert_eq!(before + 1, active_base_fetches());
         assert_eq!(2, ps_side.references());
@@ -1202,6 +1414,7 @@ mod tests {
                 BaseFetchType::PagespeedResource,
                 PreserveCachingHeaders::DontPreserve,
                 HttpOptions::default_for_tests(),
+                false,
             );
             assert!(owned.with_state(|fetch| fetch.request()) == probe);
             drop(owned);

@@ -35,6 +35,7 @@ use ngx::ffi::{
     NGX_HTTP_INTERNAL_SERVER_ERROR, NGX_HTTP_LIF_CONF, NGX_HTTP_LOC_CONF, NGX_HTTP_MAIN_CONF,
     NGX_HTTP_MODULE, NGX_HTTP_SRV_CONF, NGX_OK,
 };
+use ps_config::filter::Filter;
 use ps_config::message_handler::MessageLevel;
 use ps_config::options::{
     apply_nginx_directive, check_nginx_scope, nginx_config_error, SetOutcome,
@@ -2727,6 +2728,7 @@ unsafe fn resource_response(
                     BaseFetchType::PagespeedResource,
                     (*ctx_ptr).preserve_caching_headers,
                     http_options,
+                    false,
                 );
                 (*ctx_ptr).base_fetch = Some(ngx_side);
                 drop(ps_side);
@@ -2750,7 +2752,15 @@ unsafe fn resource_response(
                 message_image_records(server, &response.image_records);
                 let mut headers = response.headers;
                 headers.push((X_PAGE_SPEED.to_string(), resolved.core.x_header_value()));
-                serve_response(r, response.status, &headers, &response.body)
+                let encoded = crate::zstd_encode::encode_response_body(
+                    &mut headers,
+                    &response.body,
+                    response.status,
+                    &request_headers,
+                    resolved.core.filters().enabled(Filter::CompressZstd),
+                );
+                let body: &[u8] = encoded.as_deref().unwrap_or(&response.body);
+                serve_response(r, response.status, &headers, body)
             }
             Branch::Admin => {
                 let (ps_side, ngx_side) = SharedBaseFetch::new_pair(
@@ -2759,6 +2769,7 @@ unsafe fn resource_response(
                     BaseFetchType::AdminPage,
                     (*ctx_ptr).preserve_caching_headers,
                     http_options,
+                    false,
                 );
                 (*ctx_ptr).base_fetch = Some(ngx_side);
                 drop(ps_side);
@@ -2851,6 +2862,7 @@ unsafe fn resource_response(
                     BaseFetchType::PagespeedProxy,
                     (*ctx_ptr).preserve_caching_headers,
                     http_options,
+                    false,
                 );
                 (*ctx_ptr).base_fetch = Some(ngx_side);
                 drop(ps_side);
@@ -2868,18 +2880,32 @@ unsafe fn resource_response(
                 }
                 let mut headers = response.headers;
                 headers.push((X_PAGE_SPEED.to_string(), resolved.core.x_header_value()));
-                serve_response(r, response.status, &headers, &response.body)
+                let encoded = crate::zstd_encode::encode_response_body(
+                    &mut headers,
+                    &response.body,
+                    response.status,
+                    &request_headers,
+                    resolved.core.filters().enabled(Filter::CompressZstd),
+                );
+                let body: &[u8] = encoded.as_deref().unwrap_or(&response.body);
+                serve_response(r, response.status, &headers, body)
             }
             Branch::Html => {
                 if request_headers.method() == Method::Head {
                     request_headers.set_method(Method::Get);
                 }
+                // Pre-negotiate compress_zstd (filter on and client
+                // accepts); collection still checks status, method,
+                // type, and existing encoding before committing.
+                let zstd_armed = resolved.core.filters().enabled(Filter::CompressZstd)
+                    && request_headers.accepts_zstd();
                 let (ps_side, ngx_side) = SharedBaseFetch::new_pair(
                     &url_string,
                     r,
                     BaseFetchType::HtmlTransform,
                     (*ctx_ptr).preserve_caching_headers,
                     http_options,
+                    zstd_armed,
                 );
                 (*ctx_ptr).base_fetch = Some(ngx_side);
                 ps_side.with_state(|fetch| {
@@ -2934,6 +2960,7 @@ unsafe fn resource_response(
                     BaseFetchType::IproLookup,
                     (*ctx_ptr).preserve_caching_headers,
                     http_options,
+                    false,
                 );
                 (*ctx_ptr).base_fetch = Some(ngx_side);
                 drop(ps_side);
@@ -3016,8 +3043,16 @@ unsafe fn resource_response(
                 // No `X-Page-Speed`: C++ stamps it on HTML and
                 // `.pagespeed.` serves, never on in-place serves.
                 message_image_records(server, &response.image_records);
-                let headers = response.headers;
-                serve_response(r, response.status, &headers, &response.body)
+                let mut headers = response.headers;
+                let encoded = crate::zstd_encode::encode_response_body(
+                    &mut headers,
+                    &response.body,
+                    response.status,
+                    &request_headers,
+                    resolved.core.filters().enabled(Filter::CompressZstd),
+                );
+                let body: &[u8] = encoded.as_deref().unwrap_or(&response.body);
+                serve_response(r, response.status, &headers, body)
             }
             Branch::PassThrough => {
                 // NOTE: system tests grep this message; keep it verbatim.
@@ -3530,6 +3565,7 @@ mod tests {
                 BaseFetchType::IproLookup,
                 PreserveCachingHeaders::DontPreserve,
                 HttpOptions::default_for_tests(),
+                false,
             )
             .0,
         );

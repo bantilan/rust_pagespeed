@@ -548,8 +548,8 @@ mod tests {
 
     #[test]
     fn all_filter_ids_are_unique_and_round_trip() {
-        assert_eq!(95, NUM_FILTERS);
-        assert_eq!(95, Filter::ALL.len());
+        assert_eq!(96, NUM_FILTERS);
+        assert_eq!(96, Filter::ALL.len());
         let mut seen = HashSet::new();
         for filter in Filter::ALL {
             assert!(seen.insert(filter.id()), "duplicate id {}", filter.id());

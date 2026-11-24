@@ -12,6 +12,7 @@ ps-cache = { path = "../ps-cache" }
 ps-config = { path = "../ps-config" }
 regex = { version = "1", default-features = false, features = ["std", "unicode"] }
 url = "2.5.8"
+zstd = "0.14"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

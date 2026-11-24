@@ -32,5 +32,6 @@ pub mod time;
 pub mod user_agent_matcher;
 pub mod user_agent_normalizer;
 pub mod value;
+pub mod zstd;
 
 pub use response::{HttpOptions, ResponseHeaders};

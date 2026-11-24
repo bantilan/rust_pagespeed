@@ -109,10 +109,14 @@ pub enum Filter {
     StripImageMetaData = 92,
     StripLegacyPolyfills = 93,
     StripScripts = 94,
+    // Rust-port extension past the C++ set: appended, never inserted,
+    // so every C++ discriminant (and every stored bit position) keeps
+    // its value.
+    CompressZstd = 95,
 }
 
 /// Number of filters (`kEndOfFilters`).
-pub const NUM_FILTERS: usize = 95;
+pub const NUM_FILTERS: usize = 96;
 
 impl Filter {
     /// All filters in enum order.
@@ -212,9 +216,10 @@ impl Filter {
         Filter::StripImageMetaData,
         Filter::StripLegacyPolyfills,
         Filter::StripScripts,
+        Filter::CompressZstd,
     ];
 
-    /// Converts a C++ enum value (`0..95`) to a filter.
+    /// Converts a C++ enum value (`0..96`) to a filter.
     #[must_use]
     pub const fn from_repr(value: u8) -> Option<Filter> {
         // `as` casts are not allowed on enums in const fn here, so index ALL.
@@ -323,6 +328,7 @@ impl Filter {
             "md",
             "slp",
             "ss",
+            "cz",
         ];
         IDS[self as usize]
     }
@@ -427,6 +433,7 @@ impl Filter {
             "Strip Image Meta Data",
             "Strip Legacy Polyfills",
             "Strip Scripts",
+            "Compress Zstd",
         ];
         NAMES[self as usize]
     }
@@ -434,7 +441,7 @@ impl Filter {
     /// Looks up a filter by URL id (`LookupFilterById`; case-sensitive).
     #[must_use]
     pub fn from_id(id: &str) -> Option<Filter> {
-        // Linear scan over 95 entries; the C++ binary search is O(log n)
+        // Linear scan over 96 entries; the C++ binary search is O(log n)
         // but both are trivial here. Sorted-by-id order is irrelevant.
         Filter::ALL.iter().find(|f| f.id() == id).copied()
     }
@@ -447,8 +454,8 @@ impl Filter {
     /// `ServeDeprecationNotice`) have no public name and return `None`.
     #[must_use]
     pub fn from_name(name: &str) -> Option<Filter> {
-        // 93 entries in gperf order.
-        const MAP: [(&str, Filter); 93] = [
+        // 94 entries in gperf order.
+        const MAP: [(&str, Filter); 94] = [
             ("add_base_tag", Filter::AddBaseTag),
             ("add_head", Filter::AddHead),
             ("add_ids", Filter::AddIds),
@@ -462,6 +469,7 @@ impl Filter {
             ("combine_css", Filter::CombineCss),
             ("combine_javascript", Filter::CombineJavascript),
             ("combine_heads", Filter::CombineHeads),
+            ("compress_zstd", Filter::CompressZstd),
             ("compute_statistics", Filter::ComputeStatistics),
             ("compute_critical_css", Filter::ComputeCriticalCss),
             ("convert_gif_to_png", Filter::ConvertGifToPng),
@@ -1378,15 +1386,19 @@ mod tests {
     #[test]
     fn enum_order_and_count() {
         assert_eq!(Filter::ALL.len(), NUM_FILTERS);
-        assert_eq!(NUM_FILTERS, 95);
+        assert_eq!(NUM_FILTERS, 96);
         for (i, f) in Filter::ALL.iter().enumerate() {
             assert_eq!(*f as usize, i, "discriminant drift at {f:?}");
             assert_eq!(Filter::from_repr(i as u8), Some(*f));
         }
-        assert_eq!(Filter::from_repr(95), None);
+        assert_eq!(Filter::from_repr(96), None);
         // Boundary sentinels from C++ (`kFirstFilter`, last filter).
         assert_eq!(Filter::ALL[0], Filter::AddBaseTag);
         assert_eq!(Filter::ALL[94], Filter::StripScripts);
+        // Rust-port extension appended past the C++ set.
+        assert_eq!(Filter::ALL[95], Filter::CompressZstd);
+        assert_eq!(Filter::CompressZstd.id(), "cz");
+        assert_eq!(Filter::CompressZstd.display_name(), "Compress Zstd");
     }
 
     #[test]
@@ -1510,6 +1522,14 @@ mod tests {
         assert_eq!(
             Filter::from_name("Collapse_Whitespace"),
             Some(Filter::CollapseWhitespace)
+        );
+        assert_eq!(
+            Filter::from_name("compress_zstd"),
+            Some(Filter::CompressZstd)
+        );
+        assert_eq!(
+            Filter::from_name("Compress_Zstd"),
+            Some(Filter::CompressZstd)
         );
         // Aliases.
         assert_eq!(
@@ -1638,6 +1658,16 @@ mod tests {
         assert!(!state.enabled(Filter::StripScripts));
         assert!(!state.enabled(Filter::Mobilize));
         assert!(state.enabled(Filter::CollapseWhitespace));
+        // compress_zstd is safe (negotiated encoding): in All, but
+        // opt-in everywhere else.
+        assert!(state.enabled(Filter::CompressZstd));
+        let mut state = FilterState::new();
+        state.set_level(RewriteLevel::CoreFilters);
+        assert!(!state.enabled(Filter::CompressZstd));
+        state.enable(Filter::CompressZstd);
+        assert!(state.enabled(Filter::CompressZstd));
+        state.disable(Filter::CompressZstd);
+        assert!(!state.enabled(Filter::CompressZstd));
         // Mobilize level.
         let mut state = FilterState::new();
         state.set_level(RewriteLevel::MobilizeFilters);

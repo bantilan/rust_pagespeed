@@ -624,6 +624,7 @@ mod tests {
             BaseFetchType::HtmlTransform,
             crate::caching::PreserveCachingHeaders::DontPreserve,
             HttpOptions::default(),
+            false,
         );
         let options = RewriteOptions::new();
         // Without a resource driver there is nothing to drain.
@@ -679,6 +680,7 @@ mod tests {
                 BaseFetchType::HtmlTransform,
                 crate::caching::PreserveCachingHeaders::DontPreserve,
                 HttpOptions::default(),
+                false,
             );
             let html = crate::rewrite::html_context(
                 std::sync::Arc::new(ps_cache::cache::MemoryCache::new()),
@@ -778,6 +780,7 @@ mod tests {
                 BaseFetchType::HtmlTransform,
                 crate::caching::PreserveCachingHeaders::DontPreserve,
                 HttpOptions::default(),
+                false,
             );
             let html = crate::rewrite::html_context(
                 std::sync::Arc::new(ps_cache::cache::MemoryCache::new()),
@@ -878,6 +881,7 @@ mod tests {
                 BaseFetchType::HtmlTransform,
                 crate::caching::PreserveCachingHeaders::DontPreserve,
                 HttpOptions::default(),
+                false,
             );
             let html = crate::rewrite::html_context(
                 std::sync::Arc::new(ps_cache::cache::MemoryCache::new()),
@@ -978,6 +982,7 @@ mod tests {
             BaseFetchType::HtmlTransform,
             crate::caching::PreserveCachingHeaders::DontPreserve,
             HttpOptions::default(),
+            false,
         );
         let options = RewriteOptions::new();
         let mut sink = HtmlSink::new(&options, "http://h/p", false, &ps_side, &slot, None);

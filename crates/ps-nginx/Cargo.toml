@@ -27,6 +27,8 @@ libc = "=0.2.191"
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 criterion = { version = "0.5", features = ["html_reports"] }
 ps-image = { path = "../ps-image" }
+# Test-only zstd roundtrips (the filter encodes via ps-http).
+zstd = "0.14"
 
 [[bench]]
 name = "nginx"

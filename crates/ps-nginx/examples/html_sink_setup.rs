@@ -35,6 +35,7 @@ fn main() {
         BaseFetchType::HtmlTransform,
         PreserveCachingHeaders::DontPreserve,
         HttpOptions::default(),
+        false,
     );
     let slot = Mutex::new(None);
     let mut copying = Vec::new();
