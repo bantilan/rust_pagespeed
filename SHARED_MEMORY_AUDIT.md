@@ -26,7 +26,7 @@ the user after the initial review-only audit.
 | F7: lifecycle coverage gaps | Extended in `ef9aeb5`, explicit beacon coverage added in `5d434c9` | [Six beacon reload runs](docs/performance/shared-memory/beacon-reload-repetitions.json), lifecycle crash/config-change checks |
 | Permanent memory-bypass recovery | Verified for writer-slot exhaustion in `5d434c9` | [Disk-backed offline replacement regression](docs/performance/shared-memory/offline-domain-recovery-tests.log) |
 | Multi-run medians, worker scaling and pressure | Measured in `b989f48` / `f5e21a3` | [Current build](docs/performance/shared-memory/ef9aeb5-comparison.md), [worker matrix](docs/performance/shared-memory/WORKER_MATRIX.md) |
-| Production historical ~13 ms | Unattributed; not reproduced in the later small warm sample | [Installed observation](docs/performance/shared-memory/matrix-localhost-warm.json); production tracing denied |
+| Production historical ~13 ms | Unattributed; later installed review observed transient ~12–13 ms BYPASS and slow HIT tails | [Installed update review](docs/performance/shared-memory/INSTALLED_UPDATE_REVIEW.md); no server-side attribution |
 | Direct duplicate fetch/encode savings | Not measured | Ownership/job counters are proxies, not resource-byte or encode counts |
 | Sanitizers/model checking, end-to-end u64 epoch exhaustion | Not verified by these milestones | Primitive/process tests do not imply this coverage |
 
