@@ -277,6 +277,14 @@ impl SharedRegion {
         Ok(())
     }
 
+    /// Advance a reserved epoch monotonically, without acquiring its payload lock.
+    /// Used internally for conservative cancellation of background claims.
+    pub(crate) fn advance_epoch_to(&self, shard: usize, value: u64) -> io::Result<()> {
+        self.epoch_cell(shard)?
+            .fetch_max(value, std::sync::atomic::Ordering::SeqCst);
+        Ok(())
+    }
+
     /// Attempts once, without waiting: `None` means another holder is active.
     /// After owner death the payload is cleared before access is granted. A
     /// corrupt/unrecoverable mutex returns an error for higher-layer fallback.

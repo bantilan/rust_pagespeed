@@ -401,3 +401,21 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - Remaining Phase 4 requirements: HTML coordinator/publication integration, bounded release/retry/shutdown cleanup, killed coherence-writer counter recovery, end-to-end duplicate work regression. This sub-milestone alone does not enable shared single flight in Nginx.
 
 - Final scoped rustfmt and `git diff --check` pass. Commit: `git add SHARED_MEMORY_IMPLEMENTATION.md crates/ps-shm/src/{lib,ownership}.rs; git add -f docs/performance/shared-memory/phase4-ownership-*.log; git commit -m "Add bounded fenced cross-process ownership primitives"`. No push.
+
+## Phase 4 coordinator resume — design before edits
+
+- Resume: clean tree at 6ac47a7; no repository AGENTS.md found. Preflight `cargo test -p ps-shm -p ps-cache -p ps-nginx --lib` passed (391 primary cases), log phase4-coordinator-preflight.log.
+- Close cleanup gap before integration: separate dedicated robust-region atomic revocation watermark alongside owner mapping. Atomic max(serial) fences that token and earlier claims without taking the publication mutex. Only use this conservative cancellation on failed release; normal release affects one record. Later claims lazily recycle revoked slots. No live claim can publish after validation observes revocation; publication already holding the mutex linearizes before replacement. Mapping files must remain together and must not be unlinked while live.
+- Add protected `try_publish` that retains a claim across multiple metadata writes; `try_finish` still publishes/releases together. No fetching or optimization inside either closure.
+- Introduce safe ps-cache coordination traits and Linux implementation; claims and bounded publication retries run only on background workers. RAII release cancels atomically on contention/error, including panic, with no cleanup queue or unbounded wait.
+- HTML workers will wrap their metadata backend in a lease-aware adapter. Every metadata mutation (including nested CSS/image metadata) validates ownership under the publication lock; gets preserve codecs and validation. Keep immutable content-addressed HTTP outputs on existing paths. Queue rejection happens before acquiring cross-process ownership.
+- Coordinator is explicit opt-in ServerContext state until Nginx factory/config integration is verified. Shared table path supplies cache-domain isolation; partition keys already include effective options/UA. Unsupported long keys use existing local optimization; Full/Busy owners shed for retry on subsequent HTML requests.
+
+## Phase 4 coordinator dependency milestone — verified
+
+- Added `ps-cache::rewrite_coordinator` traits, Linux SharedRewriteCoordinator, and LeasedMetadataCache. Claims are worker-only; metadata publication retries have explicit budget (max 500ms); release has no wait and uses atomic revocation if contended. Long keys retain local processing; normal capacity/contention retries on later requests.
+- Owner v2 payload adds 8 reserved bytes beyond fixed records so v1 header dimensions cannot match any v2 capacity. Use a new owner filename; the adjacent revocations file is part of the domain. No runtime deployment currently uses either format. Symlink aliases canonicalize; hard-link aliases are unsupported and documented.
+- Regression tests prove contended release reclaims capacity, earlier revoked tokens cannot publish, late cleanup cannot revoke a newer token, multiple writes retain ownership, cache-domain/options separation, bounded publication failure, and panic cleanup. Publication already holding the mutex completes before any replacement can claim.
+- `cargo test -p ps-shm -p ps-cache > docs/performance/shared-memory/phase4-coordinator-tests.log 2>&1`: exit 0, 116 primary cases (47+69), plus one nested subprocess report.
+- `cargo clippy -p ps-shm -p ps-cache --all-targets --no-deps -- -D warnings -A clippy::new_without_default -A clippy::unnecessary_get_then_check > docs/performance/shared-memory/phase4-coordinator-clippy.log 2>&1`: passed; suppressions cover existing ps-cache lints only.
+- Modified: ps-shm region/ownership, ps-cache lib/new rewrite_coordinator, ledger/logs. Runtime HTML integration follows as a separate milestone; no request latency/defaults claim.

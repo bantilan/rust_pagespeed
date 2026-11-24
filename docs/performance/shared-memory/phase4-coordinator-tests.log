@@ -1,0 +1,149 @@
+   Compiling ps-shm v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-shm)
+   Compiling ps-cache v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-cache)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.63s
+     Running unittests src/lib.rs (target/debug/build/ps-cache/2be0efa45aec8a38/out/ps_cache-2be0efa45aec8a38)
+
+running 69 tests
+test base64::tests::golden_vectors ... ok
+test cache::tests::fallback_protocol ... ok
+test cache::tests::codec_round_trip_and_limits ... ok
+test base64::tests::decode_round_trip_and_rejection ... ok
+test cache::tests::filename_goldens ... ok
+test cache::tests::file_cache_clean_scheduling ... ok
+test cache::tests::lru_eviction_and_freshen ... ok
+test cache::tests::lru_replacement_and_limits ... ok
+test cache::tests::memory_cache_basics ... ok
+test cache::tests::prepender_routes ... ok
+test cache::tests::write_through_limit_and_backfill ... ok
+test hash::tests::case_preserve_hash_vectors ... ok
+test hash::tests::golden_hashes ... ok
+test hash::tests::hash_to_u64_is_big_endian_prefix ... ok
+test cache::tests::file_cache_round_trip_and_names ... ok
+test hash::tests::mock_hasher_returns_constant ... ok
+test hash::tests::md5_vectors_and_truncation ... ok
+test html::tests::eligibility_matrix ... ok
+test html::tests::hmac_golden ... ok
+test cache::tests::compressed_round_trip_and_corruption ... ok
+test html::tests::signature_shape_and_determinism ... ok
+test html::tests::value_round_trip_and_rejections ... ok
+test keys::tests::golden_partition_keys ... ok
+test keys::tests::golden_composite_keys ... ok
+test namer::tests::escaper_goldens ... ok
+test cache::tests::file_cache_clean ... ok
+test namer::tests::eventual_size_matches_encode ... ok
+test namer::tests::golden_cache_extender_shape ... ok
+test namer::tests::golden_experiment_url ... ok
+test namer::tests::golden_options_url ... ok
+test namer::tests::golden_plain_url ... ok
+test namer::tests::legacy_decode ... ok
+test namer::tests::signature_splitting ... ok
+test namer::tests::stale_signature_survives_unsigned_and_legacy_decode ... ok
+test purge::tests::clock_skew_sanitize ... ok
+test purge::tests::eviction_raises_global ... ok
+test purge::tests::flush_filenames ... ok
+test purge::tests::invalidation_list_and_combined_check ... ok
+test purge::tests::merge_and_equals ... ok
+test purge::tests::purge_file_round_trip ... ok
+test purge::tests::purge_file_validation ... ok
+test purge::tests::put_valid_and_global ... ok
+test remote::tests::error_burst_health ... ok
+test remote::tests::hash_goldens ... ok
+test remote::tests::live_memcached_opt_in ... ok
+test remote::tests::live_redis_opt_in ... ok
+test remote::tests::memcached_key_hashing ... ok
+test remote::tests::server_spec_parsing ... ok
+test shared_memory::tests::coherent_hot_hit_does_not_wait_for_unrelated_disk_write ... ok
+test rewrite_coordinator::tests::metadata_writes_and_deletes_are_fenced_and_panic_releases ... ok
+test shared_memory::tests::separate_adapters_share_mutations_and_remove_oversized_replacements ... ok
+test signature::tests::url_signing_vector ... ok
+test signature::tests::signatures_differ ... ok
+test system::tests::inflation_cap ... ok
+test system::tests::lru_and_redis_wiring ... ok
+test timer::tests::golden_values ... ok
+test ttl::tests::failure_policy_table ... ok
+test ttl::tests::golden_ttls ... ok
+test ttl::tests::recheck_rules ... ok
+test shared_memory::tests::concurrent_backfill_never_resurrects_replaced_or_deleted_bytes ... ok
+test rewrite_coordinator::tests::independent_handles_deduplicate_release_and_separate_domains ... ok
+test system::tests::default_chain_is_file_backed ... ok
+test signature::tests::correct_signature_size ... ok
+test rewrite_coordinator::tests::dropping_a_busy_lease_is_bounded_and_revokes_publication ... ok
+test cache::tests::lru_stress_keeps_invariants ... ok
+test namer::tests::round_trip_property ... ok
+test remote::tests::memcached_backend_key_in_value ... ok
+test remote::tests::redis_transport_and_backend ... ok
+test remote::tests::memcache_transport_round_trip ... ok
+
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 47 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test ownership::tests::subprocess_entry ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test ownership::tests::revoked_busy_release_reclaims_slots_and_fences_old_publication ... ok
+test ownership::tests::publication_stays_locked_until_finished ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test tests::coherent_subprocess_entry ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+
+running 1 test
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 46 filtered out; finished in 0.00s
+
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::different_tables_get_different_files ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+   Doc-tests ps_cache
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ps_shm
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

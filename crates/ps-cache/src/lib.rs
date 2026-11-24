@@ -15,6 +15,7 @@ pub mod keys;
 pub mod namer;
 pub mod purge;
 pub mod remote;
+pub mod rewrite_coordinator;
 /// Optional Linux shared-memory byte backend (factory integration is separate).
 #[cfg(target_os = "linux")]
 pub mod shared_memory;

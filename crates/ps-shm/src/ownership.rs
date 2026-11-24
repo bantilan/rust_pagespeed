@@ -2,7 +2,7 @@
 //!
 //! Call only on background workers: claims may inspect procfs. Never hold the
 //! publication lock while fetching or optimizing. Busy release/completion must
-//! be retried by the caller; this table deliberately has no lossy Drop cleanup.
+//! be retried or fenced with `revoke_through`; there is no lossy Drop cleanup.
 use crate::process_identity::{ProcessIdentity, ProcessLiveness};
 use crate::region::{RegionLayout, SharedRegion};
 use std::os::unix::fs::MetadataExt;
@@ -51,6 +51,7 @@ pub enum OwnershipFinish<T> {
 #[derive(Debug)]
 pub struct OwnershipTable {
     region: SharedRegion,
+    revocations: SharedRegion,
     slots: usize,
     mapping: (u64, u64),
 }
@@ -58,6 +59,9 @@ pub struct OwnershipTable {
 impl OwnershipTable {
     /// Open a dedicated ownership-format file without truncating live state.
     /// Capacity is 1–1024; changing capacity requires a different filename.
+    /// The adjacent `.revocations-v1` file is part of this mapping's lifetime.
+    /// Use one canonical pathname (no hard-link aliases) and never remove either
+    /// file while workers hold mappings.
     pub fn open(path: &Path, slots: usize) -> io::Result<Self> {
         if !(1..=1024).contains(&slots) {
             return Err(io::Error::new(
@@ -65,10 +69,16 @@ impl OwnershipTable {
                 "invalid owner capacity",
             ));
         }
-        let region = SharedRegion::open(path, RegionLayout::new(1, slots * RECORD)?)?;
+        let region = SharedRegion::open(path, RegionLayout::new(1, slots * RECORD + 8)?)?;
+        // Canonical path makes symlink aliases use the same cancellation file.
+        let canonical = std::fs::canonicalize(path)?;
+        let mut cancellation = canonical.as_os_str().to_os_string();
+        cancellation.push(".revocations-v1");
+        let revocations = SharedRegion::open(Path::new(&cancellation), RegionLayout::new(1, 8)?)?;
         let metadata = std::fs::metadata(path)?;
         Ok(Self {
             region,
+            revocations,
             slots,
             mapping: (metadata.dev(), metadata.ino()),
         })
@@ -88,7 +98,8 @@ impl OwnershipTable {
         let mut free = None;
         for slot in 0..self.slots {
             let record = &mut bytes[slot * RECORD..(slot + 1) * RECORD];
-            if word(record, 0) == 0 {
+            if word(record, 0) == 0 || word(record, 0) <= self.revocations.epoch(0)? {
+                record.fill(0);
                 free.get_or_insert(slot);
                 continue;
             }
@@ -140,13 +151,41 @@ impl OwnershipTable {
         }))
     }
 
-    /// Validate the token and publish under the same lock, closing the
-    /// validation/publication race. Panic clears the shard, fencing every job.
-    /// Pass `|| ()` for explicit release without publication. Never fetch or
-    /// optimize in the closure. A Busy outcome requires worker-side retry.
+    /// Revoke this token and all earlier tokens without waiting for a lock.
+    /// This conservative fallback may discard other in-progress jobs; later
+    /// requests retry them. It is intended for contended/panicking cleanup.
+    pub fn revoke_through(&self, token: OwnershipToken) -> io::Result<()> {
+        if token.mapping == self.mapping {
+            self.revocations.advance_epoch_to(0, token.serial)?;
+        }
+        Ok(())
+    }
+
+    /// Publish while retaining ownership for further metadata writes. The
+    /// closure runs under the owner mutex; never fetch or optimize inside it.
+    pub fn try_publish<T>(
+        &self,
+        token: OwnershipToken,
+        publish: impl FnOnce() -> T,
+    ) -> io::Result<OwnershipFinish<T>> {
+        self.publish(token, false, publish)
+    }
+
+    /// Validate and publish under one lock, then release this claim. Passing
+    /// `|| ()` explicitly releases without publishing. Busy requires retry or
+    /// conservative `revoke_through` cleanup on the background worker.
     pub fn try_finish<T>(
         &self,
         token: OwnershipToken,
+        publish: impl FnOnce() -> T,
+    ) -> io::Result<OwnershipFinish<T>> {
+        self.publish(token, true, publish)
+    }
+
+    fn publish<T>(
+        &self,
+        token: OwnershipToken,
+        release: bool,
         publish: impl FnOnce() -> T,
     ) -> io::Result<OwnershipFinish<T>> {
         if token.mapping != self.mapping || token.slot >= self.slots {
@@ -156,11 +195,16 @@ impl OwnershipTable {
             return Ok(OwnershipFinish::Busy);
         };
         let record = &mut guard.bytes_mut()[token.slot * RECORD..(token.slot + 1) * RECORD];
-        if token.serial == 0 || word(record, 0) != token.serial {
+        if token.serial == 0
+            || word(record, 0) != token.serial
+            || token.serial <= self.revocations.epoch(0)?
+        {
             return Ok(OwnershipFinish::Stale);
         }
         let result = publish();
-        record.fill(0);
+        if release {
+            record.fill(0);
+        }
         Ok(OwnershipFinish::Finished(result))
     }
 }
@@ -199,7 +243,7 @@ mod tests {
             Self(path)
         }
         fn path(&self) -> std::path::PathBuf {
-            self.0.join("owners-v1")
+            self.0.join("owners-v2")
         }
     }
     impl Drop for Temp {
@@ -286,6 +330,44 @@ mod tests {
             OwnershipFinish::Finished(42)
         );
         let _ = claim(&peer, "job");
+    }
+    #[test]
+    fn revoked_busy_release_reclaims_slots_and_fences_old_publication() {
+        let temp = Temp::new();
+        let table = OwnershipTable::open(&temp.path(), 2).unwrap();
+        let peer = OwnershipTable::open(&temp.path(), 2).unwrap();
+        let first = claim(&table, "first");
+        let second = claim(&table, "second");
+        let guard = table.region.try_lock(0).unwrap().unwrap();
+        assert_eq!(
+            table.try_finish(second, || ()).unwrap(),
+            OwnershipFinish::Busy
+        );
+        peer.revoke_through(second).unwrap();
+        drop(guard);
+        for token in [first, second] {
+            assert_eq!(
+                table
+                    .try_publish(token, || panic!("revoked write"))
+                    .unwrap(),
+                OwnershipFinish::<()>::Stale
+            );
+        }
+        let next = claim(&peer, "second");
+        // Late cleanup of an old token cannot revoke a newer claim.
+        table.revoke_through(first).unwrap();
+        assert_eq!(
+            peer.try_publish(next, || 1).unwrap(),
+            OwnershipFinish::Finished(1)
+        );
+        assert_eq!(
+            peer.try_publish(next, || 2).unwrap(),
+            OwnershipFinish::Finished(2)
+        );
+        assert_eq!(
+            peer.try_finish(next, || ()).unwrap(),
+            OwnershipFinish::Finished(())
+        );
     }
     #[test]
     fn contention_never_publishes_or_claims() {
