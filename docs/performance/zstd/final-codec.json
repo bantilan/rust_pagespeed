@@ -1,0 +1,6 @@
+{"level":3,"samples":9,"iterations":200,"cases":[
+{"name":"html_bulk","input_bytes":14213,"encoded_bytes":3012,"cold_ns":179581,"median_ns":641.59,"samples_ns":[894.695, 641.74, 640.94, 641.39, 641.535, 680.615, 641.59, 641.74, 620.095]}
+,{"name":"html_stream","input_bytes":14213,"encoded_bytes":3000,"cold_ns":394432,"median_ns":27851.305,"samples_ns":[24966.86, 25728.59, 26903.605, 27730.215, 27851.305, 27875.76, 27913.785, 28445.8, 27940.64]}
+,{"name":"css_bulk","input_bytes":70656,"encoded_bytes":91,"cold_ns":259933,"median_ns":3181.995,"samples_ns":[3359.445, 3248.575, 3242.665, 3186.755, 3181.995, 3165.76, 3123.025, 3115.41, 3096.575]}
+,{"name":"css_stream","input_bytes":70656,"encoded_bytes":88,"cold_ns":40351,"median_ns":10585.22,"samples_ns":[10193.78, 10175.345, 10393.08, 10475.5, 10709.815, 10585.22, 10588.625, 10605.76, 10619.285]}
+]}

@@ -72,6 +72,18 @@ for deployment details.
 Earlier component benchmarks and asynchronous-workload examples are documented
 in [the async rewriting guide](docs/ASYNC_REWRITING.md).
 
+### Zstd output compression
+
+Enable negotiated Zstandard output with `pagespeed EnableFilters compress_zstd;`.
+It keeps the original level 3 compression and streaming flush behavior. Clients
+that do not accept zstd retain the existing response path.
+
+Completed codec workspaces are reused per thread. Repeated complete bodies use
+a bounded 512 KiB/eight-entry payload cache with exact-byte validation; streaming
+HTML frames are never cached, preserving per-request RUM/beacon behavior.
+[Zstd benchmarks and memory tradeoffs](docs/performance/zstd/RESULTS.md) cover
+HTML HIT/MISS, cached resources, unique bodies, and disabled-filter controls.
+
 ## Features vs C++ PageSpeed
 
 Legend: ✅ supported · 🔶 partial · 📋 planned · ❌ not supported (out of scope)

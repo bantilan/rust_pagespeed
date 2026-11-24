@@ -1,0 +1,126 @@
+[
+  {
+    "module": "original",
+    "enabled": false,
+    "phases": {
+      "identity_hit": {
+        "median_ms": 0.445297,
+        "samples": 300
+      },
+      "zstd_hit": {
+        "median_ms": 0.41256550000000003,
+        "samples": 300
+      },
+      "identity_miss": {
+        "median_ms": 1.8294175,
+        "samples": 300
+      },
+      "zstd_miss": {
+        "median_ms": 1.886602,
+        "samples": 300
+      },
+      "resource_identity": {
+        "median_ms": 0.24693700000000002,
+        "samples": 300
+      },
+      "resource_zstd": {
+        "median_ms": 0.2286575,
+        "samples": 300
+      }
+    },
+    "median_pss_kib": 23887
+  },
+  {
+    "module": "original",
+    "enabled": true,
+    "phases": {
+      "identity_hit": {
+        "median_ms": 0.479012,
+        "samples": 300
+      },
+      "zstd_hit": {
+        "median_ms": 0.5442335,
+        "samples": 300
+      },
+      "identity_miss": {
+        "median_ms": 1.8761160000000001,
+        "samples": 300
+      },
+      "zstd_miss": {
+        "median_ms": 1.970506,
+        "samples": 300
+      },
+      "resource_identity": {
+        "median_ms": 0.235732,
+        "samples": 300
+      },
+      "resource_zstd": {
+        "median_ms": 0.471044,
+        "samples": 300
+      }
+    },
+    "median_pss_kib": 26146
+  },
+  {
+    "module": "refined",
+    "enabled": false,
+    "phases": {
+      "identity_hit": {
+        "median_ms": 0.4420565,
+        "samples": 300
+      },
+      "zstd_hit": {
+        "median_ms": 0.404802,
+        "samples": 300
+      },
+      "identity_miss": {
+        "median_ms": 1.8435745,
+        "samples": 300
+      },
+      "zstd_miss": {
+        "median_ms": 1.8257215,
+        "samples": 300
+      },
+      "resource_identity": {
+        "median_ms": 0.22499999999999998,
+        "samples": 300
+      },
+      "resource_zstd": {
+        "median_ms": 0.2221445,
+        "samples": 300
+      }
+    },
+    "median_pss_kib": 23869
+  },
+  {
+    "module": "refined",
+    "enabled": true,
+    "phases": {
+      "identity_hit": {
+        "median_ms": 0.4135135,
+        "samples": 300
+      },
+      "zstd_hit": {
+        "median_ms": 0.45081499999999997,
+        "samples": 300
+      },
+      "identity_miss": {
+        "median_ms": 1.8306945,
+        "samples": 300
+      },
+      "zstd_miss": {
+        "median_ms": 1.99037,
+        "samples": 300
+      },
+      "resource_identity": {
+        "median_ms": 0.2381235,
+        "samples": 300
+      },
+      "resource_zstd": {
+        "median_ms": 0.230271,
+        "samples": 300
+      }
+    },
+    "median_pss_kib": 25616
+  }
+]

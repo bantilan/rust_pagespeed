@@ -20,6 +20,7 @@ parser.add_argument('--nginx', required=True)
 parser.add_argument('--module', required=True)
 parser.add_argument('--output', required=True)
 parser.add_argument('--port', type=int, default=18091)
+parser.add_argument('--zstd', action='store_true', help='Enable/accept zstd and decode HTML before checking nonce behavior')
 parser.add_argument('--accept-before-reload', action='store_true', help='Accept before reload, then ensure new workers preserve evidence and reject replay')
 args = parser.parse_args()
 repo = Path(__file__).resolve().parent.parent
@@ -34,9 +35,11 @@ config = config.replace('master_process off;', 'master_process on;').replace('wo
 config = config.replace('http {', 'http {\nadd_header X-Worker $pid always;')
 config = config.replace(f'pagespeed FileCachePath {prefix}/cache;', f'pagespeed FileCachePath {prefix}/cache;\npagespeed CreateSharedMemoryMetadataCache {prefix}/cache 1024;')
 config = config.replace('    location / {', f'    location = /beacon-reload.html {{ alias {prefix}/page.html; }}\n    location = /hold.bin {{ alias {prefix}/hold.bin; limit_rate 8k; }}\n    location / {{')
+if args.zstd:
+    config = config.replace('pagespeed RewriteLevel CoreFilters;', 'pagespeed RewriteLevel CoreFilters;\npagespeed EnableFilters compress_zstd;')
 (prefix / 'conf/nginx.conf').write_text(config)
 subprocess.run([args.nginx, '-t', '-p', str(prefix) + '/', '-c', 'conf/nginx.conf'], check=True, capture_output=True)
-result = {'passed': False, 'prefix': str(prefix), 'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo, text=True).strip(),
+result = {'passed': False, 'zstd': args.zstd, 'prefix': str(prefix), 'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo, text=True).strip(),
           'module_sha256': hashlib.sha256(Path(args.module).read_bytes()).hexdigest(), 'config_sha256': hashlib.sha256(config.encode()).hexdigest()}
 
 
@@ -47,9 +50,21 @@ def connection():
 def request(path, params=None):
     conn = connection()
     conn.request('POST' if params else 'GET', path, body=urlencode(params) if params else None,
-                 headers={'Host': 'localhost', 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
+                 headers={'Host': 'localhost', 'Content-Type': 'application/x-www-form-urlencoded', 'Accept-Encoding': 'zstd' if args.zstd else 'identity', 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
     response = conn.getresponse()
     body = response.read()
+    if response.getheader('Content-Encoding') == 'zstd':
+        import ctypes
+        lib = ctypes.CDLL('libzstd.so.1')
+        lib.ZSTD_decompress.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_size_t]
+        lib.ZSTD_decompress.restype = ctypes.c_size_t
+        lib.ZSTD_isError.argtypes = [ctypes.c_size_t]
+        lib.ZSTD_isError.restype = ctypes.c_uint
+        decoded = ctypes.create_string_buffer(2 * 1024 * 1024)
+        size = lib.ZSTD_decompress(decoded, len(decoded), body, len(body))
+        assert not lib.ZSTD_isError(size), 'invalid zstd beacon response'
+        body = decoded.raw[:size]
+        result['decoded_zstd_responses'] = result.get('decoded_zstd_responses', 0) + 1
     status, pid = response.status, int(response.getheader('X-Worker', '0'))
     conn.close()
     assert status in (200, 204), (status, body[:200])
@@ -92,6 +107,8 @@ try:
     match = re.search(rb"pagespeed\.CriticalImages\.Run\('([^']*)','([^']*)','([^']*)',(?:true|false),(?:true|false),'([^']*)'\)", body)
     assert match, body[-2000:]
     endpoint, page_url, options_hash, nonce = [v.decode() for v in match.groups()]
+    if args.zstd:
+        assert result.get('decoded_zstd_responses', 0) > 0, 'HTML was not zstd encoded'
     initial = evidence()
     assert nonce in initial['nonces'] and initial['valid'] == 0, initial
     params = {'url': page_url, 'oh': options_hash, 'n': nonce, 'lcpk': 'text'}

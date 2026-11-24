@@ -13,7 +13,7 @@
 
 use crate::names::header;
 use crate::response::ResponseHeaders;
-use std::{cell::RefCell, io::Write};
+use std::{cell::RefCell, collections::VecDeque, io::Write};
 use zstd::stream::raw::Operation;
 
 /// Content-Encoding value this filter emits.
@@ -122,6 +122,24 @@ pub fn response_eligible_for_zstd(
 
 /// Compresses one complete body at the default level.
 pub fn encode_zstd(bytes: &[u8]) -> std::io::Result<Vec<u8>> {
+    let cacheable = (256..=ENCODED_CACHE_BYTES).contains(&bytes.len());
+    let fingerprint = if cacheable {
+        // Fast candidate selection only; exact input equality below is the
+        // correctness check, so checksum collisions never reuse wrong bytes.
+        u64::from(crc32fast::hash(bytes))
+    } else {
+        0
+    };
+    if cacheable {
+        if let Ok(Some(encoded)) = ENCODED_BODIES.try_with(|cache| {
+            cache
+                .try_borrow_mut()
+                .ok()
+                .and_then(|mut cache| cache.get(fingerprint, bytes))
+        }) {
+            return Ok(encoded);
+        }
+    }
     let mut encoder = BULK_CONTEXT
         .with(|slot| slot.borrow_mut().take())
         .map(Ok)
@@ -136,14 +154,89 @@ pub fn encode_zstd(bytes: &[u8]) -> std::io::Result<Vec<u8>> {
             }
         });
     }
+    if cacheable && output.len() < bytes.len() {
+        let _ = ENCODED_BODIES.try_with(|cache| {
+            if let Ok(mut cache) = cache.try_borrow_mut() {
+                if cache.seen_before(fingerprint, bytes.len()) {
+                    cache.put(fingerprint, bytes, &output);
+                }
+            }
+        });
+    }
     Ok(output)
 }
 
-// Each thread retains at most one context of each kind. Large responses are
-// still fully encoded but do not leave their workspace cached. No
-// application response/output Vecs are retained; active streams own separate contexts.
+// Complete-body results only: streaming HTML frames/nonces are never cached.
+// Account both original and encoded bytes; bounded entry count caps overhead.
+const ENCODED_CACHE_BYTES: usize = 512 * 1024;
+const ENCODED_CACHE_ENTRIES: usize = 8;
+struct EncodedBody {
+    fingerprint: u64,
+    input: Vec<u8>,
+    output: Vec<u8>,
+}
+#[derive(Default)]
+struct EncodedBodyCache {
+    entries: VecDeque<EncodedBody>,
+    // Admission metadata only: unique responses do not copy/retain their body.
+    recent: VecDeque<(u64, usize)>,
+    bytes: usize,
+}
+impl EncodedBodyCache {
+    fn seen_before(&mut self, fingerprint: u64, len: usize) -> bool {
+        if let Some(index) = self
+            .recent
+            .iter()
+            .position(|candidate| *candidate == (fingerprint, len))
+        {
+            self.recent.remove(index);
+            return true;
+        }
+        if self.recent.len() == ENCODED_CACHE_ENTRIES {
+            self.recent.pop_back();
+        }
+        self.recent.push_front((fingerprint, len));
+        false
+    }
+    fn get(&mut self, fingerprint: u64, input: &[u8]) -> Option<Vec<u8>> {
+        // Fingerprints only accelerate lookup. Exact comparison is required
+        // before serving any bytes, including on hash collisions.
+        let index = self
+            .entries
+            .iter()
+            .position(|entry| entry.fingerprint == fingerprint && entry.input == input)?;
+        let entry = self.entries.remove(index)?;
+        let output = entry.output.clone();
+        self.entries.push_front(entry);
+        Some(output)
+    }
+    fn put(&mut self, fingerprint: u64, input: &[u8], output: &[u8]) {
+        let Some(size) = input.len().checked_add(output.len()) else {
+            return;
+        };
+        if size > ENCODED_CACHE_BYTES {
+            return;
+        }
+        while self.bytes + size > ENCODED_CACHE_BYTES || self.entries.len() >= ENCODED_CACHE_ENTRIES
+        {
+            let old = self.entries.pop_back().expect("nonempty cache over budget");
+            self.bytes -= old.input.len() + old.output.len();
+        }
+        self.entries.push_front(EncodedBody {
+            fingerprint,
+            input: input.to_vec(),
+            output: output.to_vec(),
+        });
+        self.bytes += size;
+    }
+}
+
+// Each thread retains at most one codec context of each kind. Large responses
+// still encode fully but do not leave their workspace pooled. The separate
+// body memo above has its own byte limit; active streams own separate contexts.
 const MAX_RETAINED_INPUT_BYTES: usize = 1024 * 1024;
 thread_local! {
+    static ENCODED_BODIES: RefCell<EncodedBodyCache> = const { RefCell::new(EncodedBodyCache { entries: VecDeque::new(), recent: VecDeque::new(), bytes: 0 }) };
     static BULK_CONTEXT: RefCell<Option<zstd::bulk::Compressor<'static>>> = const { RefCell::new(None) };
     static STREAM_CONTEXT: RefCell<Option<zstd::stream::raw::Encoder<'static>>> = const { RefCell::new(None) };
 }
@@ -490,5 +583,54 @@ mod tests {
         for thread in threads {
             thread.join().unwrap();
         }
+    }
+    #[test]
+    fn encoded_body_cache_checks_collisions_and_tracks_bounded_lru() {
+        let mut cache = EncodedBodyCache::default();
+        cache.put(1, b"first", b"one");
+        assert!(cache.get(1, b"other").is_none(), "hash collision is a miss");
+        assert_eq!(cache.get(1, b"first").unwrap(), b"one");
+        for key in 2..=ENCODED_CACHE_ENTRIES as u64 {
+            cache.put(key, &[key as u8], &[key as u8]);
+        }
+        cache.get(1, b"first").unwrap(); // first becomes most recent
+        cache.put(100, b"last", b"last");
+        assert!(cache.get(2, &[2]).is_none());
+        assert!(cache.get(1, b"first").is_some());
+        assert!(cache.entries.len() <= ENCODED_CACHE_ENTRIES);
+        let large = vec![8; ENCODED_CACHE_BYTES / 2];
+        cache.put(101, &large, b"a");
+        cache.put(102, &large, b"b");
+        assert!(cache.bytes <= ENCODED_CACHE_BYTES);
+        assert_eq!(cache.entries.len(), 1);
+        let retained = cache.bytes;
+        cache.put(103, &vec![0; ENCODED_CACHE_BYTES], b"too big");
+        assert_eq!(cache.bytes, retained);
+    }
+
+    #[test]
+    fn encoded_body_cache_never_reuses_changed_input() {
+        let first = b"original CSS body ".repeat(1024);
+        let mut changed = first.clone();
+        changed[30] = b'X';
+        let a = encode_zstd(&first).unwrap();
+        let b = encode_zstd(&changed).unwrap();
+        assert_eq!(decode(&a, first.len()), first);
+        assert_eq!(decode(&b, changed.len()), changed);
+        assert_eq!(encode_zstd(&first).unwrap(), a);
+        let noisy: Vec<_> = (0..=255).cycle().take(ENCODED_CACHE_BYTES + 1).collect();
+        assert_eq!(decode(&encode_zstd(&noisy).unwrap(), noisy.len()), noisy);
+    }
+    #[test]
+    fn one_off_responses_only_keep_bounded_admission_metadata() {
+        let mut cache = EncodedBodyCache::default();
+        for fingerprint in 0..100 {
+            assert!(!cache.seen_before(fingerprint, 4096));
+        }
+        assert_eq!(cache.recent.len(), ENCODED_CACHE_ENTRIES);
+        assert_eq!(cache.bytes, 0);
+        assert!(cache.entries.is_empty());
+        assert!(cache.seen_before(99, 4096));
+        assert!(!cache.seen_before(99, 4097));
     }
 }
