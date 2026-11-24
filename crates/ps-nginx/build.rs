@@ -64,8 +64,15 @@ fn main() {
         .arg(include("src/core"))
         .arg(include("src/os/unix"))
         .arg(include("src/event"))
+        .arg(include("src/event/modules"))
+        .arg(include("src/event/quic"))
         .arg(include("src/http"))
+        .arg(include("src/http/modules"))
         .arg(include("src/http/v2"))
+        .arg(include("src/http/v3"))
+        .arg(include("src/mail"))
+        .arg(include("src/misc"))
+        .arg(include("src/stream"))
         .status()
         .expect("run cc (a C compiler must be installed)");
     assert!(
