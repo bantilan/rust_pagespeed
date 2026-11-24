@@ -59,6 +59,9 @@ pub mod byte_cache;
 #[cfg(target_os = "linux")]
 pub mod region;
 
+#[cfg(target_os = "linux")]
+pub mod process_identity;
+
 use fs2::FileExt;
 use std::fs::OpenOptions;
 use std::io;

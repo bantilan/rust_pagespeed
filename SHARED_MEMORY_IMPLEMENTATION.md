@@ -101,8 +101,9 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Verify negative entries, expiration, purge, failed writes/admission, concurrent backfill and multi-worker races.
 - [x] Benchmark integration before changing defaults; commit tested integration.
 
-### Phase 4 — Cross-process single flight/crash recovery [PENDING — next implementation task]
+### Phase 4 — Cross-process single flight/crash recovery [IN PROGRESS — identity dependency verified]
 
+- [x] Implement and verify conservative Linux PID/start-time liveness dependency.
 - [ ] Design bounded owner/fencing table keyed by options-aware rewrite identity.
 - [ ] Integrate async resource and combination scheduling without HTML waits.
 - [ ] Recover killed owners, queue rejection, panic, shutdown and PID reuse safely.
@@ -174,7 +175,7 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 **State:** Phases 0–3 implemented and verified (Phase 3 exposes an opt-in assembly API; no production directive/default changed). Latest integration commit is `Integrate coherent L1 shared-memory L2 and persistent L3 caches`; inspect git log for its hash. Earlier commits: `4d23d3e` baseline/plan, `ff67357` regions, `6aaefe3` bytes/adapter, `6213ac2` lifetime diagnosis, `7cf9997` coherent counter protocol.
 
-**Exact next action:** inspect status/log and run `cargo test -p ps-shm -p ps-cache -p ps-nginx --lib`. Begin Phase 4 by specifying a separate bounded, fenced cross-process owner table (do not evict running owners as LRU data). Integrate claims into fire-and-forget HTML single-resource/inline/combination optimization worker closures only, so liveness/PID-reuse checks run off the HTML thread. Namespace by cache-path domain plus options-aware job identity. Preserve foreground/IPRO resource-serving behavior: a remote owner's work cannot simply complete a byte-serving request as false. Add real subprocess deduplication, killed-owner, PID-start identity and stale-token publication regressions before committing.
+**Exact next action:** inspect status/log and read the Phase 4 identity results at the end. The standalone process-identity dependency is implemented; Phase 4 ownership integration remains pending. Specify and implement a separate bounded owner table with non-reused fencing tokens and atomic publication authorization. Account for whole-shard reset after robust mutex owner death: old jobs must lose publication rights without ever reusing their tokens. Integrate only fire-and-forget HTML optimization closures, with cache-path plus options-aware keys. Keep procfs reads off HTML threads and foreground/IPRO waiters unchanged. Add actual subprocess deduplication, killed-owner, full-table and stale-publication tests.
 
 **Additional Phase 4 requirement:** legacy-style active-writer counters in the new coherent domain still remain nonzero after an abruptly killed disk writer and safely bypass memory indefinitely. Implement bounded dead-writer recovery or an owner-aware coherence protocol as part of crash recovery. Shared regions' byte-lock recovery alone does not repair those counters.
 
@@ -356,3 +357,24 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - HTML request baseline remains baseline.json. No new whole-request shared-cache result is claimed because Nginx configuration activation is intentionally Phase 6. Final multi-worker request-level profiling and defaults remain Phase 10.
 - Known limitations: fixed-slot internal slack; killed active-write counters need Phase 4 recovery; mixed legacy/v2 participants need a migration strategy before production enablement; full workspace/fault/reload/checkpoint tests remain pending. No filters, resource codecs or background processing disabled.
 - Final checks before commit: rustfmt on modified Rust files/examples and `git diff --check`. Commit command: `git add SHARED_MEMORY_IMPLEMENTATION.md crates/ps-nginx/src/caches.rs crates/ps-nginx/examples/shared_cache_probe.rs crates/ps-cache/src/cache.rs crates/ps-cache/src/shared_memory.rs docs/performance/shared-memory/phase3-cache-probe*.json; git add -f docs/performance/shared-memory/phase3-*.log; git commit -m "Integrate coherent L1 shared-memory L2 and persistent L3 caches"`. No push.
+
+## Phase 4 identity sub-milestone — design before edits
+
+- Resume audit: clean tree at db778c3; no repository AGENTS.md found. Preflight unit suite running in phase4-preflight.log.
+- First independently testable dependency: Linux process identity = PID + /proc stat start-time ticks. Read current identity on the worker, never cache a pre-fork PID. Parse stat after its last closing parenthesis because comm may contain whitespace and parentheses.
+- Liveness is three-state: matching non-zombie identity is Alive; kernel-confirmed absent process or mismatched start time is Dead; zombie leaders and permission/I/O/malformed identity are Unknown and must never authorize stealing. Identity is scoped to the region's already validated Linux boot.
+- This primitive does not complete job fencing, publication, or active-writer recovery. Next sub-milestone remains a separate bounded owner table and publication protocol.
+
+## Phase 4 identity dependency — verified milestone
+
+- Added Linux-only `crates/ps-shm/src/process_identity.rs` and export in lib.rs. Current identity is read after fork, never inherited as a cached master PID. Matching PID/start ticks identifies the worker within the region boot.
+- Conservative recovery: zombie leaders may retain live threads and therefore return Unknown. Procfs NotFound alone may reflect hidepid; require signal-zero ESRCH before declaring absence. Permission, malformed stat, interrupted reads and invalid zero PID return Unknown. No lease timeout authorizes stealing.
+- Regression coverage: comm containing spaces/parentheses; malformed stat; PID reuse with mismatched start ticks; unknown errors; zombie leader state; actual independent killed/reaped process. Initial strict clippy found missing API docs/byte literal style, corrected. A stale zombie test expectation failed after conservative policy change; corrected and entire suite rerun successfully.
+- `cargo test -p ps-shm -p ps-cache -p ps-nginx --lib > docs/performance/shared-memory/phase4-preflight.log 2>&1`: exit 0, 381 primary cases (plus one nested harness report).
+- `cargo test -p ps-shm > docs/performance/shared-memory/phase4-identity-tests.log 2>&1`: exit 0, 40 cases, zero failures.
+- `cargo clippy -p ps-shm --all-targets -- -D warnings > docs/performance/shared-memory/phase4-identity-clippy.log 2>&1`: exit 0, no suppressions.
+- `cargo build -p ps-nginx --release > docs/performance/shared-memory/phase4-identity-build.log 2>&1`: exit 0, 22.00s optimized build. No deployment.
+- `rustfmt --edition 2021 --check crates/ps-shm/src/{lib,process_identity}.rs` and `git diff --check`: required before commit.
+- No runtime integration yet, so no new HTML latency result is claimed. Baseline and Phase 3 cache microbenchmark remain the measured performance evidence.
+- Phase 4 remains IN PROGRESS. Owner-table layout, publication fencing, background integration, stranded coherence-writer recovery and subprocess deduplication remain pending; Phases 5–10 unchanged.
+- Milestone commit command: `git add SHARED_MEMORY_IMPLEMENTATION.md crates/ps-shm/src/lib.rs crates/ps-shm/src/process_identity.rs; git add -f docs/performance/shared-memory/phase4-*.log; git commit -m "Add conservative Linux process identity for ownership recovery"`. No push.
