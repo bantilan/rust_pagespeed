@@ -252,10 +252,7 @@ pub fn constant_time_compare(a: &str, b: &str) -> bool {
 /// unless beaconing is on; available once at least one valid
 /// beacon merged (`IsBeaconDataAvailable`).
 #[must_use]
-pub fn availability(
-    beacon_enabled: bool,
-    evidence: Option<&BeaconEvidence>,
-) -> Availability {
+pub fn availability(beacon_enabled: bool, evidence: Option<&BeaconEvidence>) -> Availability {
     if !beacon_enabled {
         return Availability::Disabled;
     }
@@ -309,9 +306,8 @@ pub fn downstream_beacon_gate(
     if options.downstream_cache_rebeaconing_key().is_empty() {
         return DownstreamBeacon::Inactive;
     }
-    let matched = header.is_some_and(|value| {
-        options.matches_downstream_cache_rebeaconing_key(value)
-    });
+    let matched =
+        header.is_some_and(|value| options.matches_downstream_cache_rebeaconing_key(value));
     DownstreamBeacon::MustMatch(matched)
 }
 
@@ -445,11 +441,7 @@ pub fn prepare_beacon(
 
 /// Validates and consumes a reported nonce
 /// (`ValidateAndExpireNonce`): over-long or unknown nonces fail.
-fn validate_nonce(
-    now_ms: i64,
-    nonce: &str,
-    evidence: &mut BeaconEvidence,
-) -> bool {
+fn validate_nonce(now_ms: i64, nonce: &str, evidence: &mut BeaconEvidence) -> bool {
     if nonce.is_empty() || nonce.len() > NONCE_CHARS {
         return false;
     }
@@ -635,6 +627,30 @@ impl BeaconFinder {
         }
     }
 
+    /// Mutate evidence under the metadata backend's transaction. None means
+    /// contention: no nonce/report state was changed, so the caller may retry.
+    pub fn update<R>(
+        &self,
+        url: &str,
+        options_hash: &str,
+        device: &str,
+        mut change: impl FnMut(&mut BeaconEvidence) -> R,
+    ) -> Option<R> {
+        let mut result = None;
+        self.cache
+            .update(&evidence_key(url, options_hash, device), &mut |lookup| {
+                let mut evidence = lookup
+                    .value
+                    .as_deref()
+                    .and_then(decode_evidence)
+                    .unwrap_or_default();
+                let before = evidence.clone();
+                result = Some(change(&mut evidence));
+                (evidence != before).then(|| encode_evidence(&evidence))
+            });
+        result
+    }
+
     /// Stores a variant's evidence (best-effort, like other
     /// metadata writes).
     pub fn store(&self, url: &str, options_hash: &str, device: &str, evidence: &BeaconEvidence) {
@@ -648,6 +664,107 @@ impl BeaconFinder {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn multiprocess_evidence_updates_preserve_nonces_and_reports() {
+        use ps_cache::cache::{Cache, FileCache, FileCachePolicy};
+        const ENV: &str = "PS_BEACON_TRANSACTION_CHILD";
+        let worker = std::env::var("PS_BEACON_TRANSACTION_WORKER").ok();
+        let directory = std::env::var_os(ENV)
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::env::temp_dir().join(format!(
+                    "ps-beacon-transactions-{}-{}",
+                    std::process::id(),
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_nanos()
+                ))
+            });
+        std::fs::create_dir_all(&directory).unwrap();
+        let file: Arc<dyn Cache> = Arc::new(FileCache::new(
+            &directory.join("disk"),
+            FileCachePolicy {
+                clean_interval_ms: -1,
+                target_size_bytes: 16_777_216,
+                target_inode_count: 0,
+                path_length_limit: 8192,
+            },
+            0,
+        ));
+        let cache: Arc<dyn Cache> = Arc::new(
+            ps_cache::transactional::TransactionalCache::open(
+                &directory.join("transactions"),
+                file,
+            )
+            .unwrap(),
+        );
+        let finder = BeaconFinder::new(&cache);
+        if let Some(worker) = worker {
+            for iteration in 0..32 {
+                let nonce = format_nonce((worker.parse::<u64>().unwrap() << 32) | iteration);
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+                while finder
+                    .update("http://h/p", "options", "@Desktop", |evidence| {
+                        evidence.pending_nonces.push((nonce.clone(), 1000));
+                    })
+                    .is_none()
+                {
+                    assert!(std::time::Instant::now() < deadline);
+                    std::thread::yield_now();
+                }
+                let report = report_with(Some(HashSet::new()), "img", "", &nonce);
+                let accepted = loop {
+                    if let Some(outcome) =
+                        finder.update("http://h/p", "options", "@Desktop", |evidence| {
+                            accept_beacon(evidence, &report, 1001)
+                        })
+                    {
+                        break outcome;
+                    }
+                    assert!(std::time::Instant::now() < deadline);
+                    std::thread::yield_now();
+                };
+                assert_eq!(accepted, AcceptOutcome::Accepted);
+                let replay = loop {
+                    if let Some(outcome) =
+                        finder.update("http://h/p", "options", "@Desktop", |evidence| {
+                            accept_beacon(evidence, &report, 1001)
+                        })
+                    {
+                        break outcome;
+                    }
+                    assert!(std::time::Instant::now() < deadline);
+                    std::thread::yield_now();
+                };
+                assert_eq!(replay, AcceptOutcome::BadNonce);
+            }
+            return;
+        }
+        let mut children = Vec::new();
+        for worker in [1, 2, 3, 4] {
+            children.push(std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "beacon_finder::tests::multiprocess_evidence_updates_preserve_nonces_and_reports", "--nocapture"])
+                .env(ENV, &directory).env("PS_BEACON_TRANSACTION_WORKER", worker.to_string())
+                .stdout(std::process::Stdio::null()).spawn().unwrap());
+        }
+        let statuses: Vec<_> = children
+            .iter_mut()
+            .map(|child| child.wait().unwrap())
+            .collect();
+        assert!(statuses.iter().all(|status| status.success()));
+        let evidence = finder
+            .load("http://h/p", "options", "@Desktop")
+            .into_record();
+        assert_eq!(evidence.valid_beacons, 128);
+        assert_eq!(evidence.generation, 128);
+        assert!(evidence.pending_nonces.is_empty());
+        drop(finder);
+        drop(cache);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 
     fn report_with(
         hashes: Option<HashSet<String>>,
@@ -724,10 +841,7 @@ mod tests {
         );
         let mut evidence = BeaconEvidence::default();
         evidence.valid_beacons = 1;
-        assert_eq!(
-            availability(true, Some(&evidence)),
-            Availability::Available
-        );
+        assert_eq!(availability(true, Some(&evidence)), Availability::Available);
     }
 
     #[test]
@@ -805,8 +919,7 @@ mod tests {
     #[test]
     fn candidates_gate_and_reset() {
         let mut evidence = BeaconEvidence::default();
-        let keys: HashSet<String> =
-            ["a".to_string(), "b".to_string()].into_iter().collect();
+        let keys: HashSet<String> = ["a".to_string(), "b".to_string()].into_iter().collect();
         // New keys register at zero support and reset beacons.
         evidence.valid_beacons = 5;
         assert!(update_candidates(&mut evidence, &keys, true));
@@ -818,9 +931,7 @@ mod tests {
         // Added keys reset again without forcing rebeacon.
         evidence.next_beacon_ms = 999;
         evidence.valid_beacons = 2;
-        let more: HashSet<String> = ["a".to_string(), "c".to_string()]
-            .into_iter()
-            .collect();
+        let more: HashSet<String> = ["a".to_string(), "c".to_string()].into_iter().collect();
         assert!(update_candidates(&mut evidence, &more, false));
         assert_eq!(0, evidence.valid_beacons);
         assert_eq!(999, evidence.next_beacon_ms);
@@ -925,8 +1036,7 @@ mod tests {
 
     #[test]
     fn finder_round_trips_through_cache() {
-        let cache: Arc<dyn CacheBackend> =
-            Arc::new(ps_cache::cache::MemoryCache::new());
+        let cache: Arc<dyn CacheBackend> = Arc::new(ps_cache::cache::MemoryCache::new());
         let finder = BeaconFinder::new(&cache);
         assert_eq!(
             finder.load("http://h/p", "oh", "@Desktop"),

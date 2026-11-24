@@ -102,15 +102,9 @@ pub fn handle_beacon_evidence(
     let device = matcher.device_type_for_ua(user_agent);
     let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(device);
     let finder = BeaconFinder::new(server.metadata_cache());
-    let mut evidence = finder.load(page_url, &options_hash, suffix).into_record();
-    let before = evidence.clone();
-    let outcome = beacon_finder::accept_beacon(&mut evidence, &report, now_ms);
-    // The cohort writes back unconditionally (even nonce
-    // failures), preserving expiry feedback.
-    if evidence != before {
-        finder.store(page_url, &options_hash, suffix, &evidence);
-    }
-    Some(outcome)
+    finder.update(page_url, &options_hash, suffix, |evidence| {
+        beacon_finder::accept_beacon(evidence, &report, now_ms)
+    })
 }
 
 /// Parses the LCP/nonce evidence report: a stamped LCP hash joins
@@ -241,11 +235,9 @@ mod tests {
         let finder = BeaconFinder::new(server.metadata_cache());
         let mut evidence = BeaconEvidence::default();
         let nonce =
-            ps_html::beacon_finder::prepare_beacon(&mut evidence, 1000, 5, 42)
-                .expect("due");
+            ps_html::beacon_finder::prepare_beacon(&mut evidence, 1000, 5, 42).expect("due");
         let hash = ps_html::beacon_finder::url_hash("http://h/hero.png");
-        let keys: std::collections::HashSet<String> =
-            [hash.clone()].into_iter().collect();
+        let keys: std::collections::HashSet<String> = [hash.clone()].into_iter().collect();
         ps_html::beacon_finder::update_candidates(&mut evidence, &keys, false);
         finder.store("http://h/p", "oh1", "@Desktop", &evidence);
         // Bad nonces reject without merging.

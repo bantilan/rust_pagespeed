@@ -173,6 +173,31 @@ impl CacheCoherence for SharedCacheCoherence {
     }
 }
 
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+struct LifetimeCoherence {
+    inner: Arc<dyn CacheCoherence>,
+    _lifetime: ps_shm::SharedCounters,
+}
+#[cfg(target_os = "linux")]
+impl CacheCoherence for LifetimeCoherence {
+    fn snapshot(&self, key: &str) -> Option<i64> {
+        self.inner.snapshot(key)
+    }
+    fn memory_key(&self, generation: i64, key: &str) -> String {
+        self.inner.memory_key(generation, key)
+    }
+    fn mutate(&self, key: &str, mutation: &mut dyn FnMut()) {
+        self.inner.mutate(key, mutation);
+    }
+    fn begin_write(&self, key: &str) {
+        self.inner.begin_write(key);
+    }
+    fn end_write(&self, key: &str) {
+        self.inner.end_write(key);
+    }
+}
+
 fn shared_coherence(path: &str) -> Option<Arc<dyn CacheCoherence>> {
     if path.is_empty() {
         return None;
@@ -216,6 +241,8 @@ pub struct SystemCachePath {
     /// Opt-in shared byte tier; startup must enroll every writer to this path.
     pub shared_cache: Option<Arc<dyn Cache>>,
     memory_namespace: Option<String>,
+    #[cfg(target_os = "linux")]
+    metadata_transactions: Option<Arc<ps_cache::transactional::TransactionalCache>>,
     rewrite_coordinator: Option<Arc<dyn ps_cache::rewrite_coordinator::RewriteCoordinator>>,
     clean_interval_set: bool,
     clean_size_set: bool,
@@ -261,6 +288,8 @@ impl SystemCachePath {
             coherence,
             shared_cache: None,
             memory_namespace: None,
+            #[cfg(target_os = "linux")]
+            metadata_transactions: None,
             rewrite_coordinator: None,
             clean_interval_set: system.was_set.clean_interval,
             clean_size_set: system.was_set.clean_size,
@@ -396,6 +425,14 @@ impl SystemCaches {
                     })
             })
             .flatten();
+        #[cfg(target_os = "linux")]
+        let transaction_domain = self
+            .paths
+            .values()
+            .find(|path| {
+                same_disk_path(&path.path, &system.file_cache_path) && path.shared_cache.is_some()
+            })
+            .and_then(|path| path.metadata_transactions.clone());
         match self.paths.get_mut(&key) {
             Some(path) => warnings.extend(path.merge_config(system)),
             None => {
@@ -406,6 +443,10 @@ impl SystemCaches {
                     path.shared_cache = shared;
                     path.memory_namespace = namespace;
                     path.rewrite_coordinator = coordinator;
+                    #[cfg(target_os = "linux")]
+                    {
+                        path.metadata_transactions = transaction_domain;
+                    }
                 }
                 self.paths.insert(key.clone(), path);
             }
@@ -464,11 +505,24 @@ impl SystemCaches {
         let counters =
             ps_shm::SharedCounters::open_coherent(&directory, &names).map_err(|e| e.to_string())?;
         let namespace = format!(
-            "shm-v2:{:032x}:",
+            "shm-tracked-v1:{:032x}:",
             counters.incarnation().expect("coherent lifetime")
         );
-        let coherence: Arc<dyn CacheCoherence> =
-            Arc::new(SharedCacheCoherence(counters, Some(namespace.clone())));
+        let tracking_directory = directory.join("tracked-writers-v1");
+        std::fs::create_dir_all(&tracking_directory).map_err(|e| e.to_string())?;
+        let coherence: Arc<dyn CacheCoherence> = Arc::new(
+            ps_cache::tracked_coherence::TrackedCoherence::open(
+                &tracking_directory,
+                namespace.clone(),
+            )
+            .map_err(|e| e.to_string())?,
+        );
+        // Retain coherent lifetime participation independently of the tracker.
+        // Namespace must not reset while any enrolled cache handle survives.
+        let coherence: Arc<dyn CacheCoherence> = Arc::new(LifetimeCoherence {
+            inner: coherence,
+            _lifetime: counters,
+        });
         let filename = directory.join(format!(
             "bytes-v2-{}-{}-{}.dat",
             options.shards, options.entries_per_shard, options.bytes_per_entry
@@ -485,6 +539,13 @@ impl SystemCaches {
             )
             .map_err(|e| e.to_string())?,
         );
+        let metadata_transactions = Arc::new(
+            ps_cache::transactional::TransactionalCache::open(
+                &directory.join("metadata-transactions-v1.dat"),
+                shared.clone(),
+            )
+            .map_err(|e| e.to_string())?,
+        );
         for path in self
             .paths
             .values_mut()
@@ -494,6 +555,7 @@ impl SystemCaches {
             path.shared_cache = Some(shared.clone());
             path.memory_namespace = Some(namespace.clone());
             path.rewrite_coordinator = Some(coordinator.clone());
+            path.metadata_transactions = Some(metadata_transactions.clone());
         }
         Ok(())
     }
@@ -559,6 +621,11 @@ impl SystemCaches {
             Arc::new(CompressedCache::with_limit(metadata, cap))
         } else {
             metadata
+        };
+        #[cfg(target_os = "linux")]
+        let metadata: Arc<dyn Cache> = match &path.metadata_transactions {
+            Some(domain) => Arc::new(domain.with_backend(metadata)),
+            None => metadata,
         };
         Some(ContextCaches {
             http_cache,

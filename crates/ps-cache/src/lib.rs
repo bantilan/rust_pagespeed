@@ -22,6 +22,12 @@ pub mod shared_memory;
 pub mod signature;
 pub mod system;
 pub mod timer;
+/// Recoverable Linux disk-writer coherence.
+#[cfg(target_os = "linux")]
+pub mod tracked_coherence;
+/// Nonblocking Linux shared metadata transactions.
+#[cfg(target_os = "linux")]
+pub mod transactional;
 pub mod ttl;
 
 pub use cache::{Cache, KeyState};

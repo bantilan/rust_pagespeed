@@ -74,6 +74,16 @@ pub trait Cache: Send + Sync + std::fmt::Debug {
     /// Stores a value (`Put`).
     fn put(&self, key: &str, value: &[u8]);
 
+    /// Read/modify/write one entry. Shared backends override with a protected
+    /// transaction; false means contention and the callback was not invoked.
+    /// The default preserves legacy embedding behavior without process locking.
+    fn update(&self, key: &str, change: &mut dyn FnMut(Lookup) -> Option<Vec<u8>>) -> bool {
+        if let Some(value) = change(self.get(key)) {
+            self.put(key, &value);
+        }
+        true
+    }
+
     /// Removes a key (`Delete`; missing keys are silent successes).
     fn delete(&self, key: &str);
 
@@ -158,6 +168,18 @@ impl Cache for MemoryCache {
             Some(value) => Lookup::hit(value.clone()),
             None => Lookup::miss(KeyState::NotFound),
         }
+    }
+
+    fn update(&self, key: &str, change: &mut dyn FnMut(Lookup) -> Option<Vec<u8>>) -> bool {
+        let mut entries = lock(&self.entries);
+        let previous = entries
+            .get(key)
+            .cloned()
+            .map_or_else(|| Lookup::miss(KeyState::NotFound), Lookup::hit);
+        if let Some(value) = change(previous) {
+            entries.insert(key.to_string(), value);
+        }
+        true
     }
 
     fn put(&self, key: &str, value: &[u8]) {
@@ -1272,12 +1294,19 @@ pub trait CacheCoherence: Send + Sync + std::fmt::Debug {
     fn memory_key(&self, generation: i64, key: &str) -> String {
         format!("{generation}:{key}")
     }
+    /// Run a disk mutation under this coherence protocol. Implementations may
+    /// retain native thread-bound guards on this stack through the callback.
+    fn mutate(&self, key: &str, mutation: &mut dyn FnMut()) {
+        self.begin_write(key);
+        let _write = CacheWriteGuard(self, key);
+        mutation();
+    }
     fn begin_write(&self, key: &str);
     fn end_write(&self, key: &str);
 }
 
-struct CacheWriteGuard<'a>(&'a dyn CacheCoherence, &'a str);
-impl Drop for CacheWriteGuard<'_> {
+struct CacheWriteGuard<'a, T: CacheCoherence + ?Sized>(&'a T, &'a str);
+impl<T: CacheCoherence + ?Sized> Drop for CacheWriteGuard<'_, T> {
     fn drop(&mut self) {
         self.0.end_write(self.1);
     }
@@ -1387,9 +1416,7 @@ impl Cache for WriteThroughCache {
 
     fn put(&self, key: &str, value: &[u8]) {
         if let Some(coherence) = &self.coherence {
-            coherence.begin_write(key);
-            let _write = CacheWriteGuard(coherence.as_ref(), key);
-            self.l2.put(key, value);
+            coherence.mutate(key, &mut || self.l2.put(key, value));
             return;
         }
         let _operation = lock(&self.operations);
@@ -1399,9 +1426,7 @@ impl Cache for WriteThroughCache {
 
     fn delete(&self, key: &str) {
         if let Some(coherence) = &self.coherence {
-            coherence.begin_write(key);
-            let _write = CacheWriteGuard(coherence.as_ref(), key);
-            self.l2.delete(key);
+            coherence.mutate(key, &mut || self.l2.delete(key));
             return;
         }
         let _operation = lock(&self.operations);

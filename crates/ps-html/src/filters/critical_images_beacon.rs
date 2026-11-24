@@ -12,10 +12,10 @@
 
 use crate::beacon_finder::{self, Availability, BeaconFinder, DownstreamBeacon};
 use crate::element::NodeId;
-use crate::name::Keyword;
 use crate::filter::HtmlFilter;
 use crate::js_escape::escape_to_js_string_literal;
 use crate::lexer::Lexer;
+use crate::name::Keyword;
 use crate::parser::Dom;
 use crate::server_context::ResourceDriver;
 use crate::static_assets::{get_asset, StaticAsset};
@@ -88,34 +88,33 @@ impl CriticalImagesBeaconFilter {
         }
         let server = Rc::clone(self.driver.server_context());
         let options = self.driver.options();
-        let oh = server.hasher().hash(self.driver.options_signature().as_bytes());
+        let oh = server
+            .hasher()
+            .hash(self.driver.options_signature().as_bytes());
         self.options_hash = oh.clone();
         let device = properties.device_type();
-        let suffix =
-            ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(device);
+        let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(device);
         let page_url = self.driver.base_url().spec().to_string();
         let finder = BeaconFinder::new(server.metadata_cache());
-        let mut evidence = finder.load(&page_url, &oh, suffix).into_record();
         let downstream = self.downstream_gate();
         let now_ms = Self::now_ms();
-        let due = beacon_finder::should_beacon(now_ms, Some(&evidence), downstream);
-        let nonce_value = ((server.simple_random_next() as u64) << 32)
-            | server.simple_random_next() as u64;
+        let nonce_value =
+            ((server.simple_random_next() as u64) << 32) | server.simple_random_next() as u64;
         let reinstrument = options.beacon_reinstrument_time_sec();
-        if due {
-            self.nonce = beacon_finder::prepare_beacon(
-                &mut evidence,
-                now_ms,
-                reinstrument,
-                nonce_value,
-            );
-        }
+        let prepared = finder.update(&page_url, &oh, suffix, |evidence| {
+            let nonce = if beacon_finder::should_beacon(now_ms, Some(evidence), downstream) {
+                beacon_finder::prepare_beacon(evidence, now_ms, reinstrument, nonce_value)
+            } else {
+                None
+            };
+            (nonce, evidence.clone())
+        });
+        let (nonce, evidence) =
+            prepared.unwrap_or_else(|| (None, finder.load(&page_url, &oh, suffix).into_record()));
+        self.nonce = nonce;
         self.insert_beacon_js = self.nonce.is_some();
         self.stamp_hashes = self.insert_beacon_js
             || beacon_finder::availability(true, Some(&evidence)) == Availability::Available;
-        if self.nonce.is_some() {
-            finder.store(&page_url, &oh, suffix, &evidence);
-        }
         // Snapshot the pre-render identity; end of document
         // refreshes it after candidate registration.
         self.driver
@@ -129,17 +128,13 @@ impl CriticalImagesBeaconFilter {
         let is_https = self.driver.base_url().scheme() == "https";
         let beacon_url = options
             .beacon_url()
-            .map(|urls| {
-                if is_https {
-                    urls.https
-                } else {
-                    urls.http
-                }
-            })
+            .map(|urls| if is_https { urls.https } else { urls.http })
             .unwrap_or_else(|| DEFAULT_BEACON_URL.to_string());
         let nonce = self.nonce.clone().unwrap_or_default();
         let send_at_onload = !options.filters().enabled(Filter::LazyloadImages);
-        let resize = options.filters().enabled(Filter::ResizeToRenderedImageDimensions);
+        let resize = options
+            .filters()
+            .enabled(Filter::ResizeToRenderedImageDimensions);
         let debug = options.filters().enabled(Filter::Debug);
         let mut js = get_asset(StaticAsset::CriticalImagesBeaconJs, debug).to_vec();
         js.extend_from_slice(b"\npagespeed.CriticalImages.Run('");
@@ -284,24 +279,25 @@ impl CriticalImagesBeaconFilter {
     /// (split for unit tests).
     fn finish_document(&mut self) {
         let server = Rc::clone(self.driver.server_context());
-        let oh = server.hasher().hash(self.driver.options_signature().as_bytes());
+        let oh = server
+            .hasher()
+            .hash(self.driver.options_signature().as_bytes());
         let properties = self.driver.request_properties();
         let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
             properties.device_type(),
         );
         let page_url = self.driver.base_url().spec();
         let finder = BeaconFinder::new(server.metadata_cache());
-        let mut evidence = finder.load(&page_url, &oh, suffix).into_record();
-        // New candidates reset beaconing to high frequency; without
-        // insertion the rebeacon timestamp clears to force sampling.
-        if beacon_finder::update_candidates(
-            &mut evidence,
-            &self.image_url_hashes,
-            !self.insert_beacon_js,
-        )
-        {
-            finder.store(&page_url, &oh, suffix, &evidence);
-        }
+        let evidence = finder
+            .update(&page_url, &oh, suffix, |evidence| {
+                beacon_finder::update_candidates(
+                    evidence,
+                    &self.image_url_hashes,
+                    !self.insert_beacon_js,
+                );
+                evidence.clone()
+            })
+            .unwrap_or_else(|| finder.load(&page_url, &oh, suffix).into_record());
         self.driver
             .set_beacon_evidence_identity(beacon_finder::encode_evidence(&evidence));
     }
@@ -316,8 +312,7 @@ mod tests {
     use std::sync::Arc;
 
     fn driver_for(user_agent: &str) -> Rc<ResourceDriver> {
-        let http: Arc<dyn ps_cache::cache::Cache> =
-            Arc::new(ps_cache::cache::MemoryCache::new());
+        let http: Arc<dyn ps_cache::cache::Cache> = Arc::new(ps_cache::cache::MemoryCache::new());
         let metadata: Arc<dyn ps_cache::cache::Cache> =
             Arc::new(ps_cache::cache::MemoryCache::new());
         let server = Rc::new(ServerContext::new_with_metadata(

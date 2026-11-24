@@ -101,22 +101,22 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Verify negative entries, expiration, purge, failed writes/admission, concurrent backfill and multi-worker races.
 - [x] Benchmark integration before changing defaults; commit tested integration.
 
-### Phase 4 — Cross-process single flight/crash recovery [IN PROGRESS — workers integrated; cache-writer recovery pending]
+### Phase 4 — Cross-process single flight/crash recovery [COMPLETED — opt-in domain]
 
 - [x] Implement and verify conservative Linux PID/start-time liveness dependency.
 - [x] Implement bounded exact-key owner/fencing primitive with protected publication and subprocess crash tests.
 - [x] Specify cache-domain/options job identity and integrate coordinator with optimization publication.
 - [x] Integrate async resource and combination scheduling without HTML waits.
-- [ ] Recover killed owners, queue rejection, panic, shutdown and PID reuse safely.
+- [x] Recover killed owners, queue rejection, panic, shutdown and PID reuse safely.
 - [x] Multiprocess duplicate-work and stale-owner tests; commit tested coordination.
-- [ ] Recover abruptly killed coherent cache writers without persistent memory bypass or per-request liveness I/O.
+- [x] Recover abruptly killed coherent cache writers without persistent memory bypass or per-request liveness I/O.
 
-### Phase 5 — Shared beacon evidence/HTML cache [PENDING]
+### Phase 5 — Shared beacon evidence/HTML cache [COMPLETED — opt-in domain]
 
-- [ ] Audit/report all beacon evidence read/modify/write operations.
-- [ ] Add transactional evidence merging without lost updates.
-- [ ] Preserve per-request sampling/nonces, learned-evidence cache keys and cached-HTML RUM.
-- [ ] Multiprocess reports/sampling plus HTML HIT/MISS regressions; commit.
+- [x] Audit/report all beacon evidence read/modify/write operations.
+- [x] Add transactional evidence merging without lost updates.
+- [x] Preserve per-request sampling/nonces, learned-evidence cache keys and cached-HTML RUM.
+- [x] Multiprocess reports/sampling plus HTML HIT/MISS regressions; commit.
 
 ### Phase 6 — NGINX config/defaults/fallback [PENDING]
 
@@ -177,9 +177,9 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 **State:** Phases 0–3 implemented and verified (Phase 3 exposes an opt-in assembly API; no production directive/default changed). Latest Phase 3 integration commit is `db778c3`. Phase 4 dependencies: b37464b identity, 6ac47a7 owner table, a707279 leases/revocation. HTML worker integration is the latest tested milestone (inspect git log for its hash). Production directives/defaults remain disabled; coherent cache-writer recovery is pending. Earlier commits: `4d23d3e` baseline/plan, `ff67357` regions, `6aaefe3` bytes/adapter, `6213ac2` lifetime diagnosis, `7cf9997` coherent counter protocol.
 
-**Exact next action:** inspect status/log/build and read the writer tracker results at the end. `ps_shm::write_tracker::WriteTracker` is implemented and tested, but NOT wired into CacheCoherence: current runtime still has strandable aggregate counters. Integrate it using a transaction-scoped callback/guard rather than storing borrowed native guards in thread-local state. Preserve legacy default/mixed-version behavior and use a distinct coherent protocol filename/domain. Resolve bounded 64-slot admission explicitly (do not silently drop replacements/deletions), and ensure nested L1/shared-L2/file adapters do not recursively claim transactions or leave part of a mutation outside the guard. Hot snapshots must stay atomics-only; recovery may try robust slots without waiting or procfs. Add actual adapter L1/L2/L3 backfill/delete/overlap tests and killed disk-writer tests proving memory hits resume with correct bytes. Then repeat cache probe and mark Phase 4 complete only after integration verification; Phase 5 is not started.
+**Exact next action:** Phase 4 runtime writer recovery and Phase 5 transactional beacon evidence are implemented and verified; inspect latest commit. Begin Phase 6: wire explicit `CreateSharedMemoryMetadataCache FileCachePath size_kb` configuration through DriverFactory::root_init with dimension checks, startup fallback, and isolated Nginx config/runtime tests. C++ system_caches.cc keys explicit names by FileCachePath. Keep defaults off until final workload benchmark; existing local LRU remains enabled. Require/document a full stop/start for initial migration from legacy coherence (overlapping old binaries are not safe), and test new-protocol graceful reload/layout changes in Phase 7. Then aggregated diagnostics (Phase 8), final stress and matched request/profile benchmarks (9/10).
 
-**Additional Phase 4 requirement:** legacy-style active-writer counters in the new coherent domain still remain nonzero after an abruptly killed disk writer and safely bypass memory indefinitely. Implement bounded dead-writer recovery or an owner-aware coherence protocol as part of crash recovery. Shared regions' byte-lock recovery alone does not repair those counters.
+**Phase 4 outcome:** opt-in domains now use robust tracked transactions and recover killed writers. Legacy default coherence remains unchanged until explicit activation. Exceptional tracking-capacity overflow preserves disk mutations and deliberately disables affected memory shards; offline replacement/new tracker domain restores those shards. Surface this in diagnostics and documentation; it is distinct from ordinary killed-owner recovery.
 
 **Build/test state:** latest broad regression passes 2,098 primary cases, plus two nested subprocess reports. Final targeted html_async suite passes 9 cases (including an added combination regression); release build and scoped strict clippy pass. See end-of-ledger exact commands/results. No incomplete runtime edits. Coherence writer recovery, config defaults/migration, beacons, checkpoints/admin/full stress/final benchmarks remain pending. Nothing pushed or deployed.
 
@@ -472,3 +472,36 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - Phase 4 remains IN PROGRESS: adapter transaction/admission integration is pending. Exact next action updated above. No uncommitted partial runtime integration should remain after committing this independently tested protocol.
 
 - Milestone commit command: `git add SHARED_MEMORY_IMPLEMENTATION.md crates/ps-shm/src/{lib,region,write_tracker}.rs crates/ps-shm/examples/write_tracker_probe.rs docs/performance/shared-memory/phase4-writer-*; git commit -m "Add crash-consistent bounded disk-writer tracking primitives"`. No push. All current protocol tests/builds verified; runtime integration remains the first incomplete Phase 4 task.
+
+## Phase 4 transaction integration — design before edits
+
+- Resume e8a4e00, clean status. Introduce object-safe CacheCoherence::mutate callback with backwards-compatible default begin/end guard; tracked implementation holds native guard on the same stack through disk mutation. Nested memory adapters may independently register overlapping claims; no borrowed guard escapes or thread-local recursion state is needed.
+- Capacity/error fallback must preserve void Cache put/delete semantics: atomically disable memory generations for that shard before executing the disk mutation. Saturation fails closed for memory caching, while disk writes/deletes remain functional. This explicit, persistent bypass is exceptional capacity exhaustion, not ordinary killed-writer recovery. Expose/document diagnostics in Phase 8; no silent dropped writes. Full-stop new protocol domain/incarnation restores normal caching.
+- Snapshot normally uses atomics only. On active bitmap, attempt nonblocking robust-slot repair once; live writers remain protected; no sleeps, PID or filesystem checks. Use distinct tracker v1 subdirectory and memory namespace; keep legacy default unchanged.
+
+## Phase 5 evidence transaction — design before edits
+
+- Phase 4 adapter tests pass; broader regression/release/cache microbenchmark running. Phase 5 begins with byte-cache transaction support; do not claim phase completion before beacon tests.
+- Add Cache::update callback: default preserves existing embedding get/put semantics; shared metadata gets an outer transaction adapter (after compression) using 128 robust try-lock shards. Transaction covers read/decode/change/encode/write; same exact evidence key maps to same mutex across workers. Busy returns false without invoking callback; callers must skip nonce issuance/report acknowledgement, not fallback to an unprotected update. No new wait on HTML. MemoryCache test backend implements atomic update under its existing entries mutex.
+- Evidence operations to migrate: prepare sampling/nonce; end-document candidate registration; report nonce validation/merge. Immutable evidence snapshots still feed HTML-cache identity; sampled nonce-bearing output remains in existing no-cache path. Ordinary RUM bootstrap unchanged.
+
+## Phase 4/5 integration progress and validation caveat
+
+- TrackedCoherence and transaction-scoped CacheCoherence::mutate now protect nested L1/shared-L2/file mutations. LifetimeCoherence retains full-stop incarnation participation. Default legacy assembly remains unchanged; opt-in memory keys use shm-tracked-v1. Capacity overflow disables memory for that shard before preserving disk put/delete; disabled tracker segments require offline replacement/new tracker domain (incarnation prefix alone does NOT reset the stable tracker files). This corrects the earlier design note's reset assumption.
+- Actual ps-cache subprocess regression kills a writer after disk replacement/deletion but before completion. Parent's warm nested caches return new/missing bytes and regain stable memory generations. A deliberate subsequent disk-only removal proves recovered memory admissions, rather than permanent safe disk bypass. Capacity exhaustion regression proves replacement/deletion are preserved.
+- `phase4-tracked-integration-tests.log`: 403 primary unit cases passed (53+71+279), plus two nested reports, before transaction primitive additions. `phase4-tracked-clippy.log` passes with existing ps-cache suppressions. `phase4-tracked-factory-tests.log`: 12 primary passed (plus one nested report).
+- Phase 5: Cache::update, MemoryCache atomic override, Linux TransactionalCache outer metadata wrapper, BeaconFinder::update, transactional nonce issuance/candidate update/report acceptance implemented. Domain mappings are opened once in factory and shared across configuration aliases; wrapper sits outside compression so same read/decode/write transaction preserves codecs.
+- Four subprocesses each issue/accept/replay 32 unique nonces: regression verifies 128 accepted reports, exactly 128 generation increments, no pending nonce loss, all replayed nonces rejected. Nonblocking lock contention returns no result; no report/nonce state mutates outside the lock. Transaction adapter concurrency test verifies 2,000 increments with two independent mappings and no invoked contended callback.
+- One early release-probe attempt failed after a source edit raced compilation of a dependent crate (old BeaconFinder lacked new update API); not a passing measurement. Its empty JSON is not performance evidence. All final checks now run on a fixed source snapshot; rerun release probe to phase5-cache-probe.json and retain final regression/build logs.
+- `phase5-transactions-unit-tests.log` had overlapping command runs and duplicate result text; primary verification uses the new uniquely named phase5-final-regressions.log. Do not sum duplicate reports or use old failed/empty probe artifacts.
+- Original C++ reference revisited: system_caches.cc CreateShmMetadataCache indexes explicit caches by FileCachePath and separately supports an optional default; fixed Rust slots differ from C++ block allocation. Directive/default work remains Phase 6.
+
+## Phase 4/5 final resumed verification
+
+- The IDE/session interruption terminated the earlier full regression/release processes before their result lines. Commands resumed to fresh logs; no incomplete log is treated as passing verification.
+- `cargo test -p ps-shm -p ps-cache -p ps-html -p ps-nginx > docs/performance/shared-memory/phase5-resumed-regressions.log 2>&1`: exit 0, **2,109 primary cases**, plus two nested subprocess reports (sum 2,111), 70 result groups, zero failures. Includes transaction, killed disk writer, multiprocess evidence, critical beacon, cached-HTML instrumentation/RUM, image, CSS/JS, lazy/LCP/preload/responsive regressions.
+- `cargo clippy -p ps-shm -p ps-cache --all-targets --no-deps -- -D warnings -A clippy::new_without_default -A clippy::unnecessary_get_then_check > docs/performance/shared-memory/phase5-resumed-clippy.log 2>&1`: passes, existing lint suppressions only.
+- `cargo run -p ps-nginx --release --example shared_cache_probe > docs/performance/shared-memory/phase5-resumed-cache-probe.json 2> docs/performance/shared-memory/phase5-resumed-cache-probe-build.log`: exit 0. Final median warm 4KiB get: file-only **4,951.801ns**, shared-L2/file **279.380ns**, L1/file **155.999ns**, L1/shared-L2/file **204.919ns**. Compared with Phase 3's ~168.708ns shared-L1 hit, ~36ns additional absolute overhead in this run; different run/no isolation, not a statistical attribution. Shared-L2 remains ~18x less than warm file-only. Preserve raw samples and avoid HTML latency claims.
+- `cargo build -p ps-nginx --release > docs/performance/shared-memory/phase5-resumed-build.log 2>&1`: passes, 0.08s incremental after probe rebuilt release. No deployment or push.
+- `send::tests::html_sink_builds_filters_only_past_lookup` verifies cached HTML retains per-load JS timestamp, instrumentation init and beacon endpoint while HIT builds no filters; critical-images beacon integration and 4-process evidence update tests pass.
+- Shared bytes are still explicitly opt-in API only. Defaults/config activation, old/new binary migration, live Nginx reload tests, admin aggregation, complete final profiling remain incomplete Phases 6–10.

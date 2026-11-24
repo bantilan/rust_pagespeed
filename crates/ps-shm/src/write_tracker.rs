@@ -56,6 +56,12 @@ impl WriteTracker {
         Ok((generation != u64::MAX && self.active.epoch(shard)? == 0).then_some(generation))
     }
 
+    /// Fail closed for memory reads before an exceptional untracked disk write.
+    /// Saturated generations never wrap; choose a fresh lifetime domain to reset.
+    pub fn disable_memory(&self, shard: usize) -> io::Result<()> {
+        self.generations.advance_epoch_to(shard, u64::MAX)
+    }
+
     /// Try once per slot, without waiting. None means bounded capacity is busy;
     /// the caller must not perform an untracked mutation as if admitted.
     pub fn try_begin(&self, shard: usize) -> io::Result<Option<TrackedWrite<'_>>> {
