@@ -138,12 +138,12 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Expose admin diagnostics with accurate aggregation scopes.
 - [x] Verify shared counters across workers and reset/reload behavior; commit.
 
-### Phase 9 — Concurrency/multiprocess/regressions [PENDING]
+### Phase 9 — Concurrency/multiprocess/regressions [COMPLETED — Linux tests; sanitizer limits recorded]
 
-- [ ] Stress independent processes with mixed get/put/delete/eviction/expiry/purge workloads.
-- [ ] Fault injection: kill owners during mutation, optimization, initialization and reload.
-- [ ] Cover resource/image/CSS/JS/RUM/lazy/LCP/preload/responsive/HTML caching regressions.
-- [ ] Full workspace tests and available sanitizers/model checks; document limits; commit.
+- [x] Stress independent processes with mixed get/put/delete/eviction/expiry/purge workloads.
+- [x] Fault injection: kill owners during mutation, optimization, initialization and reload.
+- [x] Cover resource/image/CSS/JS/RUM/lazy/LCP/preload/responsive/HTML caching regressions.
+- [x] Full workspace tests and available sanitizers/model checks; document limits; commit.
 
 ### Phase 10 — Performance/docs [PENDING]
 
@@ -561,3 +561,11 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - First metrics lifecycle comparison found incomplete early HTML (2 optimized refs versus final 15) before background rewrites finished, not an output-corruption defect. Strengthened warm() to require an actual HTML cache HIT in addition to a stable normalized digest, then the check passed. Earlier Phase 7 run was on a lighter load and already had matching fully optimized hashes; do not rely on arbitrary repeated body stability alone.
 - Read-only localhost request to the originally supplied Aerosky URL timed out; no production timing is claimed. Exact request loop and failure recorded in phase10-localhost-observation.json. Profiling the isolated equivalent remains Phase 10.
 - Scoped rustfmt/Python syntax/git diff --check before commit. Workspace/stress runs started on final Phase 8 source; pending results remain Phase 9. No installed deployment or remote push.
+
+## Phase 9 final verification
+
+- `cargo test --workspace > docs/performance/shared-memory/phase9-workspace-tests.log 2>&1`: exit 0, **2,920 primary passed**, plus two nested subprocess reports (sum 2,922), 99 result groups, zero failures. Covers all workspace crates, rewrite/image/CSS/JS/RUM/filter/cache/config/admin regressions.
+- Python loop of `cargo test -p ps-shm -p ps-cache --lib` ten times to phase9-stress.log: **1,260 primary cases**, plus ten isolated lifetime reports; zero failures. Includes mixed four-process/eight-thread torn-payload stress, bounded churn, robust-mutex/thread death, five disk-write kill boundaries, actual cache-adapter killed writer tests and transactional races.
+- Actual two-worker lifecycle/admin tests in Phase 7/8 cover reload allocation changes, overlapped generations and restart; actual four-process evidence tests preserve nonce/merge counts/replay rejection. Existing invalid dimension/header/permission/expiry/purge/backfill/old-token tests all passed. No unavailable sanitizer/model checker is claimed as run; robust behavior was exercised on this Linux host with normal Rust tests and subprocess fault injection. ThreadSanitizer does not model independent mmap-sharing processes; no nightly toolchain/sanitizer environment installed by this task.
+- Phase 8 count correction: final unit log has **408 primary** (54+72+282), not 407; plus two nested reports. Source change was one Nginx diagnostic regression; raw log retained.
+- `perf stat -e task-clock true`: kernel refuses supported events (perf_event_paranoid=4). Do not change host security settings. Phase 10 uses stage timers/strace/Callgrind instead. Read-only installed localhost target timed out; isolated counterpart is available under /var/www/test/aerosky-real-estate-html-responsive-website-template/index.html.
