@@ -1,0 +1,17 @@
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.25s
+     Running unittests src/lib.rs (target/debug/build/ps-html/0369dc92a99117a5/out/ps_html-0369dc92a99117a5)
+
+running 9 tests
+test html_async::tests::coordinated_worker_subprocess ... ok
+test html_async::tests::shutdown_pool_keeps_original_url ... ok
+test html_async::tests::remote_claim_defers_fetch_and_release_allows_metadata_publication ... ok
+test html_async::tests::miss_schedules_async_and_serves_original_then_optimized ... ok
+test html_async::tests::no_pool_keeps_sync_rewrite ... ok
+test html_async::tests::inline_miss_defers_and_warm_view_inlines ... ok
+test html_async::tests::coordinated_css_and_js_combinations_warm_later_html ... ok
+test html_async::tests::separate_worker_processes_fetch_once_and_recover_killed_optimizer ... ok
+test html_async::tests::worker_image_rewrite_reports_record_to_sink ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 159 filtered out; finished in 0.56s
+

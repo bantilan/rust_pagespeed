@@ -219,6 +219,8 @@ pub struct ServerContext {
         RefCell<Option<Rc<dyn super::critical_selector_finder::CriticalSelectorFinder>>>,
     background_pool: std::sync::OnceLock<Arc<super::background::BackgroundPool>>,
     message_sink: std::sync::OnceLock<Arc<dyn MessageSink>>,
+    rewrite_coordinator:
+        std::sync::OnceLock<Arc<dyn ps_cache::rewrite_coordinator::RewriteCoordinator>>,
     chain_plans: RefCell<
         std::collections::VecDeque<(
             Arc<str>,
@@ -286,6 +288,7 @@ impl ServerContext {
             critical_selector_finder: RefCell::new(None),
             background_pool: std::sync::OnceLock::new(),
             message_sink: std::sync::OnceLock::new(),
+            rewrite_coordinator: std::sync::OnceLock::new(),
             chain_plans: RefCell::new(std::collections::VecDeque::new()),
         }
     }
@@ -325,6 +328,7 @@ impl ServerContext {
             critical_selector_finder: RefCell::new(None),
             background_pool: std::sync::OnceLock::new(),
             message_sink: std::sync::OnceLock::new(),
+            rewrite_coordinator: std::sync::OnceLock::new(),
             chain_plans: RefCell::new(std::collections::VecDeque::new()),
         }
     }
@@ -388,6 +392,22 @@ impl ServerContext {
     #[must_use]
     pub fn background_pool(&self) -> Option<Arc<super::background::BackgroundPool>> {
         self.background_pool.get().cloned()
+    }
+
+    /// Install a cache-domain coordinator before serving requests. Only HTML
+    /// background optimization jobs acquire claims; foreground serving is unchanged.
+    pub fn set_rewrite_coordinator(
+        &self,
+        coordinator: Arc<dyn ps_cache::rewrite_coordinator::RewriteCoordinator>,
+    ) {
+        let _ = self.rewrite_coordinator.set(coordinator);
+    }
+
+    /// Shared coordinator for worker snapshots; no claim or filesystem work here.
+    pub fn rewrite_coordinator(
+        &self,
+    ) -> Option<Arc<dyn ps_cache::rewrite_coordinator::RewriteCoordinator>> {
+        self.rewrite_coordinator.get().cloned()
     }
 
     /// Installs the background message sink (server-owned, once).

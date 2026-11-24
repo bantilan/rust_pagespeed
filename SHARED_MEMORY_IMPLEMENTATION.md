@@ -101,14 +101,15 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Verify negative entries, expiration, purge, failed writes/admission, concurrent backfill and multi-worker races.
 - [x] Benchmark integration before changing defaults; commit tested integration.
 
-### Phase 4 — Cross-process single flight/crash recovery [IN PROGRESS — ownership primitives verified; integration pending]
+### Phase 4 — Cross-process single flight/crash recovery [IN PROGRESS — workers integrated; cache-writer recovery pending]
 
 - [x] Implement and verify conservative Linux PID/start-time liveness dependency.
 - [x] Implement bounded exact-key owner/fencing primitive with protected publication and subprocess crash tests.
-- [ ] Specify cache-domain/options job identity and integrate coordinator with optimization publication.
-- [ ] Integrate async resource and combination scheduling without HTML waits.
+- [x] Specify cache-domain/options job identity and integrate coordinator with optimization publication.
+- [x] Integrate async resource and combination scheduling without HTML waits.
 - [ ] Recover killed owners, queue rejection, panic, shutdown and PID reuse safely.
-- [ ] Multiprocess duplicate-work and stale-owner tests; commit tested coordination.
+- [x] Multiprocess duplicate-work and stale-owner tests; commit tested coordination.
+- [ ] Recover abruptly killed coherent cache writers without persistent memory bypass or per-request liveness I/O.
 
 ### Phase 5 — Shared beacon evidence/HTML cache [PENDING]
 
@@ -174,13 +175,13 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Next Session Resume Point
 
-**State:** Phases 0–3 implemented and verified (Phase 3 exposes an opt-in assembly API; no production directive/default changed). Latest Phase 3 integration commit is `db778c3`. Phase 4 identity dependency is committed as `b37464b`; owner-table primitive is the following tested milestone (inspect git log for its hash). Runtime integration remains pending. Earlier commits: `4d23d3e` baseline/plan, `ff67357` regions, `6aaefe3` bytes/adapter, `6213ac2` lifetime diagnosis, `7cf9997` coherent counter protocol.
+**State:** Phases 0–3 implemented and verified (Phase 3 exposes an opt-in assembly API; no production directive/default changed). Latest Phase 3 integration commit is `db778c3`. Phase 4 dependencies: b37464b identity, 6ac47a7 owner table, a707279 leases/revocation. HTML worker integration is the latest tested milestone (inspect git log for its hash). Production directives/defaults remain disabled; coherent cache-writer recovery is pending. Earlier commits: `4d23d3e` baseline/plan, `ff67357` regions, `6aaefe3` bytes/adapter, `6213ac2` lifetime diagnosis, `7cf9997` coherent counter protocol.
 
-**Exact next action:** inspect status/log and current build, then integrate the new `ps_shm::ownership::OwnershipTable` into fire-and-forget HTML optimization worker closures via a safe coordinator abstraction. Read the Phase 4 owner-table results at the end first. Namespace exact job keys by canonical cache-path domain and effective options. Split final metadata publication from fetch/optimization so `try_finish` holds the claim lock through publication. Implement bounded worker-side completion/release retry or deferred cleanup: dropping a token after Busy would strand a live-owner record. Handle unsupported long keys without permanently disabling optimization. Keep procfs reads off HTML threads and preserve foreground/IPRO waiter semantics. Add real multi-worker scheduling/dedup, queue/panic/shutdown and publication regressions before enabling.
+**Exact next action:** inspect status/log and build state, then implement the remaining Phase 4 coherent-cache-writer crash recovery. HTML resource/inline/CSS+JS combination coordinator integration is verified and committed (inspect latest git log); do not redo it. Study CacheCoherence begin_write/end_write and SharedCacheCoherence's generation/active-writer counters. A killed disk writer strands an active count. Design owner-aware recovery with crash-consistent accounting; do not simply decrement counters from a separate PID list, because death between the list update and aggregate count update creates a second crash window. Keep liveness/procfs checks off HTML/cache-hit paths. Preserve overlapping put/delete/backfill ordering and bounded memory/queues; a timeout cannot prove an owner dead. Add subprocess kills at each accounting boundary and validate restored memory hits and correct persisted bytes. Then finish Phase 4 before shared beacon work.
 
 **Additional Phase 4 requirement:** legacy-style active-writer counters in the new coherent domain still remain nonzero after an abruptly killed disk writer and safely bypass memory indefinitely. Implement bounded dead-writer recovery or an owner-aware coherence protocol as part of crash recovery. Shared regions' byte-lock recovery alone does not repair those counters.
 
-**Build/test state:** ordinary optimized release passes; broad pre-fast-path run passed 2,080 primary cases; after formatter/mutex fast-path changes, 381 primary ps-shm/ps-cache/Nginx unit cases and 138 async/resource regressions pass. Strict scoped clippy passes with only two existing ps-cache lints command-suppressed. No incomplete code edits. Config defaults, production rollout/mixed legacy-worker transition, ownership, beacons, checkpoints/admin/full stress/final benchmarks remain Phases 4–10. Nothing pushed or deployed.
+**Build/test state:** latest broad regression passes 2,098 primary cases, plus two nested subprocess reports. Final targeted html_async suite passes 9 cases (including an added combination regression); release build and scoped strict clippy pass. See end-of-ledger exact commands/results. No incomplete runtime edits. Coherence writer recovery, config defaults/migration, beacons, checkpoints/admin/full stress/final benchmarks remain pending. Nothing pushed or deployed.
 
 
 ## Phase 0 audit findings (persisted before implementation)
@@ -419,3 +420,26 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - `cargo test -p ps-shm -p ps-cache > docs/performance/shared-memory/phase4-coordinator-tests.log 2>&1`: exit 0, 116 primary cases (47+69), plus one nested subprocess report.
 - `cargo clippy -p ps-shm -p ps-cache --all-targets --no-deps -- -D warnings -A clippy::new_without_default -A clippy::unnecessary_get_then_check > docs/performance/shared-memory/phase4-coordinator-clippy.log 2>&1`: passed; suppressions cover existing ps-cache lints only.
 - Modified: ps-shm region/ownership, ps-cache lib/new rewrite_coordinator, ledger/logs. Runtime HTML integration follows as a separate milestone; no request latency/defaults claim.
+
+## Phase 4 HTML worker integration — verification in progress
+
+- Lease dependency committed as a707279. Added optional coordinator OnceLock to ServerContext and Send-owned snapshots. Only run_rewrite_job (pool worker) claims; no-pool embeddings and foreground/IPRO paths remain unchanged. Queue rejection/shutdown occurs before claims. Successful-job stats now count only accepted metadata publication.
+- Worker-local LeasedMetadataCache fences all metadata mutations, preserving the existing backend/codec/validation and resource optimization logic. The separate HTTP cache continues publishing normal resource outputs; no fetch/optimization is performed while holding the ownership lock.
+- Opt-in enable_shared_memory now allocates one canonical path owner domain (256 slots, 5ms worker publication-contention budget) and shares it across aliases/variants/later registrations. ContextCaches passes it through Nginx worker init. No directive/default enabled; these provisional parameters remain Phase 6 configuration work.
+- `cargo test -p ps-html --lib html_async > docs/performance/shared-memory/phase4-html-worker-tests.log 2>&1`: 8 passed, including real shared coordinator cold-original/warm-optimized CSS and inline views, duplicate rejection, no-pool/shutdown paths, actual separate worker processes doing one fetch for concurrent same-key work, and SIGKILL of an optimizer while origin fetch is gated followed by successful replacement and optimizable CSS metadata publication. Initial test compile used nonexistent FileCachePolicy::default; replaced with explicit isolated policy and reran successfully.
+- `cargo test -p ps-nginx --lib caches::tests > docs/performance/shared-memory/phase4-factory-coordinator-tests.log 2>&1`: 12 primary passed plus one nested subprocess report. Tests verify late aliases share coordinator claims as well as byte coherence.
+- Broad four-crate regression running: `cargo test -p ps-shm -p ps-cache -p ps-html -p ps-nginx > docs/performance/shared-memory/phase4-worker-integration-tests.log 2>&1`. Inspect completion before committing.
+- Modified: ps-html html_async/server_context, ps-nginx caches/module, ledger/logs. Exact next action if interrupted: inspect cargo sessions/log, finish broad tests/release build/scoped lint and stress, then commit this worker integration. Killed coherence-writer counter recovery is still pending, so Phase 4 is not complete.
+
+## Phase 4 worker integration — verified milestone
+
+- Broad `cargo test -p ps-shm -p ps-cache -p ps-html -p ps-nginx > docs/performance/shared-memory/phase4-worker-integration-tests.log 2>&1`: exit 0, **2,098 primary cases**, plus two nested subprocess reports; 70 result groups. This compiled the 8-test html_async suite before the final test-only combination addition.
+- Final `cargo test -p ps-html --lib html_async > docs/performance/shared-memory/phase4-html-worker-tests.log 2>&1`: **9 passed**, including coordinated CSS and JS combination cold-original/warm-combined behavior added after broad compilation. The process test verifies one origin fetch during duplicate work, successful optimized CSS partition URL (not merely any/negative metadata), and replacement after SIGKILL during origin fetch.
+- `cargo clippy -p ps-shm -p ps-cache --all-targets --no-deps -- -D warnings -A clippy::new_without_default -A clippy::unnecessary_get_then_check > docs/performance/shared-memory/phase4-worker-clippy.log 2>&1`: exit 0, existing lint suppressions only.
+- `cargo build -p ps-nginx --release > docs/performance/shared-memory/phase4-worker-build.log 2>&1`: exit 0, **40.28s** optimized build targeting staged Nginx 1.31.8. Not installed or deployed.
+- Scoped rustfmt and git diff --check pass. No resource optimization/filter/RUM features removed; broad regression includes image, CSS/JS, async, HTML caching and beacon tests. No new whole-request latency claim: production activation remains Phase 6 and matched profiling Phase 10.
+- Known tradeoff: contended/panicking cleanup may revoke earlier live jobs in the same owner domain. They cannot publish stale metadata; later HTML requests retry. This bounds cleanup without per-request waits or an unbounded cancellation queue, at a possible cost of wasted background work under contention. Measure and expose this in Phases 8/10.
+- Phase 4 still incomplete: coherent cache-writer counts can remain active after SIGKILL. The next resume action addresses this separate failure; do not mark crash recovery complete solely from optimization-owner tests.
+
+- Python loop of `cargo test -p ps-html --lib html_async` ten times, log phase4-worker-stress.log: **90 primary cases passed**, including 20 parent kill/dedup scenarios and their worker subprocesses.
+- Commit: `git add SHARED_MEMORY_IMPLEMENTATION.md crates/ps-html/src/{html_async,server_context}.rs crates/ps-nginx/src/{caches,module}.rs; git add -f docs/performance/shared-memory/phase4-{factory-coordinator-tests,html-worker-tests,worker-integration-tests,worker-clippy,worker-build,worker-stress}.log; git commit -m "Coordinate HTML background rewrites across worker processes"`. No push.

@@ -181,6 +181,8 @@ pub struct HtmlRewriteShared {
     /// Message sink for completion records (`None` keeps the
     /// request-thread-only reporting).
     pub message_sink: Option<Arc<dyn super::server_context::MessageSink>>,
+    /// Optional cache-domain ownership; claim occurs only on the pool worker.
+    pub coordinator: Option<Arc<dyn ps_cache::rewrite_coordinator::RewriteCoordinator>>,
 }
 
 /// Scheduling verdict for the HTML-thread caller.
@@ -224,6 +226,7 @@ pub fn snapshot_shared(driver: &ResourceDriver) -> HtmlRewriteShared {
         statistics: server.statistics_shared(),
         hasher: server.hasher().clone(),
         message_sink: server.message_sink(),
+        coordinator: server.rewrite_coordinator(),
     }
 }
 
@@ -343,7 +346,40 @@ fn schedule_on_pool(
 /// Runs one background rewrite on a pool thread: rebuilds an equivalent
 /// driver from the snapshot and runs the sync miss core to partitions
 /// (no rendering). Returns whether partitions were written.
-fn run_rewrite_job(snapshot: HtmlRewriteSnapshot, shared: HtmlRewriteShared) -> bool {
+fn run_rewrite_job(snapshot: HtmlRewriteSnapshot, mut shared: HtmlRewriteShared) -> bool {
+    use ps_cache::rewrite_coordinator::{LeasedMetadataCache, RewriteClaim};
+    let mut leased = None;
+    if let Some(coordinator) = shared.coordinator.take() {
+        let kind = if matches!(
+            &snapshot.behavior,
+            BackgroundBehavior::CombineCss { .. } | BackgroundBehavior::CombineJs { .. }
+        ) {
+            "html-combine"
+        } else {
+            "html-rewrite"
+        };
+        match coordinator.claim(&format!("{kind}:{}", snapshot.partition_key)) {
+            RewriteClaim::Owned(lease) => {
+                let cache = Arc::new(LeasedMetadataCache::new(shared.metadata.clone(), lease));
+                shared.metadata = cache.clone();
+                leased = Some(cache);
+            }
+            RewriteClaim::Retry => return false,
+            RewriteClaim::Local => (),
+        }
+    }
+    let statistics = shared.statistics.clone();
+    let wrote = run_rewrite_job_inner(snapshot, shared)
+        && leased
+            .as_ref()
+            .is_none_or(|cache| cache.publications_valid());
+    if wrote {
+        statistics.add_variable(HTML_ASYNC_COMPLETED).add(1);
+    }
+    wrote
+}
+
+fn run_rewrite_job_inner(snapshot: HtmlRewriteSnapshot, shared: HtmlRewriteShared) -> bool {
     let HtmlRewriteShared {
         http_cache,
         metadata,
@@ -351,6 +387,7 @@ fn run_rewrite_job(snapshot: HtmlRewriteSnapshot, shared: HtmlRewriteShared) -> 
         statistics,
         hasher,
         message_sink,
+        coordinator: _,
     } = shared;
     let server = Rc::new(ServerContext::new_shared(
         http_cache,
@@ -408,7 +445,6 @@ fn run_rewrite_job(snapshot: HtmlRewriteSnapshot, shared: HtmlRewriteShared) -> 
                 .server_context()
                 .metadata_cache()
                 .put(&snapshot.partition_key, &bytes);
-            statistics.add_variable(HTML_ASYNC_COMPLETED).add(1);
             return true;
         }
         return false;
@@ -429,9 +465,6 @@ fn run_rewrite_job(snapshot: HtmlRewriteSnapshot, shared: HtmlRewriteShared) -> 
         return false;
     };
     let wrote = run_behavior_rewrite(&driver, snapshot.behavior, input, &snapshot.partition_key);
-    if wrote {
-        statistics.add_variable(HTML_ASYNC_COMPLETED).add(1);
-    }
     // Report worker-side image records (request-thread drivers
     // drain their own; without this the admin images page misses
     // every background optimization).
@@ -662,10 +695,345 @@ mod tests {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    struct CoordinatorDirectory(std::path::PathBuf);
+    #[cfg(target_os = "linux")]
+    impl CoordinatorDirectory {
+        fn new() -> Self {
+            static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "ps-html-coordinator-{}-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos(),
+                NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            ));
+            std::fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+        fn coordinator(&self) -> Arc<dyn ps_cache::rewrite_coordinator::RewriteCoordinator> {
+            Arc::new(
+                ps_cache::rewrite_coordinator::SharedRewriteCoordinator::open(
+                    &self.0.join("owners-v2"),
+                    8,
+                    Duration::from_millis(5),
+                )
+                .unwrap(),
+            )
+        }
+    }
+    #[cfg(target_os = "linux")]
+    impl Drop for CoordinatorDirectory {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn coordinated_css_and_js_combinations_warm_later_html() {
+        for (filter, mime, extension, body, output_id) in [
+            (
+                Filter::CombineCss,
+                "text/css",
+                "css",
+                b"div { display: block; }".as_slice(),
+                ".pagespeed.cc.",
+            ),
+            (
+                Filter::CombineJavascript,
+                "application/javascript",
+                "js",
+                b"window.example = 123;".as_slice(),
+                ".pagespeed.jc.",
+            ),
+        ] {
+            let directory = CoordinatorDirectory::new();
+            let fetcher = MockUrlFetcher::new();
+            let first = format!("http://test.com/a.{extension}");
+            let second = format!("http://test.com/b.{extension}");
+            let mut headers = ResponseHeaders::new(HttpOptions::default_for_tests());
+            headers.set_first_line(1, 1, 200, "OK");
+            headers.headers_mut().add(header::CONTENT_TYPE, mime);
+            headers.set_date_and_caching(START_MS_FOR_SINK_TEST, 300_000, "");
+            headers.compute_caching();
+            for url in [&first, &second] {
+                fetcher.set_response(url, headers.clone(), body);
+            }
+            let server = Rc::new(ServerContext::new_with_metadata(
+                Arc::new(MemoryCache::new()),
+                Arc::new(MemoryCache::new()),
+                Arc::new(fetcher),
+                START_MS_FOR_SINK_TEST,
+            ));
+            server.set_rewrite_coordinator(directory.coordinator());
+            let pool = BackgroundPool::new(
+                super::super::background::PoolConfig {
+                    threads: 1,
+                    queue_bound: 8,
+                },
+                &server.statistics_shared(),
+            );
+            server.set_background_pool(pool.clone());
+            let mut options = RewriteOptions::new();
+            options.filters_mut().enable(filter);
+            let options = Rc::new(RefCell::new(options));
+            let elements = if extension == "css" {
+                format!(
+                    "<link rel='stylesheet' href='{first}'><link rel='stylesheet' href='{second}'>"
+                )
+            } else {
+                format!("<script src='{first}'></script><script src='{second}'></script>")
+            };
+            let html = format!("<html><head>{elements}</head><body></body></html>");
+            let (cold, detached) = drive_html(&server, &options, &html);
+            assert!(cold.contains(&first) && cold.contains(&second));
+            assert!(detached > 0);
+            wait_for(&server, HTML_ASYNC_COMPLETED, 1);
+            let (warm, _) = drive_html(&server, &options, &html);
+            pool.shutdown();
+            assert!(warm.contains(output_id), "combination absent: {warm}");
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn remote_claim_defers_fetch_and_release_allows_metadata_publication() {
+        use ps_cache::rewrite_coordinator::RewriteClaim;
+        let directory = CoordinatorDirectory::new();
+        let peer = directory.coordinator();
+        let remote = match peer.claim("html-rewrite:test-partition") {
+            RewriteClaim::Owned(lease) => lease,
+            _ => panic!("remote claim failed"),
+        };
+        let (server, options) = css_server("http://test.com/a.css");
+        server.set_rewrite_coordinator(directory.coordinator());
+        let driver =
+            ResourceDriver::new(server.clone(), options.clone(), "http://test.com/page.html");
+        let shared = snapshot_shared(&driver);
+        let snapshot = HtmlRewriteSnapshot {
+            behavior: BackgroundBehavior::Css {
+                root_media: vec![],
+                root_charset: vec![],
+                root_charset_failure: None,
+            },
+            input_url: "http://test.com/a.css".into(),
+            input_authorized: true,
+            font_service: false,
+            partition_key: "test-partition".into(),
+            base_url: "http://test.com/page.html".into(),
+            options: options.borrow().clone(),
+            user_agent: String::new(),
+            request_headers: driver.request_headers().clone(),
+            request_context: driver.request_context().borrow().clone(),
+            response_charset: None,
+            now_ms: START_MS_FOR_SINK_TEST,
+        };
+        assert!(!run_rewrite_job(snapshot.clone(), shared.clone()));
+        assert_eq!(counter(&server, HTML_ASYNC_COMPLETED), 0);
+        assert!(server
+            .metadata_cache()
+            .get("test-partition")
+            .value
+            .is_none());
+        drop(remote);
+        assert!(run_rewrite_job(snapshot, shared));
+        assert_eq!(counter(&server, HTML_ASYNC_COMPLETED), 1);
+        assert!(server
+            .metadata_cache()
+            .get("test-partition")
+            .value
+            .is_some());
+    }
+
+    #[cfg(target_os = "linux")]
+    struct LoggedFetcher {
+        inner: Arc<dyn AsyncFetcher>,
+        directory: std::path::PathBuf,
+        gated: bool,
+    }
+    #[cfg(target_os = "linux")]
+    impl AsyncFetcher for LoggedFetcher {
+        fn fetch(&self, url: &str, fetch: &mut dyn ps_http::fetch::AsyncFetch) {
+            use std::io::Write;
+            let mut log = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(self.directory.join("fetches"))
+                .unwrap();
+            writeln!(log, "fetch").unwrap();
+            if self.gated {
+                let deadline = Instant::now() + Duration::from_secs(10);
+                while !self.directory.join("release").exists() && Instant::now() < deadline {
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+            }
+            self.inner.fetch(url, fetch);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn coordinated_worker_subprocess() {
+        let Some(directory) = std::env::var_os("PS_HTML_COORDINATOR_CHILD") else {
+            return;
+        };
+        let directory = std::path::PathBuf::from(directory);
+        let mode = std::env::var("PS_HTML_COORDINATOR_MODE").unwrap();
+        let (server, options) = css_server("http://test.com/a.css");
+        let driver =
+            ResourceDriver::new(server.clone(), options.clone(), "http://test.com/page.html");
+        let mut shared = snapshot_shared(&driver);
+        shared.coordinator = Some(Arc::new(
+            ps_cache::rewrite_coordinator::SharedRewriteCoordinator::open(
+                &directory.join("owners-v2"),
+                8,
+                Duration::from_millis(5),
+            )
+            .unwrap(),
+        ));
+        let backend = Arc::new(ps_cache::cache::FileCache::new(
+            &directory.join("cache"),
+            ps_cache::cache::FileCachePolicy {
+                clean_interval_ms: -1,
+                target_size_bytes: 16_777_216,
+                target_inode_count: 0,
+                path_length_limit: 8192,
+            },
+            START_MS_FOR_SINK_TEST,
+        ));
+        shared.metadata = backend.clone();
+        shared.http_cache = Arc::new(HttpCache::new(backend));
+        shared.fetcher = Arc::new(LoggedFetcher {
+            inner: shared.fetcher.clone(),
+            directory: directory.clone(),
+            gated: mode == "gated",
+        });
+        let snapshot = HtmlRewriteSnapshot {
+            behavior: BackgroundBehavior::Css {
+                root_media: vec![],
+                root_charset: vec![],
+                root_charset_failure: None,
+            },
+            input_url: "http://test.com/a.css".into(),
+            input_authorized: true,
+            font_service: false,
+            partition_key: "process-partition".into(),
+            base_url: "http://test.com/page.html".into(),
+            options: options.borrow().clone(),
+            user_agent: String::new(),
+            request_headers: driver.request_headers().clone(),
+            request_context: driver.request_context().borrow().clone(),
+            response_charset: None,
+            now_ms: START_MS_FOR_SINK_TEST,
+        };
+        let pool = BackgroundPool::new(
+            super::super::background::PoolConfig {
+                threads: 1,
+                queue_bound: 2,
+            },
+            &server.statistics_shared(),
+        );
+        let job = pool
+            .submit("test-job", move || run_rewrite_job(snapshot, shared))
+            .unwrap();
+        let wrote = job
+            .wait_timeout::<bool>(Duration::from_secs(12))
+            .map(|value| *value);
+        pool.shutdown();
+        assert_eq!(wrote, Some(mode != "duplicate"));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn separate_worker_processes_fetch_once_and_recover_killed_optimizer() {
+        fn child(path: &std::path::Path, mode: &str) -> std::process::Command {
+            let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+            command
+                .args([
+                    "--exact",
+                    "html_async::tests::coordinated_worker_subprocess",
+                    "--nocapture",
+                ])
+                .env("PS_HTML_COORDINATOR_CHILD", path)
+                .env("PS_HTML_COORDINATOR_MODE", mode)
+                .stdout(std::process::Stdio::null());
+            command
+        }
+        for kill_owner in [false, true] {
+            let directory = CoordinatorDirectory::new();
+            let mut first = child(&directory.0, "gated").spawn().unwrap();
+            let fetches = directory.0.join("fetches");
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while !fetches.exists() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            if !fetches.exists() {
+                let _ = first.kill();
+                let _ = first.wait();
+                panic!("first worker never fetched");
+            }
+            let duplicate = child(&directory.0, "duplicate").status();
+            if kill_owner {
+                first.kill().unwrap();
+            } else {
+                std::fs::write(directory.0.join("release"), b"go").unwrap();
+            }
+            let first_status = first.wait().unwrap();
+            assert!(duplicate.unwrap().success());
+            assert_eq!(
+                std::fs::read_to_string(&fetches).unwrap().lines().count(),
+                1
+            );
+            if kill_owner {
+                assert!(child(&directory.0, "recover").status().unwrap().success());
+            } else {
+                assert!(first_status.success());
+            }
+            let backend = ps_cache::cache::FileCache::new(
+                &directory.0.join("cache"),
+                ps_cache::cache::FileCachePolicy {
+                    clean_interval_ms: -1,
+                    target_size_bytes: 16_777_216,
+                    target_inode_count: 0,
+                    path_length_limit: 8192,
+                },
+                START_MS_FOR_SINK_TEST,
+            );
+            let tables = backend
+                .get("process-partition")
+                .value
+                .expect("worker did not publish partition metadata");
+            let tables = super::super::metadata::decode_partitions(&tables).unwrap();
+            assert!(tables
+                .partition
+                .iter()
+                .any(|result| result.optimizable && result.url.contains(".pagespeed.cf.")));
+            assert_eq!(
+                std::fs::read_to_string(&fetches).unwrap().lines().count(),
+                if kill_owner { 2 } else { 1 }
+            );
+        }
+    }
+
+    #[derive(Debug)]
+    struct RequestThreadForbiddenCoordinator;
+    impl ps_cache::rewrite_coordinator::RewriteCoordinator for RequestThreadForbiddenCoordinator {
+        fn claim(&self, _key: &str) -> ps_cache::rewrite_coordinator::RewriteClaim {
+            panic!("foreground or rejected job must never claim ownership")
+        }
+    }
+
     #[test]
     fn miss_schedules_async_and_serves_original_then_optimized() {
         let css_url = "http://test.com/a.css";
         let (server, options) = css_server(css_url);
+        #[cfg(target_os = "linux")]
+        let directory = CoordinatorDirectory::new();
+        #[cfg(target_os = "linux")]
+        server.set_rewrite_coordinator(directory.coordinator());
         let pool = BackgroundPool::new(
             super::super::background::PoolConfig {
                 threads: 2,
@@ -711,6 +1079,10 @@ mod tests {
         let mut options = RewriteOptions::new();
         options.filters_mut().enable(Filter::InlineCss);
         let options = Rc::new(RefCell::new(options));
+        #[cfg(target_os = "linux")]
+        let directory = CoordinatorDirectory::new();
+        #[cfg(target_os = "linux")]
+        server.set_rewrite_coordinator(directory.coordinator());
         let pool = BackgroundPool::new(
             super::super::background::PoolConfig {
                 threads: 2,
@@ -841,6 +1213,7 @@ mod tests {
         // optimizes inline: behavior unchanged.
         let css_url = "http://test.com/a.css";
         let (server, options) = css_server(css_url);
+        server.set_rewrite_coordinator(Arc::new(RequestThreadForbiddenCoordinator));
         let html = format!(
             "<html><head><link rel='stylesheet' href='{css_url}'></head><body></body></html>"
         );
@@ -864,6 +1237,7 @@ mod tests {
         );
         server.set_background_pool(Arc::clone(&pool));
         pool.shutdown();
+        server.set_rewrite_coordinator(Arc::new(RequestThreadForbiddenCoordinator));
         let html = format!(
             "<html><head><link rel='stylesheet' href='{css_url}'></head><body></body></html>"
         );

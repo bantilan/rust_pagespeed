@@ -216,6 +216,7 @@ pub struct SystemCachePath {
     /// Opt-in shared byte tier; startup must enroll every writer to this path.
     pub shared_cache: Option<Arc<dyn Cache>>,
     memory_namespace: Option<String>,
+    rewrite_coordinator: Option<Arc<dyn ps_cache::rewrite_coordinator::RewriteCoordinator>>,
     clean_interval_set: bool,
     clean_size_set: bool,
     clean_inode_set: bool,
@@ -260,6 +261,7 @@ impl SystemCachePath {
             coherence,
             shared_cache: None,
             memory_namespace: None,
+            rewrite_coordinator: None,
             clean_interval_set: system.was_set.clean_interval,
             clean_size_set: system.was_set.clean_size,
             clean_inode_set: system.was_set.clean_inode,
@@ -336,6 +338,8 @@ pub struct ContextCaches {
     /// Metadata cache (LRU writethrough over file, compressed
     /// unless disabled).
     pub metadata_cache: Arc<dyn Cache>,
+    /// Optional cross-worker HTML optimization domain (only opt-in shared paths).
+    pub rewrite_coordinator: Option<Arc<dyn ps_cache::rewrite_coordinator::RewriteCoordinator>>,
 }
 
 /// Cache system with optional coherent shared bytes and persistent file storage.
@@ -387,6 +391,7 @@ impl SystemCaches {
                             path.coherence.clone(),
                             path.shared_cache.clone(),
                             path.memory_namespace.clone(),
+                            path.rewrite_coordinator.clone(),
                         )
                     })
             })
@@ -396,10 +401,11 @@ impl SystemCaches {
             None => {
                 let mut path =
                     SystemCachePath::new(&system.file_cache_path, system, purge, unplugged, now_ms);
-                if let Some((coherence, shared, namespace)) = enrolled {
+                if let Some((coherence, shared, namespace, coordinator)) = enrolled {
                     path.coherence = coherence;
                     path.shared_cache = shared;
                     path.memory_namespace = namespace;
+                    path.rewrite_coordinator = coordinator;
                 }
                 self.paths.insert(key.clone(), path);
             }
@@ -471,6 +477,14 @@ impl SystemCaches {
             ps_cache::shared_memory::SharedMemoryCache::open(&filename, options)
                 .map_err(|e| e.to_string())?,
         );
+        let coordinator: Arc<dyn ps_cache::rewrite_coordinator::RewriteCoordinator> = Arc::new(
+            ps_cache::rewrite_coordinator::SharedRewriteCoordinator::open(
+                &directory.join("rewrite-owners-v2-256.dat"),
+                256,
+                std::time::Duration::from_millis(5),
+            )
+            .map_err(|e| e.to_string())?,
+        );
         for path in self
             .paths
             .values_mut()
@@ -479,6 +493,7 @@ impl SystemCaches {
             path.coherence = Some(coherence.clone());
             path.shared_cache = Some(shared.clone());
             path.memory_namespace = Some(namespace.clone());
+            path.rewrite_coordinator = Some(coordinator.clone());
         }
         Ok(())
     }
@@ -549,6 +564,7 @@ impl SystemCaches {
             http_cache,
             http_backend: backend,
             metadata_cache: metadata,
+            rewrite_coordinator: path.rewrite_coordinator.clone(),
         })
     }
 }
@@ -793,11 +809,32 @@ mod tests {
         caches.enable_shared_memory(path, shared_options()).unwrap();
         alias.cache_flush_filename = "another.flush".to_string();
         caches.register_config(&alias, false, false, 0);
-        assert!(caches.paths.values().all(|p| p.shared_cache.is_some()));
+        assert!(caches
+            .paths
+            .values()
+            .all(|p| p.shared_cache.is_some() && p.rewrite_coordinator.is_some()));
         let mut options = NgxOptions::new();
         options.system.file_cache_path = path.to_string();
         let handles = caches.setup_caches(&options).unwrap();
         assert!(handles.http_backend.name().contains("SharedMemoryCache"));
+        assert!(handles.rewrite_coordinator.is_some());
+        // All aliases and configurations, including late registrations, share
+        // one canonical cache-domain coordinator.
+        let coordinator = handles.rewrite_coordinator.unwrap();
+        let held = match coordinator.claim("same-options:ua:partition") {
+            ps_cache::rewrite_coordinator::RewriteClaim::Owned(lease) => lease,
+            _ => panic!("initial ownership refused"),
+        };
+        for path in caches.paths.values() {
+            assert!(matches!(
+                path.rewrite_coordinator
+                    .as_ref()
+                    .unwrap()
+                    .claim("same-options:ua:partition"),
+                ps_cache::rewrite_coordinator::RewriteClaim::Retry
+            ));
+        }
+        drop(held);
         assert!(caches.enable_shared_memory(path, shared_options()).is_err());
         let late = directory.join("late");
         let mut options = NgxOptions::new();

@@ -1298,6 +1298,9 @@ unsafe fn child_init_servers(cycle: *mut ngx_cycle_t, main: &mut MainConf) {
                     if let Some(html) = context.html_context.as_ref() {
                         let pool = main.driver_factory.ensure_background_pool();
                         html.set_background_pool(pool);
+                        if let Some(coordinator) = assembled.rewrite_coordinator.clone() {
+                            html.set_rewrite_coordinator(coordinator);
+                        }
                         html.set_message_sink(std::sync::Arc::new(
                             crate::message::BufferMessageSink::new(std::sync::Arc::clone(
                                 &main.driver_factory.message_buffer,
