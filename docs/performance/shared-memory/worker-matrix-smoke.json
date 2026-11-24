@@ -1,0 +1,725 @@
+{
+  "at": "2026-11-24T10:22:25.798874+00:00",
+  "commit": "5d434c97b21270d2bc435985ee60c90a59e8fc63",
+  "module_sha256": "f39a4104a52b2ffcbe7978b819559055315068c8889f4a556577a904b19cfaf0",
+  "nginx_version": "nginx version: nginx/1.31.8-2b436b0",
+  "arguments": {
+    "nginx": "../.nginx-build/nginx-1.31.8/objs/nginx",
+    "module": "target/release/libps_nginx.so",
+    "output": "docs/performance/shared-memory/worker-matrix-smoke.json",
+    "port": 18092,
+    "workers": [
+      1
+    ],
+    "repeats": 1,
+    "samples": 8,
+    "clients": 8,
+    "cold_requests": 4,
+    "seed": 20261124,
+    "shared_kb": 16384
+  },
+  "runs": [
+    {
+      "repetition": 1,
+      "workers_configured": 1,
+      "shared_kb": 16384,
+      "prefix": "/tmp/ps-worker-matrix-yt0y8zdv",
+      "config_sha256": "caa52066dd7e2af0282588b25cb72e003e3d202f8ab67dd70d8f7f7c48824de0",
+      "pages": {
+        "Moto": {
+          "cold_burst": {
+            "median_ms": 27.404381,
+            "p95_ms": 38.987851,
+            "elapsed_s": 0.041217699996195734,
+            "requests_per_second": 97.04568669210528,
+            "workers": [
+              4119326
+            ],
+            "samples": [
+              {
+                "ms": 3.337008,
+                "worker": 4119326,
+                "marker": "BYPASS"
+              },
+              {
+                "ms": 27.426938,
+                "worker": 4119326,
+                "marker": "BYPASS"
+              },
+              {
+                "ms": 27.381824,
+                "worker": 4119326,
+                "marker": "BYPASS"
+              },
+              {
+                "ms": 38.987851,
+                "worker": 4119326,
+                "marker": "BYPASS"
+              }
+            ]
+          },
+          "normalized_html_sha256": "1e7583518cb72e582774d10bda579579cc26b99cc7d4552f616978df5d1ee655",
+          "pagespeed_refs": 15,
+          "warm_hit": {
+            "median_ms": 2.677107,
+            "p95_ms": 3.961795,
+            "elapsed_s": 0.006705134001094848,
+            "requests_per_second": 1193.1156034605303,
+            "workers": [
+              4119326
+            ],
+            "samples": [
+              {
+                "ms": 2.347566,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 2.270444,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 2.191247,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 2.511681,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 2.842533,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.114516,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.550724,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.961795,
+                "worker": 4119326,
+                "marker": "HIT"
+              }
+            ]
+          },
+          "warm_miss": {
+            "median_ms": 13.2868755,
+            "p95_ms": 16.990848,
+            "elapsed_s": 0.018772866984363645,
+            "requests_per_second": 426.1469495662748,
+            "workers": [
+              4119326
+            ],
+            "samples": [
+              {
+                "ms": 11.172846,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 8.832453,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 8.834627,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 12.461823,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 14.111928,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 15.456116,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 16.990848,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 16.688568,
+                "worker": 4119326,
+                "marker": "MISS"
+              }
+            ]
+          }
+        },
+        "Aroma": {
+          "cold_burst": {
+            "median_ms": 35.642646,
+            "p95_ms": 42.496921,
+            "elapsed_s": 0.042972400959115475,
+            "requests_per_second": 93.0830000354333,
+            "workers": [
+              4119326
+            ],
+            "samples": [
+              {
+                "ms": 42.496921,
+                "worker": 4119326,
+                "marker": "BYPASS"
+              },
+              {
+                "ms": 42.494717,
+                "worker": 4119326,
+                "marker": "BYPASS"
+              },
+              {
+                "ms": 28.790575,
+                "worker": 4119326,
+                "marker": "BYPASS"
+              },
+              {
+                "ms": 28.721407,
+                "worker": 4119326,
+                "marker": "BYPASS"
+              }
+            ]
+          },
+          "normalized_html_sha256": "495b9a7c15e1bf61a17a8f44dbd44d461f92c5cca712522af866945305452147",
+          "pagespeed_refs": 23,
+          "warm_hit": {
+            "median_ms": 3.7207735,
+            "p95_ms": 4.800207,
+            "elapsed_s": 0.007189941999968141,
+            "requests_per_second": 1112.6654429250539,
+            "workers": [
+              4119326
+            ],
+            "samples": [
+              {
+                "ms": 3.125046,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 2.888247,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.22431,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.623368,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.818179,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 4.226265,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 4.800207,
+                "worker": 4119326,
+                "marker": "HIT"
+              },
+              {
+                "ms": 4.549182,
+                "worker": 4119326,
+                "marker": "HIT"
+              }
+            ]
+          },
+          "warm_miss": {
+            "median_ms": 20.6876075,
+            "p95_ms": 24.131048,
+            "elapsed_s": 0.026089554012287408,
+            "requests_per_second": 306.63613476229744,
+            "workers": [
+              4119326
+            ],
+            "samples": [
+              {
+                "ms": 17.393002,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 14.220498,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 14.332345,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 19.552351,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 21.822864,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 24.120728,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 24.131048,
+                "worker": 4119326,
+                "marker": "MISS"
+              },
+              {
+                "ms": 24.031683,
+                "worker": 4119326,
+                "marker": "MISS"
+              }
+            ]
+          }
+        }
+      },
+      "before": {
+        "worker": 4119326,
+        "values": {
+          "background_jobs_completed": 0,
+          "background_jobs_dedup_hits": 0,
+          "background_jobs_failed": 0,
+          "background_jobs_queue_full": 0,
+          "background_jobs_shutdown": 0,
+          "background_jobs_submitted": 0,
+          "shared_cache_busy": 0,
+          "shared_cache_byte_mapping_bytes": 16550016,
+          "shared_cache_delete_attempts": 0,
+          "shared_cache_diagnostics_unavailable": 0,
+          "shared_cache_domains": 1,
+          "shared_cache_errors": 0,
+          "shared_cache_evictions": 0,
+          "shared_cache_hits": 0,
+          "shared_cache_lifetime_counter_mapping_bytes": 10304,
+          "shared_cache_metrics_mapping_bytes": 1152,
+          "shared_cache_misses": 0,
+          "shared_cache_oversized": 0,
+          "shared_cache_owner_busy": 0,
+          "shared_cache_owner_claims": 0,
+          "shared_cache_owner_dead_reclaims": 0,
+          "shared_cache_owner_duplicates": 0,
+          "shared_cache_owner_errors_or_exhaustion": 0,
+          "shared_cache_owner_full": 0,
+          "shared_cache_owner_long_keys": 0,
+          "shared_cache_owner_mapping_bytes": 272128,
+          "shared_cache_owner_revocations": 0,
+          "shared_cache_owner_slot_capacity": 256,
+          "shared_cache_owner_stale_publications": 0,
+          "shared_cache_puts": 0,
+          "shared_cache_resident_entries": 0,
+          "shared_cache_resident_key_value_bytes": 0,
+          "shared_cache_slot_capacity": 1008,
+          "shared_cache_transaction_mapping_bytes": 16512,
+          "shared_cache_usage_busy_shards": 0,
+          "shared_cache_writer_capacity_failures": 0,
+          "shared_cache_writer_disabled_memory_shards": 0,
+          "shared_cache_writer_mapping_bytes": 41856,
+          "shared_cache_writer_recovery_events": 0,
+          "shared_cache_writer_untracked_disk_mutations": 0
+        }
+      },
+      "after": {
+        "worker": 4119326,
+        "values": {
+          "background_jobs_completed": 219,
+          "background_jobs_dedup_hits": 571,
+          "background_jobs_failed": 0,
+          "background_jobs_queue_full": 0,
+          "background_jobs_shutdown": 0,
+          "background_jobs_submitted": 790,
+          "background_jobs_timeouts": 11,
+          "shared_cache_busy": 0,
+          "shared_cache_byte_mapping_bytes": 16550016,
+          "shared_cache_delete_attempts": 0,
+          "shared_cache_diagnostics_unavailable": 0,
+          "shared_cache_domains": 1,
+          "shared_cache_errors": 0,
+          "shared_cache_evictions": 0,
+          "shared_cache_hits": 0,
+          "shared_cache_lifetime_counter_mapping_bytes": 10304,
+          "shared_cache_metrics_mapping_bytes": 1152,
+          "shared_cache_misses": 1203,
+          "shared_cache_oversized": 64,
+          "shared_cache_owner_busy": 0,
+          "shared_cache_owner_claims": 173,
+          "shared_cache_owner_dead_reclaims": 0,
+          "shared_cache_owner_duplicates": 0,
+          "shared_cache_owner_errors_or_exhaustion": 0,
+          "shared_cache_owner_full": 0,
+          "shared_cache_owner_long_keys": 2,
+          "shared_cache_owner_mapping_bytes": 272128,
+          "shared_cache_owner_revocations": 0,
+          "shared_cache_owner_slot_capacity": 256,
+          "shared_cache_owner_stale_publications": 0,
+          "shared_cache_puts": 207,
+          "shared_cache_resident_entries": 207,
+          "shared_cache_resident_key_value_bytes": 264347,
+          "shared_cache_slot_capacity": 1008,
+          "shared_cache_transaction_mapping_bytes": 16512,
+          "shared_cache_usage_busy_shards": 0,
+          "shared_cache_writer_capacity_failures": 0,
+          "shared_cache_writer_disabled_memory_shards": 0,
+          "shared_cache_writer_mapping_bytes": 41856,
+          "shared_cache_writer_recovery_events": 0,
+          "shared_cache_writer_untracked_disk_mutations": 0
+        }
+      },
+      "memory_kib": {
+        "4119326": {
+          "Rss": 41272,
+          "Pss": 29037,
+          "Private_Dirty": 15852
+        }
+      },
+      "passed": true
+    },
+    {
+      "repetition": 1,
+      "workers_configured": 1,
+      "shared_kb": 0,
+      "prefix": "/tmp/ps-worker-matrix-a91tc_hy",
+      "config_sha256": "f2940e1d4aa71677f4559f4516c1ab7cd92cd7ac69411f4f86fbe08c8eb75550",
+      "pages": {
+        "Moto": {
+          "cold_burst": {
+            "median_ms": 22.245276,
+            "p95_ms": 39.837688,
+            "elapsed_s": 0.04095443501137197,
+            "requests_per_second": 97.66951976969784,
+            "workers": [
+              4119434
+            ],
+            "samples": [
+              {
+                "ms": 28.570858,
+                "worker": 4119434,
+                "marker": "BYPASS"
+              },
+              {
+                "ms": 15.919694,
+                "worker": 4119434,
+                "marker": "BYPASS"
+              },
+              {
+                "ms": 15.842041,
+                "worker": 4119434,
+                "marker": "BYPASS"
+              },
+              {
+                "ms": 39.837688,
+                "worker": 4119434,
+                "marker": "BYPASS"
+              }
+            ]
+          },
+          "normalized_html_sha256": "1e7583518cb72e582774d10bda579579cc26b99cc7d4552f616978df5d1ee655",
+          "pagespeed_refs": 15,
+          "warm_hit": {
+            "median_ms": 3.491439,
+            "p95_ms": 4.075916,
+            "elapsed_s": 0.006814046006184071,
+            "requests_per_second": 1174.045492610355,
+            "workers": [
+              4119434
+            ],
+            "samples": [
+              {
+                "ms": 3.193382,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 2.790156,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.124565,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.860328,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.025952,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.789496,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 4.075916,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 4.025613,
+                "worker": 4119434,
+                "marker": "HIT"
+              }
+            ]
+          },
+          "warm_miss": {
+            "median_ms": 15.0597475,
+            "p95_ms": 17.081105,
+            "elapsed_s": 0.018947610980831087,
+            "requests_per_second": 422.21681710129246,
+            "workers": [
+              4119434
+            ],
+            "samples": [
+              {
+                "ms": 13.08162,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 11.118526,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 14.391756,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 10.847814,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 15.727739,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 17.081105,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 16.93786,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 16.554259,
+                "worker": 4119434,
+                "marker": "MISS"
+              }
+            ]
+          }
+        },
+        "Aroma": {
+          "cold_burst": {
+            "median_ms": 35.3821535,
+            "p95_ms": 41.778952,
+            "elapsed_s": 0.04234699398512021,
+            "requests_per_second": 94.45770817653577,
+            "workers": [
+              4119434
+            ],
+            "samples": [
+              {
+                "ms": 29.057228,
+                "worker": 4119434,
+                "marker": "BYPASS"
+              },
+              {
+                "ms": 41.778952,
+                "worker": 4119434,
+                "marker": "BYPASS"
+              },
+              {
+                "ms": 41.707079,
+                "worker": 4119434,
+                "marker": "BYPASS"
+              },
+              {
+                "ms": 28.667697,
+                "worker": 4119434,
+                "marker": "BYPASS"
+              }
+            ]
+          },
+          "normalized_html_sha256": "495b9a7c15e1bf61a17a8f44dbd44d461f92c5cca712522af866945305452147",
+          "pagespeed_refs": 23,
+          "warm_hit": {
+            "median_ms": 3.3948505,
+            "p95_ms": 4.308988,
+            "elapsed_s": 0.0069171159993857145,
+            "requests_per_second": 1156.5513720906881,
+            "workers": [
+              4119434
+            ],
+            "samples": [
+              {
+                "ms": 2.924324,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.179556,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 2.472839,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.320087,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.469614,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 3.727361,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 4.308988,
+                "worker": 4119434,
+                "marker": "HIT"
+              },
+              {
+                "ms": 4.092217,
+                "worker": 4119434,
+                "marker": "HIT"
+              }
+            ]
+          },
+          "warm_miss": {
+            "median_ms": 15.6288465,
+            "p95_ms": 23.502353,
+            "elapsed_s": 0.02567376400111243,
+            "requests_per_second": 311.6021476108203,
+            "workers": [
+              4119434
+            ],
+            "samples": [
+              {
+                "ms": 8.671935,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 8.445095,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 11.730398,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 14.418205,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 16.839488,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 19.03866,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 21.290248,
+                "worker": 4119434,
+                "marker": "MISS"
+              },
+              {
+                "ms": 23.502353,
+                "worker": 4119434,
+                "marker": "MISS"
+              }
+            ]
+          }
+        }
+      },
+      "before": {
+        "worker": 4119434,
+        "values": {
+          "background_jobs_completed": 0,
+          "background_jobs_dedup_hits": 0,
+          "background_jobs_failed": 0,
+          "background_jobs_queue_full": 0,
+          "background_jobs_shutdown": 0,
+          "background_jobs_submitted": 0,
+          "shared_cache_diagnostics_unavailable": 0,
+          "shared_cache_domains": 0
+        }
+      },
+      "after": {
+        "worker": 4119434,
+        "values": {
+          "background_jobs_completed": 219,
+          "background_jobs_dedup_hits": 607,
+          "background_jobs_failed": 0,
+          "background_jobs_queue_full": 0,
+          "background_jobs_shutdown": 0,
+          "background_jobs_submitted": 826,
+          "background_jobs_timeouts": 11,
+          "shared_cache_diagnostics_unavailable": 0,
+          "shared_cache_domains": 0
+        }
+      },
+      "memory_kib": {
+        "4119434": {
+          "Rss": 24172,
+          "Pss": 20243,
+          "Private_Dirty": 15180
+        }
+      },
+      "passed": true
+    }
+  ],
+  "scope": "Ordinary local client-observed latency; fresh application caches, warm OS caches. Fixed eight-client default; order randomized within worker/repetition pairs. Client scheduling limits throughput. Background counters are proxies, not resource fetch/encode counts.",
+  "passed": true
+}

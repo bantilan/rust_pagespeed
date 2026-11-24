@@ -18,13 +18,11 @@ Targeted serial debug test measured 248.634 ms with zero polling versus 519.508 
 
 The separate end-to-end u64 epoch-exhaustion case remains optional coverage work; it is not the same condition as exhausted writer slots. Never delete live mappings.
 
-## 3. Complete performance acceptance
+## 3. Performance acceptance — expanded evidence; attribution remains open
 
-Current five-run default/shared cold/HIT/MISS data is saved under ef9aeb5-*.json. Single-worker shared hits show no consistent win; keep opt-in. Existing concurrency evidence is one workload/order and stress-test throughput; broader process-count, queue saturation, eviction/memory, duplicate-fetch/encode measurements remain useful before recommending wider rollout.
+See [WORKER_MATRIX.md](WORKER_MATRIX.md): 18 randomized default/shared16MiB runs across 1/2/4 workers plus six four-worker default/shared1MiB runs, confirmed HTML phases, output equality, eviction and RSS/PSS/gauges. Seven gated queue-saturation/dedup probes verify bounded rejection and single local execution. No consistent shared-cache latency advantage or completed-job reduction; keep opt-in.
 
-Use matched binaries/configuration and randomized repeated modes for causal performance claims. No new optimization should be justified solely by historic numbers from different clients/NGINX versions.
-
-The historical production ~13 ms remains unattributed: the supplied localhost endpoint previously timed out. Isolated stage residual includes NGINX, uninstrumented Rust, sockets, scheduling and client overhead. A functioning endpoint and suitable tracing are required to isolate production and NGINX costs. perf kernel events were denied; sanitizers/model checking were not run.
+Remaining: directly measure unique fetch/encode work rather than treating local/global dedup counters as bytes/encodes saved; broader workloads and peak-memory/leak profiling before general production claims. Historical ~13 ms remains unattributed. Aerosky now responds with a 0.488 ms warm median in a small read-only sample, but installed module differs and strace attachment was denied. See raw artifacts and report; no security settings were changed.
 
 ## 4. Reconcile audit and progress presentation
 

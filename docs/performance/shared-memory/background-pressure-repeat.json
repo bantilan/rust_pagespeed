@@ -1,0 +1,86 @@
+{
+  "scope": "Controlled local pool scheduling only; one blocked worker, four queue slots; 256 duplicate joins and 256 unique submissions per run; no HTML/resource latency claim",
+  "runs": [
+    {
+      "threads": 1,
+      "queue_bound": 4,
+      "executed": 5,
+      "duplicates_joined": 256,
+      "queue_rejections": 252,
+      "dedup_median_ns": 50,
+      "dedup_p95_ns": 61,
+      "rejection_median_ns": 120,
+      "rejection_p95_ns": 140
+    },
+    {
+      "threads": 1,
+      "queue_bound": 4,
+      "executed": 5,
+      "duplicates_joined": 256,
+      "queue_rejections": 252,
+      "dedup_median_ns": 50,
+      "dedup_p95_ns": 60,
+      "rejection_median_ns": 110,
+      "rejection_p95_ns": 131
+    },
+    {
+      "threads": 1,
+      "queue_bound": 4,
+      "executed": 5,
+      "duplicates_joined": 256,
+      "queue_rejections": 252,
+      "dedup_median_ns": 50,
+      "dedup_p95_ns": 61,
+      "rejection_median_ns": 90,
+      "rejection_p95_ns": 110
+    },
+    {
+      "threads": 1,
+      "queue_bound": 4,
+      "executed": 5,
+      "duplicates_joined": 256,
+      "queue_rejections": 252,
+      "dedup_median_ns": 50,
+      "dedup_p95_ns": 61,
+      "rejection_median_ns": 120,
+      "rejection_p95_ns": 140
+    },
+    {
+      "threads": 1,
+      "queue_bound": 4,
+      "executed": 5,
+      "duplicates_joined": 256,
+      "queue_rejections": 252,
+      "dedup_median_ns": 40,
+      "dedup_p95_ns": 51,
+      "rejection_median_ns": 90,
+      "rejection_p95_ns": 110
+    },
+    {
+      "threads": 1,
+      "queue_bound": 4,
+      "executed": 5,
+      "duplicates_joined": 256,
+      "queue_rejections": 252,
+      "dedup_median_ns": 40,
+      "dedup_p95_ns": 50,
+      "rejection_median_ns": 90,
+      "rejection_p95_ns": 110
+    },
+    {
+      "threads": 1,
+      "queue_bound": 4,
+      "executed": 5,
+      "duplicates_joined": 256,
+      "queue_rejections": 252,
+      "dedup_median_ns": 40,
+      "dedup_p95_ns": 51,
+      "rejection_median_ns": 90,
+      "rejection_p95_ns": 110
+    }
+  ],
+  "median_of_run_medians_ns": {
+    "dedup_median_ns": 50,
+    "rejection_median_ns": 90
+  }
+}

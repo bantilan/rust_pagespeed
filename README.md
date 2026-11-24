@@ -60,7 +60,9 @@ The example allocates a 16 MiB byte-cache budget; bounded coordination mappings
 are additional. Shared caching remains **opt-in**: the latest single-worker
 run measured Moto/Aroma HTML hits at 0.47/0.50 ms, with no consistent advantage
 over the default stack. Its cross-worker reuse and coordination should be
-evaluated under the intended workload.
+evaluated under the intended workload. The [worker-scaling and cache-pressure
+report](docs/performance/shared-memory/WORKER_MATRIX.md) covers 1/2/4-worker
+comparisons, eviction, memory use, and bounded queue rejection.
 
 Initial activation over legacy workers requires a **full stop/start**.
 Subsequent same-protocol graceful reloads are tested. See
