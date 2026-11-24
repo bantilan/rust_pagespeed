@@ -1,0 +1,345 @@
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+warning: unused import: `LoadCallback`
+  --> crates/ps-html/tests/background_fetch.rs:15:28
+   |
+15 |     CacheableResourceBase, LoadCallback, MockLoadCallback, NotCacheablePolicy, ResourceHooks,
+   |                            ^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `wrap_body` is never used
+  --> crates/ps-html/tests/harness.rs:34:8
+   |
+34 | pub fn wrap_body(fragment: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `run_with_filters` is never used
+  --> crates/ps-html/tests/harness.rs:44:8
+   |
+44 | pub fn run_with_filters(input: &[u8], build: impl FnOnce(&mut Parser)) -> Vec<u8> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `round_trip` is never used
+  --> crates/ps-html/tests/harness.rs:56:8
+   |
+56 | pub fn round_trip(input: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^^
+
+warning: function `validate_expected` is never used
+  --> crates/ps-html/tests/harness.rs:62:8
+   |
+62 | pub fn validate_expected(id: &str, input: &[u8], expected: &[u8]) {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: struct `SharedFilter` is never constructed
+  --> crates/ps-html/tests/harness.rs:72:12
+   |
+72 | pub struct SharedFilter<F> {
+   |            ^^^^^^^^^^^^
+
+warning: associated items `new` and `with` are never used
+  --> crates/ps-html/tests/harness.rs:86:12
+   |
+84 | impl<F> SharedFilter<F> {
+   | ----------------------- associated items in this implementation
+85 |     /// Wraps a filter for shared ownership.
+86 |     pub fn new(filter: F) -> Self {
+   |            ^^^
+...
+93 |     pub fn with<R>(&self, read: impl FnOnce(&F) -> R) -> R {
+   |            ^^^^
+
+warning: struct `ExplicitCloseTag` is never constructed
+   --> crates/ps-html/tests/harness.rs:181:12
+    |
+181 | pub struct ExplicitCloseTag;
+    |            ^^^^^^^^^^^^^^^^
+
+warning: struct `InsertCommentOnFirstDiv` is never constructed
+   --> crates/ps-html/tests/harness.rs:200:12
+    |
+200 | pub struct InsertCommentOnFirstDiv {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `new` and `insert` are never used
+   --> crates/ps-html/tests/harness.rs:207:12
+    |
+205 | impl InsertCommentOnFirstDiv {
+    | ---------------------------- associated items in this implementation
+206 |     #[must_use]
+207 |     pub fn new(at_start: bool) -> Self {
+    |            ^^^
+...
+214 |     fn insert(&mut self, at_start: bool, dom: &mut Dom, lexer: &Lexer, id: NodeId) {
+    |        ^^^^^^
+
+warning: struct `InsertScripts` is never constructed
+   --> crates/ps-html/tests/harness.rs:238:12
+    |
+238 | pub struct InsertScripts {
+    |            ^^^^^^^^^^^^^
+
+warning: associated items `new` and `insert` are never used
+   --> crates/ps-html/tests/harness.rs:246:12
+    |
+244 | impl InsertScripts {
+    | ------------------ associated items in this implementation
+245 |     #[must_use]
+246 |     pub fn new(before: bool, at_start: bool, external: bool) -> Self {
+    |            ^^^
+...
+254 |     fn insert(&mut self, at_start: bool, dom: &mut Dom, id: NodeId) {
+    |        ^^^^^^
+
+warning: struct `DeleteCounts` is never constructed
+   --> crates/ps-html/tests/harness.rs:285:12
+    |
+285 | pub struct DeleteCounts {
+    |            ^^^^^^^^^^^^
+
+warning: struct `DeleteCountValues` is never constructed
+   --> crates/ps-html/tests/harness.rs:291:12
+    |
+291 | pub struct DeleteCountValues {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: method `values` is never used
+   --> crates/ps-html/tests/harness.rs:300:12
+    |
+298 | impl DeleteCounts {
+    | ----------------- method in this implementation
+299 |     #[must_use]
+300 |     pub fn values(&self) -> DeleteCountValues {
+    |            ^^^^^^
+
+warning: struct `DeleteNodes` is never constructed
+   --> crates/ps-html/tests/harness.rs:306:12
+    |
+306 | pub struct DeleteNodes {
+    |            ^^^^^^^^^^^
+
+warning: associated items `new`, `set_delete_node_type`, `set_delete_from_type`, `set_delete_on_open_tag`, and `delete_elements` are never used
+   --> crates/ps-html/tests/harness.rs:318:12
+    |
+316 | impl DeleteNodes {
+    | ---------------- associated items in this implementation
+317 |     #[must_use]
+318 |     pub fn new(counts: &DeleteCounts) -> Self {
+    |            ^^^
+...
+330 |     pub fn set_delete_node_type(&mut self, keyword: Keyword) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+334 |     pub fn set_delete_from_type(&mut self, keyword: Keyword) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+338 |     pub fn set_delete_on_open_tag(&mut self, on_open: bool) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+342 |     fn delete_elements(&mut self, dom: &mut Dom) {
+    |        ^^^^^^^^^^^^^^^
+
+warning: unused import: `ps_cache::hash::Hasher`
+   --> crates/ps-html/tests/js_combine.rs:386:9
+    |
+386 |     use ps_cache::hash::Hasher;
+    |         ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/ps-html/tests/js_combine.rs:179:13
+    |
+179 |         let mut fixture = Fixture {
+    |             ----^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `use_test_namer` is never read
+   --> crates/ps-html/tests/js_combine.rs:137:5
+    |
+129 | struct Fixture {
+    |        ------- field in this struct
+...
+137 |     use_test_namer: bool,
+    |     ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `wrap_body` is never used
+  --> crates/ps-html/tests/harness.rs:34:8
+   |
+34 | pub fn wrap_body(fragment: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^
+
+warning: `ps-html` (test "background_fetch") generated 1 warning
+warning: `ps-html` (test "js_combine") generated 19 warnings (15 duplicates) (run `cargo fix --test "js_combine" -p ps-html` to apply 1 suggestion)
+warning: `ps-html` (test "async_progressive") generated 16 warnings
+warning: `ps-html` (test "css_combine") generated 16 warnings (16 duplicates)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.06s
+     Running tests/async_progressive.rs (target/debug/build/ps-html/eff3d4ce96e13ebc/out/async_progressive-eff3d4ce96e13ebc)
+
+running 7 tests
+test failed_candidate_does_not_discard_successful_combinations ... ok
+test concurrent_html_renders_share_one_fetch ... ok
+test font_service_miss_defers_and_warm_hit_keeps_ua_hooks ... ok
+test queue_full_load_sheds_without_waiting ... ok
+test html_miss_falls_back_then_progresses_to_metadata_hit ... ok
+test saturated_pool_serves_fallback_html_fast_then_recovers ... ok
+test combinations_defer_then_match_sync_without_refetching ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.27s
+
+     Running tests/background_fetch.rs (target/debug/build/ps-html/a9a872c1b98e7193/out/background_fetch-a9a872c1b98e7193)
+
+running 8 tests
+test failed_fetch_preserves_fallback ... ok
+test fast_fetch_completes_inline_through_pool ... ok
+test shutdown_html_keeps_fallback_without_fetching ... ok
+test ipro_scope_selects_ipro_deadline ... ok
+test shutdown_preserves_foreground_resource_serving ... ok
+test concurrent_loads_share_one_fetch ... ok
+test exhausted_budget_skips_waiting ... ok
+test slow_fetch_times_out_then_warms_cache ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+     Running tests/css_combine.rs (target/debug/build/ps-html/41f65120ae489715/out/css_combine-41f65120ae489715)
+
+running 76 tests
+test claims_xhtml_but_has_unclosed_link ... ok
+test combine_css_absolute_base_url_out_of_order ... ok
+test alternate_stylesheets ... ok
+test combine_css_base_url_correctly_ordered ... ok
+test combine_css_base_url_out_of_order ... ok
+test bogus_link_barrier_debug ... ok
+test at_bound_is_combined ... ok
+test combine_css_no_input ... ok
+test combine_css ... ok
+test bogus_link_barrier ... ok
+test combine_css_missing_resource ... ok
+test combine_css_unhealthy ... ok
+test alternate_stylesheet_barrier_debug ... ok
+test alternate_stylesheet_barrier ... ok
+test combine_css_not_cached ... ok
+test async_combine_with_missing_member_converges ... ok
+test combine_css_with_import_in_second ... ok
+test combine_css_with_import_in_first ... ok
+test combine_css_md5 ... ok
+test combine_css_xhtml ... ok
+test combine_css_xhtml_with_flush ... ok
+test cross_across_paths_disallowed ... ok
+test combine_style_tag ... ok
+test combine_css_with_media_barrier ... ok
+test combine_css_with_non_media_barrier ... ok
+test combine_css_with_noscript_barrier ... ok
+test cross_mapped_domain ... ok
+test combine_css_with_fake_noscript_barrier ... ok
+test cross_unmapped_domain_with_unauth_enabled ... ok
+test cross_unmapped_domain ... ok
+test combine_css_recombine ... ok
+test css_do_not_combine_across_not_proxied_domains ... ok
+test debug_unauthorized_domain ... ok
+test css_combine_across_proxy_domains ... ok
+test fetch ... ok
+test fetch_with_no_inputs_is_refused ... ok
+test fetch_result_does_not_decide_html_combination ... ok
+test fetch_with_oversized_name_is_refused ... ok
+test fetch_unhealthy ... ok
+test deal_with_params ... ok
+test cross_across_paths_exceeding_url_size ... ok
+test do_rewrite_for_different_dir ... ok
+test invalid_fetch_cache ... ok
+test fetch_of_inputs_beyond_cacheable_size_is_refused ... ok
+test fetch_of_many_inputs_combines_in_order ... ok
+test id_alone_is_no_barrier ... ok
+test fragment_reference_kept_with_shards ... ok
+test no_combine_parse_error_unclosed_import ... ok
+test no_combine_parse_errors_unclosed_comment ... ok
+test no_combine_parse_errors_at_rule ... ok
+test no_combine_css_base_url_out_of_order ... ok
+test no_absolutify_same_dir ... ok
+test ie_directive_barrier_debug ... ok
+test no_combine_parse_errors ... ok
+test ie_directive_barrier ... ok
+test no_extension_corruption ... ok
+test over_bound_is_not_combined ... ok
+test robustness_unclosed_string ... ok
+test no_query_corruption ... ok
+test no_wrong_ext_corruption ... ok
+test non_standard_attributes_barrier_with_allowed_id_debug ... ok
+test non_standard_attributes_barrier_with_allowed_id ... ok
+test non_standard_attributes_barrier_with_id ... ok
+test non_standard_attributes_barrier ... ok
+test non_standard_attributes_barrier_with_id_debug ... ok
+test shard_subresources ... ok
+test non_standard_attributes_barrier_debug ... ok
+test stats ... ok
+test strip_bom_reconstruct ... ok
+test strip_bom ... ok
+test xhtml_combine_link_closed ... ok
+test style_barrier ... ok
+test style_barrier_debug ... ok
+test two_combinations_twice ... ok
+test combine_css_many_files_one_orphan ... ok
+test combine_css_many_files ... ok
+
+test result: ok. 76 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/js_combine.rs (target/debug/build/ps-html/e918107047fa6c4e/out/js_combine-e918107047fa6c4e)
+
+running 47 tests
+test charset_determination ... ok
+test combine_js_unhealthy ... ok
+test combine_js_preserve_urls_on ... ok
+test embedded_bom_reconstruct ... ok
+test bom_mismatch ... ok
+test all_different_charsets ... ok
+test fetch_with_no_inputs_is_refused ... ok
+test fetch_result_does_not_decide_html_combination ... ok
+test combination_stops_at_cacheable_size ... ok
+test charset_mismatch_reason_escaped_in_log ... ok
+test integrity_script_untouched ... ok
+test inline_stands_down_for_combinations ... ok
+test embedded_bom ... ok
+test no_combine_data_no_defer_attribute ... ok
+test combine_js_no_extra_cache_extension ... ok
+test map_rewrite_domain_accross_dirs ... ok
+test combine_js_avoid_rewriting_introspective_javascrip_on ... ok
+test minify_combine_across_hosts ... ok
+test minify_combine_same_host_proxy ... ok
+test combine_js ... ok
+test minify_combine_across_hosts_proxy ... ok
+test no_combine_no_defer_attribute ... ok
+test no_preserve_url_relativity ... ok
+test not_really_strict ... ok
+test minify_combine_js ... ok
+test oversized_first_file_does_not_poison_rest ... ok
+test non_ascii_script_on_multibyte_page_is_not_combined ... ok
+test non_ascii_utf8_script_is_combined_only_on_utf8_page ... ok
+test test_base ... ok
+test serve_files_unhealthy ... ok
+test minify_shard_combine_js ... ok
+test preserve_url_relativity ... ok
+test partly_invalid_fetch_cache ... ok
+test test_cross_domain_reject_unauth_enabled ... ok
+test pages_in_different_charsets_do_not_share_decision ... ok
+test test_cross_domain_reject ... ok
+test test_combine_stats ... ok
+test test_combine_shard ... ok
+test test_flush_middle3 ... ok
+test test_cross_domain_recover ... ok
+test test_script_inline_text_rollback ... ok
+test is_likely_strict_mode ... ok
+test test_flush_middle1 ... ok
+test test_max_combined_js_size ... ok
+test test_barriers ... ok
+test test_flush_middle2 ... ok
+test test_non_barriers ... ok
+
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+

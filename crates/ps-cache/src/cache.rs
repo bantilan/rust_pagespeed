@@ -1267,6 +1267,11 @@ impl Cache for FallbackCache {
 /// writes are active; L1 reads then fall through to the persistent backend.
 pub trait CacheCoherence: Send + Sync + std::fmt::Debug {
     fn snapshot(&self, key: &str) -> Option<i64>;
+    /// Builds a memory-layer identity. Implementations with restart incarnations
+    /// can include their namespace here without a second key-prefix allocation.
+    fn memory_key(&self, generation: i64, key: &str) -> String {
+        format!("{generation}:{key}")
+    }
     fn begin_write(&self, key: &str);
     fn end_write(&self, key: &str);
 }
@@ -1339,13 +1344,13 @@ impl WriteThroughCache {
 
 impl Cache for WriteThroughCache {
     fn get(&self, key: &str) -> Lookup {
-        // Keep L2 reads/backfills atomic with local puts and deletes.
-        let _operation = lock(&self.operations);
+        // Shared generations make backfills safe without holding a local
+        // operation mutex over disk I/O. An unrelated writer must not stall hits.
         if let Some(coherence) = &self.coherence {
             let Some(generation) = coherence.snapshot(key) else {
                 return self.l2.get(key);
             };
-            let memory_key = format!("{generation}:{key}");
+            let memory_key = coherence.memory_key(generation, key);
             let cached = self.l1.get(&memory_key);
             let was_hit = cached.state == KeyState::Available;
             let result = if was_hit { cached } else { self.l2.get(key) };
@@ -1360,6 +1365,7 @@ impl Cache for WriteThroughCache {
             return result;
         }
 
+        let _operation = lock(&self.operations);
         match self.l1.get(key) {
             hit @ Lookup {
                 state: KeyState::Available,
@@ -1380,25 +1386,25 @@ impl Cache for WriteThroughCache {
     }
 
     fn put(&self, key: &str, value: &[u8]) {
-        let _operation = lock(&self.operations);
         if let Some(coherence) = &self.coherence {
             coherence.begin_write(key);
             let _write = CacheWriteGuard(coherence.as_ref(), key);
             self.l2.put(key, value);
             return;
         }
+        let _operation = lock(&self.operations);
         self.l2.put(key, value);
         self.put_in_l1(key, value);
     }
 
     fn delete(&self, key: &str) {
-        let _operation = lock(&self.operations);
         if let Some(coherence) = &self.coherence {
             coherence.begin_write(key);
             let _write = CacheWriteGuard(coherence.as_ref(), key);
             self.l2.delete(key);
             return;
         }
+        let _operation = lock(&self.operations);
         self.l1.delete(key);
         self.l2.delete(key);
     }

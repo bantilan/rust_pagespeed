@@ -3,10 +3,10 @@
 //! Ports the cache composition: per-path file plus LRU caches
 //! with cleaning-policy merge rules, config registration, the
 //! RootInit/ChildInit lifecycle, and the per-context cache
-//! assembly. Shared-memory metadata caches, external
-//! (memcached/redis) caches, lock managers, and the property
-//! store are unsupported: shm metadata caches already fail
-//! closed at config time, configured external caches warn once
+//! assembly. Shared bytes are available through an opt-in factory API;
+//! the Nginx directive remains unsupported until configuration integration.
+//! External (memcached/redis) caches, job lock managers and the property
+//! store remain unsupported; configured external caches warn once
 //! per path and fall back to file cache, and purge-file polling
 //! waits for HTTPCache purge integration (the file format is
 //! ported). Cleaning runs synchronously from the backends (C++
@@ -17,6 +17,7 @@ use crate::conf::NgxOptions;
 use ps_cache::cache::{
     Cache, CacheCoherence, CompressedCache, FileCache, FileCachePolicy, LruCache,
     WriteThroughCache, DEFAULT_MAX_INFLATED_BYTES, DEFAULT_PATH_LENGTH_LIMIT,
+    WRITE_THROUGH_UNLIMITED,
 };
 use ps_config::options::Value;
 use ps_http::http_cache::HttpCache;
@@ -138,7 +139,7 @@ pub fn child_init_message(path: &str) -> String {
 
 /// Shared generation and active-writer count, mapped once before worker fork.
 #[derive(Debug)]
-struct SharedCacheCoherence(ps_shm::SharedCounters);
+struct SharedCacheCoherence(ps_shm::SharedCounters, Option<String>);
 impl SharedCacheCoherence {
     fn slot(key: &str) -> usize {
         let hash = key.bytes().fold(0xcbf29ce484222325u64, |hash, byte| {
@@ -155,6 +156,12 @@ impl CacheCoherence for SharedCacheCoherence {
         }
         let generation = self.0.coordination_get(slot);
         (self.0.coordination_get(slot + 1) == 0).then_some(generation)
+    }
+    fn memory_key(&self, generation: i64, key: &str) -> String {
+        match &self.1 {
+            Some(prefix) => format!("{prefix}{generation}:{key}"),
+            None => format!("{generation}:{key}"),
+        }
     }
     fn begin_write(&self, key: &str) {
         self.0.coordination_add(Self::slot(key) + 1, 1);
@@ -182,7 +189,12 @@ fn shared_coherence(path: &str) -> Option<Arc<dyn CacheCoherence>> {
         })
         .collect();
     let shared = ps_shm::SharedCounters::open(&directory, &names).ok()?;
-    Some(Arc::new(SharedCacheCoherence(shared)))
+    Some(Arc::new(SharedCacheCoherence(shared, None)))
+}
+
+fn same_disk_path(left: &str, right: &str) -> bool {
+    left == right
+        || matches!((std::fs::canonicalize(left), std::fs::canonicalize(right)), (Ok(left), Ok(right)) if left == right)
 }
 
 /// Per-path caches (`SystemCachePath` without shm locks, purge
@@ -201,6 +213,9 @@ pub struct SystemCachePath {
     /// Per-process LRU (absent when sized 0).
     pub lru_cache: Option<Arc<LruCache>>,
     coherence: Option<Arc<dyn CacheCoherence>>,
+    /// Opt-in shared byte tier; startup must enroll every writer to this path.
+    pub shared_cache: Option<Arc<dyn Cache>>,
+    memory_namespace: Option<String>,
     clean_interval_set: bool,
     clean_size_set: bool,
     clean_inode_set: bool,
@@ -243,6 +258,8 @@ impl SystemCachePath {
             file_cache,
             lru_cache,
             coherence,
+            shared_cache: None,
+            memory_namespace: None,
             clean_interval_set: system.was_set.clean_interval,
             clean_size_set: system.was_set.clean_size,
             clean_inode_set: system.was_set.clean_inode,
@@ -321,7 +338,7 @@ pub struct ContextCaches {
     pub metadata_cache: Arc<dyn Cache>,
 }
 
-/// Cache system (`SystemCaches` without shm/external/locks).
+/// Cache system with optional coherent shared bytes and persistent file storage.
 #[derive(Debug, Default)]
 pub struct SystemCaches {
     paths: HashMap<String, SystemCachePath>,
@@ -357,16 +374,113 @@ impl SystemCaches {
         {
             warnings.push(EXTERNAL_CACHE_WARNING.to_string());
         }
+        let enrolled = (!unplugged)
+            .then(|| {
+                self.paths
+                    .values()
+                    .find(|path| {
+                        same_disk_path(&path.path, &system.file_cache_path)
+                            && path.shared_cache.is_some()
+                    })
+                    .map(|path| {
+                        (
+                            path.coherence.clone(),
+                            path.shared_cache.clone(),
+                            path.memory_namespace.clone(),
+                        )
+                    })
+            })
+            .flatten();
         match self.paths.get_mut(&key) {
             Some(path) => warnings.extend(path.merge_config(system)),
             None => {
-                self.paths.insert(
-                    key.clone(),
-                    SystemCachePath::new(&system.file_cache_path, system, purge, unplugged, now_ms),
-                );
+                let mut path =
+                    SystemCachePath::new(&system.file_cache_path, system, purge, unplugged, now_ms);
+                if let Some((coherence, shared, namespace)) = enrolled {
+                    path.coherence = coherence;
+                    path.shared_cache = shared;
+                    path.memory_namespace = namespace;
+                }
+                self.paths.insert(key.clone(), path);
             }
         }
         warnings
+    }
+
+    /// Enables shared bytes for every registered context sharing a disk path.
+    /// Must run before setup_caches exposes handles. This API is intentionally
+    /// opt-in; configuration and mixed-version migration are separate steps.
+    #[cfg(target_os = "linux")]
+    pub fn enable_shared_memory(
+        &mut self,
+        disk_path: &str,
+        options: ps_shm::byte_cache::ByteCacheOptions,
+    ) -> Result<(), String> {
+        let paths: Vec<_> = self
+            .paths
+            .values()
+            .filter(|path| same_disk_path(&path.path, disk_path) && !path.unplugged)
+            .collect();
+        if paths.is_empty() {
+            return Err("no registered cache path".into());
+        }
+        std::fs::create_dir_all(disk_path).map_err(|e| e.to_string())?;
+        let paths: Vec<_> = self
+            .paths
+            .values()
+            .filter(|path| same_disk_path(&path.path, disk_path) && !path.unplugged)
+            .collect();
+        if paths
+            .iter()
+            .any(|path| Arc::strong_count(&path.file_cache) != 1 || path.shared_cache.is_some())
+        {
+            return Err("shared cache must be enabled once, before backend handles escape".into());
+        }
+        let boot = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
+            .map_err(|e| e.to_string())?;
+        let boot = boot.trim();
+        if boot.len() != 36 || !boot.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-') {
+            return Err("invalid Linux boot identity".into());
+        }
+        let directory = Path::new(disk_path)
+            .join(".pagespeed-lru")
+            .join("shared-v2")
+            .join(boot);
+        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+        let names: Vec<_> = (0..128)
+            .flat_map(|slot| {
+                [
+                    format!("cache_generation_{slot}"),
+                    format!("active_writers_{slot}"),
+                ]
+            })
+            .collect();
+        let counters =
+            ps_shm::SharedCounters::open_coherent(&directory, &names).map_err(|e| e.to_string())?;
+        let namespace = format!(
+            "shm-v2:{:032x}:",
+            counters.incarnation().expect("coherent lifetime")
+        );
+        let coherence: Arc<dyn CacheCoherence> =
+            Arc::new(SharedCacheCoherence(counters, Some(namespace.clone())));
+        let filename = directory.join(format!(
+            "bytes-v2-{}-{}-{}.dat",
+            options.shards, options.entries_per_shard, options.bytes_per_entry
+        ));
+        let shared: Arc<dyn Cache> = Arc::new(
+            ps_cache::shared_memory::SharedMemoryCache::open(&filename, options)
+                .map_err(|e| e.to_string())?,
+        );
+        for path in self
+            .paths
+            .values_mut()
+            .filter(|path| same_disk_path(&path.path, disk_path) && !path.unplugged)
+        {
+            path.coherence = Some(coherence.clone());
+            path.shared_cache = Some(shared.clone());
+            path.memory_namespace = Some(namespace.clone());
+        }
+        Ok(())
     }
 
     /// Root-phase messages (`RootInit`): one info line per path.
@@ -412,7 +526,8 @@ impl SystemCaches {
         );
         let path = self.paths.get(&key)?;
         let backend = path_backend(path, options.system.lru_cache_byte_limit as u64);
-        let levels = if path.lru_cache.is_some() { 2 } else { 1 };
+        let levels =
+            1 + i32::from(path.lru_cache.is_some()) + i32::from(path.shared_cache.is_some());
         let mut http_cache = HttpCache::new(Arc::clone(&backend));
         configure_http_cache(&mut http_cache, options, levels);
         // Metadata rides the same file/LRU stack (both L2s are the
@@ -442,22 +557,28 @@ impl SystemCaches {
 /// the path sizes an LRU.
 #[must_use]
 pub fn path_backend(path: &SystemCachePath, lru_byte_limit: u64) -> Arc<dyn Cache> {
-    let file_cache = Arc::clone(&path.file_cache);
-    let file: Arc<dyn Cache> = file_cache;
-    match path.lru_cache.as_ref() {
-        Some(lru) => {
-            let lru_cache = Arc::clone(lru);
-            let lru: Arc<dyn Cache> = lru_cache;
-            Arc::new(
-                WriteThroughCache::new(lru, file, lru_byte_limit).with_coherence(
-                    path.coherence
-                        .as_ref()
-                        .expect("LRU requires coherence")
-                        .clone(),
-                ),
-            )
-        }
+    let file: Arc<dyn Cache> = path.file_cache.clone();
+    let backend: Arc<dyn Cache> = match &path.shared_cache {
+        Some(shared) => Arc::new(
+            WriteThroughCache::new(shared.clone(), file, WRITE_THROUGH_UNLIMITED).with_coherence(
+                path.coherence
+                    .as_ref()
+                    .expect("shared tier requires coherence")
+                    .clone(),
+            ),
+        ),
         None => file,
+    };
+    match path.lru_cache.as_ref() {
+        Some(lru) => Arc::new(
+            WriteThroughCache::new(lru.clone(), backend, lru_byte_limit).with_coherence(
+                path.coherence
+                    .as_ref()
+                    .expect("LRU requires coherence")
+                    .clone(),
+            ),
+        ),
+        None => backend,
     }
 }
 
@@ -635,6 +756,218 @@ mod tests {
         assert!(Path::new(&options.system.file_cache_path)
             .join(".pagespeed-lru")
             .is_dir());
+    }
+
+    #[cfg(target_os = "linux")]
+    fn shared_options() -> ps_shm::byte_cache::ByteCacheOptions {
+        ps_shm::byte_cache::ByteCacheOptions {
+            shards: 4,
+            entries_per_shard: 16,
+            bytes_per_entry: 1024,
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn shared_fixture(path: &str) -> (SystemCaches, NgxOptions) {
+        let mut options = NgxOptions::new();
+        options.system.file_cache_path = path.to_string();
+        let mut caches = SystemCaches::new();
+        caches.register_config(&options.system, false, false, 0);
+        caches.enable_shared_memory(path, shared_options()).unwrap();
+        (caches, options)
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn shared_factory_enrolls_all_path_variants_and_rejects_late_switches() {
+        let directory =
+            std::env::temp_dir().join(format!("ps-shm-factory-all-{}", std::process::id()));
+        let path = directory.to_str().unwrap();
+        let mut caches = SystemCaches::new();
+        let options = system_with(path);
+        caches.register_config(&options, false, false, 0);
+        caches.register_config(&options, true, false, 0);
+        let mut alias = options.clone();
+        alias.file_cache_path = format!("{path}/");
+        caches.register_config(&alias, false, false, 0);
+        caches.enable_shared_memory(path, shared_options()).unwrap();
+        alias.cache_flush_filename = "another.flush".to_string();
+        caches.register_config(&alias, false, false, 0);
+        assert!(caches.paths.values().all(|p| p.shared_cache.is_some()));
+        let mut options = NgxOptions::new();
+        options.system.file_cache_path = path.to_string();
+        let handles = caches.setup_caches(&options).unwrap();
+        assert!(handles.http_backend.name().contains("SharedMemoryCache"));
+        assert!(caches.enable_shared_memory(path, shared_options()).is_err());
+        let late = directory.join("late");
+        let mut options = NgxOptions::new();
+        options.system.file_cache_path = late.to_str().unwrap().to_string();
+        let mut caches = SystemCaches::new();
+        caches.register_config(&options.system, false, false, 0);
+        let _escaped = caches.setup_caches(&options).unwrap();
+        assert!(caches
+            .enable_shared_memory(late.to_str().unwrap(), shared_options())
+            .is_err());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn shared_factory_cross_process_put_delete_and_oversized_replacement() {
+        const ENV: &str = "PS_SHM_FACTORY_CHILD";
+        let child = std::env::var(ENV).ok();
+        let directory = child.clone().unwrap_or_else(|| {
+            std::env::temp_dir()
+                .join(format!("ps-shm-factory-worker-{}", std::process::id()))
+                .to_string_lossy()
+                .into_owned()
+        });
+        let (caches, options) = shared_fixture(&directory);
+        let backend = caches.setup_caches(&options).unwrap().http_backend;
+        if child.is_some() {
+            backend.put("shared", b"updated");
+            backend.put("oversized", &[7; 2048]);
+            backend.delete("deleted");
+            return;
+        }
+        for key in ["shared", "oversized", "deleted"] {
+            backend.put(key, b"old");
+            assert_eq!(Some(b"old".to_vec()), backend.get(key).value);
+        }
+        let child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "caches::tests::shared_factory_cross_process_put_delete_and_oversized_replacement",
+            ])
+            .env(ENV, &directory)
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(child.success());
+        assert_eq!(Some(b"updated".to_vec()), backend.get("shared").value);
+        assert_eq!(Some(vec![7; 2048]), backend.get("oversized").value);
+        assert!(backend.get("deleted").value.is_none());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn shared_tier_serves_another_worker_without_a_disk_entry() {
+        let directory =
+            std::env::temp_dir().join(format!("ps-shm-factory-hit-{}", std::process::id()));
+        let path = directory.to_str().unwrap();
+        let (first, options) = shared_fixture(path);
+        let backend = first.setup_caches(&options).unwrap().http_backend;
+        backend.put("cached", b"value");
+        assert_eq!(Some(b"value".to_vec()), backend.get("cached").value);
+        let (second, options) = shared_fixture(path);
+        // Simulate L3 eviction only: a valid shared object must remain useful.
+        first
+            .paths
+            .values()
+            .next()
+            .unwrap()
+            .file_cache
+            .delete("cached");
+        let other_worker = second.setup_caches(&options).unwrap().http_backend;
+        assert_eq!(Some(b"value".to_vec()), other_worker.get("cached").value);
+        assert!(first
+            .paths
+            .values()
+            .next()
+            .unwrap()
+            .file_cache
+            .get("cached")
+            .value
+            .is_none());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn restart_namespace_prevents_old_shared_generation_hits() {
+        let directory =
+            std::env::temp_dir().join(format!("ps-shm-factory-restart-{}", std::process::id()));
+        let path = directory.to_str().unwrap();
+        let (first, options) = shared_fixture(path);
+        let backend = first.setup_caches(&options).unwrap().http_backend;
+        backend.put("persistent", b"old");
+        assert_eq!(Some(b"old".to_vec()), backend.get("persistent").value);
+        let namespace = first
+            .paths
+            .values()
+            .next()
+            .unwrap()
+            .memory_namespace
+            .clone();
+        let file = first.paths.values().next().unwrap().file_cache.clone();
+        drop(backend);
+        drop(first);
+        // No live cache participants remain; disk persistence changes offline.
+        file.put("persistent", b"new");
+        drop(file);
+        let (second, options) = shared_fixture(path);
+        assert_ne!(
+            namespace,
+            second.paths.values().next().unwrap().memory_namespace
+        );
+        let backend = second.setup_caches(&options).unwrap().http_backend;
+        // Force the target shard to reuse its old numeric generation, proving
+        // that the incarnation prefix, not just a different integer, protects it.
+        let collision = (0..100_000)
+            .map(|i| format!("different-{i}"))
+            .find(|key| SharedCacheCoherence::slot(key) == SharedCacheCoherence::slot("persistent"))
+            .unwrap();
+        backend.put(&collision, b"other");
+        assert_eq!(Some(b"new".to_vec()), backend.get("persistent").value);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn shared_metadata_retains_html_expiry_purge_and_variant_validation() {
+        let directory =
+            std::env::temp_dir().join(format!("ps-shm-factory-ttl-{}", std::process::id()));
+        let path = directory.to_str().unwrap();
+        let (first, options) = shared_fixture(path);
+        let cache = first.setup_caches(&options).unwrap().metadata_cache;
+        let key_a = ps_cache::html::html_cache_key("page options-A chrome");
+        let key_b = ps_cache::html::html_cache_key("page options-B firefox");
+        let a = ps_cache::html::encode_value(1000, 2000, b"chrome html").unwrap();
+        let b = ps_cache::html::encode_value(1000, 2000, b"firefox html").unwrap();
+        cache.put(&key_a, &a);
+        cache.put(&key_b, &b);
+        assert_eq!(Some(a.clone()), cache.get(&key_a).value);
+        let (second, options) = shared_fixture(path);
+        let remote = second.setup_caches(&options).unwrap().metadata_cache;
+        let from_shared = remote.get(&key_a).value.unwrap();
+        assert_eq!(a, from_shared);
+        assert_eq!(Some(b), remote.get(&key_b).value);
+        let mut purge = ps_cache::purge::PurgeSet::new(4096);
+        assert!(ps_cache::html::validate_value(
+            &from_shared,
+            "http://h/page",
+            1500,
+            1000,
+            i64::MAX,
+            &purge
+        )
+        .is_some());
+        assert!(ps_cache::html::validate_value(
+            &from_shared,
+            "http://h/page",
+            2001,
+            1000,
+            i64::MAX,
+            &purge
+        )
+        .is_none());
+        purge.put("http://h/page", 1600);
+        assert!(ps_cache::html::validate_value(
+            &from_shared,
+            "http://h/page",
+            1700,
+            1000,
+            i64::MAX,
+            &purge
+        )
+        .is_none());
     }
 
     #[test]

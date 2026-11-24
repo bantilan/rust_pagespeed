@@ -94,14 +94,14 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Add safe `ps-cache` adapter with existing Cache trait semantics.
 - [x] Run checks; update ledger; commit tested backend (not yet enabled).
 
-### Phase 3 — L1/L2/L3 integration/coherence [IN PROGRESS — audit only]
+### Phase 3 — L1/L2/L3 integration/coherence [COMPLETED — explicit API only]
 
-- [ ] Introduce opt-in factory wiring and preserve L3 persistence.
-- [ ] Make reads/backfill/writes/deletes coherent across worker L1s, shared L2 and disk.
-- [ ] Verify negative entries, expiration, purge, failed writes/admission, concurrent backfill and multi-worker races.
-- [ ] Benchmark integration before changing defaults; commit tested integration.
+- [x] Introduce opt-in factory wiring and preserve L3 persistence.
+- [x] Make reads/backfill/writes/deletes coherent across worker L1s, shared L2 and disk.
+- [x] Verify negative entries, expiration, purge, failed writes/admission, concurrent backfill and multi-worker races.
+- [x] Benchmark integration before changing defaults; commit tested integration.
 
-### Phase 4 — Cross-process single flight/crash recovery [PENDING]
+### Phase 4 — Cross-process single flight/crash recovery [PENDING — next implementation task]
 
 - [ ] Design bounded owner/fencing table keyed by options-aware rewrite identity.
 - [ ] Integrate async resource and combination scheduling without HTML waits.
@@ -172,11 +172,13 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Next Session Resume Point
 
-**State:** Phases 0–2 complete. Phase 3 lifetime/incarnation API is verified; next commit is `Add coherent counter lifetime and restart incarnations`. Legacy default remains unchanged. No shared-byte factory integration yet.
+**State:** Phases 0–3 implemented and verified (Phase 3 exposes an opt-in assembly API; no production directive/default changed). Latest integration commit is `Integrate coherent L1 shared-memory L2 and persistent L3 caches`; inspect git log for its hash. Earlier commits: `4d23d3e` baseline/plan, `ff67357` regions, `6aaefe3` bytes/adapter, `6213ac2` lifetime diagnosis, `7cf9997` coherent counter protocol.
 
-**Exact next action:** implement opt-in SystemCaches shared-memory assembly for all configs sharing the same disk path, before setup_caches returns any handles. Use open_coherent plus its incarnation for L1/L2 memory key prefixes, retain existing disk keys, and use generation-coherent nested adapters. Add tests for cross-mapping L1 invalidation, restart with persistent L2 bytes, delete, oversized admission, disk backfill and all-config path coverage. Verify cleaner exclusion and reject attempts to switch after backend escape.
+**Exact next action:** inspect status/log and run `cargo test -p ps-shm -p ps-cache -p ps-nginx --lib`. Begin Phase 4 by specifying a separate bounded, fenced cross-process owner table (do not evict running owners as LRU data). Integrate claims into fire-and-forget HTML single-resource/inline/combination optimization worker closures only, so liveness/PID-reuse checks run off the HTML thread. Namespace by cache-path domain plus options-aware job identity. Preserve foreground/IPRO resource-serving behavior: a remote owner's work cannot simply complete a byte-serving request as false. Add real subprocess deduplication, killed-owner, PID-start identity and stale-token publication regressions before committing.
 
-**Build state:** latest ps-shm/ps-cache tests and strict ps-shm clippy pass. Phase 2 ordinary release passed before this API addition; run a new build when factory integration is tested. Phases 4–10 pending.
+**Additional Phase 4 requirement:** legacy-style active-writer counters in the new coherent domain still remain nonzero after an abruptly killed disk writer and safely bypass memory indefinitely. Implement bounded dead-writer recovery or an owner-aware coherence protocol as part of crash recovery. Shared regions' byte-lock recovery alone does not repair those counters.
+
+**Build/test state:** ordinary optimized release passes; broad pre-fast-path run passed 2,080 primary cases; after formatter/mutex fast-path changes, 381 primary ps-shm/ps-cache/Nginx unit cases and 138 async/resource regressions pass. Strict scoped clippy passes with only two existing ps-cache lints command-suppressed. No incomplete code edits. Config defaults, production rollout/mixed legacy-worker transition, ownership, beacons, checkpoints/admin/full stress/final benchmarks remain Phases 4–10. Nothing pushed or deployed.
 
 
 ## Phase 0 audit findings (persisted before implementation)
@@ -294,3 +296,63 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - `cargo run -p ps-shm --example shared_lifetime_probe -- --coherent > docs/performance/shared-memory/phase3-lifetime-fixed-probe.log 2>&1`: before=1, after=1, reset=false. The legacy version of the same probe still reproduces the old defect; default behavior remains untouched for binary compatibility.
 - `cargo clippy -p ps-shm --all-targets -- -D warnings > docs/performance/shared-memory/phase3-lifetime-clippy.log 2>&1`: passes without lint suppressions. Shared downgrade uses try_lock_shared as well; no blocking flock remains in the new API.
 - Next independently testable milestone: opt-in factory API applying one coherent incarnation/generation domain to ALL SystemCachePath objects sharing a disk path before any backend escapes. Namespace memory layers only (L1/L2), preserve disk keys. Nested WriteThroughCache adapters must share the coherent generation source; reboot/layout-qualified shared segment filename lives under excluded .pagespeed-lru subtree. Configuration parsing/defaults remain Phase 6.
+
+## Phase 3 factory milestone design (before code edits)
+
+- Lifetime sub-milestone commit: `7cf9997`.
+- Opt-in SystemCaches API will enroll every registered non-unplugged SystemCachePath sharing the same disk pathname. Reject enablement once any file backend handle escaped; reject duplicate enablement. Default assembly is unchanged until the API is explicitly called.
+- Open shared bytes and coherent counters under `.pagespeed-lru/shared-v2/<Linux boot-id>/`; existing cleaner exclusion covers the entire subtree. Byte-cache filenames include allocation dimensions; the coherent counter table is independent of allocation size so simultaneous old/new size mappings still receive the same writes' generations.
+- Prefix only L1/L2 keys with coherent incarnation; preserve persistent file keys. Both nested WriteThroughCache adapters use the same shared generation source; reads/backfills and writes/deletes retain existing checks.
+- Mixed legacy/new coherence participants on the same disk path are not safe to deploy. Production directive/default and migration handling remain deferred to Phases 6/7; this milestone is an explicit API exercised by isolated tests only.
+
+- Factory integration draft is now in `crates/ps-nginx/src/caches.rs`; first existing cache tests compile/run pending result. Added explicit opt-in enrollment, boot/layout-qualified files, memory-only incarnation prefixes and coherent L1/L2/L3 adapters. New tests cover all path variants, late-switch refusal, real child-process writes/delete/oversized replacement, L2 use without an L3 file, and numeric-generation reuse after restart with different disk content. No production directive/default changed.
+- Exact next command: `cargo test -p ps-nginx --lib caches::tests`; inspect failures before proceeding. The current Phase 3 integration draft is not yet verified.
+
+- Existing + first new factory tests passed (11 primary tests). Added canonical disk-path alias matching and enrollment inheritance for configurations registered later, avoiding mixed domains inside one factory.
+- Added controlled concurrent backfill tests over a real shared byte backend and nested generation adapters: pause an old disk read, mutate/delete through a second worker adapter, then verify no old value can enter shared memory or be returned. Added compressed shared metadata tests preserving HTML expiry/purge and options/UA identity separation.
+- Next verification command: `cargo test -p ps-shm -p ps-cache -p ps-html -p ps-nginx`, then ordinary release build and targeted factory stress before commit.
+
+## Phase 3 current verification in progress
+
+- All 11 first factory tests passed; new alias/late-registration and TTL/purge/variant tests plus the controlled nested-cache backfill test are now included in the broader run.
+- Running `cargo test -p ps-shm -p ps-cache -p ps-html -p ps-nginx > docs/performance/shared-memory/phase3-integration-tests.log 2>&1` (build/linking phase; inspect log and active cargo sessions on resume). No test failure observed so far.
+- Existing warnings in file_fetch.rs/send.rs and integration-test harnesses are unrelated; leave unchanged. Once this run passes, do an ordinary release build and targeted factory repetition, then commit the verified integration API.
+
+## Phase 4 design notes to avoid repeating audit
+
+- Acquire cross-process optimization ownership on pool workers, not HTML scheduling threads, so /proc/PID-reuse checks never add request-path filesystem work. Deduplicate exact options-aware partition/combination job keys; keep existing local bounded queues.
+- Use a separate bounded owner table (not cache entry eviction slots). Owner identity includes PID plus process-start identity and boot incarnation; release/completion uses a fencing token. Do not steal a live owner's non-atomic state merely because a timeout expired.
+- Job panic/queue rejection/shutdown must release ownership; killed-process recovery must distinguish dead owners from permission-denied/unknown liveness. If table is full/busy, serve originals without HTML waits.
+- A transactional byte-backend primitive may also support Phase 5 evidence RMW, but ownership state must not be evicted as ordinary LRU data while jobs run. Completion must not let an old token overwrite a new owner's metadata. These are design notes, not verified implementations.
+
+## Phase 3 measurements / prefix optimization in progress
+
+- Broad tests passed: `cargo test -p ps-shm -p ps-cache -p ps-html -p ps-nginx`: **2,080 primary cases**, 0 failed; includes full HTML/resource regression suites.
+- Ordinary release build passes (56.57 s). Factory suite repeated ten times: 120 primary factory cases passed, 0 failed. Scoped ps-shm/ps-cache clippy passes. Logs phase3-build.log, phase3-factory-stress.log, phase3-clippy-scoped.log.
+- Added `crates/ps-nginx/examples/shared_cache_probe.rs`: 7 x 10,000 warm 4 KiB gets per case. `cargo run -p ps-nginx --release --example shared_cache_probe > docs/performance/shared-memory/phase3-cache-probe.json 2> docs/performance/shared-memory/phase3-cache-probe-build.log`. First results saved as phase3-cache-probe-before-prefix.json: file-only 4,940 ns; shared-L2/file 272 ns; L1/file 151 ns; L1/shared-L2/file 228 ns. These are isolated cache operations, not HTML latency.
+- Measured extra prefix allocation hurt hot L1 by ~77 ns. Draft optimization: CacheCoherence gets a default memory_key formatter; coherent factory formats incarnation + generation + key in one allocation instead of nesting KeyPrepender. Physical cache key bytes and disk keys remain identical. Retest and repeat probe before committing. This adds modifications to `crates/ps-cache/src/cache.rs` (public trait method has a backwards-compatible default).
+
+- Single-allocation prefix probe completed: L1/shared median fell from 228 ns to 170 ns; raw after-prefix data saved separately in phase3-cache-probe-after-prefix.json. File-only ~4,891 ns, shared L2 ~269 ns, L1-only ~134 ns in that run. Tiny absolute L1 overhead remains; no end-to-end speed claim.
+- Additional concurrency fix in progress: coherent WriteThroughCache no longer holds its process-local operations mutex over disk I/O. Generation-keyed double-validation already makes backfill safe; non-coherent adapters retain the mutex. A controlled slow-writer regression checks an unrelated hot hit completes before the writer is released. Retest before commit; no assertion about the historical 13 ms production gap is inferred from this synthetic test.
+
+## Phase 3 completion / final verification
+
+- Modified: `crates/ps-nginx/src/caches.rs`, `crates/ps-cache/src/{cache,shared_memory}.rs`; new `crates/ps-nginx/examples/shared_cache_probe.rs`; this ledger and phase3 artifacts.
+- Opt-in `SystemCaches::enable_shared_memory` enrolls all registered aliases/variants sharing a canonical disk path, and later registrations inherit that domain. Late switches after handle escape are rejected. Shared data/coherent lifecycle files live under the cleaner-excluded .pagespeed-lru tree, boot/layout qualified. Memory keys carry incarnation and generation; disk keys remain unchanged.
+- Generation-aware get/put/delete no longer acquire the process-local operation mutex over filesystem I/O. Uncoordinated adapters still serialize. The controlled slow-writer regression proves unrelated hot hits finish before the writer is released; concurrent old-read replacement/delete tests prove stale backfill is not republished.
+- `cargo test -p ps-shm -p ps-cache -p ps-html -p ps-nginx > docs/performance/shared-memory/phase3-integration-tests.log 2>&1`: **2,080 primary cases passed**, 0 failed, before the small final key-formatter/mutex fast-path change.
+- Final `cargo test -p ps-shm -p ps-cache -p ps-nginx --lib > docs/performance/shared-memory/phase3-prefix-tests.log 2>&1`: **381 primary cases passed** (36 + 66 + 279), 0 failed; excludes one nested subprocess harness report.
+- `cargo test -p ps-html --test async_progressive --test background_fetch --test css_combine --test js_combine > docs/performance/shared-memory/phase3-resource-regressions.log 2>&1`: **138 passed**, 0 failed after final fast-path changes.
+- Ten `cargo test -p ps-nginx --lib caches::tests` repetitions: **120 primary factory cases passed** (plus 10 nested legacy subprocess reports), 0 failed. Earlier than formatter-only refinement; core topology unchanged.
+- `cargo clippy -p ps-shm -p ps-cache --all-targets --no-deps -- -D warnings -A clippy::new_without_default -A clippy::unnecessary_get_then_check > docs/performance/shared-memory/phase3-clippy-scoped.log 2>&1`: passed. No new warnings; existing Nginx test warnings untouched.
+- `cargo build -p ps-nginx --release > docs/performance/shared-memory/phase3-build.log 2>&1`: passes, 0.12 s incremental after the cache probe rebuilt the release library. Profiling feature disabled. Target ABI is staged 1.31.8, not an automatic deployment artifact for any system Nginx version.
+- `cargo run -p ps-nginx --release --example shared_cache_probe > docs/performance/shared-memory/phase3-cache-probe.json 2> docs/performance/shared-memory/phase3-cache-probe-build.log`: passed; seven samples x 10,000 warm 4 KiB gets. Final medians:
+  - file_only: 4986.688 ns/get.
+  - shared_l2_file: 297.649 ns/get.
+  - l1_file: 132.739 ns/get.
+  - l1_shared_l2_file: 168.708 ns/get.
+
+- Shared-L2 hit ~0.298 us versus warm file-only ~4.987 us. Fully hot L1 ~0.133 us without shared L2 versus ~0.169 us with it: a real ~36 ns overhead remains. Defaults are not selected from a microbenchmark. Initial prefix-only overhead (~228 ns shared L1) and intermediate single-allocation result (~170 ns) are retained in phase3-cache-probe-before-prefix.json / phase3-cache-probe-after-prefix.json. Final no-unrelated-I/O-wait change establishes a concurrency guarantee; tiny uncontended timing differences are not treated as statistically isolated latency improvements.
+- HTML request baseline remains baseline.json. No new whole-request shared-cache result is claimed because Nginx configuration activation is intentionally Phase 6. Final multi-worker request-level profiling and defaults remain Phase 10.
+- Known limitations: fixed-slot internal slack; killed active-write counters need Phase 4 recovery; mixed legacy/v2 participants need a migration strategy before production enablement; full workspace/fault/reload/checkpoint tests remain pending. No filters, resource codecs or background processing disabled.
+- Final checks before commit: rustfmt on modified Rust files/examples and `git diff --check`. Commit command: `git add SHARED_MEMORY_IMPLEMENTATION.md crates/ps-nginx/src/caches.rs crates/ps-nginx/examples/shared_cache_probe.rs crates/ps-cache/src/cache.rs crates/ps-cache/src/shared_memory.rs docs/performance/shared-memory/phase3-cache-probe*.json; git add -f docs/performance/shared-memory/phase3-*.log; git commit -m "Integrate coherent L1 shared-memory L2 and persistent L3 caches"`. No push.
