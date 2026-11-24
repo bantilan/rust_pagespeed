@@ -172,11 +172,11 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Next Session Resume Point
 
-**State:** Phases 0–2 implemented and verified; Phase 2 milestone commit is `6aaefe3` (`Add bounded shared byte cache and safe cache adapter`). Phase 0=`4d23d3e`, Phase 1=`ff67357`. Existing production cache assembly and defaults are unchanged. No shared cache is enabled; nothing deployed/pushed.
+**State:** Phases 0–2 complete. Phase 3 lifetime/incarnation API is verified; next commit is `Add coherent counter lifetime and restart incarnations`. Legacy default remains unchanged. No shared-byte factory integration yet.
 
-**Exact next action (Phase 3, first incomplete task):** re-read this ledger, inspect status/log, run `cargo test -p ps-shm -p ps-cache`. Then design and implement an opt-in L1/L2/L3 assembly API (config parsing can remain Phase 6). Resolve resettable-counter incarnation/lifetime safety *before* using generations to cache persistent shared values. The creator-drop/reset problem is already reproduced by `cargo run -p ps-shm --example shared_lifetime_probe` (log below); do not repeat the audit as if unverified. Convert that diagnostic into a desired-behavior regression when implementing the lifetime fix, then add full restart with old shared L2 bytes. The existing lifetime-flock protocol does not retain a lock in every attached reader, so blindly reusing its generations is unsafe for L2 persistence. Preserve complete-key/TTL/purge/option validation and avoid filesystem reads on shared hits. Do not mark Phase 3 complete without multi-worker stale-backfill/delete/failed-admission tests.
+**Exact next action:** implement opt-in SystemCaches shared-memory assembly for all configs sharing the same disk path, before setup_caches returns any handles. Use open_coherent plus its incarnation for L1/L2 memory key prefixes, retain existing disk keys, and use generation-coherent nested adapters. Add tests for cross-mapping L1 invalidation, restart with persistent L2 bytes, delete, oversized admission, disk backfill and all-config path coverage. Verify cleaner exclusion and reject attempts to switch after backend escape.
 
-**Latest build state:** release build passes; ps-shm and ps-cache tests pass; Nginx unit tests pass. No incomplete code edits. Known lint suppressions are command-scoped for two existing ps-cache lints. Phase 3 coherence audit has begun; implementation and Phases 4–10 remain pending, with phase-specific acceptance checkboxes above.
+**Build state:** latest ps-shm/ps-cache tests and strict ps-shm clippy pass. Phase 2 ordinary release passed before this API addition; run a new build when factory integration is tested. Phases 4–10 pending.
 
 
 ## Phase 0 audit findings (persisted before implementation)
@@ -275,3 +275,22 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - First Phase 3 implementation milestone should be the small lifetime/incarnation protocol and tests, separately committed before factory wiring. Then L1/L2/L3 composition can use shared generations consistently for both nested adapters. Verify reads/backfills across mutations, oversized admissions, deletes, TTL/purge and restart before claiming coherence.
 - No approval or external access blocker. The remaining work is implementation, not a user decision. No remote push, live reload, cache purge or deployment performed.
 - This diagnostic/audit commit records the resume point; it does NOT complete Phase 3.
+
+## Phase 3 lifetime milestone design (before code changes)
+
+- Add an explicit `SharedCounters::open_coherent` API with separate bounded initialization and shared lifetime locks. Every attached mapping participates in lifetime locking; only an opener proving no live mappings may reset counters. New incarnation is a randomized 128-bit namespace, preserved across attached readers and changed after full stop/start.
+- Keep legacy `SharedCounters::open` and its filenames unchanged for existing stats/L1 users: changing the default format now would split coherence across mixed old/new binary workers. New protocol uses an isolated `coherent_counters_v2` subdirectory so old sibling cleanup cannot unlink its live files. Production migration remains for Phase 7, not silently applied now.
+- Add desired-behavior regression tests against open_coherent and extend the diagnostic with `--coherent`. No Nginx wiring in this sub-milestone.
+
+## Phase 3 lifetime implementation progress
+
+- Added `SharedCounters::open_coherent` and optional `incarnation()` without changing legacy open behavior/default cache assembly. Every coherent handle owns a SH lifetime flock; open is serialized separately with a 500 ms bounded initialization lock. Full-stop reset creates a new randomized 128-bit namespace; attach preserves it. Files are under `coherent_counters_v2`, outside legacy sibling cleanup.
+- Added tests for reader survival after creator drop, full-stop reset/new namespace, legacy cleanup isolation and an actual surviving subprocess after creator exit. Existing legacy diagnostic remains valid, while `--coherent` should report no reset.
+- Current task: verify the tests and diagnostics; then commit this protocol as a Phase 3 sub-milestone. Factory wiring/coherence composition remains incomplete.
+
+## Phase 3 lifetime sub-milestone verified
+
+- `cargo test -p ps-shm -p ps-cache > docs/performance/shared-memory/phase3-lifetime-tests.log 2>&1`: 100 passed, 0 failed. New tests cover surviving attached reader/process, intentional full-stop reset with different incarnation, and legacy cleanup isolation.
+- `cargo run -p ps-shm --example shared_lifetime_probe -- --coherent > docs/performance/shared-memory/phase3-lifetime-fixed-probe.log 2>&1`: before=1, after=1, reset=false. The legacy version of the same probe still reproduces the old defect; default behavior remains untouched for binary compatibility.
+- `cargo clippy -p ps-shm --all-targets -- -D warnings > docs/performance/shared-memory/phase3-lifetime-clippy.log 2>&1`: passes without lint suppressions. Shared downgrade uses try_lock_shared as well; no blocking flock remains in the new API.
+- Next independently testable milestone: opt-in factory API applying one coherent incarnation/generation domain to ALL SystemCachePath objects sharing a disk path before any backend escapes. Namespace memory layers only (L1/L2), preserve disk keys. Nested WriteThroughCache adapters must share the coherent generation source; reboot/layout-qualified shared segment filename lives under excluded .pagespeed-lru subtree. Configuration parsing/defaults remain Phase 6.

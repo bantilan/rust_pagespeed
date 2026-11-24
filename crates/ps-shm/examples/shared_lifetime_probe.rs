@@ -12,12 +12,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     std::fs::create_dir(&directory)?;
     let names = vec!["generation".to_string()];
-    let creator = SharedCounters::open(&directory, &names)?;
-    let surviving_reader = SharedCounters::open(&directory, &names)?;
+    let open = if std::env::args().any(|arg| arg == "--coherent") {
+        SharedCounters::open_coherent
+    } else {
+        SharedCounters::open
+    };
+    let creator = open(&directory, &names)?;
+    let surviving_reader = open(&directory, &names)?;
     creator.add(0, 1);
     let before = surviving_reader.get(0);
     drop(creator);
-    let new_opener = SharedCounters::open(&directory, &names)?;
+    let new_opener = open(&directory, &names)?;
     let after = surviving_reader.get(0);
     println!("surviving_reader_before={before}");
     println!("surviving_reader_after={after}");

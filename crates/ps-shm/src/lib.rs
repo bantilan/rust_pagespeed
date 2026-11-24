@@ -145,12 +145,12 @@ pub struct SharedCounters {
     fixed_names: Vec<String>,
     /// Fixed slot count (mirrors the header).
     fixed_count: usize,
-    /// Locked file description, held exactly when this process
-    /// initialized the file (creation or uncontended re-init).
-    /// Workers inherit it across fork, so the flock stays held
-    /// until every nginx process exits; that is what tells a new
-    /// master (or `nginx -t`) that live users exist.
+    /// Lifetime file description. Legacy open retains an exclusive lock only
+    /// for its initializer; open_coherent retains a shared lock in every
+    /// mapping. Inherited descriptions stay live across worker fork/exit.
     _locked_file: Option<std::fs::File>,
+    /// Whether every mapping retains a shared lifetime lock (v2 protocol).
+    coherent_lifetime: bool,
 }
 
 impl SharedCounters {
@@ -158,7 +158,8 @@ impl SharedCounters {
     ///
     /// The filename embeds the table hash, so different registries never
     /// collide. Creation and fresh-start resets happen under an exclusive
-    /// flock; mapping an in-use file never mutates it.
+    /// flock. This legacy protocol retains lifetime ownership only in its
+    /// initializer; new cache coherence must use `open_coherent` instead.
     pub fn open(dir: &Path, fixed_names: &[String]) -> Result<Self, OpenError> {
         let hash = table_hash(fixed_names);
         let path = dir.join(file_name(hash));
@@ -182,6 +183,7 @@ impl SharedCounters {
                         fixed_names: fixed_names.to_vec(),
                         fixed_count: fixed_names.len(),
                         _locked_file: None,
+                        coherent_lifetime: false,
                     };
                     this.write_header(hash, fixed_names.len());
                     this.atomic_at(OFF_MAGIC)
@@ -209,6 +211,7 @@ impl SharedCounters {
                 fixed_names: fixed_names.to_vec(),
                 fixed_count: fixed_names.len(),
                 _locked_file: None,
+                coherent_lifetime: false,
             };
             this.write_header(hash, fixed_names.len());
             this.atomic_at(OFF_MAGIC)
@@ -227,9 +230,120 @@ impl SharedCounters {
             fixed_names: fixed_names.to_vec(),
             fixed_count: fixed_names.len(),
             _locked_file: None,
+            coherent_lifetime: false,
         };
         this.wait_for_header(hash, fixed_names.len())?;
         Ok(this)
+    }
+
+    /// Opens counters with recoverable lifetime participation and an explicit
+    /// incarnation namespace. Unlike legacy `open`, every attached reader holds
+    /// a shared lock, so losing the creator cannot permit a premature reset.
+    /// The separate v2 directory protects live files from legacy sibling cleanup.
+    /// Lock acquisition is bounded and occurs only at startup/attachment.
+    pub fn open_coherent(dir: &Path, fixed_names: &[String]) -> Result<Self, OpenError> {
+        let directory = dir.join("coherent_counters_v2");
+        std::fs::create_dir_all(&directory)?;
+        let hash = table_hash(fixed_names);
+        let base = directory.join(format!("{hash:016x}"));
+        let open_lock = |suffix: &str| -> io::Result<std::fs::File> {
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(base.with_extension(suffix))
+        };
+        let init = open_lock("init")?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
+        loop {
+            match init.try_lock_exclusive() {
+                Ok(()) => break,
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    if std::time::Instant::now() >= deadline {
+                        return Err(io::Error::new(
+                            io::ErrorKind::TimedOut,
+                            "counter initialization busy",
+                        )
+                        .into());
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(2));
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+        // Independent open descriptions are essential: inherited flock handles
+        // from fork are fine, but independent processes must all retain a lock.
+        let life = open_lock("live")?;
+        let fresh = match life.try_lock_exclusive() {
+            Ok(()) => true,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                FileExt::try_lock_shared(&life)?;
+                false
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let total = fixed_names
+            .len()
+            .checked_mul(8)
+            .and_then(|n| n.checked_add(HEADER_LEN + DYN_SLOTS * DYN_STRIDE))
+            .filter(|_| fixed_names.len() <= u32::MAX as usize)
+            .ok_or(OpenError::TableMismatch)?;
+        let file = open_lock("dat")?;
+        if fresh {
+            // Exclusive lifetime ownership proves no live mapping exists.
+            file.set_len(total as u64)?;
+        } else if file.metadata()?.len() != total as u64 {
+            return Err(OpenError::TableMismatch);
+        }
+        let mut this = SharedCounters {
+            map: Self::map_file(&file, total)?,
+            fixed_names: fixed_names.to_vec(),
+            fixed_count: fixed_names.len(),
+            _locked_file: Some(life),
+            coherent_lifetime: true,
+        };
+        if fresh {
+            this.write_header(hash, fixed_names.len());
+            // std's randomized hashing seeds are process-randomized without
+            // adding an entropy-source dependency. Two independently keyed
+            // states give the restart namespace 128 bits.
+            use std::hash::{BuildHasher, Hasher};
+            for offset in [48, 56] {
+                let mut random = std::collections::hash_map::RandomState::new().build_hasher();
+                random.write_u64(hash);
+                random.write_u32(std::process::id());
+                random.write_u128(
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_nanos(),
+                );
+                this.atomic_at(offset)
+                    .store(random.finish() as i64, Ordering::Release);
+            }
+            this.atomic_at(OFF_MAGIC)
+                .store(MAGIC as i64, Ordering::Release);
+            // Downgrade while still holding init's exclusive lock. Other opens
+            // cannot inspect or change lifetime state during the conversion.
+            FileExt::try_lock_shared(this._locked_file.as_ref().unwrap())?;
+        } else {
+            this.wait_for_header(hash, fixed_names.len())?;
+        }
+        // Closing init releases startup serialization. The shared life handle
+        // stays in this object and survives fork until its final process closes.
+        drop(init);
+        Ok(this)
+    }
+
+    /// Restart namespace, available only with the v2 lifetime protocol. Pair
+    /// this with generation counters when keying persistent shared/L1 entries.
+    pub fn incarnation(&self) -> Option<u128> {
+        self.coherent_lifetime.then(|| {
+            let low = self.atomic_at(48).load(Ordering::Acquire) as u64;
+            let high = self.atomic_at(56).load(Ordering::Acquire) as u64;
+            u128::from(low) | (u128::from(high) << 64)
+        })
     }
 
     /// Maps `total` bytes (the file must already be that long).
@@ -557,6 +671,100 @@ mod tests {
         fn drop(&mut self) {
             std::fs::remove_dir_all(&self.dir).ok();
         }
+    }
+
+    fn coherent(scratch: &Scratch) -> SharedCounters {
+        SharedCounters::open_coherent(&scratch.dir, &["shared".to_string()]).unwrap()
+    }
+
+    #[test]
+    fn coherent_readers_prevent_creator_drop_reset() {
+        let scratch = Scratch::new();
+        let creator = coherent(&scratch);
+        let incarnation = creator.incarnation().unwrap();
+        creator.add(0, 41);
+        let reader = coherent(&scratch);
+        assert_eq!(Some(incarnation), reader.incarnation());
+        drop(creator);
+        let newcomer = coherent(&scratch);
+        assert_eq!(41, reader.get(0));
+        assert_eq!(41, newcomer.get(0));
+        assert_eq!(Some(incarnation), newcomer.incarnation());
+        drop(reader);
+        newcomer.add(0, 1);
+        assert_eq!(42, coherent(&scratch).get(0));
+    }
+
+    #[test]
+    fn coherent_full_stop_resets_with_a_new_namespace() {
+        let scratch = Scratch::new();
+        let first = coherent(&scratch);
+        let before = first.incarnation().unwrap();
+        first.add(0, 99);
+        drop(first);
+        let second = coherent(&scratch);
+        assert_eq!(0, second.get(0));
+        assert_ne!(Some(before), second.incarnation());
+        assert!(scratch.open(&["legacy"]).incarnation().is_none());
+    }
+
+    #[test]
+    fn legacy_sibling_cleanup_cannot_unlink_live_coherent_tables() {
+        let scratch = Scratch::new();
+        let first = coherent(&scratch);
+        first.add(0, 7);
+        let _legacy = scratch.open(&["legacy"]);
+        let _other_legacy = scratch.open(&["other"]);
+        let second = coherent(&scratch);
+        assert_eq!(7, second.get(0));
+        assert_eq!(first.incarnation(), second.incarnation());
+    }
+
+    #[test]
+    fn coherent_subprocess_entry() {
+        let Some(path) = std::env::var_os("PS_COHERENT_TEST_DIRECTORY") else {
+            return;
+        };
+        let directory = Path::new(&path);
+        let counters = SharedCounters::open_coherent(directory, &["shared".to_string()]).unwrap();
+        counters.add(0, 1);
+        std::fs::write(directory.join("ready"), b"ready").unwrap();
+        loop {
+            std::thread::park_timeout(std::time::Duration::from_secs(1));
+        }
+    }
+
+    #[test]
+    fn surviving_process_keeps_incarnation_after_creator_exits() {
+        let scratch = Scratch::new();
+        let creator = coherent(&scratch);
+        creator.add(0, 40);
+        let incarnation = creator.incarnation();
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "tests::coherent_subprocess_entry", "--nocapture"])
+            .env("PS_COHERENT_TEST_DIRECTORY", &scratch.dir)
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !scratch.dir.join("ready").exists() {
+            assert!(child.try_wait().unwrap().is_none());
+            if std::time::Instant::now() >= deadline {
+                child.kill().unwrap();
+                child.wait().unwrap();
+                panic!("coherent child timeout");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        drop(creator);
+        let newcomer = coherent(&scratch);
+        let observed = newcomer.get(0);
+        let observed_incarnation = newcomer.incarnation();
+        child.kill().unwrap();
+        child.wait().unwrap();
+        assert_eq!(41, observed);
+        assert_eq!(incarnation, observed_incarnation);
+        assert_eq!(41, coherent(&scratch).get(0));
     }
 
     #[test]
