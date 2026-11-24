@@ -305,6 +305,13 @@ pub(crate) fn schedule_combination(
     driver.note_detached_rewrite();
 }
 
+/// Coordinator key for single/inline background rewrites. Fetch
+/// reconstruction derives the identical key so both sides deduplicate
+/// against each other; keep the format in exactly one place.
+pub(crate) fn single_claim_key(partition_key: &str) -> String {
+    format!("html-rewrite:{partition_key}")
+}
+
 /// Submits onto an explicit pool (the caller already resolved it).
 fn schedule_on_pool(
     driver: &ResourceDriver,
@@ -350,15 +357,13 @@ fn run_rewrite_job(snapshot: HtmlRewriteSnapshot, mut shared: HtmlRewriteShared)
     use ps_cache::rewrite_coordinator::{LeasedMetadataCache, RewriteClaim};
     let mut leased = None;
     if let Some(coordinator) = shared.coordinator.take() {
-        let kind = if matches!(
-            &snapshot.behavior,
-            BackgroundBehavior::CombineCss { .. } | BackgroundBehavior::CombineJs { .. }
-        ) {
-            "html-combine"
-        } else {
-            "html-rewrite"
+        let key = match &snapshot.behavior {
+            BackgroundBehavior::CombineCss { .. } | BackgroundBehavior::CombineJs { .. } => {
+                format!("html-combine:{}", snapshot.partition_key)
+            }
+            _ => single_claim_key(&snapshot.partition_key),
         };
-        match coordinator.claim(&format!("{kind}:{}", snapshot.partition_key)) {
+        match coordinator.claim(&key) {
             RewriteClaim::Owned(lease) => {
                 let cache = Arc::new(LeasedMetadataCache::new(shared.metadata.clone(), lease));
                 shared.metadata = cache.clone();
@@ -1022,7 +1027,7 @@ mod tests {
     struct RequestThreadForbiddenCoordinator;
     impl ps_cache::rewrite_coordinator::RewriteCoordinator for RequestThreadForbiddenCoordinator {
         fn claim(&self, _key: &str) -> ps_cache::rewrite_coordinator::RewriteClaim {
-            panic!("foreground or rejected job must never claim ownership")
+            panic!("HTML scheduling or rejected job must never claim ownership")
         }
     }
 

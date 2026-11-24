@@ -148,31 +148,50 @@ impl OwnershipTable {
                 free.get_or_insert(slot);
                 continue;
             }
-            let len = usize::try_from(word(record, 24)).map_err(|_| {
-                io::Error::new(io::ErrorKind::InvalidData, "invalid owner key length")
-            })?;
-            if len > KEY_BYTES {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "corrupt owner record",
-                ));
-            }
-            if &record[32..32 + len] == key.as_bytes() {
-                if identity(record)?.liveness() != ProcessLiveness::Dead {
-                    return Ok(OwnershipClaim::AlreadyOwned);
+            // Writers bounds-check lengths and PIDs, so out-of-range
+            // values are unwritable garbage: recycle the slot instead
+            // of failing every future claim against it.
+            let len = match usize::try_from(word(record, 24)) {
+                Ok(len) if len <= KEY_BYTES => len,
+                _ => {
+                    record.fill(0);
+                    free.get_or_insert(slot);
+                    continue;
                 }
-                self.metrics.increment(8)?;
-                free = Some(slot);
-                break;
+            };
+            if &record[32..32 + len] == key.as_bytes() {
+                match identity(record) {
+                    Ok(identity) if identity.liveness() != ProcessLiveness::Dead => {
+                        return Ok(OwnershipClaim::AlreadyOwned);
+                    }
+                    Ok(_) => {
+                        self.metrics.increment(8)?;
+                        free = Some(slot);
+                        break;
+                    }
+                    Err(_) => {
+                        record.fill(0);
+                        free = Some(slot);
+                        break;
+                    }
+                }
             }
         }
         if free.is_none() {
             for slot in 0..self.slots {
-                let record = &bytes[slot * RECORD..(slot + 1) * RECORD];
-                if identity(record)?.liveness() == ProcessLiveness::Dead {
-                    self.metrics.increment(8)?;
-                    free = Some(slot);
-                    break;
+                let record = &mut bytes[slot * RECORD..(slot + 1) * RECORD];
+                match identity(record) {
+                    Ok(identity) if identity.liveness() == ProcessLiveness::Dead => {
+                        self.metrics.increment(8)?;
+                        free = Some(slot);
+                        break;
+                    }
+                    Ok(_) => {}
+                    Err(_) => {
+                        record.fill(0);
+                        free = Some(slot);
+                        break;
+                    }
                 }
             }
         }
@@ -196,6 +215,39 @@ impl OwnershipTable {
             serial,
             mapping: self.mapping,
         }))
+    }
+
+    /// Nonblocking exact-key presence check for request threads: true
+    /// when an unrevoked record matches, without any liveness (procfs)
+    /// inspection. False on lock contention, I/O errors, or no match —
+    /// callers treat false as "proceed locally" (at worst one duplicate
+    /// optimization, the pre-coordination behavior). A lingering dead
+    /// record can cause bounded false-positive waits; normal claiming
+    /// reclaims such records.
+    pub fn is_claimed(&self, key: &str) -> bool {
+        let Ok(Some(guard)) = self.region.try_lock(0) else {
+            return false;
+        };
+        let Ok(watermark) = self.revocations.epoch(0) else {
+            return false;
+        };
+        let bytes = guard.bytes();
+        for slot in 0..self.slots {
+            let record = &bytes[slot * RECORD..(slot + 1) * RECORD];
+            if word(record, 0) == 0 || word(record, 0) <= watermark {
+                continue;
+            }
+            let Ok(len) = usize::try_from(word(record, 24)) else {
+                continue;
+            };
+            if len > KEY_BYTES {
+                continue;
+            }
+            if &record[32..32 + len] == key.as_bytes() {
+                return true;
+            }
+        }
+        false
     }
 
     /// Revoke this token and all earlier tokens without waiting for a lock.
@@ -364,6 +416,107 @@ mod tests {
             OwnershipFinish::<()>::Stale
         );
     }
+    #[test]
+    fn corrupt_records_recycle_instead_of_failing_claims() {
+        let temp = Temp::new();
+        let table = OwnershipTable::open(&temp.path(), 1).unwrap();
+        // Poison the only slot with an unwritable key length, as a
+        // torn write that somehow escaped crash recovery would.
+        {
+            let mut guard = table.region.try_lock(0).unwrap().unwrap();
+            let bytes = guard.bytes_mut();
+            bytes[0..8].copy_from_slice(&7u64.to_le_bytes());
+            bytes[24..32].copy_from_slice(&u64::MAX.to_le_bytes());
+        }
+        // The claim recycles the garbage slot instead of erroring.
+        let token = claim(&table, "job");
+        assert_eq!(
+            table
+                .try_finish(token, || 7)
+                .unwrap(),
+            OwnershipFinish::Finished(7)
+        );
+        // And a corrupt PID on an exact-key match heals the same way
+        // (tokens are inert values; abandoning one releases nothing).
+        let _abandoned = claim(&table, "job");
+        {
+            let mut guard = table.region.try_lock(0).unwrap().unwrap();
+            let bytes = guard.bytes_mut();
+            bytes[8..16].copy_from_slice(&0u64.to_le_bytes());
+        }
+        let _ = claim(&table, "job");
+    }
+
+    #[test]
+    fn contended_claims_never_duplicate_lose_or_deadlock() {
+        let temp = Temp::new();
+        let table = std::sync::Arc::new(OwnershipTable::open(&temp.path(), 32).unwrap());
+        // Fewer keys than workers: forces AlreadyOwned overlap, Full
+        // pressure, and interleaved finish/revoke paths.
+        let start = std::time::Instant::now();
+        let mut workers = Vec::new();
+        for worker in 0..8 {
+            let table = table.clone();
+            workers.push(std::thread::spawn(move || {
+                let mut owned = 0u32;
+                let mut shared = 0u32;
+                for round in 0..200 {
+                    let key = format!("job-{}", (worker + round) % 4);
+                    match table.try_claim(&key).unwrap() {
+                        OwnershipClaim::Owned(token) => {
+                            owned += 1;
+                            // Hold briefly to overlap peers, then finish,
+                            // retrying through contention like production.
+                            if round % 7 == 0 {
+                                std::thread::yield_now();
+                            }
+                            let mut finished = false;
+                            for _ in 0..100 {
+                                match table.try_finish(token, || {}).unwrap() {
+                                    OwnershipFinish::Finished(())
+                                    | OwnershipFinish::Stale => {
+                                        finished = true;
+                                        break;
+                                    }
+                                    OwnershipFinish::Busy => {
+                                        std::thread::yield_now();
+                                    }
+                                }
+                            }
+                            assert!(finished, "finish starved under contention");
+                        }
+                        OwnershipClaim::AlreadyOwned
+                        | OwnershipClaim::Busy
+                        | OwnershipClaim::Full => shared += 1,
+                        other => panic!("unexpected claim outcome: {other:?}"),
+                    }
+                }
+                (owned, shared)
+            }));
+        }
+        let mut owned = 0u32;
+        let mut shared = 0u32;
+        for worker in workers {
+            let (own, shr) = worker.join().unwrap();
+            owned += own;
+            shared += shr;
+        }
+        // Every attempt resolved (nothing lost, no deadlock, no
+        // unexpected outcome); the owned/shared split itself is
+        // scheduling-dependent and asserted nowhere.
+        assert_eq!(owned + shared, 8 * 200);
+        eprintln!(
+            "ownership contention: {owned} owned, {shared} shared in {:?}",
+            start.elapsed()
+        );
+        // Table reusable afterwards: every slot reclaimable or free.
+        let token = claim(&table, "aftermath");
+        assert!(matches!(
+            table.try_finish(token, || {}).unwrap(),
+            OwnershipFinish::Finished(())
+        ));
+    }
+
     #[test]
     fn publication_stays_locked_until_finished() {
         let temp = Temp::new();

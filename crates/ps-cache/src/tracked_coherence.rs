@@ -18,7 +18,9 @@ impl TrackedCoherence {
             namespace,
         })
     }
-    fn shard(key: &str) -> usize {
+    /// Key shard for the shared generation domain (FNV-1a mod 128).
+    /// Public so integrators can construct colliding keys in tests.
+    pub fn shard(key: &str) -> usize {
         key.bytes().fold(0xcbf29ce484222325u64, |hash, byte| {
             (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
         }) as usize

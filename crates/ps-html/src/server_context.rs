@@ -394,8 +394,10 @@ impl ServerContext {
         self.background_pool.get().cloned()
     }
 
-    /// Install a cache-domain coordinator before serving requests. Only HTML
-    /// background optimization jobs acquire claims; foreground serving is unchanged.
+    /// Install a cache-domain coordinator before serving requests. HTML
+    /// background optimization jobs acquire claims, and fetch
+    /// reconstruction claims (or briefly awaits) the same keys to
+    /// avoid duplicating encodes; HTML element scheduling never claims.
     pub fn set_rewrite_coordinator(
         &self,
         coordinator: Arc<dyn ps_cache::rewrite_coordinator::RewriteCoordinator>,

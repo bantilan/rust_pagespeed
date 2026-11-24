@@ -234,6 +234,12 @@ impl DriverFactory {
             #[cfg(not(target_os = "linux"))]
             messages.push(format!("Shared cache unavailable for {path}: unsupported platform; using existing disk/L1 caches."));
         }
+        let stale_boots = self.caches.gc_stale_boot_dirs();
+        if stale_boots > 0 {
+            messages.push(format!(
+                "Removed {stale_boots} stale shared-cache boot directories."
+            ));
+        }
         messages.extend(self.caches.root_init_messages());
         messages
     }

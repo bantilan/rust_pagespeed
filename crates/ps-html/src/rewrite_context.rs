@@ -13,6 +13,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use ps_cache::cache::KeyState;
+use ps_cache::rewrite_coordinator::{RewriteClaim, RewriteLease};
 use ps_cache::ttl::FetchStatus;
 use ps_http::fetch::AsyncFetch;
 use ps_http::google_url::GoogleUrl;
@@ -31,6 +32,13 @@ use super::url_segment_encoder::{DefaultEncoder, UrlSegmentEncoder};
 
 /// Shared default encoder.
 static DEFAULT_ENCODER: DefaultEncoder = DefaultEncoder;
+
+/// Upper bound a fetch waits for another worker's in-flight output
+/// before reconstructing locally: long enough to catch fast races,
+/// far below typical encode times so a dead owner costs little.
+const FETCH_DEDUP_WAIT: std::time::Duration = std::time::Duration::from_millis(250);
+/// Poll interval while awaiting a claimed output.
+const FETCH_DEDUP_POLL: std::time::Duration = std::time::Duration::from_millis(10);
 
 /// Rewrite outcome (`RewriteResult`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1255,7 +1263,97 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
             fetch.handle_done(false);
             return false;
         }
+        // Cross-process fetch dedup: hold our own claim across the
+        // reconstruction so a concurrent background job for this exact
+        // rewrite sheds instead of duplicating the encode; when
+        // someone else already owns it, wait briefly for their bytes.
+        // Every failure mode proceeds locally (no coordinator, no
+        // behavior change at all).
+        let _fetch_lease = self.claim_fetch_lease();
+        if _fetch_lease.is_none() && self.await_claimed_output(fetch) {
+            return true;
+        }
         self.start_fetch(fetch)
+    }
+
+    /// Claims this fetch's rewrite for mutual exclusion with background
+    /// jobs (same `html-rewrite:` key). The lease is held by the
+    /// caller across reconstruction and auto-releases on completion.
+    fn claim_fetch_lease(&self) -> Option<std::sync::Arc<dyn RewriteLease>> {
+        let coordinator = self.driver.server_context().rewrite_coordinator()?;
+        match coordinator.claim(&super::html_async::single_claim_key(&self.partition_key)) {
+            RewriteClaim::Owned(lease) => Some(lease),
+            _ => None,
+        }
+    }
+
+    /// When another worker owns this rewrite, polls briefly for its
+    /// output bytes and serves them on arrival instead of duplicating
+    /// the encode. Returns whether the fetch was served (false always
+    /// means proceed with local reconstruction).
+    fn await_claimed_output(&mut self, fetch: &mut dyn AsyncFetch) -> bool {
+        use ps_http::http_cache::FindStatus;
+        let Some(coordinator) = self.driver.server_context().rewrite_coordinator() else {
+            return false;
+        };
+        if !coordinator.is_claimed(&super::html_async::single_claim_key(&self.partition_key)) {
+            return false;
+        }
+        self.driver
+            .server_context()
+            .variable("fetch_dedup_waits")
+            .add(1);
+        let key = self
+            .fetch
+            .as_ref()
+            .map(|state| state.requested_key.clone())
+            .unwrap_or_default();
+        let accepts_webp = super::device_properties::accepts_image_format(
+            fetch.request_headers(),
+            "image/webp",
+        );
+        let serve_webp_to_any = self.driver.options().serve_rewritten_webp_urls_to_any_agent();
+        let deadline = std::time::Instant::now() + FETCH_DEDUP_WAIT;
+        loop {
+            let mut ctx = self.driver.request_context().borrow().clone();
+            let found = self.driver.server_context().http_cache().find(
+                &key,
+                self.driver.cache_fragment(),
+                ps_http::response::RequestProperties::default(),
+                ps_http::response::VaryOption::IgnoreVaryOnResources,
+                &|headers| {
+                    if !serve_webp_to_any
+                        && !accepts_webp
+                        && headers
+                            .determine_content_type()
+                            .is_some_and(|content| content.mime_type() == "image/webp")
+                    {
+                        return false;
+                    }
+                    true
+                },
+                -1,
+                &mut ctx,
+                self.driver.server_context().now_ms(),
+            );
+            if found.status == FindStatus::Found {
+                if let Some(headers) = found.headers {
+                    fetch.response_headers_mut().copy_from(&headers);
+                }
+                fetch.headers_complete();
+                let ok = fetch.handle_write(&found.body);
+                fetch.handle_done(ok);
+                self.driver
+                    .server_context()
+                    .variable("fetch_dedup_hits")
+                    .add(1);
+                return true;
+            }
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(FETCH_DEDUP_POLL);
+        }
     }
 
     /// Decodes input URLs and builds fetch slots (`PrepareFetch`).

@@ -283,8 +283,10 @@ impl SharedByteCache {
         Ok(ByteLookup::Miss)
     }
 
-    /// Inserts/replaces, evicting the least recently used slot when full. A
-    /// failed admission invalidates the prior value rather than exposing it.
+    /// Inserts/replaces, evicting the least recently used slot when full.
+    /// A contended put changes nothing (the caller falls through to the
+    /// next tier); only oversized replacements drop the prior value, as
+    /// in C++ `LRUCacheBase::Put`. Deletes fence through invalidation.
     pub fn put(&self, key: &[u8], value: &[u8]) -> io::Result<ByteStore> {
         let result = self.put_impl(key, value);
         let index = match &result {
@@ -300,7 +302,10 @@ impl SharedByteCache {
         let fingerprint = hash(key);
         let shard = self.shard(fingerprint);
         let Some(mut guard) = self.region.try_lock(shard)? else {
-            self.region.invalidate(shard)?;
+            // Contended admission changes nothing: the caller falls
+            // through to the next tier, and every entry in this shard
+            // stays readable. (Deletes still fence via invalidation
+            // because `Cache::delete` has no failure channel.)
             return Ok(ByteStore::Busy);
         };
         let epoch = self.region.epoch(shard)?;
@@ -528,19 +533,61 @@ mod tests {
     }
 
     #[test]
-    fn contended_mutations_invalidate_old_values_without_waiting() {
+    fn contended_single_shard_never_returns_torn_values() {
+        let temp = Temp::new();
+        let cache = std::sync::Arc::new(cache(&temp));
+        // Writers race monotonically increasing counters through one
+        // shard while readers sample: every Hit must decode to a
+        // fully-written value (8-byte atomicity + slot protocol).
+        let start = std::time::Instant::now();
+        let mut workers = Vec::new();
+        for _ in 0..4 {
+            let cache = cache.clone();
+            workers.push(std::thread::spawn(move || {
+                for i in 0u64..500 {
+                    let _ = cache.put(b"counter", &i.to_le_bytes());
+                    if let Ok(ByteLookup::Hit(value)) = cache.get(b"counter") {
+                        let back = u64::from_le_bytes(value.try_into().unwrap());
+                        assert!(back < 500, "{back}");
+                    }
+                }
+            }));
+        }
+        for worker in workers {
+            worker.join().unwrap();
+        }
+        eprintln!("byte-cache contention: 2000 puts + gets in {:?}", start.elapsed());
+        // Final state coherent: some fully-written counter wins.
+        match cache.get(b"counter").unwrap() {
+            ByteLookup::Hit(value) => {
+                assert!(u64::from_le_bytes(value.try_into().unwrap()) < 500);
+            }
+            ByteLookup::Miss => panic!("counter must survive uncontended read"),
+            ByteLookup::Busy => panic!("no contention left after join"),
+        }
+    }
+
+    #[test]
+    fn contended_put_preserves_old_values_and_delete_still_fences() {
         let temp = Temp::new();
         let cache = cache(&temp);
         cache.put(b"key", b"old").unwrap();
+        cache.put(b"sibling", b"keep").unwrap();
         let guard = cache.region.try_lock(0).unwrap().unwrap();
         assert_eq!(ByteLookup::Busy, cache.get(b"key").unwrap());
         assert_eq!(ByteStore::Busy, cache.put(b"key", b"new").unwrap());
         drop(guard);
-        assert_eq!(ByteLookup::Miss, cache.get(b"key").unwrap());
+        // A failed admission changes nothing: the prior value and
+        // every sibling stay readable (C++ never invalidates on
+        // failed puts; callers fall through to the next tier).
+        expect(&cache, b"key", b"old");
+        expect(&cache, b"sibling", b"keep");
         cache.put(b"key", b"again").unwrap();
         let guard = cache.region.try_lock(0).unwrap().unwrap();
         cache.delete(b"key").unwrap();
         drop(guard);
+        // Deletes have no failure channel, so contention still
+        // fences through invalidation.
         assert_eq!(ByteLookup::Miss, cache.get(b"key").unwrap());
     }
 

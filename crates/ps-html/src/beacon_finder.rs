@@ -705,7 +705,9 @@ mod tests {
         if let Some(worker) = worker {
             for iteration in 0..32 {
                 let nonce = format_nonce((worker.parse::<u64>().unwrap() << 32) | iteration);
-                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+                // Generous: four children hammer one transaction shard
+                // while the full workspace suite saturates CPU/disk.
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
                 while finder
                     .update("http://h/p", "options", "@Desktop", |evidence| {
                         evidence.pending_nonces.push((nonce.clone(), 1000));

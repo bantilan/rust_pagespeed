@@ -77,9 +77,12 @@ impl WriteTracker {
 
     /// Fail closed for memory reads before an exceptional untracked disk write.
     /// Saturated generations never wrap; choose a fresh lifetime domain to reset.
+    /// Fences before counting: metrics I/O failure must never skip the fence
+    /// (nor panic a worker through the caller's expect).
     pub fn disable_memory(&self, shard: usize) -> io::Result<()> {
-        self.metrics.increment(2)?;
-        self.generations.advance_epoch_to(shard, u64::MAX)
+        self.generations.advance_epoch_to(shard, u64::MAX)?;
+        let _ = self.metrics.increment(2);
+        Ok(())
     }
 
     /// Try once per slot, without waiting. None means bounded capacity is busy;

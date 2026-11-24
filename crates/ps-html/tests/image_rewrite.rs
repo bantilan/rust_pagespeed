@@ -5312,3 +5312,135 @@ fn lazy_image_inlining_preserved_first_view() {
     // Eager path taken: nothing deferred.
     assert_eq!(0, fixture.stat(IMAGE_REWRITES_DEFERRED));
 }
+
+/// Scripted coordinator: records claim keys without any locking.
+#[derive(Debug)]
+struct ScriptedCoordinator {
+    claims: std::sync::Mutex<Vec<String>>,
+    contended: bool,
+}
+
+#[derive(Debug)]
+struct DummyLease;
+
+impl ps_cache::rewrite_coordinator::RewriteLease for DummyLease {
+    fn publish(&self, mutation: &mut dyn FnMut()) -> bool {
+        mutation();
+        true
+    }
+}
+
+impl ps_cache::rewrite_coordinator::RewriteCoordinator for ScriptedCoordinator {
+    fn claim(&self, key: &str) -> ps_cache::rewrite_coordinator::RewriteClaim {
+        self.claims.lock().unwrap().push(key.to_string());
+        if self.contended {
+            ps_cache::rewrite_coordinator::RewriteClaim::Retry
+        } else {
+            ps_cache::rewrite_coordinator::RewriteClaim::Owned(Arc::new(DummyLease))
+        }
+    }
+    fn is_claimed(&self, _key: &str) -> bool {
+        self.contended
+    }
+}
+
+fn fetch_counter(server: &ServerContext, name: &str) -> i64 {
+    server.variable(name).get()
+}
+
+#[test]
+fn fetch_claims_rewrite_and_proceeds_when_owned() {
+    // A fetch claims the same `html-rewrite:` key background jobs use,
+    // so the two sides deduplicate against each other; ownership lets
+    // the fetch proceed immediately with no waiting.
+    let fixture = Fixture::new();
+    fixture.add_file_to_mock_fetcher(PUZZLE_URL, PUZZLE_JPG, "image/jpeg", 100);
+    fixture.add_recompress_image_filters();
+    let coordinator = Arc::new(ScriptedCoordinator {
+        claims: std::sync::Mutex::new(Vec::new()),
+        contended: false,
+    });
+    fixture
+        .server
+        .set_rewrite_coordinator(coordinator.clone());
+    let driver = fixture.driver_for("http://rewrite_image.test/RewriteImage.html");
+    let html = "<head/><body><img src=\"Puzzle.jpg\"/></body>";
+    let output = fixture.parse_with_driver(
+        &driver,
+        "http://rewrite_image.test/RewriteImage.html",
+        html,
+    );
+    let srcs = collect_img_srcs(&output);
+    assert_eq!(1, srcs.len());
+    let serve_driver = fixture.driver_for("http://rewrite_image.test/Puzzle.jpg");
+    serve_driver.add_filter(Rc::new(ImageRewriteFilter::new(serve_driver.clone())));
+    let absolute = GoogleUrl::resolve(
+        &GoogleUrl::new("http://rewrite_image.test/RewriteImage.html"),
+        &srcs[0],
+    )
+    .spec()
+    .to_string();
+    let ctx = serve_driver.request_context().borrow().clone();
+    let mut fetch = BufferingFetch::new(&absolute, ctx);
+    assert!(serve_driver.fetch_resource(&absolute, &mut fetch));
+    assert!(fetch.success());
+    let claims = coordinator.claims.lock().unwrap();
+    assert_eq!(1, claims.len(), "{claims:?}");
+    assert!(
+        claims[0].starts_with("html-rewrite:rname/"),
+        "{}",
+        claims[0]
+    );
+    assert_eq!(0, fetch_counter(&fixture.server, "fetch_dedup_waits"));
+}
+
+#[test]
+fn fetch_waits_then_proceeds_when_claimed_elsewhere() {
+    // Contended fetch: another worker owns the rewrite, nothing lands
+    // in time, so the fetch waits the bounded budget and then encodes
+    // locally — never wedged, never skipped.
+    let fixture = Fixture::new();
+    fixture.add_file_to_mock_fetcher(PUZZLE_URL, PUZZLE_JPG, "image/jpeg", 100);
+    fixture.add_recompress_image_filters();
+    let coordinator = Arc::new(ScriptedCoordinator {
+        claims: std::sync::Mutex::new(Vec::new()),
+        contended: true,
+    });
+    fixture
+        .server
+        .set_rewrite_coordinator(coordinator.clone());
+    let driver = fixture.driver_for("http://rewrite_image.test/RewriteImage.html");
+    let html = "<head/><body><img src=\"Puzzle.jpg\"/></body>";
+    let output = fixture.parse_with_driver(
+        &driver,
+        "http://rewrite_image.test/RewriteImage.html",
+        html,
+    );
+    let srcs = collect_img_srcs(&output);
+    assert_eq!(1, srcs.len());
+    let serve_driver = fixture.driver_for("http://rewrite_image.test/Puzzle.jpg");
+    serve_driver.add_filter(Rc::new(ImageRewriteFilter::new(serve_driver.clone())));
+    let absolute = GoogleUrl::resolve(
+        &GoogleUrl::new("http://rewrite_image.test/RewriteImage.html"),
+        &srcs[0],
+    )
+    .spec()
+    .to_string();
+    let ctx = serve_driver.request_context().borrow().clone();
+    let mut fetch = BufferingFetch::new(&absolute, ctx);
+    let start = std::time::Instant::now();
+    assert!(serve_driver.fetch_resource(&absolute, &mut fetch));
+    assert!(fetch.success());
+    let elapsed = start.elapsed();
+    assert!(
+        elapsed >= std::time::Duration::from_millis(200),
+        "must wait out the budget, took {elapsed:?}"
+    );
+    assert!(
+        elapsed < std::time::Duration::from_secs(10),
+        "wait must stay bounded, took {elapsed:?}"
+    );
+    assert_eq!(1, coordinator.claims.lock().unwrap().len());
+    assert_eq!(1, fetch_counter(&fixture.server, "fetch_dedup_waits"));
+    assert_eq!(0, fetch_counter(&fixture.server, "fetch_dedup_hits"));
+}

@@ -112,4 +112,81 @@ mod tests {
         drop(peer);
         std::fs::remove_dir_all(directory).unwrap();
     }
+
+    #[test]
+    fn killed_transaction_holder_recovers_for_next_update() {
+        const ENV: &str = "PS_TXN_KILL_CHILD";
+        if let Some(path) = std::env::var_os(ENV) {
+            let directory = std::path::PathBuf::from(path);
+            let backend: Arc<dyn Cache> = Arc::new(crate::cache::FileCache::new(
+                &directory.join("disk"),
+                crate::cache::FileCachePolicy {
+                    clean_interval_ms: -1,
+                    target_size_bytes: 16_777_216,
+                    target_inode_count: 0,
+                    path_length_limit: 8192,
+                },
+                0,
+            ));
+            let cache =
+                TransactionalCache::open(&directory.join("locks"), backend).unwrap();
+            // Hold the transaction lock, then wait to be killed before
+            // publishing anything: the file backend stays untouched.
+            cache.update("evidence", &mut |_| {
+                std::fs::write(directory.join("ready"), b"ready").unwrap();
+                std::thread::sleep(std::time::Duration::from_secs(30));
+                None
+            });
+            return;
+        }
+        let directory = std::env::temp_dir().join(format!(
+            "ps-transactions-kill-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        // Seed through a file-backed cache so the kill victim and the
+        // assertions below share one persistent backend.
+        let disk: Arc<dyn Cache> = Arc::new(crate::cache::FileCache::new(
+            &directory.join("disk"),
+            crate::cache::FileCachePolicy {
+                clean_interval_ms: -1,
+                target_size_bytes: 16_777_216,
+                target_inode_count: 0,
+                path_length_limit: 8192,
+            },
+            0,
+        ));
+        let shared =
+            TransactionalCache::open(&directory.join("locks"), disk.clone()).unwrap();
+        shared.update("evidence", &mut |_| Some(b"seeded".to_vec()));
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "transactional::tests::killed_transaction_holder_recovers_for_next_update",
+                "--nocapture",
+            ])
+            .env(ENV, &directory)
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !directory.join("ready").exists() && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert!(directory.join("ready").exists(), "child never held the lock");
+        child.kill().unwrap();
+        child.wait().unwrap();
+        // The robust lock recovers: the next update runs instead of
+        // wedging, and the victim published nothing partial.
+        assert!(shared.update("evidence", &mut |old| {
+            assert_eq!(old.value.as_deref(), Some(b"seeded".as_slice()));
+            Some(b"recovered".to_vec())
+        }));
+        assert_eq!(
+            disk.get("evidence").value.as_deref(),
+            Some(b"recovered".as_slice())
+        );
+        drop((shared, disk));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 }

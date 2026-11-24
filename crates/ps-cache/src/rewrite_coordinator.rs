@@ -5,7 +5,9 @@ use std::sync::{
     Arc,
 };
 
-/// Coordinator claims run on pool workers, never HTML scheduling threads.
+/// Coordinator claims run on pool workers and fetch reconstruction, never
+/// HTML scheduling threads (element crunching must stay lock- and
+/// procfs-free).
 pub trait RewriteCoordinator: Send + Sync + std::fmt::Debug {
     /// Shared ownership counters for admin sampling.
     fn diagnostics(&self) -> Vec<(&'static str, u64)> {
@@ -13,6 +15,13 @@ pub trait RewriteCoordinator: Send + Sync + std::fmt::Debug {
     }
     /// The exact options/UA-aware key is scoped by the coordinator's cache domain.
     fn claim(&self, key: &str) -> RewriteClaim;
+    /// Nonblocking exact-key presence probe (no liveness inspection):
+    /// true means another worker may be producing this key right now.
+    /// Fetch paths use it to decide a bounded wait; false always means
+    /// proceed locally.
+    fn is_claimed(&self, _key: &str) -> bool {
+        false
+    }
 }
 
 /// Admission result; retry means keep original URLs and try on a later request.
@@ -126,6 +135,9 @@ mod linux {
                 Ok(OwnershipClaim::KeyTooLong) => RewriteClaim::Local,
                 _ => RewriteClaim::Retry,
             }
+        }
+        fn is_claimed(&self, key: &str) -> bool {
+            self.table.is_claimed(key)
         }
     }
     #[derive(Debug)]

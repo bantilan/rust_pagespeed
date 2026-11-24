@@ -38,7 +38,7 @@ result = {
     'nginx': str(Path(args.nginx).resolve()),
     'nginx_version': subprocess.check_output([args.nginx, '-v'], stderr=subprocess.STDOUT, text=True).strip(),
     'template_sha256': hashlib.sha256(template.encode()).hexdigest(),
-    'method': 'Fresh isolated application caches/processes; OS caches warm; first full run has HIT/MISS/OFF phases; remaining runs cold-only. Request timings exclude process launch. HTTP client and sampling are tools/profile_html.py.',
+    'method': 'Fresh isolated application caches/processes per run; OS caches warm; every run performs cold plus full warm HIT/MISS/OFF phases. Request timings exclude process launch. HTTP client and sampling are tools/profile_html.py.',
     'shared_kb': args.shared_kb,
     'working_tree_dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=repo)),
     'source_diff_sha256': hashlib.sha256(subprocess.check_output(['git', 'diff', '--', 'crates', 'tools'], cwd=repo)).hexdigest(),
@@ -60,8 +60,6 @@ for name, page in [('Moto', 'moto-business-html5-responsive-web-template'),
         command = [sys.executable, str(repo / 'tools/profile_html.py'), '--nginx', args.nginx,
                    '--prefix', str(prefix), '--port', str(args.port), '--path', f'/test/{page}/index.html',
                    '--samples', str(args.samples), '--output', str(output), '--body-output', str(body)]
-        if run:
-            command.append('--cold-only')
         subprocess.run(command, check=True, stdout=subprocess.DEVNULL)
         if args.shared_kb:
             domain = prefix / 'cache/.pagespeed-lru/shared-v2'
@@ -81,9 +79,12 @@ for name, page in [('Moto', 'moto-business-html5-responsive-web-template'),
             data['normalized_html_bytes'] = len(normalized)
             data['pagespeed_refs'] = normalized.count(b'.pagespeed.')
         runs.append(data)
+    def pooled(phase):
+        return statistics.median(
+            sample['total_ms'] for run in runs for sample in run[phase]['samples'])
     summary = {'cold_median_ms': statistics.median(r['cold']['total_ms'] for r in runs),
-               'warm_hit_median_ms': runs[0]['warm_html_hit']['median_ms'],
-               'warm_miss_median_ms': runs[0]['warm_html_miss']['median_ms'], 'runs': runs}
+               'warm_hit_median_ms': pooled('warm_html_hit'),
+               'warm_miss_median_ms': pooled('warm_html_miss'), 'runs': runs}
     result['pages'][name] = summary
     print(name, {key: value for key, value in summary.items() if key != 'runs'}, flush=True)
     Path(args.output).write_text(json.dumps(result, indent=2) + '\n')

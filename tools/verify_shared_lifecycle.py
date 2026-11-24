@@ -19,6 +19,8 @@ parser.add_argument('--output', required=True)
 parser.add_argument('--port', type=int, default=18089)
 parser.add_argument('--check-metrics', action='store_true')
 parser.add_argument('--benchmark-requests', type=int, default=0, help='Optional eight-client warm HIT comparison after lifecycle checks')
+parser.add_argument('--crash-restart', action='store_true', help='SIGKILL master+workers for the restart phase instead of graceful SIGTERM')
+parser.add_argument('--config-change-reload', action='store_true', help='Extra reload phase toggling a rewrite filter; asserts new workers converge on changed output')
 args = parser.parse_args()
 repo = Path(__file__).resolve().parent.parent
 prefix = Path(tempfile.mkdtemp(prefix='ps-shared-lifecycle-'))
@@ -98,6 +100,20 @@ def stop():
         process = None
 
 
+def stop_crash():
+    # Crash-restart: SIGKILL the whole group with no graceful cleanup,
+    # leaving shared mappings and tracker state exactly as a real crash
+    # would (in-flight writers abandoned mid-mutation).
+    global process
+    if process is not None:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=10)
+        process = None
+
+
 result = {'prefix': str(prefix), 'module_sha256': hashlib.sha256(module.read_bytes()).hexdigest(),
           'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo, text=True).strip()}
 try:
@@ -142,11 +158,42 @@ try:
     if after is None:
         raise RuntimeError('did not observe overlapping worker generations')
     assert before[1:] == after[1:], (before, after)
+    # Overlap sampler: concurrent renders must agree while old and new
+    # workers coexist. Note: nginx stops old-worker accepts at reload, so
+    # new connections only ever reach new workers; old workers finish only
+    # pre-existing connections (the held download above). Old-generation
+    # HTML renders are therefore unobservable by design — what this
+    # sampler proves is that new workers stay coherent while old mappings
+    # (and their tracker generations) are still alive.
+    seen_workers = set()
+    seen_old = set()
+    for _ in range(60):
+        try:
+            worker, body = request()
+        except (OSError, http.client.HTTPException):
+            continue
+        normalized = re.sub(rb'<!-- PageSpeed Cache:.*?-->', b'', body)
+        digest = hashlib.sha256(normalized).hexdigest()
+        assert digest == before[1], (worker, digest, before[1])
+        assert b'.pagespeed.' in body
+        seen_workers.add(str(worker))
+        if str(worker) in original_workers:
+            seen_old.add(str(worker))
+        if len(seen_workers) >= 2:
+            break
+    assert len(seen_workers) >= 2, seen_workers
+    result['overlap_workers'] = sorted(seen_workers)
+    result['overlap_old_generation_sampled'] = sorted(seen_old)
     hold.close()
     hold = None
     mappings = sorted(str(p.relative_to(prefix)) for p in (prefix / 'cache/.pagespeed-lru').glob('shared-v2/*/bytes-v2-*.dat'))
     assert len(mappings) == 2, mappings
-    stop()
+    if args.crash_restart:
+        stop_crash()
+        result['restart_mode'] = 'crash'
+    else:
+        stop()
+        result['restart_mode'] = 'graceful'
     process = start()
     restarted = warm()
     assert before[1:] == restarted[1:], (before, restarted)
@@ -179,6 +226,23 @@ try:
         process = start()
         warm()
         result['concurrent_default'] = concurrent_run()
+    if args.config_change_reload:
+        # Reload with a visibly different rewrite configuration: new
+        # workers must converge on changed-but-stable output (option
+        # signature rotation must not collide with old-variant entries).
+        config_path = prefix / 'conf/nginx.conf'
+        changed_text = config_path.read_text().replace(
+            'pagespeed RewriteLevel CoreFilters;',
+            'pagespeed RewriteLevel CoreFilters;\npagespeed DisableFilters combine_css;')
+        assert changed_text != config_path.read_text()
+        config_path.write_text(changed_text)
+        subprocess.run([args.nginx, '-t', '-p', str(prefix) + '/', '-c', 'conf/nginx.conf'],
+                       check=True, capture_output=True)
+        os.kill(process.pid, signal.SIGHUP)
+        time.sleep(2)
+        changed_warm = warm()
+        assert changed_warm[1] != before[1], 'filter toggle had no visible effect'
+        result['config_change_digest'] = changed_warm[1]
     result.update({'passed': True, 'before': before, 'after_reload': after, 'after_restart': restarted,
                    'held_old_worker': old_worker, 'byte_mappings': mappings,
                    'checkpoint_policy': 'validated existing write-through disk cache; no native mutex checkpoint'})

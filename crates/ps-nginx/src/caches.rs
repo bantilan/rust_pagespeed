@@ -139,7 +139,12 @@ pub fn child_init_message(path: &str) -> String {
 
 /// Shared generation and active-writer count, mapped once before worker fork.
 #[derive(Debug)]
+/// Legacy unrecoverable coherence (non-Linux only): shared counters can
+/// reset generations under live readers, and abandoned writers strand
+/// active bits with no repair path. Linux uses [`TrackedCoherence`].
+#[cfg(not(target_os = "linux"))]
 struct SharedCacheCoherence(ps_shm::SharedCounters, Option<String>);
+#[cfg(not(target_os = "linux"))]
 impl SharedCacheCoherence {
     fn slot(key: &str) -> usize {
         let hash = key.bytes().fold(0xcbf29ce484222325u64, |hash, byte| {
@@ -148,6 +153,7 @@ impl SharedCacheCoherence {
         (hash as usize % 128) * 2
     }
 }
+#[cfg(not(target_os = "linux"))]
 impl CacheCoherence for SharedCacheCoherence {
     fn snapshot(&self, key: &str) -> Option<i64> {
         let slot = Self::slot(key);
@@ -213,16 +219,50 @@ fn shared_coherence(path: &str) -> Option<Arc<dyn CacheCoherence>> {
     // Reserved subtree: the file cleaner explicitly excludes live mappings.
     let directory = Path::new(path).join(".pagespeed-lru");
     std::fs::create_dir_all(&directory).ok()?;
-    let names: Vec<_> = (0..128)
-        .flat_map(|slot| {
-            [
-                format!("cache_generation_{slot}"),
-                format!("active_writers_{slot}"),
-            ]
-        })
-        .collect();
-    let shared = ps_shm::SharedCounters::open(&directory, &names).ok()?;
-    Some(Arc::new(SharedCacheCoherence(shared, None)))
+    #[cfg(target_os = "linux")]
+    {
+        // Recoverable tracked generations: abandoned writers self-heal
+        // via slot recovery instead of stranding active bits, and no
+        // reset can run under live readers. Boot-qualified like the
+        // opt-in domain (a reboot must not reuse a stale generation
+        // space against fresh per-process L1s).
+        let boot = std::fs::read_to_string("/proc/sys/kernel/random/boot_id").ok()?;
+        let boot = boot.trim();
+        if boot.len() != 36 || !boot.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-') {
+            return None;
+        }
+        let tracking = directory.join("tracked-default-v1").join(boot);
+        std::fs::create_dir_all(&tracking).ok()?;
+        let tracked = ps_cache::tracked_coherence::TrackedCoherence::open(
+            &tracking,
+            "default-tracked-v1:".to_string(),
+        )
+        .ok()?;
+        return Some(Arc::new(tracked));
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let names: Vec<_> = (0..128)
+            .flat_map(|slot| {
+                [
+                    format!("cache_generation_{slot}"),
+                    format!("active_writers_{slot}"),
+                ]
+            })
+            .collect();
+        let shared = ps_shm::SharedCounters::open(&directory, &names).ok()?;
+        Some(Arc::new(SharedCacheCoherence(shared, None)))
+    }
+}
+
+/// Validated Linux boot identity for boot-qualified directories.
+fn read_boot_id() -> Option<String> {
+    let boot = std::fs::read_to_string("/proc/sys/kernel/random/boot_id").ok()?;
+    let boot = boot.trim().to_string();
+    if boot.len() != 36 || !boot.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-') {
+        return None;
+    }
+    Some(boot)
 }
 
 fn same_disk_path(left: &str, right: &str) -> bool {
@@ -502,16 +542,13 @@ impl SystemCaches {
             .join("shared-v2")
             .join(boot);
         std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-        let names: Vec<_> = (0..128)
-            .flat_map(|slot| {
-                [
-                    format!("cache_generation_{slot}"),
-                    format!("active_writers_{slot}"),
-                ]
-            })
-            .collect();
+        // Lifetime anchor only: generations live in the write-tracker
+        // files and incarnations in the header, so no named counters
+        // are needed. (A previous revision created 256 unread
+        // coordination counters here; the file is intentionally
+        // re-cut on upgrade, which also rotates the namespace cleanly.)
         let counters =
-            ps_shm::SharedCounters::open_coherent(&directory, &names).map_err(|e| e.to_string())?;
+            ps_shm::SharedCounters::open_coherent(&directory, &[]).map_err(|e| e.to_string())?;
         let namespace = format!(
             "shm-tracked-v1:{:032x}:",
             counters.incarnation().expect("coherent lifetime")
@@ -666,6 +703,44 @@ impl SystemCaches {
         paths.into_iter().map(root_init_message).collect()
     }
 
+    /// Best-effort removal of stale boot-qualified shared-cache
+    /// directories. Boot ids never repeat, so a non-current boot
+    /// directory is garbage by construction (its mappings could only
+    /// belong to a previous boot). Runs at root init; all errors are
+    /// swallowed because leftover directories are merely wasted disk.
+    /// Returns the number of directories removed.
+    pub fn gc_stale_boot_dirs(&self) -> usize {
+        let current = read_boot_id().unwrap_or_default();
+        if current.is_empty() {
+            return 0;
+        }
+        let mut removed = 0;
+        let mut roots: Vec<&str> = self
+            .paths
+            .values()
+            .map(|path| path.path.as_str())
+            .collect();
+        roots.sort_unstable();
+        roots.dedup();
+        for root in roots {
+            for subtree in ["shared-v2", "tracked-default-v1"] {
+                let parent = Path::new(root).join(".pagespeed-lru").join(subtree);
+                let Ok(entries) = std::fs::read_dir(&parent) else {
+                    continue;
+                };
+                for entry in entries.flatten() {
+                    let name = entry.file_name();
+                    if name.to_str() != Some(current.as_str()) {
+                        if std::fs::remove_dir_all(entry.path()).is_ok() {
+                            removed += 1;
+                        }
+                    }
+                }
+            }
+        }
+        removed
+    }
+
     /// Child-phase messages (`ChildInit` minus shm attach, worker
     /// handoff, and purge setup): one info line per live path.
     #[must_use]
@@ -780,6 +855,69 @@ pub fn configure_http_cache(cache: &mut HttpCache, options: &NgxOptions, levels:
 mod tests {
     use super::*;
     use crate::conf::NgxOptions;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn default_coherence_never_resets_under_live_readers() {
+        // The default L1 coherence must survive its initializer going
+        // away: a fresh opener with a live peer attaches (generations
+        // continue) instead of resetting them (which would let stale
+        // low-generation L1 entries collide with post-reset lookups).
+        let directory = std::env::temp_dir().join(format!(
+            "ps-default-coherence-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let path = directory.to_str().unwrap();
+        let first = shared_coherence(path).unwrap();
+        first.mutate("k", &mut || {});
+        assert!(first.snapshot("k").unwrap() >= 1);
+        let second = shared_coherence(path).unwrap();
+        drop(first);
+        let third = shared_coherence(path).unwrap();
+        assert!(
+            third.snapshot("k").unwrap() >= 1,
+            "generations must continue while a peer lives"
+        );
+        assert!(second.snapshot("k").unwrap() >= 1);
+        drop((second, third));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn gc_stale_boot_dirs_keeps_current_boot() {
+        let directory = std::env::temp_dir().join(format!(
+            "ps-boot-gc-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let path = directory.to_str().unwrap();
+        let mut options = NgxOptions::new();
+        options.system.file_cache_path = path.to_string();
+        let mut caches = SystemCaches::new();
+        caches.register_config(&options.system, false, false, 0);
+        let boot = read_boot_id().unwrap();
+        for subtree in ["shared-v2", "tracked-default-v1"] {
+            let parent = directory.join(".pagespeed-lru").join(subtree);
+            std::fs::create_dir_all(parent.join(&boot)).unwrap();
+            std::fs::create_dir_all(parent.join("dead0000-0000-0000-0000-000000000000")).unwrap();
+        }
+        assert_eq!(2, caches.gc_stale_boot_dirs());
+        for subtree in ["shared-v2", "tracked-default-v1"] {
+            let parent = directory.join(".pagespeed-lru").join(subtree);
+            assert!(parent.join(&boot).exists());
+            assert!(!parent.join("dead0000-0000-0000-0000-000000000000").exists());
+        }
+        // Second run is a no-op.
+        assert_eq!(0, caches.gc_stale_boot_dirs());
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 
     #[test]
     fn path_keys_and_filenames() {
@@ -1179,7 +1317,10 @@ mod tests {
         // that the incarnation prefix, not just a different integer, protects it.
         let collision = (0..100_000)
             .map(|i| format!("different-{i}"))
-            .find(|key| SharedCacheCoherence::slot(key) == SharedCacheCoherence::slot("persistent"))
+            .find(|key| {
+                ps_cache::tracked_coherence::TrackedCoherence::shard(key)
+                    == ps_cache::tracked_coherence::TrackedCoherence::shard("persistent")
+            })
             .unwrap();
         backend.put(&collision, b"other");
         assert_eq!(Some(b"new".to_vec()), backend.get("persistent").value);
