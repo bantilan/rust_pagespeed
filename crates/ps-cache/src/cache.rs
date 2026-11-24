@@ -980,7 +980,7 @@ impl FileCache {
         if now_ms < *lock(&self.next_clean_ms) {
             return;
         }
-        let new_time = now_ms + self.policy.clean_interval_ms;
+        let new_time = now_ms.saturating_add(self.policy.clean_interval_ms);
         let file_time: i64 = std::fs::read_to_string(self.clean_time_path())
             .ok()
             .and_then(|text| text.trim().parse().ok())
@@ -1026,8 +1026,11 @@ fn walk_cache(path: &Path) -> (Vec<WalkEntry>, Vec<PathBuf>, i64) {
         let mut saw_child = false;
         for entry in read.flatten() {
             saw_child = true;
-            *inodes += 1;
             let path = entry.path();
+            if entry.file_name() == ".pagespeed-lru" {
+                continue;
+            }
+            *inodes += 1;
             if path.is_dir() {
                 visit(&path, files, empty, inodes);
             } else if let Ok(meta) = entry.metadata() {
@@ -1259,6 +1262,22 @@ impl Cache for FallbackCache {
     }
 }
 
+/// Cross-worker write generation. Implementations must share their atomics
+/// between every writer to the backing store. A snapshot is unavailable while
+/// writes are active; L1 reads then fall through to the persistent backend.
+pub trait CacheCoherence: Send + Sync + std::fmt::Debug {
+    fn snapshot(&self, key: &str) -> Option<i64>;
+    fn begin_write(&self, key: &str);
+    fn end_write(&self, key: &str);
+}
+
+struct CacheWriteGuard<'a>(&'a dyn CacheCoherence, &'a str);
+impl Drop for CacheWriteGuard<'_> {
+    fn drop(&mut self) {
+        self.0.end_write(self.1);
+    }
+}
+
 /// Write-through L1/L2 adapter (`WriteThroughCache`).
 ///
 /// Reads try L1, then L2 (backfilling L1 on L2 hits, subject to the
@@ -1269,6 +1288,8 @@ pub struct WriteThroughCache {
     l1: std::sync::Arc<dyn Cache>,
     l2: std::sync::Arc<dyn Cache>,
     l1_size_limit: u64,
+    operations: Mutex<()>,
+    coherence: Option<std::sync::Arc<dyn CacheCoherence>>,
 }
 
 /// Unlimited L1 size (`kUnlimited`).
@@ -1286,7 +1307,15 @@ impl WriteThroughCache {
             l1,
             l2,
             l1_size_limit,
+            operations: Mutex::new(()),
+            coherence: None,
         }
+    }
+
+    /// Uses shared generations for coherent process-local LRU entries.
+    pub fn with_coherence(mut self, coherence: std::sync::Arc<dyn CacheCoherence>) -> Self {
+        self.coherence = Some(coherence);
+        self
     }
 
     /// Formats the adapter name (`FormatName`).
@@ -1301,12 +1330,36 @@ impl WriteThroughCache {
         let size = (key.len() + value.len()) as u64;
         if self.l1_size_limit == WRITE_THROUGH_UNLIMITED || size < self.l1_size_limit {
             self.l1.put(key, value);
+        } else {
+            // A replacement too large for L1 must invalidate the old value.
+            self.l1.delete(key);
         }
     }
 }
 
 impl Cache for WriteThroughCache {
     fn get(&self, key: &str) -> Lookup {
+        // Keep L2 reads/backfills atomic with local puts and deletes.
+        let _operation = lock(&self.operations);
+        if let Some(coherence) = &self.coherence {
+            let Some(generation) = coherence.snapshot(key) else {
+                return self.l2.get(key);
+            };
+            let memory_key = format!("{generation}:{key}");
+            let cached = self.l1.get(&memory_key);
+            let was_hit = cached.state == KeyState::Available;
+            let result = if was_hit { cached } else { self.l2.get(key) };
+            if coherence.snapshot(key) != Some(generation) {
+                return self.l2.get(key);
+            }
+            if !was_hit {
+                if let Some(value) = &result.value {
+                    self.put_in_l1(&memory_key, value);
+                }
+            }
+            return result;
+        }
+
         match self.l1.get(key) {
             hit @ Lookup {
                 state: KeyState::Available,
@@ -1327,11 +1380,25 @@ impl Cache for WriteThroughCache {
     }
 
     fn put(&self, key: &str, value: &[u8]) {
-        self.put_in_l1(key, value);
+        let _operation = lock(&self.operations);
+        if let Some(coherence) = &self.coherence {
+            coherence.begin_write(key);
+            let _write = CacheWriteGuard(coherence.as_ref(), key);
+            self.l2.put(key, value);
+            return;
+        }
         self.l2.put(key, value);
+        self.put_in_l1(key, value);
     }
 
     fn delete(&self, key: &str) {
+        let _operation = lock(&self.operations);
+        if let Some(coherence) = &self.coherence {
+            coherence.begin_write(key);
+            let _write = CacheWriteGuard(coherence.as_ref(), key);
+            self.l2.delete(key);
+            return;
+        }
         self.l1.delete(key);
         self.l2.delete(key);
     }
@@ -1824,7 +1891,8 @@ mod tests {
         assert_eq!(l1.get("k").state, KeyState::Available);
         cache.put("k", b"123"); // 4 !< 4 -> L2 only
         assert_eq!(l2.get("k").state, KeyState::Available);
-        l1.delete("k");
+        assert_eq!(cache.get("k").value.as_deref(), Some(b"123".as_slice()));
+        assert_eq!(l1.get("k").state, KeyState::NotFound);
         // L2 hit backfills L1 only when under the limit.
         assert_eq!(cache.get("k").state, KeyState::Available);
         assert_eq!(l1.get("k").state, KeyState::NotFound); // 4 !< 4

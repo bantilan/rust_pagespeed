@@ -26,6 +26,7 @@ pub fn normalize_with_all(
 }
 
 /// Strips Android device-model noise (`AndroidUserAgentNormalizer`).
+#[derive(Clone)]
 pub struct AndroidUserAgentNormalizer {
     dalvik_ua: Regex,
     chrome_android_ua: Regex,
@@ -36,6 +37,12 @@ impl AndroidUserAgentNormalizer {
     /// Builds the normalizer (patterns must compile).
     #[must_use]
     pub fn new() -> Self {
+        static NORMALIZER: std::sync::OnceLock<AndroidUserAgentNormalizer> =
+            std::sync::OnceLock::new();
+        NORMALIZER.get_or_init(Self::build).clone()
+    }
+
+    fn build() -> Self {
         AndroidUserAgentNormalizer {
             dalvik_ua: Regex::new(
                 r"\A(Dalvik/[0-9.]+ \(Linux; U; Android [^ \t\n\f\r;]+)[ \t\n\f\r;][^)]+\)\z",
@@ -75,6 +82,7 @@ impl UserAgentNormalizer for AndroidUserAgentNormalizer {
 }
 
 /// Strips IE add-on noise (`IEUserAgentNormalizer`).
+#[derive(Clone)]
 pub struct IEUserAgentNormalizer {
     ie_ua: Regex,
 }
@@ -83,6 +91,11 @@ impl IEUserAgentNormalizer {
     /// Builds the normalizer (pattern must compile).
     #[must_use]
     pub fn new() -> Self {
+        static NORMALIZER: std::sync::OnceLock<IEUserAgentNormalizer> = std::sync::OnceLock::new();
+        NORMALIZER.get_or_init(Self::build).clone()
+    }
+
+    fn build() -> Self {
         IEUserAgentNormalizer {
             ie_ua: Regex::new(r"\A(Mozilla/[0-9].0 \(compatible; MSIE [0-9.]+)([^)]+)\)\z")
                 .expect("ie pattern"),

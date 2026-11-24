@@ -345,13 +345,26 @@ fn ipro_scope_selects_ipro_deadline() {
 }
 
 #[test]
-fn shutdown_keeps_requests_working() {
+fn shutdown_html_keeps_fallback_without_fetching() {
     let fixture = Fixture::new(Duration::from_millis(0), 1000);
     fixture.script_css(b"a{}");
     fixture.pool.shutdown();
-    // Post-shutdown loads run inline (degraded, never failed).
+    // HTML must not degrade to blocking origin work at shutdown.
     let mut resource = fixture.resource();
+    assert!(!fixture.load(&mut resource));
+    assert!(resource.load_pending());
+    assert!(resource.contents().is_empty());
+    assert_eq!(fixture.stat("background_jobs_shutdown"), 1);
+}
+
+#[test]
+fn shutdown_preserves_foreground_resource_serving() {
+    let fixture = Fixture::new(Duration::ZERO, 1000);
+    fixture.script_css(b"a{}");
+    fixture.pool.shutdown();
+    let mut resource = fixture.resource();
+    resource.set_is_background_fetch(false);
     assert!(fixture.load(&mut resource));
     assert_eq!(resource.contents(), b"a{}");
-    assert_eq!(fixture.stat("background_jobs_shutdown"), 1);
+    assert!(!resource.load_pending());
 }

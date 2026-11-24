@@ -31,3 +31,7 @@ ps-image = { path = "../ps-image" }
 [[bench]]
 name = "nginx"
 harness = false
+
+[features]
+# Opt-in request stage timers; no timer/log overhead in ordinary builds.
+pipeline-profile = ["ps-html/pipeline-profile"]

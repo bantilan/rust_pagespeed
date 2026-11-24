@@ -336,6 +336,22 @@ impl SharedCounters {
             .load(Ordering::Relaxed)
     }
 
+    /// Reads a coordination slot in the global sequentially consistent order.
+    /// Use this for protocols spanning several slots; ordinary statistics only
+    /// need the cheaper relaxed operations.
+    #[must_use]
+    pub fn coordination_get(&self, slot: usize) -> i64 {
+        self.atomic_at(self.slot_offset(slot))
+            .load(Ordering::SeqCst)
+    }
+
+    /// Updates a coordination slot in the same order as `coordination_get`.
+    pub fn coordination_add(&self, slot: usize, delta: i64) -> i64 {
+        self.atomic_at(self.slot_offset(slot))
+            .fetch_add(delta, Ordering::SeqCst)
+            .wrapping_add(delta)
+    }
+
     /// Adds a delta, returning the new value.
     pub fn add(&self, slot: usize, delta: i64) -> i64 {
         self.atomic_at(self.slot_offset(slot))

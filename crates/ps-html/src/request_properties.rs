@@ -11,7 +11,7 @@ use super::device_properties::DeviceProperties;
 use super::downstream_caching_directives::DownstreamCachingDirectives;
 
 /// Request capabilities (`RequestProperties`).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RequestProperties {
     device: DeviceProperties,
     downstream: DownstreamCachingDirectives,

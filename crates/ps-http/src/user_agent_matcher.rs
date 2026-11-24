@@ -326,6 +326,13 @@ const CHROME_VERSION_PATTERN: &str =
     r"(?:Chrome|CriOS|Edg|EdgA|EdgiOS|OPR)/([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)";
 
 impl UserAgentMatcher {
+    /// Immutable pattern tables and compiled expressions shared by requests.
+    #[must_use]
+    pub fn shared() -> &'static Self {
+        static MATCHER: std::sync::OnceLock<UserAgentMatcher> = std::sync::OnceLock::new();
+        MATCHER.get_or_init(Self::new)
+    }
+
     /// Builds the matcher with all pattern tables.
     #[must_use]
     pub fn new() -> Self {

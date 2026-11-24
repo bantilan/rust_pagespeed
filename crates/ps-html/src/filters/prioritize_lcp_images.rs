@@ -53,6 +53,7 @@ struct PictureSource {
 /// LCP prioritization filter.
 pub struct PrioritizeLcpImagesFilter {
     driver: Rc<ResourceDriver>,
+    evidence: std::cell::OnceCell<Rc<BeaconEvidence>>,
     head_element: Option<NodeId>,
     in_body: bool,
     prioritized_count: u32,
@@ -73,6 +74,7 @@ impl PrioritizeLcpImagesFilter {
     pub fn new(driver: Rc<ResourceDriver>) -> Self {
         PrioritizeLcpImagesFilter {
             driver,
+            evidence: std::cell::OnceCell::new(),
             head_element: None,
             in_body: false,
             prioritized_count: 0,
@@ -87,16 +89,24 @@ impl PrioritizeLcpImagesFilter {
     }
 
     /// Loads the page variant's evidence for finder lookups.
-    fn evidence(&self) -> BeaconEvidence {
-        let server = self.driver.server_context();
-        let oh = server.hasher().hash(self.driver.options_signature().as_bytes());
-        let properties = self.driver.request_properties();
-        let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
-            properties.device_type(),
-        );
-        BeaconFinder::new(server.metadata_cache())
-            .load(&self.driver.base_url().spec().to_string(), &oh, suffix)
-            .into_record()
+    fn evidence(&self) -> Rc<BeaconEvidence> {
+        self.evidence
+            .get_or_init(|| {
+                let server = self.driver.server_context();
+                let oh = server
+                    .hasher()
+                    .hash(self.driver.options_signature().as_bytes());
+                let properties = self.driver.request_properties();
+                let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
+                    properties.device_type(),
+                );
+                Rc::new(
+                    BeaconFinder::new(server.metadata_cache())
+                        .load(&self.driver.base_url().spec().to_string(), &oh, suffix)
+                        .into_record(),
+                )
+            })
+            .clone()
     }
 
     /// Whether the beacon finder has usable evidence.
@@ -354,10 +364,7 @@ impl PrioritizeLcpImagesFilter {
         {
             dom.add_attribute(id, b"data-pagespeed-no-defer", b"1");
         }
-        if dom
-            .find_attribute(id, Keyword::PagespeedNoDefer)
-            .is_none()
-        {
+        if dom.find_attribute(id, Keyword::PagespeedNoDefer).is_none() {
             dom.add_attribute(id, b"pagespeed-no-defer", b"1");
         }
         self.insert_preload_hint(dom, id, src, absolute_url);
@@ -475,6 +482,7 @@ impl HtmlFilter for PrioritizeLcpImagesFilter {
     fn start_document(&mut self, _dom: &mut Dom, _lexer: &Lexer) {
         self.head_element = None;
         self.in_body = false;
+        self.evidence.take();
         self.prioritized_count = 0;
         self.saw_eligible_image = false;
         self.preloaded_srcs.clear();
@@ -525,8 +533,7 @@ impl HtmlFilter for PrioritizeLcpImagesFilter {
         // a logo that measurements prove is the LCP element keeps
         // its prioritization, and author attributes are never
         // touched either way.
-        let is_confident_logo =
-            super::logo_detection::detect_logo(dom, id, &src).is_logo;
+        let is_confident_logo = super::logo_detection::detect_logo(dom, id, &src).is_logo;
         // Prefer accepted LCP evidence over document position.
         let evidence = self.evidence();
         let evidence_available = self.evidence_available(&evidence);
@@ -543,15 +550,14 @@ impl HtmlFilter for PrioritizeLcpImagesFilter {
                         beacon_finder::html_critical_images(&evidence).contains(&stamped);
                 }
             } else {
-                learned_critical =
-                    beacon_finder::is_html_critical_image(&absolute_url, &evidence);
+                learned_critical = beacon_finder::is_html_critical_image(&absolute_url, &evidence);
             }
             if !learned_critical {
                 // Unstamped LCP images match by loaded URL: the
                 // beacon reports the URL the browser fetched,
                 // which equals the post-rewrite src observed here.
-                learned_critical = !evidence.lcp_image_url.is_empty()
-                    && evidence.lcp_image_url == absolute_url;
+                learned_critical =
+                    !evidence.lcp_image_url.is_empty() && evidence.lcp_image_url == absolute_url;
             }
         }
         if learned_critical {
@@ -702,12 +708,14 @@ fn collect_link_header_preloads(
                     is_image = true;
                 }
             }
-            if is_preload && is_image && !target.is_empty() && !ps_http::data_url::is_data_url(target)
+            if is_preload
+                && is_image
+                && !target.is_empty()
+                && !ps_http::data_url::is_data_url(target)
             {
                 let base = ps_http::google_url::GoogleUrl::new(base_url);
                 let reference = String::from_utf8_lossy(target);
-                let absolute =
-                    ps_http::google_url::GoogleUrl::resolve(&base, &reference);
+                let absolute = ps_http::google_url::GoogleUrl::resolve(&base, &reference);
                 if absolute.is_valid() {
                     out.insert(absolute.spec().to_string());
                 }
@@ -763,27 +771,15 @@ mod tests {
     fn format_matrix() {
         // AVIF/WebP follow capabilities.
         assert!(bg_preload_format_supported("http://h/x.avif", true, false));
-        assert!(!bg_preload_format_supported(
-            "http://h/x.avif",
-            false,
-            true
-        ));
-        assert!(bg_preload_format_supported(
-            "http://h/x.webp",
-            false,
-            true
-        ));
+        assert!(!bg_preload_format_supported("http://h/x.avif", false, true));
+        assert!(bg_preload_format_supported("http://h/x.webp", false, true));
         assert!(!bg_preload_format_supported(
             "http://h/x.webp",
             false,
             false
         ));
         // Universal kinds always pass.
-        assert!(bg_preload_format_supported(
-            "http://h/x.jpg",
-            false,
-            false
-        ));
+        assert!(bg_preload_format_supported("http://h/x.jpg", false, false));
         assert!(bg_preload_format_supported(
             "http://h/x.JPEG?y=1",
             false,

@@ -64,3 +64,5 @@ pub mod url_namer;
 pub mod url_partnership;
 pub mod url_segment_encoder;
 pub mod writer;
+
+mod combine_metadata;

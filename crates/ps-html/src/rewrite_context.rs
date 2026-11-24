@@ -934,11 +934,6 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
             return false;
         };
         let input = &self.inputs[0];
-        // Font-service inputs rebuild through claimants, which a
-        // worker-side driver cannot see: keep them sync.
-        if matches!(input, InputResource::Font(_)) {
-            return false;
-        }
         match super::html_async::schedule_single_rewrite(
             &self.driver,
             snapshot,
@@ -2227,9 +2222,6 @@ impl<B: InlineBehavior> InlineRewriteContext<B> {
         let Some(snapshot) = self.behavior.background_snapshot() else {
             return false;
         };
-        if matches!(input, InputResource::Font(_)) {
-            return false;
-        }
         match super::html_async::schedule_inline_rewrite(
             &self.driver,
             snapshot,

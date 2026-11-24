@@ -15,8 +15,8 @@
 
 use crate::conf::NgxOptions;
 use ps_cache::cache::{
-    Cache, CompressedCache, FileCache, FileCachePolicy, LruCache, WriteThroughCache,
-    DEFAULT_MAX_INFLATED_BYTES, DEFAULT_PATH_LENGTH_LIMIT,
+    Cache, CacheCoherence, CompressedCache, FileCache, FileCachePolicy, LruCache,
+    WriteThroughCache, DEFAULT_MAX_INFLATED_BYTES, DEFAULT_PATH_LENGTH_LIMIT,
 };
 use ps_config::options::Value;
 use ps_http::http_cache::HttpCache;
@@ -136,6 +136,55 @@ pub fn child_init_message(path: &str) -> String {
     format!("Reusing shared memory for path: {path}.")
 }
 
+/// Shared generation and active-writer count, mapped once before worker fork.
+#[derive(Debug)]
+struct SharedCacheCoherence(ps_shm::SharedCounters);
+impl SharedCacheCoherence {
+    fn slot(key: &str) -> usize {
+        let hash = key.bytes().fold(0xcbf29ce484222325u64, |hash, byte| {
+            (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
+        });
+        (hash as usize % 128) * 2
+    }
+}
+impl CacheCoherence for SharedCacheCoherence {
+    fn snapshot(&self, key: &str) -> Option<i64> {
+        let slot = Self::slot(key);
+        if self.0.coordination_get(slot + 1) != 0 {
+            return None;
+        }
+        let generation = self.0.coordination_get(slot);
+        (self.0.coordination_get(slot + 1) == 0).then_some(generation)
+    }
+    fn begin_write(&self, key: &str) {
+        self.0.coordination_add(Self::slot(key) + 1, 1);
+    }
+    fn end_write(&self, key: &str) {
+        let slot = Self::slot(key);
+        self.0.coordination_add(slot, 1);
+        self.0.coordination_add(slot + 1, -1);
+    }
+}
+
+fn shared_coherence(path: &str) -> Option<Arc<dyn CacheCoherence>> {
+    if path.is_empty() {
+        return None;
+    }
+    // Reserved subtree: the file cleaner explicitly excludes live mappings.
+    let directory = Path::new(path).join(".pagespeed-lru");
+    std::fs::create_dir_all(&directory).ok()?;
+    let names: Vec<_> = (0..128)
+        .flat_map(|slot| {
+            [
+                format!("cache_generation_{slot}"),
+                format!("active_writers_{slot}"),
+            ]
+        })
+        .collect();
+    let shared = ps_shm::SharedCounters::open(&directory, &names).ok()?;
+    Some(Arc::new(SharedCacheCoherence(shared)))
+}
+
 /// Per-path caches (`SystemCachePath` without shm locks, purge
 /// polling, or the clean worker).
 pub struct SystemCachePath {
@@ -151,6 +200,7 @@ pub struct SystemCachePath {
     pub file_cache: Arc<FileCache>,
     /// Per-process LRU (absent when sized 0).
     pub lru_cache: Option<Arc<LruCache>>,
+    coherence: Option<Arc<dyn CacheCoherence>>,
     clean_interval_set: bool,
     clean_size_set: bool,
     clean_inode_set: bool,
@@ -175,7 +225,10 @@ impl SystemCachePath {
             path_length_limit: DEFAULT_PATH_LENGTH_LIMIT,
         };
         let file_cache = Arc::new(FileCache::new(Path::new(path), policy, now_ms));
-        let lru_cache = if system.lru_cache_kb_per_process != 0 {
+        let coherence = (system.lru_cache_kb_per_process > 0 && !unplugged)
+            .then(|| shared_coherence(path))
+            .flatten();
+        let lru_cache = if system.lru_cache_kb_per_process > 0 && coherence.is_some() {
             // `size_t` conversion, verbatim (negative wraps huge).
             let bytes = system.lru_cache_kb_per_process.wrapping_mul(1024) as usize;
             Some(Arc::new(LruCache::new(bytes)))
@@ -189,6 +242,7 @@ impl SystemCachePath {
             purge_enabled: purge,
             file_cache,
             lru_cache,
+            coherence,
             clean_interval_set: system.was_set.clean_interval,
             clean_size_set: system.was_set.clean_size,
             clean_inode_set: system.was_set.clean_inode,
@@ -394,7 +448,14 @@ pub fn path_backend(path: &SystemCachePath, lru_byte_limit: u64) -> Arc<dyn Cach
         Some(lru) => {
             let lru_cache = Arc::clone(lru);
             let lru: Arc<dyn Cache> = lru_cache;
-            Arc::new(WriteThroughCache::new(lru, file, lru_byte_limit))
+            Arc::new(
+                WriteThroughCache::new(lru, file, lru_byte_limit).with_coherence(
+                    path.coherence
+                        .as_ref()
+                        .expect("LRU requires coherence")
+                        .clone(),
+                ),
+            )
         }
         None => file,
     }
@@ -520,12 +581,72 @@ mod tests {
     }
 
     #[test]
+    fn cross_worker_coherence() {
+        const CHILD_PATH: &str = "PS_TEST_COHERENCE_PATH";
+        let child = std::env::var(CHILD_PATH).ok();
+        let path = child.clone().unwrap_or_else(|| {
+            std::env::temp_dir()
+                .join(format!("ps-coherence-{}", std::process::id()))
+                .to_string_lossy()
+                .into_owned()
+        });
+        let mut options = NgxOptions::new();
+        options.system.file_cache_path = path;
+        let mut caches = SystemCaches::new();
+        caches.register_config(&options.system, false, false, 0);
+        let backend = caches.setup_caches(&options).unwrap().http_backend;
+        if child.is_some() {
+            backend.put("shared", b"new");
+            backend.delete("deleted");
+            return;
+        }
+        backend.put("shared", b"old");
+        backend.put("deleted", b"old");
+        assert_eq!(
+            backend.get("shared").value.as_deref(),
+            Some(b"old".as_slice())
+        );
+        assert_eq!(
+            backend.get("shared").value.as_deref(),
+            Some(b"old".as_slice())
+        );
+        assert!(backend.get("deleted").value.is_some());
+        let result = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "caches::tests::cross_worker_coherence"])
+            .env(CHILD_PATH, &options.system.file_cache_path)
+            .status()
+            .unwrap();
+        assert!(result.success());
+        assert_eq!(
+            backend.get("shared").value.as_deref(),
+            Some(b"new".as_slice())
+        );
+        assert!(backend.get("deleted").value.is_none());
+        // Cleanup must leave the shared mapping intact.
+        let path = caches
+            .path(&cache_path_key(
+                false,
+                &options.system.file_cache_path,
+                false,
+                "",
+            ))
+            .unwrap();
+        path.file_cache.clean_if_needed(i64::MAX);
+        assert!(Path::new(&options.system.file_cache_path)
+            .join(".pagespeed-lru")
+            .is_dir());
+    }
+
+    #[test]
     fn setup_assembly() {
         let mut caches = SystemCaches::new();
+        let scratch =
+            std::env::temp_dir().join(format!("ps-cache-assembly-{}", std::process::id()));
+        std::fs::create_dir_all(&scratch).unwrap();
         // Defaults enable the bounded in-memory tier (writethrough
         // LRU over file, compressed metadata).
         let mut options = NgxOptions::new();
-        options.system.file_cache_path = "/c".to_string();
+        options.system.file_cache_path = scratch.join("c").to_string_lossy().into_owned();
         caches.register_config(&options.system.clone(), false, false, 0);
         let assembled = caches.setup_caches(&options).expect("registered");
         assert!(assembled.http_cache.name().contains("WriteThrough"));
@@ -545,7 +666,7 @@ mod tests {
         assert!(caches.setup_caches(&missing).is_none());
         // Sized LRU adds writethrough layers.
         let mut lru_options = NgxOptions::new();
-        lru_options.system.file_cache_path = "/l".to_string();
+        lru_options.system.file_cache_path = scratch.join("l").to_string_lossy().into_owned();
         lru_options.system.lru_cache_kb_per_process = 1024;
         caches.register_config(&lru_options.system.clone(), false, false, 0);
         let assembled = caches.setup_caches(&lru_options).expect("registered");

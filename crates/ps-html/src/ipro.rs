@@ -1288,7 +1288,7 @@ fn add_vary_if_required(
         return;
     }
     if options.private_not_vary_for_ie()
-        && ps_http::user_agent_matcher::UserAgentMatcher::new().is_ie(&driver.user_agent())
+        && ps_http::user_agent_matcher::UserAgentMatcher::shared().is_ie(&driver.user_agent())
     {
         // IE stores Vary: Accept resources in its cache, but
         // must revalidate them every single time they're

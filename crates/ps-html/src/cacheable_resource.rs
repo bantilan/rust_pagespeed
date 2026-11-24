@@ -321,7 +321,20 @@ fn execute_fetch(plan: &FetchPlan, fetcher: &dyn AsyncFetcher) -> FetchOutcome {
         plan.http_options,
         plan.request_context.clone(),
     );
+    #[cfg(feature = "pipeline-profile")]
+    let profile_start = std::time::Instant::now();
     fetcher.fetch(&plan.fetch_url, &mut fetch);
+    #[cfg(feature = "pipeline-profile")]
+    {
+        let thread = std::thread::current();
+        let background = thread
+            .name()
+            .is_some_and(|name| name.starts_with("pagespeed-rewrite-"));
+        eprintln!(
+            "PS_RESOURCE_FETCH_NS elapsed={} background={background}",
+            profile_start.elapsed().as_nanos()
+        );
+    }
     let mut headers = fetch.response_headers;
     let mut body = fetch.body;
     let mut success = fetch.success;
@@ -1417,6 +1430,15 @@ impl<H: ResourceHooks> CacheableResourceBase<H> {
             // The pool already counted the rejection; serve
             // fallback now and retry once workers drain.
             Err(super::background::SubmitError::QueueFull) => {
+                self.last_load_pending = true;
+                self.headers.clear();
+                callback.done(false, false);
+                return;
+            }
+            Err(super::background::SubmitError::Shutdown)
+                if self.is_background_fetch && !self.driver.is_ipro_serving() =>
+            {
+                // Shutdown must not turn an HTML miss into an inline fetch.
                 self.last_load_pending = true;
                 self.headers.clear();
                 callback.done(false, false);

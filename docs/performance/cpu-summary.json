@@ -1,0 +1,21 @@
+{
+  "before": [
+    "8,060,340,621 (100.0%)  PROGRAM TOTALS",
+    "7,286,495,290 (90.40%)  ???:<ps_nginx::send::HtmlSink as ps_nginx::send::BodySink>::done [/tmp/ps-before.so]",
+    "7,202,270,066 (89.35%)  ???:<ps_html::parser::Parser>::apply_phase [/tmp/ps-before.so]",
+    "3,231,211,765 (40.09%)  ???:<ps_html::filters::js_combine::JsCombineFilter>::next_combination [/tmp/ps-before.so]",
+    "2,363,696,323 (29.33%)  ???:<ps_html::filters::css_combine::CssCombineFilter>::next_combination [/tmp/ps-before.so]",
+    "1,068,135,698 (13.25%)  ???:<ps_http::user_agent_matcher::UserAgentMatcher>::new [/tmp/ps-before.so]",
+    "221,802,836 ( 2.75%)  ???:<ps_html::filters::prioritize_lcp_images::PrioritizeLcpImagesFilter>::evidence [/tmp/ps-before.so]",
+    "111,020,923 ( 1.38%)  ???:<ps_html::device_properties::DeviceProperties>::set_user_agent [/tmp/ps-before.so]",
+    "102,154,324 ( 1.27%)  ???:<ps_nginx::send::HtmlSink as ps_nginx::send::BodySink>::write [/tmp/ps-before.so]"
+  ],
+  "final": [
+    "1,370,302,809 (100.0%)  PROGRAM TOTALS",
+    "558,230,464 (40.74%)  ???:<ps_nginx::send::HtmlSink as ps_nginx::send::BodySink>::done [/tmp/ps-final.so]",
+    "496,802,705 (36.25%)  ???:<ps_html::parser::Parser>::apply_phase [/tmp/ps-final.so]",
+    "115,913,414 ( 8.46%)  ???:<ps_nginx::send::HtmlSink as ps_nginx::send::BodySink>::write [/tmp/ps-final.so]",
+    "100,181,245 ( 7.31%)  ???:<ps_html::filters::js_combine::JsCombineFilter>::next_combination [/tmp/ps-final.so]",
+    "32,022,023 ( 2.34%)  ???:<ps_nginx::send::HtmlSink>::html_cache_lookup [/tmp/ps-final.so]"
+  ]
+}

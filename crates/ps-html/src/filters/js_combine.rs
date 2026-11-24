@@ -9,8 +9,8 @@
 //! and renders at hand-off (flush/end) instead of across threads.
 //!
 //! NOTE: CSP gating waits for the CSP subsystem. Combination
-//! metadata caching waits for the async reconstruction epic (no
-//! portable test observes it); fetches rebuild from inputs.
+//! metadata is cached by ordered candidate URLs, effective options, and
+//! charsets. Misses optimize on the bounded pool; hits never load input bytes.
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -243,6 +243,7 @@ pub struct JsCombineFilter {
     current_js_script: Option<NodeId>,
     pending: Vec<PendingScript>,
     meta_tag_charset: Vec<u8>,
+    background: Option<crate::combine_metadata::Recorder>,
 }
 
 impl JsCombineFilter {
@@ -256,7 +257,30 @@ impl JsCombineFilter {
             current_js_script: None,
             pending: Vec::new(),
             meta_tag_charset: Vec::new(),
+            background: None,
         }
+    }
+
+    pub(crate) fn background_combine(
+        driver: Rc<ResourceDriver>,
+        scripts: Vec<(String, Vec<u8>)>,
+        charset: Vec<u8>,
+    ) -> Option<crate::metadata::OutputPartitions> {
+        let mut filter = Self::new(driver);
+        filter.background = Some(Default::default());
+        filter.meta_tag_charset = charset;
+        filter.pending = scripts
+            .into_iter()
+            .enumerate()
+            .map(|(index, (url, charset))| PendingScript {
+                element: index as u32,
+                url,
+                charset,
+                relativity: UrlRelativity::AbsoluteUrl,
+            })
+            .collect();
+        filter.next_combination(&mut Dom::new());
+        filter.background.take()?.finish()
     }
 
     /// Whether a script is likely strict-mode
@@ -367,6 +391,57 @@ impl JsCombineFilter {
             self.pending.clear();
             return;
         }
+        if self.pending.len() < 2 {
+            self.pending.clear();
+            return;
+        }
+        if self.background.is_none() && self.driver.server_context().background_pool().is_some() {
+            let scripts: Vec<_> = self
+                .pending
+                .iter()
+                .map(|script| (script.url.clone(), script.charset.clone()))
+                .collect();
+            let charset = self.containing_charset();
+            let identity = format!(
+                "jc-v1:{}:{}:{charset:?}:{scripts:?}",
+                self.driver.base_url().spec(),
+                self.driver.user_agent()
+            );
+            let key = format!("{}:{}", self.driver.partition_signature_hash(), identity);
+            if let Some(tables) =
+                crate::combine_metadata::lookup(&self.driver, &key, self.pending.len())
+            {
+                for partition in tables.partition {
+                    let pieces: Vec<_> = partition
+                        .input
+                        .iter()
+                        .map(|info| &self.pending[info.index.unwrap() as usize])
+                        .collect();
+                    if pieces
+                        .iter()
+                        .all(|script| dom.is_rewritable(script.element))
+                    {
+                        Self::render_combination(&self.driver, dom, &pieces, &partition.url);
+                        self.driver
+                            .server_context()
+                            .variable(FILE_COUNT_REDUCTION)
+                            .add(pieces.len() as i64 - 1);
+                    }
+                }
+                self.pending.clear();
+            } else {
+                crate::html_async::schedule_combination(
+                    &self.driver,
+                    crate::html_async::BackgroundBehavior::CombineJs {
+                        scripts,
+                        containing_charset: charset,
+                    },
+                    &key,
+                );
+                self.pending.clear();
+            }
+            return;
+        }
         let containing = self.containing_charset();
         let pending = std::mem::take(&mut self.pending);
         let mut loaded = Vec::new();
@@ -379,6 +454,9 @@ impl JsCombineFilter {
                 InputRole::Script,
             );
             let Some(mut input) = resource else {
+                if let Some(recorder) = &self.background {
+                    recorder.missing(&script.url, self.driver.server_context().now_ms());
+                }
                 continue;
             };
             let mut ctx = self.driver.request_context().borrow().clone();
@@ -389,6 +467,11 @@ impl JsCombineFilter {
                 &mut callback,
             );
             loaded.push((script, input));
+        }
+        if let Some(recorder) = &self.background {
+            for (_, input) in &loaded {
+                recorder.dependency(input, self.driver.server_context().now_ms());
+            }
         }
         let mut partnership = UrlPartnership::new(&self.driver);
         partnership.reset(self.driver.base_url());
@@ -548,14 +631,23 @@ impl JsCombineFilter {
         partnership.reset(self.driver.base_url());
         state.reset_sizes();
         if pieces.len() <= 1
-            || !pieces
-                .iter()
-                .all(|(script, _)| dom.is_rewritable(script.element))
+            || (self.background.is_none()
+                && !pieces
+                    .iter()
+                    .all(|(script, _)| dom.is_rewritable(script.element)))
         {
             return;
         }
         if let Some(combined_url) = self.make_output(&pieces) {
-            Self::render_combination(&self.driver, dom, &pieces, &combined_url);
+            if let Some(recorder) = &self.background {
+                recorder.record(
+                    pieces.iter().map(|(script, _)| script.element),
+                    combined_url,
+                );
+                return;
+            }
+            let scripts: Vec<_> = pieces.iter().map(|(script, _)| script).collect();
+            Self::render_combination(&self.driver, dom, &scripts, &combined_url);
             self.driver
                 .server_context()
                 .variable(FILE_COUNT_REDUCTION)
@@ -651,10 +743,10 @@ impl JsCombineFilter {
     fn render_combination(
         driver: &Rc<ResourceDriver>,
         dom: &mut Dom,
-        pieces: &[(PendingScript, InputResource)],
+        pieces: &[&PendingScript],
         combined_url: &str,
     ) {
-        let first = &pieces[0].0;
+        let first = pieces[0];
         let element = dom.new_element(None, b"script");
         driver.claim_element(element);
         dom.insert_node_before_node(first.element, element);
@@ -664,7 +756,7 @@ impl JsCombineFilter {
             combined_url.to_string()
         };
         dom.add_attribute(element, b"src", rendered.as_bytes());
-        for (script, _) in pieces {
+        for script in pieces {
             let var = var_name(driver, &script.url);
             let stub = dom.new_element(None, b"script");
             dom.insert_node_before_node(script.element, stub);
@@ -822,6 +914,7 @@ fn fetch_combined(
         let Some(mut input) = resource else {
             return fail(fetch);
         };
+        input.set_is_background_fetch(false);
         let mut ctx = driver.request_context().borrow().clone();
         let mut callback = MockLoadCallback::new();
         input.load(

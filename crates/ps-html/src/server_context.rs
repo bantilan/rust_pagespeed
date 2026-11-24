@@ -219,6 +219,14 @@ pub struct ServerContext {
         RefCell<Option<Rc<dyn super::critical_selector_finder::CriticalSelectorFinder>>>,
     background_pool: std::sync::OnceLock<Arc<super::background::BackgroundPool>>,
     message_sink: std::sync::OnceLock<Arc<dyn MessageSink>>,
+    chain_plans: RefCell<
+        std::collections::VecDeque<(
+            Arc<str>,
+            bool,
+            super::chain::ChainContext,
+            Rc<super::chain::ChainPlan>,
+        )>,
+    >,
 }
 
 impl ServerContext {
@@ -270,6 +278,7 @@ impl ServerContext {
             critical_selector_finder: RefCell::new(None),
             background_pool: std::sync::OnceLock::new(),
             message_sink: std::sync::OnceLock::new(),
+            chain_plans: RefCell::new(std::collections::VecDeque::new()),
         }
     }
 
@@ -308,7 +317,35 @@ impl ServerContext {
             critical_selector_finder: RefCell::new(None),
             background_pool: std::sync::OnceLock::new(),
             message_sink: std::sync::OnceLock::new(),
+            chain_plans: RefCell::new(std::collections::VecDeque::new()),
         }
+    }
+
+    /// Reuses immutable chain plans across effective option generations. The
+    /// small LRU bound prevents request option overrides growing worker memory.
+    /// Mutable filter and parser state is always constructed per document.
+    pub fn chain_plan(
+        &self,
+        options: &RewriteOptions,
+        context: &super::chain::ChainContext,
+    ) -> Rc<super::chain::ChainPlan> {
+        let signature = options.signature_shared();
+        // Debug intentionally does not version resource cache keys, but it
+        // changes the HTML chain and must participate in the plan identity.
+        let debug = options.enabled(ps_config::filter::Filter::Debug);
+        let mut plans = self.chain_plans.borrow_mut();
+        if let Some(index) = plans.iter().position(|(key, is_debug, ctx, _)| {
+            key == &signature && *is_debug == debug && ctx == context
+        }) {
+            let entry = plans.remove(index).expect("position exists");
+            let plan = entry.3.clone();
+            plans.push_front(entry);
+            return plan;
+        }
+        let plan = Rc::new(super::chain::build_chain(options, context));
+        plans.push_front((signature, debug, *context, plan.clone()));
+        plans.truncate(16);
+        plan
     }
 
     /// Draws from the shared generator (`simple_random()->Next()`).
@@ -702,6 +739,7 @@ pub struct ResourceDriver {
     base_url: GoogleUrl,
     cache_fragment: String,
     is_bot: bool,
+    cached_request_properties: RefCell<Option<super::request_properties::RequestProperties>>,
     request_context: RefCell<RequestContext>,
     lawyer: DomainLawyer,
     claimants: RefCell<Vec<Rc<dyn Fn(&GoogleUrl) -> bool>>>,
@@ -720,6 +758,8 @@ pub struct ResourceDriver {
     image_records: RefCell<Vec<ImageRewriteRecord>>,
     beacon_evidence_identity: RefCell<Option<Vec<u8>>>,
     fetch_budget_ms: RefCell<Option<i64>>,
+    fetch_window_started: Cell<Option<std::time::Instant>>,
+    partition_hash: RefCell<Option<(Arc<str>, String)>>,
     ipro_serving: Cell<bool>,
     detached_rewrites: Cell<u64>,
 }
@@ -810,6 +850,7 @@ impl ResourceDriver {
             base_url: GoogleUrl::new(base_url),
             cache_fragment: String::new(),
             is_bot: false,
+            cached_request_properties: RefCell::new(None),
             request_context: RefCell::new(RequestContext::new(
                 ps_http::response::HttpOptions::default_for_tests(),
             )),
@@ -830,6 +871,8 @@ impl ResourceDriver {
             image_records: RefCell::new(Vec::new()),
             beacon_evidence_identity: RefCell::new(None),
             fetch_budget_ms: RefCell::new(None),
+            fetch_window_started: Cell::new(None),
+            partition_hash: RefCell::new(None),
             ipro_serving: Cell::new(false),
             detached_rewrites: Cell::new(0),
         };
@@ -854,7 +897,17 @@ impl ResourceDriver {
             return None;
         }
         let mut budget = self.fetch_budget_ms.borrow_mut();
-        Some((*budget.get_or_insert(configured)).max(0))
+        let started = self.fetch_window_started.get().unwrap_or_else(|| {
+            let now = std::time::Instant::now();
+            self.fetch_window_started.set(Some(now));
+            now
+        });
+        let elapsed = started.elapsed().as_millis().min(i64::MAX as u128) as i64;
+        Some(
+            (*budget.get_or_insert(configured))
+                .min(configured.saturating_sub(elapsed))
+                .max(0),
+        )
     }
 
     /// Marks IPRO serving for this driver until the guard drops
@@ -901,6 +954,7 @@ impl ResourceDriver {
     /// Restores the full flush-window budget (C++ rearms per window).
     pub fn reset_fetch_budget(&self) {
         *self.fetch_budget_ms.borrow_mut() = None;
+        self.fetch_window_started.set(None);
     }
 
     /// Records a successful image rewrite for the admin images page
@@ -953,11 +1007,13 @@ impl ResourceDriver {
     /// resources call this instead of `SetCurrentUserAgent`).
     pub fn set_user_agent(&self, user_agent: &str) {
         *self.user_agent.borrow_mut() = user_agent.to_string();
+        self.cached_request_properties.borrow_mut().take();
     }
 
     /// Installs the request headers (`SetRequestHeaders`).
     pub fn set_request_headers(&self, headers: RequestHeaders) {
         *self.request_headers.borrow_mut() = headers;
+        self.cached_request_properties.borrow_mut().take();
     }
 
     /// Borrows the request headers.
@@ -966,13 +1022,17 @@ impl ResourceDriver {
         self.request_headers.borrow()
     }
 
-    /// Computes request capabilities (`request_properties`, rebuilt
-    /// per call; C++ caches on the driver).
+    /// Returns request capabilities cached until UA or headers change.
+    /// Callers own a cheap copy of the mutable downstream capability gates.
     #[must_use]
     pub fn request_properties(&self) -> super::request_properties::RequestProperties {
+        if let Some(cached) = self.cached_request_properties.borrow().as_ref() {
+            return cached.clone();
+        }
         let mut properties = super::request_properties::RequestProperties::new();
         properties.set_user_agent(&self.user_agent.borrow());
         properties.parse_request_headers(&self.request_headers.borrow());
+        *self.cached_request_properties.borrow_mut() = Some(properties.clone());
         properties
     }
 
@@ -1080,7 +1140,7 @@ impl ResourceDriver {
     /// Whether the request is a bot (`request_properties()->IsBot()`).
     #[must_use]
     pub fn is_bot(&self) -> bool {
-        self.is_bot
+        self.is_bot || self.request_properties().is_bot()
     }
 
     /// Borrows the shared request context.
@@ -1475,9 +1535,16 @@ impl ResourceDriver {
     /// test naming hashers cannot flatten it).
     #[must_use]
     pub fn partition_signature_hash(&self) -> String {
-        self.server
-            .lock_hasher()
-            .hash(self.options_signature().as_bytes())
+        let signature = self.options().signature_shared();
+        let mut cached = self.partition_hash.borrow_mut();
+        if let Some((generation, hash)) = &*cached {
+            if Arc::ptr_eq(generation, &signature) {
+                return hash.clone();
+            }
+        }
+        let hash = self.server.lock_hasher().hash(signature.as_bytes());
+        *cached = Some((signature, hash.clone()));
+        hash
     }
 
     /// Writes rewritten bytes to an output (`Write`), caching the
@@ -2100,6 +2167,66 @@ mod tests {
     }
 
     #[test]
+    fn chain_plan_reuses_config_but_separates_debug_and_context() {
+        let driver = driver_with(RewriteOptions::new());
+        let server = driver.server_context();
+        let context = super::super::chain::ChainContext::new(true, true);
+        let plain = server.chain_plan(&driver.options(), &context);
+        let again = server.chain_plan(&driver.options(), &context);
+        assert!(Rc::ptr_eq(&plain, &again));
+        let mut debug = driver.options().clone();
+        debug.enable_filter(ps_config::filter::Filter::Debug);
+        assert_eq!(debug.signature(), driver.options_signature());
+        let debug_plan = server.chain_plan(&debug, &context);
+        assert!(!Rc::ptr_eq(&plain, &debug_plan));
+        assert!(debug_plan
+            .post
+            .contains(&super::super::chain::ChainFilter::Debug));
+        assert!(!Rc::ptr_eq(
+            &plain,
+            &server.chain_plan(
+                &driver.options(),
+                &super::super::chain::ChainContext::new(false, true)
+            )
+        ));
+    }
+
+    #[test]
+    fn capabilities_refresh_after_request_changes() {
+        let driver = driver_with(RewriteOptions::new());
+        driver.set_user_agent("Googlebot/2.1");
+        assert!(driver.request_properties().is_bot());
+        driver.set_user_agent("Mozilla/5.0 Chrome/120.0.0.0 Safari/537.36");
+        assert!(!driver.request_properties().is_bot());
+        let mut request = RequestHeaders::new();
+        request.headers_mut().add("Accept", "image/avif");
+        driver.set_request_headers(request);
+        assert!(driver.request_properties().supports_avif_rewritten_urls());
+        let mut rejected = RequestHeaders::new();
+        rejected.headers_mut().add("Accept", "image/avif;q=0");
+        driver.set_request_headers(rejected);
+        assert!(!driver.request_properties().supports_avif_rewritten_urls());
+    }
+
+    #[test]
+    fn deadline_counts_elapsed_work_and_rearms_on_flush() {
+        let mut options = RewriteOptions::new();
+        options
+            .set_option(
+                "RewriteDeadlinePerFlushMs",
+                "1",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        let driver = driver_with(options);
+        assert_eq!(driver.html_wait_budget_ms(), 1);
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        assert_eq!(driver.html_wait_budget_ms(), 0);
+        driver.reset_fetch_budget();
+        assert_eq!(driver.html_wait_budget_ms(), 1);
+    }
+
+    #[test]
     fn options_signature_memo_matches_direct() {
         let driver = driver_with(RewriteOptions::new());
         let direct = driver.options().signature();
@@ -2110,6 +2237,17 @@ mod tests {
             driver.partition_signature_hash(),
             driver.partition_signature_hash()
         );
+    }
+
+    #[test]
+    fn partition_hash_refreshes_with_live_options() {
+        let driver = driver_with(RewriteOptions::new());
+        let before = driver.partition_signature_hash();
+        driver
+            .options
+            .borrow_mut()
+            .enable_filter(ps_config::filter::Filter::InlineCss);
+        assert_ne!(before, driver.partition_signature_hash());
     }
 
     #[test]

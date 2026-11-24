@@ -1,0 +1,238 @@
+{
+  "epoll_wait": {
+    "calls": 223,
+    "seconds": 0.06158400000000027
+  },
+  "write": {
+    "calls": 930,
+    "seconds": 0.01126800000000002
+  },
+  "openat": {
+    "calls": 385,
+    "seconds": 0.006594999999999977
+  },
+  "readlink": {
+    "calls": 602,
+    "seconds": 0.006295000000000026
+  },
+  "close": {
+    "calls": 383,
+    "seconds": 0.005247
+  },
+  "statx": {
+    "calls": 417,
+    "seconds": 0.004411999999999992
+  },
+  "rename": {
+    "calls": 73,
+    "seconds": 0.004029999999999998
+  },
+  "read": {
+    "calls": 343,
+    "seconds": 0.003593000000000005
+  },
+  "writev": {
+    "calls": 73,
+    "seconds": 0.001981
+  },
+  "recvfrom": {
+    "calls": 146,
+    "seconds": 0.0014919999999999977
+  },
+  "accept4": {
+    "calls": 73,
+    "seconds": 0.0011369999999999998
+  },
+  "futex": {
+    "calls": 90,
+    "seconds": 0.0010590000000000005
+  },
+  "mkdir": {
+    "calls": 79,
+    "seconds": 0.0009710000000000008
+  },
+  "epoll_ctl": {
+    "calls": 79,
+    "seconds": 0.0008850000000000004
+  },
+  "fstat": {
+    "calls": 91,
+    "seconds": 0.0008339999999999991
+  },
+  "setsockopt": {
+    "calls": 74,
+    "seconds": 0.0007480000000000003
+  },
+  "mmap": {
+    "calls": 50,
+    "seconds": 0.0006920000000000001
+  },
+  "pread64": {
+    "calls": 51,
+    "seconds": 0.0005520000000000004
+  },
+  "execve": {
+    "calls": 1,
+    "seconds": 0.000281
+  },
+  "brk": {
+    "calls": 20,
+    "seconds": 0.00023600000000000002
+  },
+  "getdents64": {
+    "calls": 4,
+    "seconds": 0.000229
+  },
+  "mprotect": {
+    "calls": 13,
+    "seconds": 0.00019100000000000003
+  },
+  "munmap": {
+    "calls": 5,
+    "seconds": 0.00011899999999999999
+  },
+  "rt_sigaction": {
+    "calls": 14,
+    "seconds": 0.00010299999999999998
+  },
+  "gettid": {
+    "calls": 8,
+    "seconds": 7.1e-05
+  },
+  "fcntl": {
+    "calls": 6,
+    "seconds": 5.2000000000000004e-05
+  },
+  "lseek": {
+    "calls": 6,
+    "seconds": 5.099999999999999e-05
+  },
+  "clone3": {
+    "calls": 1,
+    "seconds": 4.9e-05
+  },
+  "unlink": {
+    "calls": 1,
+    "seconds": 4.5e-05
+  },
+  "ftruncate": {
+    "calls": 2,
+    "seconds": 4.4e-05
+  },
+  "rt_sigprocmask": {
+    "calls": 4,
+    "seconds": 3.9999999999999996e-05
+  },
+  "madvise": {
+    "calls": 2,
+    "seconds": 2.9e-05
+  },
+  "prlimit64": {
+    "calls": 3,
+    "seconds": 2.4e-05
+  },
+  "io_setup": {
+    "calls": 1,
+    "seconds": 2.2e-05
+  },
+  "epoll_create": {
+    "calls": 2,
+    "seconds": 2.1000000000000002e-05
+  },
+  "flock": {
+    "calls": 2,
+    "seconds": 1.8e-05
+  },
+  "pwrite64": {
+    "calls": 1,
+    "seconds": 1.8e-05
+  },
+  "eventfd2": {
+    "calls": 2,
+    "seconds": 1.8e-05
+  },
+  "socketpair": {
+    "calls": 1,
+    "seconds": 1.8e-05
+  },
+  "getrandom": {
+    "calls": 2,
+    "seconds": 1.7e-05
+  },
+  "uname": {
+    "calls": 2,
+    "seconds": 1.7e-05
+  },
+  "socket": {
+    "calls": 1,
+    "seconds": 1.7e-05
+  },
+  "listen": {
+    "calls": 2,
+    "seconds": 1.7e-05
+  },
+  "geteuid": {
+    "calls": 2,
+    "seconds": 1.6e-05
+  },
+  "ioctl": {
+    "calls": 2,
+    "seconds": 1.6e-05
+  },
+  "arch_prctl": {
+    "calls": 1,
+    "seconds": 1.5e-05
+  },
+  "bind": {
+    "calls": 1,
+    "seconds": 1.2e-05
+  },
+  "pipe2": {
+    "calls": 1,
+    "seconds": 1.2e-05
+  },
+  "access": {
+    "calls": 1,
+    "seconds": 1e-05
+  },
+  "newfstatat": {
+    "calls": 1,
+    "seconds": 1e-05
+  },
+  "prctl": {
+    "calls": 1,
+    "seconds": 1e-05
+  },
+  "rt_sigreturn": {
+    "calls": 1,
+    "seconds": 1e-05
+  },
+  "set_tid_address": {
+    "calls": 1,
+    "seconds": 9e-06
+  },
+  "set_robust_list": {
+    "calls": 1,
+    "seconds": 9e-06
+  },
+  "sched_getaffinity": {
+    "calls": 1,
+    "seconds": 9e-06
+  },
+  "getpid": {
+    "calls": 1,
+    "seconds": 8e-06
+  },
+  "getppid": {
+    "calls": 1,
+    "seconds": 8e-06
+  },
+  "dup2": {
+    "calls": 1,
+    "seconds": 8e-06
+  },
+  "rseq": {
+    "calls": 1,
+    "seconds": 7e-06
+  }
+}

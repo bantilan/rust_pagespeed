@@ -137,9 +137,8 @@ impl HtmlCacheSession {
     pub fn new(driver: Rc<super::server_context::ResourceDriver>, url: &str) -> Self {
         let mut properties = driver.request_properties();
         let device_type = properties.device_type();
-        let device =
-            ps_http::user_agent_matcher::UserAgentMatcher::device_type_string(device_type)
-                .to_string();
+        let device = ps_http::user_agent_matcher::UserAgentMatcher::device_type_string(device_type)
+            .to_string();
         let device_suffix =
             ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(device_type)
                 .to_string();
@@ -301,11 +300,12 @@ impl HtmlCacheSession {
                 // Skip rewrites whose beacon evidence changed while
                 // filters ran (the beacon filter snapshots the
                 // post-render identity at end of document).
-                let evidence_settled = match (&beacon_identity, self.driver.beacon_evidence_identity()) {
-                    (Some(then), Some(now)) => then == &now,
-                    (Some(_), None) => false,
-                    (None, _) => true,
-                };
+                let evidence_settled =
+                    match (&beacon_identity, self.driver.beacon_evidence_identity()) {
+                        (Some(then), Some(now)) => then == &now,
+                        (Some(_), None) => false,
+                        (None, _) => true,
+                    };
                 // Detached rewrites (deadline-pending inputs serving
                 // fallback content) never publish: the background
                 // completion warms the caches for a complete later
@@ -460,7 +460,11 @@ impl HtmlCacheSession {
             self.driver.options_signature(),
             request.to_http_string_without_cookies(),
         );
-        identity.push_str(&format!("origin-ttl:{}\n", policy.cache_ttl_ms()));
+        identity.push_str(&format!(
+            "debug:{}\norigin-ttl:{}\n",
+            options.enabled(Filter::Debug),
+            policy.cache_ttl_ms()
+        ));
         if let Some((secs, nanos)) = file_mtime {
             identity.push_str(&format!("file-mtime:{secs}.{nanos:09}\n"));
         }
@@ -491,9 +495,10 @@ impl HtmlCacheSession {
         let mut beacon_identity = None;
         if super::beacon_finder::beaconing_active(options) {
             let server = self.driver.server_context();
-            let oh = server.hasher().hash(self.driver.options_signature().as_bytes());
-            let finder =
-                super::beacon_finder::BeaconFinder::new(server.metadata_cache());
+            let oh = server
+                .hasher()
+                .hash(self.driver.options_signature().as_bytes());
+            let finder = super::beacon_finder::BeaconFinder::new(server.metadata_cache());
             let lookup = finder.load(&self.url, &oh, &self.device_suffix);
             match &lookup {
                 super::beacon_finder::EvidenceLookup::Found(_) => {
@@ -508,10 +513,8 @@ impl HtmlCacheSession {
             }
             let record = lookup.record();
             let header = request.headers().lookup1("PS-ShouldBeacon");
-            let downstream = super::beacon_finder::downstream_beacon_gate(
-                options,
-                header.as_deref(),
-            );
+            let downstream =
+                super::beacon_finder::downstream_beacon_gate(options, header.as_deref());
             // Sampling cadence applies to recorded evidence, and only
             // when this request could actually contribute one: clients
             // that cannot beacon (curl, bots, latency probes) would
@@ -549,9 +552,8 @@ impl HtmlCacheSession {
             };
             let encoded = super::beacon_finder::encode_evidence(effective);
             identity.push_str("\nbeacon:");
-            identity.push_str(
-                &String::from_utf8(encoded.clone()).expect("evidence codec emits UTF-8"),
-            );
+            identity
+                .push_str(&String::from_utf8(encoded.clone()).expect("evidence codec emits UTF-8"));
             beacon_identity = Some(encoded);
         }
         Ok(Eligibility {
@@ -633,11 +635,7 @@ fn request_eligible(
 /// History line for cookie-attributed bypasses (`PS_HTML_BYPASS`,
 /// cookie names only, values never): `None` for non-cookie reasons
 /// (no new noise) and overlong URLs.
-fn bypass_history_line(
-    reason: &HtmlCacheBypassReason,
-    url: &str,
-    now_ms: i64,
-) -> Option<String> {
+fn bypass_history_line(reason: &HtmlCacheBypassReason, url: &str, now_ms: i64) -> Option<String> {
     let token = match reason {
         HtmlCacheBypassReason::Cookie(name) => format!("cookie:{}", sanitize_reason_name(name)),
         HtmlCacheBypassReason::MalformedCookie => "malformed-cookie".to_string(),
@@ -696,17 +694,13 @@ fn has_cache_prohibition(origin: &ResponseHeaders) -> bool {
 /// Sampled beacon initialization markers (never freeze these
 /// into a cached document, including the boundary case where
 /// sampling becomes due during the rewrite).
-const SAMPLED_BEACON_MARKERS: &[&[u8]] = &[
-    b"pagespeed.CriticalImages.Run(",
-    b"CriticalCssBeacon",
-];
+const SAMPLED_BEACON_MARKERS: &[&[u8]] = &[b"pagespeed.CriticalImages.Run(", b"CriticalCssBeacon"];
 
 /// Whether a body carries sampled beacon initialization.
 fn contains_sampled_beacon_init(body: &[u8]) -> bool {
-    SAMPLED_BEACON_MARKERS.iter().any(|marker| {
-        body.windows(marker.len())
-            .any(|window| window == *marker)
-    })
+    SAMPLED_BEACON_MARKERS
+        .iter()
+        .any(|marker| body.windows(marker.len()).any(|window| window == *marker))
 }
 
 /// Formats the served-timestamp comment (`show_cache_timestamp`):
@@ -1019,10 +1013,7 @@ mod tests {
         assert!(finish.detail_line.is_none());
         assert_eq!(0, harness.counter("html_cache_inserts"));
         // Sampled beacon initializations never freeze.
-        for marker in [
-            "pagespeed.CriticalImages.Run('",
-            "CriticalCssBeacon",
-        ] {
+        for marker in ["pagespeed.CriticalImages.Run('", "CriticalCssBeacon"] {
             let mut sampled = harness.session();
             assert!(sampled
                 .lookup(&origin, &request, &harness.purge, None, START_MS)
@@ -1126,11 +1117,7 @@ mod tests {
         evidence.next_beacon_ms = 0;
         let nonce = finder::prepare_beacon(&mut evidence, START_MS, 5, 77).expect("due");
         let hash = finder::url_hash("http://cache.test/hero.png");
-        finder::update_candidates(
-            &mut evidence,
-            &[hash.clone()].into_iter().collect(),
-            false,
-        );
+        finder::update_candidates(&mut evidence, &[hash.clone()].into_iter().collect(), false);
         let report = finder::BeaconReport {
             html_hashes: Some([hash].into_iter().collect()),
             lcp_kind: finder::LCP_KIND_IMG.to_string(),
@@ -1166,9 +1153,7 @@ mod tests {
     fn beacon_learning_gates_lookup_store_and_identity() {
         use crate::beacon_finder as finder;
         // Default options drive no beacon learning.
-        assert!(!finder::beaconing_active(
-            &Harness::new().driver.options()
-        ));
+        assert!(!finder::beaconing_active(&Harness::new().driver.options()));
         let harness = Harness::new();
         harness
             .options
@@ -1240,12 +1225,8 @@ mod tests {
         let oh = server
             .hasher()
             .hash(harness.driver.options().signature().as_bytes());
-        crate::beacon_finder::BeaconFinder::new(server.metadata_cache()).store(
-            PAGE_URL,
-            &oh,
-            "@Desktop",
-            &evidence,
-        );
+        crate::beacon_finder::BeaconFinder::new(server.metadata_cache())
+            .store(PAGE_URL, &oh, "@Desktop", &evidence);
         let mut due = harness.session();
         assert!(due
             .lookup(
@@ -1267,7 +1248,13 @@ mod tests {
         let request = settled.get_request();
         let mut render = settled.session();
         assert!(render
-            .lookup(&settled.ok_origin(), &request, &settled.purge, None, START_MS)
+            .lookup(
+                &settled.ok_origin(),
+                &request,
+                &settled.purge,
+                None,
+                START_MS
+            )
             .is_none());
         render.write(b"<html/>");
         // No driver snapshot (or a divergent one): skip the store.
@@ -1443,10 +1430,7 @@ mod tests {
                 START_MS
             )
             .is_none());
-        assert_eq!(
-            second.bypass_reason(),
-            Some(&HtmlCacheBypassReason::Other)
-        );
+        assert_eq!(second.bypass_reason(), Some(&HtmlCacheBypassReason::Other));
         let finish = second.finish(&harness.get_request(), START_MS + 1000);
         assert!(finish.bypass_line.is_none());
     }
@@ -1478,7 +1462,11 @@ mod tests {
         custom
             .options
             .borrow_mut()
-            .parse_and_set_1("HtmlCacheIgnoreCookie", "tracker", ps_config::scope::Scope::Server)
+            .parse_and_set_1(
+                "HtmlCacheIgnoreCookie",
+                "tracker",
+                ps_config::scope::Scope::Server,
+            )
             .unwrap();
         let request = cookie_request(&custom, "_ga=1; tracker=2");
         let mut session = custom.session();
@@ -1515,7 +1503,11 @@ mod tests {
         custom
             .options
             .borrow_mut()
-            .parse_and_set_1("HtmlCacheBypassCookie", "_ga", ps_config::scope::Scope::Server)
+            .parse_and_set_1(
+                "HtmlCacheBypassCookie",
+                "_ga",
+                ps_config::scope::Scope::Server,
+            )
             .unwrap();
         let request = cookie_request(&custom, "_ga=1");
         let mut session = custom.session();

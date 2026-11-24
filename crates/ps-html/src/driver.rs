@@ -21,7 +21,7 @@ use crate::writer::{ByteSink, WriterFilter};
 /// Plan-built streaming rewriter over one parser instance.
 pub struct Driver {
     parser: Parser,
-    plan: ChainPlan,
+    plan: Rc<ChainPlan>,
     skipped: Vec<(Phase, ChainFilter)>,
     amp_verdict: Rc<RefCell<Option<bool>>>,
     flush_early_info: Rc<RefCell<crate::flush_early::FlushEarlyInfo>>,
@@ -50,15 +50,16 @@ impl Driver {
         sink: impl ByteSink + 'static,
         resource_driver: Option<Rc<ResourceDriver>>,
     ) -> Self {
-        let plan = build_chain(options, ctx);
+        let plan = resource_driver.as_ref().map_or_else(
+            || Rc::new(build_chain(options, ctx)),
+            |driver| driver.server_context().chain_plan(options, ctx),
+        );
         let mut parser = Parser::new();
         let mut skipped = Vec::new();
         let amp_verdict = Rc::new(RefCell::new(None));
         // One flush-early page state shared by its filters, like C++
         // `driver()->flush_early_info()`.
-        let flush_early_info = Rc::new(RefCell::new(
-            crate::flush_early::FlushEarlyInfo::default(),
-        ));
+        let flush_early_info = Rc::new(RefCell::new(crate::flush_early::FlushEarlyInfo::default()));
         // Cross-request persistence, like C++ `write_property_cache_dom_cohort`
         // (set by the DNS filter): without the slot or a driver there
         // is nothing to persist.
@@ -120,6 +121,10 @@ impl Driver {
                         Box::new(filters::css_combine::CssCombineFilter::new(driver))
                             as Box<dyn crate::filter::HtmlFilter>
                     }),
+                    ChainFilter::GoogleFontCssInline => resource_driver.clone().map(|driver| {
+                        Box::new(filters::GoogleFontCssInlineFilter::new(driver))
+                            as Box<dyn crate::filter::HtmlFilter>
+                    }),
                     ChainFilter::CssInline => resource_driver.clone().map(|driver| {
                         Box::new(filters::CssInlineFilter::new(driver))
                             as Box<dyn crate::filter::HtmlFilter>
@@ -141,15 +146,48 @@ impl Driver {
                             as Box<dyn crate::filter::HtmlFilter>
                     }),
                     ChainFilter::CriticalImagesBeacon => resource_driver.clone().map(|driver| {
-                        Box::new(filters::critical_images_beacon::CriticalImagesBeaconFilter::new(
-                            driver,
-                        )) as Box<dyn crate::filter::HtmlFilter>
+                        Box::new(
+                            filters::critical_images_beacon::CriticalImagesBeaconFilter::new(
+                                driver,
+                            ),
+                        ) as Box<dyn crate::filter::HtmlFilter>
                     }),
                     ChainFilter::PrioritizeLcpImages => resource_driver.clone().map(|driver| {
-                        Box::new(filters::prioritize_lcp_images::PrioritizeLcpImagesFilter::new(
-                            driver,
-                        )) as Box<dyn crate::filter::HtmlFilter>
+                        Box::new(
+                            filters::prioritize_lcp_images::PrioritizeLcpImagesFilter::new(driver),
+                        ) as Box<dyn crate::filter::HtmlFilter>
                     }),
+                    ChainFilter::AddInstrumentation => {
+                        let beacon = options.beacon_url().unwrap_or_else(|| {
+                            ps_config::options::BeaconUrl::parse("/ngx_pagespeed_beacon")
+                                .expect("default beacon")
+                        });
+                        let enabled = |name| {
+                            matches!(
+                                options.get_by_name(name),
+                                Some(ps_config::options::Value::Bool(true))
+                            )
+                        };
+                        let config = filters::AddInstrumentationConfig {
+                            is_bot: resource_driver
+                                .as_ref()
+                                .is_some_and(|driver| driver.is_bot()),
+                            pedantic: options.enabled(ps_config::filter::Filter::Pedantic),
+                            debug: options.enabled(ps_config::filter::Filter::Debug),
+                            report_unload_time: enabled("ReportUnloadTime"),
+                            enable_extended_instrumentation: enabled(
+                                "EnableExtendedInstrumentation",
+                            ),
+                            beacon_http: beacon.http.into_bytes(),
+                            beacon_https: beacon.https.into_bytes(),
+                            is_https: resource_driver
+                                .as_ref()
+                                .is_some_and(|driver| driver.base_url().scheme() == "https"),
+                            ..Default::default()
+                        };
+                        Some(Box::new(filters::AddInstrumentationFilter::new(config))
+                            as Box<dyn crate::filter::HtmlFilter>)
+                    }
                     ChainFilter::AddHead => Some(Box::new(filters::AddHeadFilter::new(
                         options
                             .filters()
@@ -282,22 +320,15 @@ impl Driver {
                             filters::LazyloadImagesConfig {
                                 options: options.clone(),
                                 supports_lazyload_images: properties.supports_lazyload_images(),
-                                is_xml_http_request: driver
-                                    .request_headers()
-                                    .is_xml_http_request(),
+                                is_xml_http_request: driver.request_headers().is_xml_http_request(),
                                 finder_availability,
                                 critical_images,
                                 blank_image_url: filters::lazyload_images::BLANK_IMAGE_DATA_URL
                                     .to_string(),
                                 lazyload_script_flushed: false,
-                                hash_length: driver
-                                    .server_context()
-                                    .hasher()
-                                    .hash_size_in_chars(),
+                                hash_length: driver.server_context().hasher().hash_size_in_chars(),
                                 signature_length: driver.signature_length(),
-                                debug: options
-                                    .filters()
-                                    .enabled(ps_config::filter::Filter::Debug),
+                                debug: options.filters().enabled(ps_config::filter::Filter::Debug),
                                 pedantic: options
                                     .filters()
                                     .enabled(ps_config::filter::Filter::Pedantic),
@@ -323,25 +354,20 @@ impl Driver {
                         // requires ClientDomainRewrite plus rewritten-to
                         // domains, so non-AMP documents behave exactly
                         // like C++.
-                        let lawyer = std::rc::Rc::new(
-                            crate::domain_lawyer::DomainLawyer::clone(driver.lawyer()),
-                        );
+                        let lawyer = std::rc::Rc::new(crate::domain_lawyer::DomainLawyer::clone(
+                            driver.lawyer(),
+                        ));
                         let mut filter = filters::DomainRewriteFilter::new(
                             filters::DomainRewriteConfig {
                                 options: options.clone(),
                                 disable_domain_rewrite: false,
                                 is_amp_document: false,
-                                debug: options
-                                    .filters()
-                                    .enabled(ps_config::filter::Filter::Debug),
+                                debug: options.filters().enabled(ps_config::filter::Filter::Debug),
                                 pedantic: options
                                     .filters()
                                     .enabled(ps_config::filter::Filter::Pedantic),
                                 xhtml,
-                                hash_length: driver
-                                    .server_context()
-                                    .hasher()
-                                    .hash_size_in_chars(),
+                                hash_length: driver.server_context().hasher().hash_size_in_chars(),
                                 signature_length: driver.signature_length(),
                                 url_valued: options.url_valued_attributes().to_vec(),
                                 response_headers: Some(driver.response_headers_shared()),
@@ -395,27 +421,28 @@ impl Driver {
     ) {
         use filters::lazyload_images::FinderAvailability;
         if !crate::beacon_finder::beaconing_active(options) {
-            return (FinderAvailability::Disabled, std::collections::HashSet::new());
+            return (
+                FinderAvailability::Disabled,
+                std::collections::HashSet::new(),
+            );
         }
         let server = driver.server_context();
         let options_hash = server.hasher().hash(driver.options_signature().as_bytes());
         let properties = driver.request_properties();
-        let device_suffix =
-            ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
-                properties.device_type(),
-            );
-        let finder = crate::beacon_finder::BeaconFinder::new(server.metadata_cache());
-        let lookup = finder.load(
-            driver.base_url().spec(),
-            &options_hash,
-            device_suffix,
+        let device_suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
+            properties.device_type(),
         );
+        let finder = crate::beacon_finder::BeaconFinder::new(server.metadata_cache());
+        let lookup = finder.load(driver.base_url().spec(), &options_hash, device_suffix);
         match lookup.record() {
             Some(record) if record.valid_beacons >= 1 => (
                 FinderAvailability::Available,
                 crate::beacon_finder::html_critical_images(record),
             ),
-            _ => (FinderAvailability::NoDataYet, std::collections::HashSet::new()),
+            _ => (
+                FinderAvailability::NoDataYet,
+                std::collections::HashSet::new(),
+            ),
         }
     }
 

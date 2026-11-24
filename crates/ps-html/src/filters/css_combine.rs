@@ -10,7 +10,7 @@
 //! threads.
 //!
 //! NOTE: CSP gating waits for the CSP subsystem. Combination
-//! metadata caching waits for the async reconstruction epic (fetch
+//! metadata is validated before rendering when a worker pool is installed (fetch
 //! tests rebuild from inputs).
 
 use std::rc::Rc;
@@ -95,6 +95,7 @@ pub struct CssCombineFilter {
     current_base: GoogleUrl,
     /// Whether a `<base>` tag already rebased (`SetBaseUrlIfUnset`).
     base_from_tag: bool,
+    background: Option<crate::combine_metadata::Recorder>,
 }
 
 impl CssCombineFilter {
@@ -112,7 +113,31 @@ impl CssCombineFilter {
             noscript_depth: 0,
             current_base,
             base_from_tag: false,
+            background: None,
         }
+    }
+
+    pub(crate) fn background_combine(
+        driver: Rc<ResourceDriver>,
+        inputs: Vec<(String, bool)>,
+        base: &str,
+    ) -> Option<crate::metadata::OutputPartitions> {
+        let mut filter = Self::new(driver.clone());
+        filter.current_base = GoogleUrl::new(base);
+        filter.background = Some(Default::default());
+        for (index, (url, authorized)) in inputs.into_iter().enumerate() {
+            let input =
+                driver.create_input_resource_unchecked(&GoogleUrl::new(&url), authorized)?;
+            filter.pending.push(PendingLink {
+                element: index as u32,
+                href_attr: 0,
+                url,
+                relativity: UrlRelativity::AbsoluteUrl,
+                input,
+            });
+        }
+        filter.initiate_combination(&mut Dom::new());
+        filter.background.take()?.finish()
     }
 
     /// Hands the pending combination off (`NextCombination`).
@@ -285,6 +310,52 @@ impl CssCombineFilter {
             self.pending.clear();
             return;
         }
+        if self.pending.len() < 2 {
+            self.pending.clear();
+            return;
+        }
+        if self.background.is_none() && self.driver.server_context().background_pool().is_some() {
+            let inputs: Vec<_> = self
+                .pending
+                .iter()
+                .map(|link| (link.url.clone(), link.input.is_authorized_domain()))
+                .collect();
+            let identity = format!(
+                "cc-v1:{}:{}:{inputs:?}",
+                self.current_base.spec(),
+                self.driver.user_agent()
+            );
+            let key = format!("{}:{}", self.driver.partition_signature_hash(), identity);
+            if let Some(tables) =
+                crate::combine_metadata::lookup(&self.driver, &key, self.pending.len())
+            {
+                let mut pending: Vec<_> = std::mem::take(&mut self.pending)
+                    .into_iter()
+                    .map(Some)
+                    .collect();
+                for partition in tables.partition {
+                    let pieces: Vec<_> = partition
+                        .input
+                        .iter()
+                        .map(|info| pending[info.index.unwrap() as usize].take().unwrap())
+                        .collect();
+                    if pieces.iter().all(|link| dom.is_rewritable(link.element)) {
+                        self.render_partition(dom, &pieces, partition.url);
+                    }
+                }
+            } else {
+                crate::html_async::schedule_combination(
+                    &self.driver,
+                    crate::html_async::BackgroundBehavior::CombineCss {
+                        inputs,
+                        current_base: self.current_base.spec().to_string(),
+                    },
+                    &key,
+                );
+                self.pending.clear();
+            }
+            return;
+        }
         let mut pending = std::mem::take(&mut self.pending);
         for link in &mut pending {
             let mut ctx = self.driver.request_context().borrow().clone();
@@ -294,6 +365,11 @@ impl CssCombineFilter {
                 &mut ctx,
                 &mut callback,
             );
+        }
+        if let Some(recorder) = &self.background {
+            for link in &pending {
+                recorder.dependency(&link.input, self.driver.server_context().now_ms());
+            }
         }
         let base = self.current_base.clone();
         let mut partnership = UrlPartnership::new(&self.driver);
@@ -332,12 +408,20 @@ impl CssCombineFilter {
         if pieces.len() <= 1 {
             return;
         }
-        if !pieces.iter().all(|link| dom.is_rewritable(link.element)) {
+        if self.background.is_none() && !pieces.iter().all(|link| dom.is_rewritable(link.element)) {
             return;
         }
         let Some(combined_url) = self.make_output(&pieces) else {
             return;
         };
+        if let Some(recorder) = &self.background {
+            recorder.record(pieces.iter().map(|link| link.element), combined_url);
+            return;
+        }
+        self.render_partition(dom, &pieces, combined_url);
+    }
+
+    fn render_partition(&self, dom: &mut Dom, pieces: &[PendingLink], combined_url: String) {
         // XHTML-ish pages keep the brief close on the surviving link.
         if self.driver.mime_type_xhtml_status() != crate::server_context::XhtmlStatus::IsNotXhtml {
             dom.set_element_style(pieces[0].element, crate::element::ElementStyle::BriefClose);
@@ -690,6 +774,7 @@ fn fetch_combined(
         let Some(mut input) = resource else {
             return fail(fetch);
         };
+        input.set_is_background_fetch(false);
         let mut ctx = driver.request_context().borrow().clone();
         let mut callback = crate::cacheable_resource::MockLoadCallback::new();
         input.load(

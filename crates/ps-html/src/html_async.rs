@@ -20,7 +20,7 @@
 //! everything they touch; shared state is `Send + Sync` caches), work
 //! deduplication (concurrent same-key misses join one execution), and
 //! bounded queues (saturation sheds to fallback content, retried by the
-//! next request). Behaviors without a snapshot (combiners) and the
+//! next request). Custom behaviors without a snapshot and the
 //! fetch/IPRO serving paths keep the sync behavior, so no optimization
 //! is silently disabled — only deferred off the HTML critical path.
 //!
@@ -59,6 +59,16 @@ pub const HTML_ASYNC_COMPLETED: &str = "html_async_rewrite_completed";
 /// the sync path.
 #[derive(Debug, Clone)]
 pub enum BackgroundBehavior {
+    /// Adjacent stylesheet candidates; worker uses the original partitioner.
+    CombineCss {
+        inputs: Vec<(String, bool)>,
+        current_base: String,
+    },
+    /// Adjacent script candidates and per-element/page charsets.
+    CombineJs {
+        scripts: Vec<(String, Vec<u8>)>,
+        containing_charset: Vec<u8>,
+    },
     /// CSS rewrite (`cf`): element/page charset agreement.
     Css {
         /// Root applicable media (link/style element).
@@ -134,6 +144,8 @@ pub struct HtmlRewriteSnapshot {
     /// Whether the input's domain is authorized (verdict from the HTML
     /// thread; the worker recreates the resource unchecked).
     pub input_authorized: bool,
+    /// Preserve font-service UA keys and response hooks on the worker.
+    pub font_service: bool,
     /// Partition key the HTML lookup missed (the worker writes here).
     pub partition_key: String,
     /// Containing page URL.
@@ -142,6 +154,10 @@ pub struct HtmlRewriteSnapshot {
     pub options: RewriteOptions,
     /// Request user agent.
     pub user_agent: String,
+    /// Preserve explicit format rejection and downstream capability gates.
+    pub request_headers: ps_http::request::RequestHeaders,
+    /// Preserve fetch options and session-authorized origins.
+    pub request_context: ps_http::request::RequestContext,
     /// Page response charset, when the containing headers name one
     /// (CSS charset agreement must match the sync path).
     pub response_charset: Option<String>,
@@ -176,8 +192,7 @@ pub enum ScheduleOutcome {
     /// Queue saturated: serve original URLs now (shed load); a later
     /// request retries once workers drain.
     Shed,
-    /// Pool gone (shutdown): run the sync path so the request still
-    /// completes, degraded.
+    /// No pool installed (synchronous embedding/test compatibility).
     SyncFallback,
 }
 
@@ -216,7 +231,7 @@ pub fn snapshot_shared(driver: &ResourceDriver) -> HtmlRewriteShared {
 ///
 /// Dedup key: the partition key (concurrent same-resource misses join
 /// one execution). Returns [`ScheduleOutcome::SyncFallback`] only when
-/// no pool is installed or it shut down.
+/// no pool is installed. Shutdown and saturation both shed to original URLs.
 pub fn schedule_single_rewrite(
     driver: &ResourceDriver,
     behavior: BackgroundBehavior,
@@ -249,6 +264,44 @@ fn schedule_rewrite(
     schedule_on_pool(driver, &pool, behavior, input, partition_key)
 }
 
+/// Schedules a combination without loading any candidate bytes on the HTML thread.
+pub(crate) fn schedule_combination(
+    driver: &ResourceDriver,
+    behavior: BackgroundBehavior,
+    key: &str,
+) {
+    let Some(pool) = driver.server_context().background_pool() else {
+        return;
+    };
+    let (base_url, options, user_agent, response_charset, now_ms) = snapshot_driver(driver);
+    let snapshot = HtmlRewriteSnapshot {
+        behavior,
+        input_url: String::new(),
+        input_authorized: false,
+        font_service: false,
+        partition_key: key.to_string(),
+        base_url,
+        options,
+        user_agent,
+        request_headers: driver.request_headers().clone(),
+        request_context: driver.request_context().borrow().clone(),
+        response_charset,
+        now_ms,
+    };
+    let shared = snapshot_shared(driver);
+    let job_key = format!("html-combine:{key}");
+    if pool
+        .submit(&job_key, move || run_rewrite_job(snapshot, shared))
+        .is_ok()
+    {
+        driver
+            .server_context()
+            .variable(HTML_ASYNC_SCHEDULED)
+            .add(1);
+    }
+    driver.note_detached_rewrite();
+}
+
 /// Submits onto an explicit pool (the caller already resolved it).
 fn schedule_on_pool(
     driver: &ResourceDriver,
@@ -263,10 +316,13 @@ fn schedule_on_pool(
         behavior,
         input_url: input.url().to_string(),
         input_authorized: input.is_authorized_domain(),
+        font_service: matches!(input, InputResource::Font(_)),
         partition_key: partition_key.to_string(),
         base_url,
         options,
         user_agent,
+        request_headers: driver.request_headers().clone(),
+        request_context: driver.request_context().borrow().clone(),
         response_charset,
         now_ms,
     };
@@ -280,7 +336,7 @@ fn schedule_on_pool(
             ScheduleOutcome::Scheduled
         }
         Err(SubmitError::QueueFull) => ScheduleOutcome::Shed,
-        Err(SubmitError::Shutdown) => ScheduleOutcome::SyncFallback,
+        Err(SubmitError::Shutdown) => ScheduleOutcome::Shed,
     }
 }
 
@@ -310,6 +366,8 @@ fn run_rewrite_job(snapshot: HtmlRewriteSnapshot, shared: HtmlRewriteShared) -> 
         &snapshot.base_url,
     ));
     driver.set_user_agent(&snapshot.user_agent);
+    driver.set_request_headers(snapshot.request_headers);
+    *driver.request_context().borrow_mut() = snapshot.request_context;
     if let Some(charset) = snapshot.response_charset.as_deref() {
         // CSS charset agreement reads the containing headers; mirror
         // the page charset so the worker agrees with the sync path.
@@ -320,12 +378,54 @@ fn run_rewrite_job(snapshot: HtmlRewriteSnapshot, shared: HtmlRewriteShared) -> 
         );
         driver.set_response_headers(headers);
     }
+    let tables = match &snapshot.behavior {
+        BackgroundBehavior::CombineCss {
+            inputs,
+            current_base,
+        } => Some(
+            super::filters::css_combine::CssCombineFilter::background_combine(
+                driver.clone(),
+                inputs.clone(),
+                current_base,
+            ),
+        ),
+        BackgroundBehavior::CombineJs {
+            scripts,
+            containing_charset,
+        } => Some(
+            super::filters::js_combine::JsCombineFilter::background_combine(
+                driver.clone(),
+                scripts.clone(),
+                containing_charset.clone(),
+            ),
+        ),
+        _ => None,
+    };
+    if let Some(tables) = tables {
+        if let Some(tables) = tables {
+            let bytes = super::metadata::encode_partitions(&tables);
+            driver
+                .server_context()
+                .metadata_cache()
+                .put(&snapshot.partition_key, &bytes);
+            statistics.add_variable(HTML_ASYNC_COMPLETED).add(1);
+            return true;
+        }
+        return false;
+    }
     let input_url = GoogleUrl::new(&snapshot.input_url);
     if !input_url.is_web_valid() {
         return false;
     }
-    let Some(input) = driver.create_input_resource_unchecked(&input_url, snapshot.input_authorized)
-    else {
+    let input = if snapshot.font_service {
+        super::font_service_input_resource::FontServiceInputResource::make_font_service(
+            &input_url, &driver,
+        )
+        .map(InputResource::Font)
+    } else {
+        driver.create_input_resource_unchecked(&input_url, snapshot.input_authorized)
+    };
+    let Some(input) = input else {
         return false;
     };
     let wrote = run_behavior_rewrite(&driver, snapshot.behavior, input, &snapshot.partition_key);
@@ -355,6 +455,7 @@ fn run_behavior_rewrite(
 ) -> bool {
     use super::rewrite_context::{InlineRewriteContext, SingleRewriteContext};
     match behavior {
+        BackgroundBehavior::CombineCss { .. } | BackgroundBehavior::CombineJs { .. } => false,
         BackgroundBehavior::Css {
             root_media,
             root_charset,
@@ -422,12 +523,8 @@ fn run_behavior_rewrite(
                 htmls_charset,
                 size_threshold_bytes,
             );
-            let mut context = InlineRewriteContext::new(
-                driver.clone(),
-                behavior,
-                0,
-                driver.base_url().clone(),
-            );
+            let mut context =
+                InlineRewriteContext::new(driver.clone(), behavior, 0, driver.base_url().clone());
             context.run_background_inline(input, partition_key)
         }
         BackgroundBehavior::InlineJs {
@@ -441,12 +538,8 @@ fn run_behavior_rewrite(
                 htmls_charset,
                 size_threshold_bytes,
             );
-            let mut context = InlineRewriteContext::new(
-                driver.clone(),
-                behavior,
-                0,
-                driver.base_url().clone(),
-            );
+            let mut context =
+                InlineRewriteContext::new(driver.clone(), behavior, 0, driver.base_url().clone());
             context.run_background_inline(input, partition_key)
         }
         BackgroundBehavior::InlineGoogleFontCss {
@@ -461,12 +554,8 @@ fn run_behavior_rewrite(
                     htmls_charset,
                     size_threshold_bytes,
                 );
-            let mut context = InlineRewriteContext::new(
-                driver.clone(),
-                behavior,
-                0,
-                driver.base_url().clone(),
-            );
+            let mut context =
+                InlineRewriteContext::new(driver.clone(), behavior, 0, driver.base_url().clone());
             context.run_background_inline(input, partition_key)
         }
     }
@@ -665,11 +754,7 @@ mod tests {
         }
 
         impl super::super::server_context::MessageSink for CollectingSink {
-            fn message(
-                &self,
-                _level: ps_config::message_handler::MessageLevel,
-                text: String,
-            ) {
+            fn message(&self, _level: ps_config::message_handler::MessageLevel, text: String) {
                 self.lines.lock().unwrap().push(text);
             }
         }
@@ -728,10 +813,13 @@ mod tests {
             },
             input_url: image_url.to_string(),
             input_authorized: true,
+            font_service: false,
             partition_key: "test-sink-partition".to_string(),
             base_url: "http://test.com/page.html".to_string(),
             options: options.borrow().clone(),
             user_agent: String::new(),
+            request_headers: driver.request_headers().clone(),
+            request_context: driver.request_context().borrow().clone(),
             response_charset: None,
             now_ms: START_MS_FOR_SINK_TEST,
         };
@@ -763,8 +851,8 @@ mod tests {
     }
 
     #[test]
-    fn shutdown_pool_falls_back_to_sync() {
-        // A gone pool degrades to inline completion, never failure.
+    fn shutdown_pool_keeps_original_url() {
+        // A gone pool keeps valid fallback HTML without an inline fetch.
         let css_url = "http://test.com/a.css";
         let (server, options) = css_server(css_url);
         let pool = BackgroundPool::new(
@@ -779,10 +867,9 @@ mod tests {
         let html = format!(
             "<html><head><link rel='stylesheet' href='{css_url}'></head><body></body></html>"
         );
-        let (out, _) = drive_html(&server, &options, &html);
-        assert!(
-            out.contains("pagespeed"),
-            "shutdown degrades to sync: {out}"
-        );
+        let (out, detached) = drive_html(&server, &options, &html);
+        assert!(!out.contains("pagespeed"), "{out}");
+        assert!(out.contains(css_url), "{out}");
+        assert!(detached > 0);
     }
 }

@@ -117,6 +117,7 @@ pub enum SubmitError {
 struct PoolCounters {
     submitted: Arc<Variable>,
     completed: Arc<Variable>,
+    failed: Arc<Variable>,
     dedup_hits: Arc<Variable>,
     queue_rejections: Arc<Variable>,
     shutdown_rejections: Arc<Variable>,
@@ -177,6 +178,7 @@ impl BackgroundPool {
         let counters = PoolCounters {
             submitted: statistics.add_variable("background_jobs_submitted"),
             completed: statistics.add_variable("background_jobs_completed"),
+            failed: statistics.add_variable("background_jobs_failed"),
             dedup_hits: statistics.add_variable("background_jobs_dedup_hits"),
             queue_rejections: statistics.add_variable("background_jobs_queue_full"),
             shutdown_rejections: statistics.add_variable("background_jobs_shutdown"),
@@ -317,7 +319,9 @@ impl BackgroundPool {
                 // as never run, not as completed.
                 continue;
             }
-            let shared: Arc<dyn Any + Send + Sync> = (job.task)();
+            // A failing optimizer must not strand deduplicated waiters or
+            // permanently remove a worker from the bounded pool.
+            let shared = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job.task));
             // Bookkeeping lands before the value is visible: a waiter
             // that observes completion must also observe the count.
             {
@@ -331,7 +335,13 @@ impl BackgroundPool {
                     .state
                     .lock()
                     .unwrap_or_else(|err| err.into_inner());
-                state.value = Some(shared);
+                match shared {
+                    Ok(value) => state.value = Some(value),
+                    Err(_) => {
+                        self.counters.failed.add(1);
+                        state.shutdown = true;
+                    }
+                }
                 job.result.updated.notify_all();
             }
         }
@@ -478,16 +488,37 @@ mod tests {
     }
 
     #[test]
+    fn panicking_job_releases_waiters_and_worker_survives() {
+        let (pool, statistics) = pool();
+        let handle = pool
+            .submit::<i32, _>("panic", || panic!("optimizer probe"))
+            .unwrap();
+        assert!(handle.wait_timeout::<i32>(Duration::from_secs(5)).is_none());
+        assert!(handle.wait_unbounded::<i32>().is_none());
+        let retry = pool.submit("panic", || 42).unwrap();
+        assert_eq!(
+            *retry.wait_timeout::<i32>(Duration::from_secs(5)).unwrap(),
+            42
+        );
+        assert_eq!(counter(&statistics, "background_jobs_failed"), 1);
+        pool.shutdown();
+    }
+
+    #[test]
     fn shutdown_releases_and_joins() {
         let (pool, _statistics) = pool();
         let gate = Arc::new(std::sync::Barrier::new(2));
         let probe = Arc::clone(&gate);
+        let (started_tx, started_rx) = mpsc::channel();
         let handle = pool
             .submit("stuck", move || {
+                started_tx.send(()).unwrap();
                 probe.wait();
                 3
             })
             .unwrap();
+        // Ensure shutdown cannot discard the queued job before it starts.
+        started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         // Shut down beside the stuck worker: waiters release
         // immediately while the join waits for the worker.
         let shutdown_pool = Arc::clone(&pool);

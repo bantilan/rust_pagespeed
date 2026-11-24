@@ -48,6 +48,8 @@ impl ps_html::writer::ByteSink for VecSink {
 /// serve stored bytes and swallow the origin body without ever
 /// constructing filters or parsing.
 pub struct HtmlSink<'a> {
+    #[cfg(feature = "pipeline-profile")]
+    timings: [u128; 4],
     driver: Option<ps_html::driver::Driver>,
     /// Deferred driver inputs (consumed by the first write).
     deferred: Option<DeferredDriver>,
@@ -92,6 +94,8 @@ impl<'a> HtmlSink<'a> {
             .clone()
             .map(|driver| ps_html::html_cache::HtmlCacheSession::new(driver, url));
         HtmlSink {
+            #[cfg(feature = "pipeline-profile")]
+            timings: [0; 4],
             driver: None,
             deferred: Some(DeferredDriver {
                 options: options.clone(),
@@ -117,6 +121,8 @@ impl<'a> HtmlSink<'a> {
             return;
         };
         let context = ps_html::chain::ChainContext::new(true, true);
+        #[cfg(feature = "pipeline-profile")]
+        let profile_start = std::time::Instant::now();
         let mut driver = ps_html::driver::Driver::new(
             &deferred.options,
             &context,
@@ -126,6 +132,10 @@ impl<'a> HtmlSink<'a> {
             self.resource_driver.clone(),
         );
         driver.start_parse(deferred.url.as_bytes(), deferred.content_is_xml_like);
+        #[cfg(feature = "pipeline-profile")]
+        {
+            self.timings[0] += profile_start.elapsed().as_nanos();
+        }
         self.driver = Some(driver);
     }
 
@@ -170,11 +180,17 @@ impl<'a> HtmlSink<'a> {
         file_mtime: Option<(u64, u32)>,
         now_ms: i64,
     ) -> Option<ps_cache::html::HtmlCacheEntry> {
+        #[cfg(feature = "pipeline-profile")]
+        let profile_start = std::time::Instant::now();
         self.html_cache_request = Some(request.clone());
         let out = self
             .html_cache
             .as_mut()
             .and_then(|session| session.lookup(origin, request, purge, file_mtime, now_ms));
+        #[cfg(feature = "pipeline-profile")]
+        {
+            self.timings[1] += profile_start.elapsed().as_nanos();
+        }
         out
     }
 
@@ -206,11 +222,33 @@ impl<'a> HtmlSink<'a> {
     }
 }
 
+#[cfg(feature = "pipeline-profile")]
+impl Drop for HtmlSink<'_> {
+    fn drop(&mut self) {
+        eprintln!(
+            "PS_PIPELINE_NS init={} lookup={} processing={} store={} hit={}",
+            self.timings[0],
+            self.timings[1],
+            self.timings[2],
+            self.timings[3],
+            self.html_cache
+                .as_ref()
+                .is_some_and(|session| session.is_hit())
+        );
+    }
+}
+
 impl BodySink for HtmlSink<'_> {
     fn write(&mut self, bytes: &[u8]) {
         self.ensure_driver();
         if let Some(driver) = self.driver.as_mut() {
+            #[cfg(feature = "pipeline-profile")]
+            let profile_start = std::time::Instant::now();
             driver.write(bytes);
+            #[cfg(feature = "pipeline-profile")]
+            {
+                self.timings[2] += profile_start.elapsed().as_nanos();
+            }
         }
         self.pump_output();
     }
@@ -218,7 +256,13 @@ impl BodySink for HtmlSink<'_> {
     fn flush(&mut self) {
         self.ensure_driver();
         if let Some(driver) = self.driver.as_mut() {
+            #[cfg(feature = "pipeline-profile")]
+            let profile_start = std::time::Instant::now();
             driver.flush();
+            #[cfg(feature = "pipeline-profile")]
+            {
+                self.timings[2] += profile_start.elapsed().as_nanos();
+            }
         }
         // Rearm the per-flush fetch-wait budget (C++ rearms the
         // rewrite deadline every flush window).
@@ -240,7 +284,13 @@ impl BodySink for HtmlSink<'_> {
             self.ensure_driver();
         }
         if let Some(driver) = self.driver.as_mut() {
+            #[cfg(feature = "pipeline-profile")]
+            let profile_start = std::time::Instant::now();
             driver.finish();
+            #[cfg(feature = "pipeline-profile")]
+            {
+                self.timings[2] += profile_start.elapsed().as_nanos();
+            }
         }
         self.pump_output();
         if let Some(session) = self.html_cache.as_mut() {
@@ -252,7 +302,13 @@ impl BodySink for HtmlSink<'_> {
                     &empty
                 }
             };
+            #[cfg(feature = "pipeline-profile")]
+            let profile_start = std::time::Instant::now();
             let finish = session.finish(request, Self::now_ms());
+            #[cfg(feature = "pipeline-profile")]
+            {
+                self.timings[3] += profile_start.elapsed().as_nanos();
+            }
             // Stores and cookie bypasses never coincide.
             self.html_cache_line = finish.detail_line.or(finish.bypass_line);
             if let Some(comment) = finish.show_comment {
@@ -678,6 +734,7 @@ mod tests {
                 std::sync::Arc::new(crate::rewrite::UnavailableFetcher),
             );
             let mut options = RewriteOptions::new();
+            options.enable_filter(ps_config::filter::Filter::AddInstrumentation);
             options
                 .set_option("HtmlCache", "on", ps_config::scope::Scope::Server)
                 .unwrap();
@@ -689,6 +746,7 @@ mod tests {
                 std::rc::Rc::new(std::cell::RefCell::new(options.clone())),
                 "http://h/p",
             ));
+            driver.set_user_agent("Mozilla/5.0 Chrome/120.0.0.0 Safari/537.36");
             HtmlSink::new(&options, "http://h/p", false, &ps_side, slot, Some(driver))
         };
         let mut request = ps_http::request::RequestHeaders::new();
@@ -718,7 +776,7 @@ mod tests {
             .html_cache_lookup(&origin, &request, &purge, None, now_ms)
             .is_none());
         assert!(!first.driver_built());
-        first.write(b"<html>hi</html>");
+        first.write(b"<html><head></head><body>hi</body></html>");
         assert!(first.driver_built());
         BodySink::done(&mut first);
         assert!(first.take_html_cache_line().is_some());
@@ -733,6 +791,13 @@ mod tests {
         let entry = second
             .html_cache_lookup(&origin, &request, &purge, None, later_ms)
             .expect("hit");
+        let body = String::from_utf8_lossy(&entry.body);
+        assert!(
+            body.contains("window.mod_pagespeed_start = Number(new Date())"),
+            "{body}"
+        );
+        assert!(body.contains("pagespeed.addInstrumentationInit("), "{body}");
+        assert!(body.contains("/ngx_pagespeed_beacon"), "{body}");
         assert!(!second.driver_built());
         second.serve_html_cache_hit(&entry, later_ms);
         // Served: the origin body is swallowed downstream, so no

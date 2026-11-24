@@ -775,7 +775,7 @@ pub struct RewriteOptions {
     /// through the returned reference after this method returns —
     /// eager clearing is correct because the borrow checker forbids
     /// interleaving `signature()` with the outstanding `&mut`).
-    signature_cache: RefCell<Option<String>>,
+    signature_cache: RefCell<Option<std::sync::Arc<str>>>,
 }
 
 impl RewriteOptions {
@@ -2212,10 +2212,17 @@ impl RewriteOptions {
     /// computation across all of a request's partition keys.
     #[must_use]
     pub fn signature(&self) -> String {
-        if let Some(cached) = self.signature_cache.borrow().clone() {
-            return cached;
+        self.signature_shared().as_ref().to_owned()
+    }
+
+    /// Shared signature for immutable configuration generations. Cloning options
+    /// and reading a key no longer copies the complete serialized configuration.
+    #[must_use]
+    pub fn signature_shared(&self) -> std::sync::Arc<str> {
+        if let Some(cached) = self.signature_cache.borrow().as_ref() {
+            return cached.clone();
         }
-        let computed = self.compute_signature();
+        let computed: std::sync::Arc<str> = self.compute_signature().into();
         *self.signature_cache.borrow_mut() = Some(computed.clone());
         computed
     }
@@ -2266,6 +2273,23 @@ impl RewriteOptions {
         parts.push(format!("fileload={}", self.file_load.signature()));
         parts.push(format!("proxysuf={}", self.proxy_suffix));
         parts.push(format!("experiment={}", self.experiment_state_str()));
+        parts.push(format!("enabled={:?}", self.enabled_state));
+        parts.push(format!("known_domains={:?}", self.known_domains));
+        parts.push(format!("downstream_purge={}", self.downstream_purge_prefix));
+        parts.push(format!("resource_headers={:?}", self.resource_headers));
+        parts.push(format!("fetch_headers={:?}", self.custom_fetch_headers));
+        parts.push(format!("url_attrs={:?}", self.url_valued_attrs));
+        parts.push(format!("experiments={:?}", self.experiment_specs));
+        let mut libraries: Vec<_> = self
+            .libraries
+            .iter()
+            .flat_map(|(bytes, entries)| entries.iter().map(move |(hash, url)| (bytes, hash, url)))
+            .collect();
+        libraries.sort_unstable();
+        parts.push(format!("libraries={libraries:?}"));
+        let mut polyfills: Vec<_> = self.polyfill_filenames.iter().collect();
+        polyfills.sort_unstable();
+        parts.push(format!("polyfills={polyfills:?}"));
         parts.join(";")
     }
 
@@ -6060,6 +6084,61 @@ mod tests {
     }
 
     #[test]
+    fn signatures_include_collections_and_are_order_stable() {
+        let base = RewriteOptions::new();
+        let mut headers = base.clone();
+        headers
+            .parse_and_set_2("CustomFetchHeader", "X-Origin-Variant", "alternate")
+            .unwrap();
+        assert_ne!(base.signature(), headers.signature());
+        let mut attrs = base.clone();
+        attrs.add_url_valued_attribute("image", "data-src", Category::Image);
+        assert_ne!(base.signature(), attrs.signature());
+        let mut first = base.clone();
+        first
+            .libraries
+            .entry(10)
+            .or_default()
+            .insert("a".into(), "http://a/a.js".into());
+        first
+            .libraries
+            .entry(20)
+            .or_default()
+            .insert("b".into(), "http://a/b.js".into());
+        let mut second = base.clone();
+        second
+            .libraries
+            .entry(20)
+            .or_default()
+            .insert("b".into(), "http://a/b.js".into());
+        second
+            .libraries
+            .entry(10)
+            .or_default()
+            .insert("a".into(), "http://a/a.js".into());
+        first.invalidate_signature();
+        second.invalidate_signature();
+        assert_ne!(base.signature(), first.signature());
+        assert_eq!(first.signature(), second.signature());
+    }
+
+    #[test]
+    fn shared_signature_survives_clones_and_versions_mutation() {
+        let options = RewriteOptions::new();
+        let generation = options.signature_shared();
+        let mut cloned = options.clone();
+        assert!(std::sync::Arc::ptr_eq(
+            &generation,
+            &cloned.signature_shared()
+        ));
+        cloned.enable_filter(Filter::InlineCss);
+        assert!(!std::sync::Arc::ptr_eq(
+            &generation,
+            &cloned.signature_shared()
+        ));
+        assert_eq!(generation.as_ref(), options.signature());
+    }
+
     #[test]
     fn signature_memoized_until_mutation() {
         // The signature computes once and every mutation path
@@ -6098,6 +6177,7 @@ mod tests {
         assert_eq!(clone.signature(), options.signature());
     }
 
+    #[test]
     fn signature_and_secret_tables() {
         assert!(EXCLUDED_FROM_SIGNATURE.contains(&"tifrwd"));
         assert!(EXCLUDED_FROM_SIGNATURE.contains(&"noop"));

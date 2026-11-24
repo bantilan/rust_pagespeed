@@ -11,9 +11,9 @@ use ps_http::request::RequestHeaders;
 use ps_http::user_agent_matcher::{DeviceType, UserAgentMatcher};
 
 /// Device capabilities (`DeviceProperties`).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DeviceProperties {
-    matcher: UserAgentMatcher,
+    matcher: &'static UserAgentMatcher,
     user_agent: String,
     supports_image_inlining: bool,
     supports_lazyload_images: bool,
@@ -37,7 +37,7 @@ impl DeviceProperties {
     #[must_use]
     pub fn new() -> Self {
         DeviceProperties {
-            matcher: UserAgentMatcher::new(),
+            matcher: UserAgentMatcher::shared(),
             user_agent: String::new(),
             supports_image_inlining: false,
             supports_lazyload_images: false,

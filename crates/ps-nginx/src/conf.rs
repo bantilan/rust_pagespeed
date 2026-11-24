@@ -55,6 +55,10 @@ impl NgxOptions {
     /// cannot see it, so the clone starts cleared, like C++.
     #[must_use]
     pub fn clone_with(&self) -> Self {
+        // Populate the source generation before cloning so ordinary requests
+        // inherit the memoized signature. A clone already contains all core
+        // fields; merging the source again invalidated it and duplicated rules.
+        let _ = self.core.signature_shared();
         let mut cloned = NgxOptions {
             core: self.core.clone(),
             system: self.system.clone(),
@@ -62,7 +66,6 @@ impl NgxOptions {
             clear_inherited_scripts: false,
         };
         self.copy_script_lines_to(&mut cloned);
-        cloned.core.merge(&self.core);
         cloned
     }
 

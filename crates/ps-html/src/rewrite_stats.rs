@@ -158,6 +158,7 @@ pub fn init_stats(statistics: &Statistics) {
     statistics.add_variable("num_resource_fetch_successes"); // kNumResourceFetchSuccesses
     statistics.add_variable("background_jobs_submitted");
     statistics.add_variable("background_jobs_completed");
+    statistics.add_variable("background_jobs_failed");
     statistics.add_variable("background_jobs_dedup_hits");
     statistics.add_variable("background_jobs_timeouts");
     statistics.add_variable("background_jobs_queue_full");
@@ -221,6 +222,7 @@ mod tests {
             "rewrite_cached_output_hits",
             "background_jobs_submitted",
             "background_jobs_completed",
+            "background_jobs_failed",
             "background_jobs_dedup_hits",
             "background_jobs_timeouts",
             "background_jobs_queue_full",

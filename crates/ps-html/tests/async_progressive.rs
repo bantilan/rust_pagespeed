@@ -76,11 +76,33 @@ impl AsyncFetcher for SlowFetcher {
     }
 }
 
+#[derive(Debug)]
+struct CountedHttpCache {
+    inner: MemoryCache,
+    reads: Arc<AtomicU64>,
+}
+impl ps_cache::cache::Cache for CountedHttpCache {
+    fn get(&self, key: &str) -> ps_cache::cache::Lookup {
+        self.reads.fetch_add(1, Ordering::SeqCst);
+        ps_cache::cache::Cache::get(&self.inner, key)
+    }
+    fn put(&self, key: &str, value: &[u8]) {
+        ps_cache::cache::Cache::put(&self.inner, key, value);
+    }
+    fn delete(&self, key: &str) {
+        ps_cache::cache::Cache::delete(&self.inner, key);
+    }
+    fn name(&self) -> String {
+        "CountedHttpCache".into()
+    }
+}
+
 struct World {
     server: Rc<ServerContext>,
     options: Rc<RefCell<RewriteOptions>>,
     fetcher: Arc<SlowFetcher>,
     pool: Arc<BackgroundPool>,
+    http_reads: Arc<AtomicU64>,
 }
 
 impl World {
@@ -97,8 +119,12 @@ impl World {
             .unwrap();
         let fetcher = Arc::new(SlowFetcher::new(Duration::from_millis(origin_ms)));
         fetcher.script_css(CSS_URL, CSS_BODY, START_MS);
+        let http_reads = Arc::new(AtomicU64::new(0));
         let server = Rc::new(ServerContext::new_with_metadata(
-            Arc::new(MemoryCache::new()),
+            Arc::new(CountedHttpCache {
+                inner: MemoryCache::new(),
+                reads: http_reads.clone(),
+            }),
             Arc::new(MemoryCache::new()),
             fetcher.clone() as Arc<dyn AsyncFetcher>,
             START_MS,
@@ -116,13 +142,23 @@ impl World {
             options,
             fetcher,
             pool,
+            http_reads,
         }
     }
 
     /// Drives one full HTML request through the resource driver.
     fn drive(&self, css_url: &str) -> String {
+        let html = format!("<head><link rel='stylesheet' href='{css_url}'></head><body></body>");
+        self.drive_markup(&html)
+    }
+
+    fn drive_markup(&self, html: &str) -> String {
+        self.drive_markup_on(self.server.clone(), html)
+    }
+
+    fn drive_markup_on(&self, server: Rc<ServerContext>, html: &str) -> String {
         let resource_driver = Rc::new(ResourceDriver::new(
-            self.server.clone(),
+            server,
             self.options.clone(),
             "http://test.com/page.html",
         ));
@@ -135,7 +171,6 @@ impl World {
             Some(resource_driver),
         );
         driver.start_parse(b"http://test.com/page.html", false);
-        let html = format!("<head><link rel='stylesheet' href='{css_url}'></head><body></body>");
         driver.write(html.as_bytes());
         driver.finish();
         String::from_utf8(sink.bytes()).unwrap()
@@ -537,4 +572,88 @@ fn saturated_pool_serves_fallback_html_fast_then_recovers() {
     world.await_completions(3);
     let recovered = world.drive(url);
     assert!(recovered.contains(".pagespeed."), "{recovered}");
+}
+
+#[test]
+fn font_service_miss_defers_and_warm_hit_keeps_ua_hooks() {
+    let world = World::new(300, 10, 2, 16);
+    let url = "http://fonts.googleapis.com/css?family=Roboto";
+    world
+        .options
+        .borrow_mut()
+        .enable_filter(Filter::InlineGoogleFontCss);
+    world.fetcher.script_css(url, CSS_BODY, START_MS);
+    let start = Instant::now();
+    let first = world.drive(url);
+    assert!(start.elapsed() < Duration::from_millis(250));
+    assert!(first.contains(url), "{first}");
+    world.await_completions(1);
+    let second = world.drive(url);
+    assert!(second.contains("<style"), "{second}");
+    assert!(!second.contains("<link"), "{second}");
+    let fetches = world.fetcher.count.load(Ordering::SeqCst);
+    assert_eq!(second, world.drive(url));
+    assert_eq!(fetches, world.fetcher.count.load(Ordering::SeqCst));
+}
+
+#[test]
+fn combinations_defer_then_match_sync_without_refetching() {
+    for (filter, markup, body) in [
+        (Filter::CombineCss, "<head><link rel='stylesheet' href='a.css'><link rel='stylesheet' href='b.css'></head><body></body>", CSS_BODY),
+        (Filter::CombineJavascript, "<head></head><body><script src='a.css'></script><script src='b.css'></script></body>", b"var x = 1;".as_slice()),
+    ] {
+        let world = World::new(100, 10, 2, 16);
+        *world.options.borrow_mut() = RewriteOptions::new();
+        world.options.borrow_mut().filters_mut().set_level(ps_config::filter::RewriteLevel::PassThrough);
+        world.options.borrow_mut().enable_filter(filter);
+        world.fetcher.script_css(CSS_URL, body, START_MS);
+        world.fetcher.script_css("http://test.com/b.css", body, START_MS);
+        let start = Instant::now();
+        let first = world.drive_markup(markup);
+        assert!(start.elapsed() < Duration::from_millis(150));
+        assert!(!first.contains(".pagespeed."), "{first}");
+        world.await_completions(1);
+        assert_eq!(world.stat("html_async_rewrite_completed"), 1);
+        let second = world.drive_markup(markup);
+        assert!(second.contains(".pagespeed."), "{second}");
+        let calls = world.fetcher.count.load(Ordering::SeqCst);
+        let reads = world.http_reads.load(Ordering::SeqCst);
+        assert_eq!(second, world.drive_markup(markup));
+        assert_eq!(calls, world.fetcher.count.load(Ordering::SeqCst));
+        assert_eq!(reads, world.http_reads.load(Ordering::SeqCst), "metadata HIT must not read resource bytes from the HTTP cache");
+        let sync_server = Rc::new(ServerContext::new_with_metadata(
+            Arc::new(MemoryCache::new()), Arc::new(MemoryCache::new()), world.fetcher.clone(), START_MS));
+        assert_eq!(second, world.drive_markup_on(sync_server, markup));
+        // Expiration invalidates the combination, preserving original URLs
+        // while a new background job refreshes it.
+        world.server.timer().borrow_mut().set_ms(START_MS + 400_000);
+        let expired = world.drive_markup(markup);
+        assert!(!expired.contains(".pagespeed."), "{expired}");
+    }
+}
+
+#[test]
+fn failed_candidate_does_not_discard_successful_combinations() {
+    let world = World::new(0, 10, 2, 16);
+    *world.options.borrow_mut() = RewriteOptions::new();
+    world.options.borrow_mut().enable_filter(Filter::CombineCss);
+    world
+        .fetcher
+        .script_css("http://test.com/b.css", CSS_BODY, START_MS);
+    let html = "<head><link rel='stylesheet' href='a.css'><link rel='stylesheet' href='b.css'><link rel='stylesheet' href='missing.css'></head><body></body>";
+    world.drive_markup(html);
+    world.await_completions(1);
+    let second = world.drive_markup(html);
+    assert!(second.contains(".pagespeed.cc."), "{second}");
+    assert!(second.contains("missing.css"), "{second}");
+    let calls = world.fetcher.count.load(Ordering::SeqCst);
+    assert_eq!(second, world.drive_markup(html));
+    assert_eq!(calls, world.fetcher.count.load(Ordering::SeqCst));
+    let sync = Rc::new(ServerContext::new_with_metadata(
+        Arc::new(MemoryCache::new()),
+        Arc::new(MemoryCache::new()),
+        world.fetcher.clone(),
+        START_MS,
+    ));
+    assert_eq!(second, world.drive_markup_on(sync, html));
 }
