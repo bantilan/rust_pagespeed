@@ -18,6 +18,7 @@ parser.add_argument('--module', required=True)
 parser.add_argument('--output', required=True)
 parser.add_argument('--port', type=int, default=18089)
 parser.add_argument('--check-metrics', action='store_true')
+parser.add_argument('--benchmark-requests', type=int, default=0, help='Optional eight-client warm HIT comparison after lifecycle checks')
 args = parser.parse_args()
 repo = Path(__file__).resolve().parent.parent
 prefix = Path(tempfile.mkdtemp(prefix='ps-shared-lifecycle-'))
@@ -155,6 +156,29 @@ try:
         assert values['shared_cache_domains'] == 1
         assert 1024 * 1024 < values['shared_cache_byte_mapping_bytes'] <= 2048 * 1024
         result['metrics_after_restart'] = {key: value for key, value in values.items() if key.startswith('shared_cache_')}
+    if args.benchmark_requests:
+        import concurrent.futures
+        import statistics
+        def concurrent_run():
+            def timed(_):
+                started = time.perf_counter_ns()
+                pid, body = request()
+                elapsed = (time.perf_counter_ns() - started) / 1e6
+                marker = body.rsplit(b'PageSpeed Cache:', 1)[-1].split(b'|', 1)[0].strip()
+                assert marker == b'HIT', marker
+                normalized = re.sub(rb'<!-- PageSpeed Cache:.*?-->', b'', body)
+                assert hashlib.sha256(normalized).hexdigest() == before[1]
+                return {'ms': elapsed, 'worker': pid}
+            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+                samples = list(executor.map(timed, range(args.benchmark_requests)))
+            return {'clients': 8, 'requests': len(samples), 'median_ms': statistics.median(sample['ms'] for sample in samples), 'workers': sorted(set(sample['worker'] for sample in samples)), 'samples': samples}
+        result['concurrent_shared'] = concurrent_run()
+        stop()
+        config_path = prefix / 'conf/nginx.conf'
+        config_path.write_text(re.sub(r'^pagespeed CreateSharedMemoryMetadataCache .*?;\n', '', config_path.read_text(), flags=re.MULTILINE))
+        process = start()
+        warm()
+        result['concurrent_default'] = concurrent_run()
     result.update({'passed': True, 'before': before, 'after_reload': after, 'after_restart': restarted,
                    'held_old_worker': old_worker, 'byte_mappings': mappings,
                    'checkpoint_policy': 'validated existing write-through disk cache; no native mutex checkpoint'})

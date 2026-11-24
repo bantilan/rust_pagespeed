@@ -1,0 +1,2742 @@
+--------------------------------------------------------------------------------
+Profile data file '/tmp/ps-shared-profile-umu5aai6/callgrind.out' (creator: callgrind-3.22.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 662629639
+Trigger: Program termination
+Profiled target:  /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/objs/nginx -p /tmp/ps-shared-profile-umu5aai6/ -c conf/nginx.conf (PID 3976654, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+2,590,272,038 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+488,145,131 (18.85%)  ???:zlib_rs::deflate::algorithm::slow::deflate_slow [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+162,452,106 ( 6.27%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+160,815,117 ( 6.21%)  ???:<jpeg_encoder::encoder::Encoder<&mut alloc::vec::Vec<u8>>>::encode_blocks::<jpeg_encoder::image_buffer::RgbImage, jpeg_encoder::encoder::DefaultOperations> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+119,109,606 ( 4.60%)  ???:<jpeg_decoder::decoder::Decoder<core::io::cursor::Cursor<&[u8]>>>::decode_internal [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+110,793,617 ( 4.28%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 77,142,432 ( 2.98%)  ???:jpeg_decoder::arch::ssse3::dequantize_and_idct_block_8x8 [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 62,114,811 ( 2.40%)  ???:zlib_rs::deflate::algorithm::medium::deflate_medium [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 60,497,245 ( 2.34%)  ???:<zlib_rs::deflate::hash_calc::RollHashCalc>::insert_string [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 54,745,132 ( 2.11%)  ???:<regex_automata::nfa::thompson::pikevm::PikeVM>::epsilon_closure [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 52,457,280 ( 2.03%)  ???:jpeg_encoder::fdct::fdct [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 49,710,951 ( 1.92%)  ./malloc/./malloc/malloc.c:_int_free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 44,845,160 ( 1.73%)  ???:md5::compress::soft::compress [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 42,487,911 ( 1.64%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 38,436,136 ( 1.48%)  ???:jpeg_decoder::arch::ssse3::color_convert_line_ycbcr [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 34,391,123 ( 1.33%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 33,301,548 ( 1.29%)  ???:<ps_html::lexer::Lexer>::parse [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 33,105,866 ( 1.28%)  ???:<jpeg_encoder::writer::JfifWriter<&mut alloc::vec::Vec<u8>>>::write_ac_block [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 29,698,741 ( 1.15%)  ???:<regex_automata::nfa::thompson::pikevm::PikeVM>::next [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 28,820,952 ( 1.11%)  ???:png::filter::filter [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 28,315,054 ( 1.09%)  ???:<jpeg_encoder::encoder::Encoder<&mut alloc::vec::Vec<u8>>>::optimize_huffman_table [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 26,099,433 ( 1.01%)  ???:<ps_css::unicode_text::UnicodeText>::push_codepoint [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 24,987,585 ( 0.96%)  ???:<regex_automata::nfa::thompson::pikevm::PikeVM>::search_imp [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 23,500,519 ( 0.91%)  ???:<ps_html::parser::Parser>::apply_phase [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 22,547,523 ( 0.87%)  ???:ps_image::optimize::optimize_png_frame [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 22,454,015 ( 0.87%)  ???:zlib_rs::deflate::longest_match::longest_match [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 22,366,278 ( 0.86%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 21,733,332 ( 0.84%)  ???:ps_js::minify::minify_utf8_with_source_map [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 20,694,602 ( 0.80%)  ???:<ps_js::tokenizer::Tokenizer>::try_consume_identifier_or_keyword [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 20,606,836 ( 0.80%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 17,757,392 ( 0.69%)  ???:png::filter::filter_internal [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 16,892,302 ( 0.65%)  ???:<ps_http::google_url::GoogleUrl>::path_bounds [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 16,764,707 ( 0.65%)  ???:core::str::converts::from_utf8 [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 16,257,050 ( 0.63%)  ???:<url::parser::Parser>::parse_path [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 16,011,896 ( 0.62%)  ???:ps_css::escapes::escape_identifier [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 15,135,225 ( 0.58%)  ???:<jpeg_decoder::worker::immediate::ImmediateWorker>::append_row_immediate [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 14,462,800 ( 0.56%)  ???:<jpeg_decoder::upsampler::UpsamplerH2V2 as jpeg_decoder::upsampler::Upsample>::upsample_row [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 13,740,970 ( 0.53%)  ???:ps_config::property::lookup_by_name [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 13,370,722 ( 0.52%)  ???:<jpeg_decoder::huffman::HuffmanDecoder>::read_bits::<core::io::cursor::Cursor<&[u8]>> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 12,885,547 ( 0.50%)  ???:<alloc::raw_vec::RawVecInner>::finish_grow [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 11,613,815 ( 0.45%)  ???:<ps_css::parser::Parser>::parse_ident [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 11,384,029 ( 0.44%)  ???:<jpeg_decoder::huffman::HuffmanDecoder>::decode::<core::io::cursor::Cursor<&[u8]>> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 11,076,119 ( 0.43%)  ???:<core::str::lossy::Utf8Chunks as core::iter::traits::iterator::Iterator>::next [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+ 10,717,819 ( 0.41%)  ???:<ps_config::options::RewriteOptions>::get_by_id [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  9,945,656 ( 0.38%)  ???:zlib_rs::deflate::compare256::avx2::compare256 [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  9,345,920 ( 0.36%)  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  9,134,478 ( 0.35%)  ???:<jpeg_encoder::writer::JfifWriter<&mut alloc::vec::Vec<u8>>>::write_bits [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  8,875,245 ( 0.34%)  ???:ps_cache::cache::filename::encode [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  8,871,644 ( 0.34%)  ???:ps_image::jpeg::scan_markers [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  8,302,896 ( 0.32%)  ???:<ps_html::parser::Dom>::sanity_check [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  8,259,676 ( 0.32%)  ./malloc/./malloc/malloc.c:malloc_consolidate [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  7,742,904 ( 0.30%)  ???:zlib_rs::inflate::inftrees::inflate_table [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  7,675,982 ( 0.30%)  ???:zlib_rs::deflate::compare256::compare256_slice [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  7,411,321 ( 0.29%)  ???:<percent_encoding::PercentEncode as core::iter::traits::iterator::Iterator>::next [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  6,739,665 ( 0.26%)  ???:<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  6,639,932 ( 0.26%)  ???:__rustc::__rdl_alloc [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  6,497,340 ( 0.25%)  ???:<ps_config::wildcard::Wildcard>::matches [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  6,485,847 ( 0.25%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  6,344,150 ( 0.24%)  ???:<fdeflate::decompress::Decompressor>::read [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  6,247,651 ( 0.24%)  ???:<&str as core::str::pattern::Pattern>::is_contained_in [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  6,064,539 ( 0.23%)  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  5,782,014 ( 0.22%)  ???:zlib_rs::inflate::inflate_fast_help_avx2 [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  5,653,464 ( 0.22%)  ???:ps_html::name::generated::lookup [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  5,554,085 ( 0.21%)  ???:zlib_rs::deflate::flush_block_only [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  5,504,607 ( 0.21%)  ???:<url::parser::Parser>::after_double_slash [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  5,382,429 ( 0.21%)  ???:<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  5,295,757 ( 0.20%)  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  5,052,969 ( 0.20%)  ./malloc/./malloc/arena.c:free
+  5,046,476 ( 0.19%)  ???:<ps_js::tokenizer::Tokenizer>::next_token [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,936,066 ( 0.19%)  ???:<jpeg_encoder::encoder::Encoder<&mut alloc::vec::Vec<u8>>>::encode_image_progressive::<jpeg_encoder::image_buffer::RgbImage, jpeg_encoder::encoder::DefaultOperations> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,646,442 ( 0.18%)  ???:zlib_rs::inflate::inflate [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,583,339 ( 0.18%)  ???:<ps_css::parser::Parser>::skip_space [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,570,508 ( 0.18%)  ???:<ps_html::writer::WriterFilter<ps_nginx::send::VecSink>>::write_raw [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,565,484 ( 0.18%)  ???:zlib_rs::deflate::slide_hash::avx2::slide_hash_chain [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,355,216 ( 0.17%)  ???:<ps_js::tokenizer::Tokenizer>::emit [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,353,910 ( 0.17%)  ???:alloc::fmt::format::format_inner [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,352,676 ( 0.17%)  ???:<ps_css::parser::Parser>::parse_selectors [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,300,168 ( 0.17%)  ???:core::fmt::write [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,178,916 ( 0.16%)  ???:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&str> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,158,523 ( 0.16%)  ???:<ps_html::writer::WriterFilter<ps_nginx::send::VecSink> as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,095,479 ( 0.16%)  ???:<ps_html::html_cache::HtmlCacheSession>::finish [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  4,094,271 ( 0.16%)  ???:ps_css::unicode_text::coerce_to_interchange_valid [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  3,963,558 ( 0.15%)  ???:<alloc::string::String as core::fmt::Write>::write_str [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  3,578,941 ( 0.14%)  ???:jpeg_decoder::decoder::color_convert_line_ycbcr [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  3,574,302 ( 0.14%)  ???:zlib_rs::adler32::avx2::adler32_avx2_help [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  3,251,755 ( 0.13%)  ???:ps_html::resource_tag_scanner::scan_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  3,137,041 ( 0.12%)  ???:<ps_cache::tracked_coherence::TrackedCoherence as ps_cache::cache::CacheCoherence>::snapshot [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  3,117,862 ( 0.12%)  ???:__rustc::__rdl_realloc [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,980,126 ( 0.12%)  ???:<zlib_rs::deflate::Heap>::pqdownheap [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,818,972 ( 0.11%)  ???:core::slice::memchr::memrchr_aligned [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,490,125 ( 0.10%)  ???:<alloc::raw_vec::RawVec<u8>>::grow_one [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,413,055 ( 0.09%)  ???:png::filter::unfilter [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,412,283 ( 0.09%)  ???:<ps_html::parser::Dom>::coalesce_characters [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,412,013 ( 0.09%)  ./malloc/./malloc/malloc.c:_int_free_maybe_consolidate [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  2,338,377 ( 0.09%)  ???:sha1::compress::compress [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,247,466 ( 0.09%)  ???:core::slice::memchr::memchr_aligned [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,225,533 ( 0.09%)  ???:<ps_css::parser::Parser>::parse_raw_declarations [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,185,974 ( 0.08%)  ???:<url::parser::Parser>::parse_path::push_pending [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,182,623 ( 0.08%)  ???:<url::parser::Parser>::parse_host [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,174,064 ( 0.08%)  ???:<ps_html::writer::WriterFilter<ps_nginx::send::VecSink> as ps_html::filter::HtmlFilter>::characters [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,173,701 ( 0.08%)  ???:zlib_rs::deflate::fill_window [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,054,853 ( 0.08%)  ???:<alloc::string::String as core::clone::Clone>::clone [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,050,455 ( 0.08%)  ???:<ps_shm::byte_cache::SharedByteCache>::get [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,045,674 ( 0.08%)  ???:<ps_config::options::RewriteOptions as core::clone::Clone>::clone [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  2,024,394 ( 0.08%)  ???:<ps_css::selector::SimpleSelector>::to_css_string [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,902,780 ( 0.07%)  ???:<ps_html::lexer::Lexer>::emit_tag_open [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,899,895 ( 0.07%)  ???:<url::ParseOptions>::parse [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,840,424 ( 0.07%)  ???:ps_html::js_escape::escape_to_js_string_literal [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,837,075 ( 0.07%)  ???:<url::parser::Parser>::parse_scheme [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,784,160 ( 0.07%)  ???:<ps_css::minify::Minifier>::minify_simple_selectors [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,614,164 ( 0.06%)  ???:<alloc::vec::Vec<&str> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<&str, core::str::iter::Split<char>>>::from_iter [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,589,388 ( 0.06%)  ???:<regex::regex::bytes::Regex>::find_at [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,545,718 ( 0.06%)  ???:<ps_stats::core::Statistics>::get_variable [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,536,084 ( 0.06%)  ???:ps_html::lexer::dispatch_event [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,534,575 ( 0.06%)  ???:<ps_css::minify::Minifier>::join_declarations [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,506,320 ( 0.06%)  ???:<regex_automata::meta::strategy::Core>::search_nofail [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,497,792 ( 0.06%)  ???:<ps_html::writer::WriterFilter<ps_nginx::send::VecSink>>::emit_name [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,477,039 ( 0.06%)  ./malloc/./malloc/arena.c:malloc
+  1,459,694 ( 0.06%)  ???:<ps_html::event::EventQueue>::insert_before [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,427,389 ( 0.06%)  ???:<regex_syntax::hir::interval::IntervalSet<regex_syntax::hir::ClassUnicodeRange>>::canonicalize [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,377,135 ( 0.05%)  ???:<ps_config::wildcard::WildcardGroup>::is_match [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,328,651 ( 0.05%)  ???:<ps_html::event::EventQueue>::erase [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,304,379 ( 0.05%)  ???:<ps_html::parser::Dom>::element_name [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,298,198 ( 0.05%)  ???:<core::fmt::Formatter>::pad [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,264,170 ( 0.05%)  ???:zlib_rs::deflate::deflate [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,245,918 ( 0.05%)  ???:<ps_css::parser::Parser>::parse_number [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,244,880 ( 0.05%)  ???:<ps_html::parser::Dom>::element_name_equals [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,243,358 ( 0.05%)  ???:<ps_html::filters::image_rewrite::ImageRewriteFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,241,649 ( 0.05%)  ???:<ps_http::google_url::GoogleUrl>::leaf_sans_query [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,235,345 ( 0.05%)  ???:<ps_html::parser::Dom>::clear_events [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,230,406 ( 0.05%)  ???:<ps_css::minify::Minifier>::minify_value [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,215,116 ( 0.05%)  ???:<core::str::pattern::StrSearcher>::new [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,184,364 ( 0.05%)  ???:<ps_html::lexer::Lexer>::emit_literal [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,178,957 ( 0.05%)  ???:<ps_js::tokenizer::Tokenizer>::try_consume_whitespace [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,176,566 ( 0.05%)  ???:<ps_css::property::generated::Prop>::from_text [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,146,214 ( 0.04%)  ???:<ps_http::headers::Headers>::lookup [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,144,401 ( 0.04%)  ???:<idna::uts46::Uts46>::to_ascii_from_cow [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,120,287 ( 0.04%)  ???:<ps_http::headers::Headers>::remove_all_from_sorted::{closure#0}::{closure#0} [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,105,185 ( 0.04%)  ???:<ps_css::parser::Parser>::parse_color [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,077,644 ( 0.04%)  ???:core::ptr::drop_glue::<[alloc::vec::Vec<ps_css::selector::SimpleSelectors>]> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,077,085 ( 0.04%)  ???:<zlib_rs::deflate::BitWriter>::send_tree [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,076,772 ( 0.04%)  ???:<flate2::zlib::write::ZlibEncoder<alloc::vec::Vec<u8>> as core::io::write::Write>::write_all [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,066,902 ( 0.04%)  ???:<ps_css::property::Property>::prop_text [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,043,414 ( 0.04%)  ???:<core::fmt::Formatter>::pad_integral [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,030,225 ( 0.04%)  ???:<(alloc::string::String, alloc::string::String, ps_config::options::Category) as <[_]>::to_vec_in::ConvertVec>::to_vec::<alloc::alloc::Global> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+  1,025,681 ( 0.04%)  ???:core::slice::sort::stable::drift::sort::<regex_syntax::hir::ClassUnicodeRange, <regex_syntax::hir::ClassUnicodeRange as core::cmp::PartialOrd>::lt> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    992,497 ( 0.04%)  ???:zlib_rs::deflate::read_buf_window [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    960,300 ( 0.04%)  ???:ps_html::keywords::unescape [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    906,660 ( 0.04%)  ???:<flate2::mem::Compress as flate2::zio::Ops>::run_vec [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    906,211 ( 0.03%)  ???:<ps_html::script_scanner::ScriptTagScanner>::parse_script_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    898,560 ( 0.03%)  ???:zlib_rs::adler32::generic::adler32_len_64 [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    890,856 ( 0.03%)  ???:<ps_html::lexer::Lexer>::emit_tag_close [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    861,912 ( 0.03%)  ???:<ps_html::filters::cache_extender::CacheExtenderFilter as ps_html::filter::HtmlFilter>::end_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    861,571 ( 0.03%)  ???:<ps_js::tokenizer::Tokenizer>::push_expression [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    855,426 ( 0.03%)  ???:<ps_js::tokenizer::Tokenizer>::consume_close_paren [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    846,415 ( 0.03%)  ???:jpeg_decoder::decoder::compute_image [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    833,910 ( 0.03%)  ???:<ps_js::tokenizer::Tokenizer>::consume_operator [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    832,487 ( 0.03%)  /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_hash.c:ngx_hash_init [/home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/objs/nginx]
+    830,196 ( 0.03%)  ???:<ps_html::lexer::Lexer>::eval_attribute [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    827,910 ( 0.03%)  ???:<ps_shm::byte_cache::SharedByteCache>::matches [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    798,120 ( 0.03%)  ???:<ps_html::lexer::Lexer>::make_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    791,760 ( 0.03%)  ???:<ps_html::name::HtmlName>::new [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    790,680 ( 0.03%)  ./malloc/./malloc/arena.c:realloc
+    777,060 ( 0.03%)  ???:<ps_html::parser::Dom>::add_escaped_attribute [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    776,803 ( 0.03%)  ???:ps_cache::base64::encode_with [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    775,900 ( 0.03%)  ???:<regex_automata::util::look::LookMatcher>::matches_inline [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    768,798 ( 0.03%)  ???:<core::str::pattern::StrSearcher as core::str::pattern::Searcher>::next_match [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    762,138 ( 0.03%)  ???:ps_cache::base64::decode_with [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    760,734 ( 0.03%)  ???:<ps_css::parser::Parser>::skip_to_next_any [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    742,169 ( 0.03%)  ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    740,714 ( 0.03%)  ???:<ps_css::parser::Parser>::parse_statement [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    740,224 ( 0.03%)  ???:<ps_css::minify::Minifier>::minify_ruleset_ignoring_media [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    736,014 ( 0.03%)  ???:__rustc::__rust_alloc [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    732,260 ( 0.03%)  ???:__rustc::__rdl_dealloc [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    732,260 ( 0.03%)  ???:__rustc::__rust_dealloc [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    730,852 ( 0.03%)  ???:<ps_css::parser::Parser>::parse_any_with_function_depth [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    722,091 ( 0.03%)  ???:<zlib_rs::stable::Deflate>::compress_uninit [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    721,430 ( 0.03%)  ???:<ps_html::parser::Dom>::is_rewritable [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    715,984 ( 0.03%)  ???:<regex_syntax::utf8::Utf8Sequences as core::iter::traits::iterator::Iterator>::next [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    707,515 ( 0.03%)  ???:ps_html::url_input_resource::make_url_input_resource [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    705,425 ( 0.03%)  ???:<regex_automata::nfa::thompson::pikevm::PikeVM>::search_slots [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    703,728 ( 0.03%)  ???:<url::parser::Parser>::with_query_and_fragment [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    698,544 ( 0.03%)  ???:<ps_html::filters::css_combine::CssCombineFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    691,039 ( 0.03%)  ???:<ps_html::filters::css::CssFilter as ps_html::filter::HtmlFilter>::end_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    685,459 ( 0.03%)  ???:<alloc::borrow::Cow<[u8]> as core::convert::From<percent_encoding::PercentDecode>>::from [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    673,325 ( 0.03%)  ???:<alloc::string::String>::from_utf8_lossy [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    667,261 ( 0.03%)  ???:core::ptr::drop_glue::<core::cell::RefCell<regex_automata::nfa::thompson::compiler::Utf8State>> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    663,088 ( 0.03%)  ???:zlib_rs::deflate::scan_tree [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    659,813 ( 0.03%)  ???:ps_html::name::generated::as_str [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    658,113 ( 0.03%)  ???:<jpeg_encoder::huffman::HuffmanTable>::new_optimized [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    645,644 ( 0.02%)  ???:ps_html::css_tag_scanner::parse_css_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    634,255 ( 0.02%)  ???:<ps_html::filters::css::CssFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    633,435 ( 0.02%)  ???:<regex_automata::nfa::thompson::map::Utf8BoundedEntry as alloc::vec::spec_from_elem::SpecFromElem>::from_elem::<alloc::alloc::Global> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    631,740 ( 0.02%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    630,373 ( 0.02%)  ???:<zlib_rs::deflate::BitWriter>::send_bits_overflow [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    624,058 ( 0.02%)  ???:zlib_rs::deflate::gen_codes [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    611,163 ( 0.02%)  ???:<url::host::Host<alloc::borrow::Cow<str>>>::parse_cow [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    603,909 ( 0.02%)  ???:core::ptr::drop_glue::<hashbrown::raw::RawTable<(&str, ps_config::options::Value)>> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    588,525 ( 0.02%)  ???:<ps_html::filters::prioritize_lcp_images::PrioritizeLcpImagesFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    587,326 ( 0.02%)  ???:<ps_js::tokenizer::Tokenizer>::consume_string [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    572,071 ( 0.02%)  ???:<ps_html::parser::Dom>::decoded_attribute [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    569,941 ( 0.02%)  ???:<core::str::iter::SplitInternal<char>>::next_back [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    556,194 ( 0.02%)  ???:ps_html::keywords::escape [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    553,659 ( 0.02%)  ???:<core::ffi::c_str::CStr>::from_bytes_with_nul [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    553,278 ( 0.02%)  ???:ps_css::escapes::escape_identifier_name [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    550,647 ( 0.02%)  ???:core::num::imp::dec2flt::parse::parse_number [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    547,992 ( 0.02%)  ???:<ps_html::lexer::Lexer>::make_attribute [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    540,601 ( 0.02%)  ./malloc/./malloc/malloc.c:calloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    537,280 ( 0.02%)  ???:zlib_rs::deflate::algorithm::run [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    534,113 ( 0.02%)  ???:<zlib_rs::deflate::Heap>::construct_huffman_tree [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    530,624 ( 0.02%)  ???:ps_html::filters::logo_detection::detect_logo [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    522,246 ( 0.02%)  ???:<str as core::fmt::Debug>::fmt [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    516,354 ( 0.02%)  ???:<core::str::iter::SplitInternal<char>>::next [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    513,240 ( 0.02%)  ???:<ps_shm::write_tracker::WriteTracker>::repair_slot [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    511,600 ( 0.02%)  ???:<alloc::vec::Vec<alloc::string::String> as core::clone::Clone>::clone [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    506,124 ( 0.02%)  ./malloc/./malloc/malloc.c:alloc_perturb [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    505,892 ( 0.02%)  ???:ps_cache::cache::filename::append_segment [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    502,947 ( 0.02%)  ???:<f64 as core::str::traits::FromStr>::from_str [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    495,011 ( 0.02%)  ???:<ps_shm::ownership::OwnershipTable>::try_claim [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    493,321 ( 0.02%)  ???:<ps_html::parser::Dom>::leaf_contents [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    489,412 ( 0.02%)  ???:<alloc::vec::Vec<u8> as alloc::vec::spec_from_elem::SpecFromElem>::from_elem::<alloc::alloc::Global> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    483,720 ( 0.02%)  ???:<regex_automata::nfa::thompson::pikevm::PikeVM>::search_slots_imp [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    483,354 ( 0.02%)  ???:<ps_shm::byte_cache::SharedByteCache>::put [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    475,043 ( 0.02%)  ???:ps_http::content_type::extension_to_content_type [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    470,662 ( 0.02%)  ???:<ps_config::options::Value>::from_default [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    470,318 ( 0.02%)  ???:<ps_js::tokenizer::Tokenizer>::try_consume_comment [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    466,997 ( 0.02%)  ???:<alloc::vec::Vec<(alloc::string::String, alloc::string::String)> as core::clone::Clone>::clone [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    464,709 ( 0.02%)  ???:<ps_html::domain_lawyer::DomainLawyer>::find_domain [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    462,054 ( 0.02%)  ???:<ps_html::writer::WriterFilter<ps_nginx::send::VecSink> as ps_html::filter::HtmlFilter>::end_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    461,019 ( 0.02%)  /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_conf_file.c:ngx_conf_parse'2 [/home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/objs/nginx]
+    460,617 ( 0.02%)  ???:<ps_stats::core::Statistics>::add_variable [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    458,154 ( 0.02%)  ???:<ps_http::google_url::GoogleUrl>::new [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    444,564 ( 0.02%)  ???:<ps_html::parser::Dom>::close_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    437,605 ( 0.02%)  ???:<ps_js::tokenizer::Tokenizer>::consume_number [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    437,453 ( 0.02%)  ???:<ps_config::options::RewriteOptions>::signature_shared [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    431,834 ( 0.02%)  ???:<alloc::vec::Vec<(alloc::string::String, bool)> as core::clone::Clone>::clone [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    431,627 ( 0.02%)  ???:<ps_config::filter::Filter>::from_id [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    420,768 ( 0.02%)  ???:<ps_html::filters::critical_images_beacon::CriticalImagesBeaconFilter as ps_html::filter::HtmlFilter>::end_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    411,831 ( 0.02%)  ???:<core::fmt::Formatter>::pad_integral::write_prefix [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    406,736 ( 0.02%)  ???:<ps_css::value::Value>::dimension_unit_text [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    405,507 ( 0.02%)  ???:<ps_http::google_url::GoogleUrl>::origin [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    405,168 ( 0.02%)  ???:<ps_html::parser::Dom>::element_style [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    404,054 ( 0.02%)  ???:<ps_css::tags::generated::HtmlTag>::find_builtin [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    397,056 ( 0.02%)  ???:<url::Url>::host_str [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    393,265 ( 0.02%)  ???:<std::path::Components>::parse_next_component_back [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    392,263 ( 0.02%)  ???:<ps_html::filters::javascript::JavascriptFilter as ps_html::filter::HtmlFilter>::characters [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    387,324 ( 0.01%)  ???:<ps_html::parser::Dom>::find_attribute_by_name [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    381,514 ( 0.01%)  ???:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&alloc::string::String> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    379,908 ( 0.01%)  ???:ps_html::filters::logo_detection::class_id_score [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    377,196 ( 0.01%)  ???:<url::parser::Parser>::parse_relative [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    371,712 ( 0.01%)  ???:<alloc::raw_vec::RawVec<ps_css::selector::SimpleSelector>>::grow_one [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    369,624 ( 0.01%)  ???:<ps_css::minify::Minifier>::write_number_text [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    368,807 ( 0.01%)  ???:<regex_automata::util::pool::inner::Pool<regex_automata::meta::regex::Cache, alloc::boxed::Box<dyn core::ops::function::Fn<(), Output = regex_automata::meta::regex::Cache> + core::marker::Send + core::panic::unwind_safe::RefUnwindSafe + core::panic::unwind_safe::UnwindSafe + core::marker::Sync>>>::put_value [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    366,927 ( 0.01%)  ???:<url::parser::Parser>::parse_path_start [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    363,946 ( 0.01%)  ???:<ps_html::filters::css_inline::CssInlineFilter as ps_html::filter::HtmlFilter>::end_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    361,162 ( 0.01%)  ???:<regex_automata::nfa::thompson::compiler::Utf8Compiler>::add [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    359,828 ( 0.01%)  ./elf/../sysdeps/x86_64/dl-machine.h:_dl_relocate_object
+    356,950 ( 0.01%)  ???:ps_http::content_type::mime_to_content_type [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    356,104 ( 0.01%)  ???:<ps_html::resource::InputResource as core::clone::Clone>::clone [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    344,936 ( 0.01%)  ???:core::ptr::drop_glue::<alloc::vec::Vec<ps_css::value::Value>> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    344,664 ( 0.01%)  ???:<ps_html::filters::amp_document::AmpDocumentFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    342,240 ( 0.01%)  ???:<regex_automata::util::pool::inner::Pool<regex_automata::meta::regex::Cache, alloc::boxed::Box<dyn core::ops::function::Fn<(), Output = regex_automata::meta::regex::Cache> + core::marker::Send + core::panic::unwind_safe::RefUnwindSafe + core::panic::unwind_safe::UnwindSafe + core::marker::Sync>>>::get_slow [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    342,065 ( 0.01%)  ???:ps_css::string_util::parse_double [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    340,748 ( 0.01%)  ???:<ps_http::google_url::GoogleUrl>::after_last_slash [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    338,131 ( 0.01%)  ???:ps_html::filters::css::collect_uris [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    334,564 ( 0.01%)  ???:<ps_js::tokenizer::Tokenizer>::consume_period [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    326,498 ( 0.01%)  ???:core::ptr::drop_glue::<alloc::vec::Vec<ps_css::ast::Declaration>> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    324,318 ( 0.01%)  ???:ps_http::response::determine_content_type [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    322,981 ( 0.01%)  ./elf/../sysdeps/x86_64/tls_get_addr.S:__tls_get_addr [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    321,354 ( 0.01%)  ???:ps_html::html_async::schedule_rewrite [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    320,664 ( 0.01%)  ???:ps_http::time::parse_http_date [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    319,743 ( 0.01%)  ???:ps_config::property::strip_mod_pagespeed_prefix [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    319,509 ( 0.01%)  ???:<ps_css::identifier::generated::Ident>::from_text [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    319,157 ( 0.01%)  ???:<ps_js::tokenizer::Tokenizer>::consume_comma [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    318,003 ( 0.01%)  ???:zlib_rs::adler32::adler32 [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    317,112 ( 0.01%)  ???:<ps_js::tokenizer::Tokenizer>::consume_open_paren [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    316,272 ( 0.01%)  ???:core::ptr::drop_glue::<ps_config::options::RewriteOptions> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    313,174 ( 0.01%)  ???:<png::decoder::Reader<core::io::cursor::Cursor<&[u8]>>>::next_interlaced_row_impl [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    312,161 ( 0.01%)  ???:<ps_http::google_url::GoogleUrl>::unescape_ignore_plus [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    310,826 ( 0.01%)  ???:<ps_config::filter::FilterState>::enabled [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    309,452 ( 0.01%)  ???:<ps_http::google_url::GoogleUrl>::is_web_valid [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    308,844 ( 0.01%)  ???:<ps_html::lexer::Lexer>::emit_comment [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    308,151 ( 0.01%)  ???:OPENSSL_LH_insert [/usr/lib/x86_64-linux-gnu/libcrypto.so.3]
+    307,608 ( 0.01%)  ???:core::ptr::drop_glue::<ps_html::parser::Dom> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    306,792 ( 0.01%)  ???:<ps_html::filters::strip_subresource_hints::StripSubresourceHintsFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    306,210 ( 0.01%)  ???:<str>::trim_matches::<<char>::is_whitespace> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    298,387 ( 0.01%)  ???:0x000000000021d4d0 [/usr/lib/x86_64-linux-gnu/libcrypto.so.3]
+    296,108 ( 0.01%)  ???:<i64 as core::fmt::Display>::fmt [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    295,185 ( 0.01%)  ???:<ps_http::headers::Headers>::add [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    294,156 ( 0.01%)  ???:ps_html::filters::logo_detection::attribute_value [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    292,746 ( 0.01%)  ???:<ps_js::tokenizer::Tokenizer>::consume_close_brace [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    291,744 ( 0.01%)  ???:<png::encoder::Writer<&mut alloc::vec::Vec<u8>>>::write_image_data [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    287,965 ( 0.01%)  ???:<str as core::fmt::Display>::fmt [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    286,084 ( 0.01%)  ???:core::ptr::drop_glue::<ps_http::response::ResponseHeaders> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    285,934 ( 0.01%)  ???:core::ptr::drop_glue::<ps_css::value::Value> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    284,534 ( 0.01%)  ???:<ps_html::filters::js_combine::JsCombineFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    276,216 ( 0.01%)  ???:<url::Url>::path [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    275,980 ( 0.01%)  ???:<ps_html::filters::meta_tag::MetaTagFilter as ps_html::filter::HtmlFilter>::end_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    275,252 ( 0.01%)  ???:<regex_automata::nfa::thompson::compiler::Utf8Compiler>::compile_from [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    273,828 ( 0.01%)  ???:<jpeg_decoder::huffman::HuffmanDecoder>::get_bits::<core::io::cursor::Cursor<&[u8]>> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    272,702 ( 0.01%)  ???:<ps_http::response::CacheComputer>::state [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    272,545 ( 0.01%)  ???:ps_css::string_util::lowercase_ascii [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    268,182 ( 0.01%)  ???:<png::decoder::unfiltering_buffer::UnfilteringBuffer>::unfilter_curr_row_in_place [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    263,655 ( 0.01%)  ???:<ps_cache::cache::FileCache as ps_cache::cache::Cache>::is_healthy [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    263,655 ( 0.01%)  ???:<ps_cache::cache::LruCache as ps_cache::cache::Cache>::is_healthy [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    263,448 ( 0.01%)  ???:<alloc::raw_vec::RawVec<ps_css::value::Value>>::grow_one [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    262,768 ( 0.01%)  ???:<regex_automata::nfa::thompson::nfa::Inner>::add [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    259,948 ( 0.01%)  ???:ps_http::response::read_lifetime_directive [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    254,397 ( 0.01%)  ???:<ps_html::filters::js_inline::JsInlineFilter as ps_html::filter::HtmlFilter>::end_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    253,111 ( 0.01%)  ???:<ps_html::server_context::ResourceDriver>::create_input_resource_unchecked [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    248,934 ( 0.01%)  ???:<ps_html::filters::javascript::JavascriptFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    246,376 ( 0.01%)  ./elf/./elf/do-rel.h:_dl_relocate_object
+    245,613 ( 0.01%)  ???:<jpeg_decoder::huffman::HuffmanTable>::new [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    242,320 ( 0.01%)  ???:<regex_automata::meta::wrappers::PikeVMCache>::get [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    237,579 ( 0.01%)  ???:<ps_css::parser::Parser>::parse_ident_or_function [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    234,864 ( 0.01%)  ???:<ps_html::base_tracker::BaseTracker>::observe [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    234,288 ( 0.01%)  ???:<alloc::raw_vec::RawVec<(u32, usize)>>::grow_one [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    233,269 ( 0.01%)  ???:ps_html::metadata::decode_partitions [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    233,047 ( 0.01%)  ???:core::ptr::drop_glue::<ps_css::ast::Ruleset> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    232,242 ( 0.01%)  ???:<regex_automata::nfa::thompson::compiler::Utf8Compiler>::compile [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    229,770 ( 0.01%)  ???:<ps_http::google_url::GoogleUrl>::resolve [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    229,474 ( 0.01%)  ???:<ps_css::value::Unit>::from_text [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    228,866 ( 0.01%)  ???:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&(u32, usize)> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    228,593 ( 0.01%)  ???:<core::iter::adapters::filter::Filter<core::iter::adapters::map::Map<core::str::iter::Split<char>, <ps_http::response::ResponseHeaders>::apply_s_max_age::{closure#0}>, <ps_http::response::ResponseHeaders>::apply_s_max_age::{closure#1}> as core::iter::traits::iterator::Iterator>::next [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    227,087 ( 0.01%)  ???:<ps_css::parser::Parser>::parse_escape [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    223,921 ( 0.01%)  ???:<ps_cache::namer::ResourceNamer>::decode [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    219,956 ( 0.01%)  ???:<core::iter::adapters::zip::Zip<core::iter::adapters::zip::Zip<core::iter::adapters::zip::Zip<core::slice::iter::ChunksExactMut<u8>, core::slice::iter::Iter<u8>>, core::slice::iter::Iter<u8>>, core::slice::iter::Iter<u8>> as core::iter::adapters::zip::ZipImpl<core::iter::adapters::zip::Zip<core::iter::adapters::zip::Zip<core::slice::iter::ChunksExactMut<u8>, core::slice::iter::Iter<u8>>, core::slice::iter::Iter<u8>>, core::slice::iter::Iter<u8>>>::nth [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    219,936 ( 0.01%)  ???:<alloc::raw_vec::RawVec<ps_css::selector::SimpleSelectors>>::grow_one [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    218,093 ( 0.01%)  ???:<ps_html::filters::js_inline::JsInlineFilter as ps_html::filter::HtmlFilter>::characters [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    213,490 ( 0.01%)  ???:<ps_css::minify::Minifier>::minify_value'2 [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    211,597 ( 0.01%)  ???:<ps_html::filters::js_combine::JsCombineFilter as ps_html::filter::HtmlFilter>::end_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    208,640 ( 0.01%)  ???:ps_html::filters::logo_detection::score_logo_url [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    207,468 ( 0.01%)  ???:ps_html::filters::logo_detection::has_token [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    206,488 ( 0.01%)  ???:core::ptr::drop_glue::<ps_html::element::Attribute> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    206,010 ( 0.01%)  ???:idna::domain_to_ascii_from_cow [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    205,297 ( 0.01%)  ???:<regex_automata::nfa::thompson::builder::Builder>::build [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    205,065 ( 0.01%)  ???:<ps_cache::cache::WriteThroughCache as ps_cache::cache::Cache>::is_healthy [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    205,065 ( 0.01%)  ???:<ps_cache::cache::WriteThroughCache as ps_cache::cache::Cache>::is_healthy'2 [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    203,504 ( 0.01%)  ???:<url::parser::Parser>::parse_query_and_fragment [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    201,929 ( 0.01%)  ???:ps_http::proto::decode_response [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    201,158 ( 0.01%)  ???:<regex_automata::nfa::thompson::compiler::Compiler>::c'2 [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    199,272 ( 0.01%)  ???:core::ptr::drop_glue::<ps_config::cookies::CookiePatternSet> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    198,334 ( 0.01%)  ???:<ps_js::tokenizer::Tokenizer>::consume_colon [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    198,200 ( 0.01%)  ???:<regex_automata::meta::strategy::Core as regex_automata::meta::strategy::Strategy>::search [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    196,306 ( 0.01%)  ???:ps_css::rewrite::collect_image_urls [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    195,971 ( 0.01%)  ???:ps_image::png::decode [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    195,207 ( 0.01%)  ???:core::ptr::drop_glue::<ps_html::resource::InputResource> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    193,601 ( 0.01%)  ???:<alloc::vec::Vec<ps_css::media::MediaQuery> as core::clone::Clone>::clone [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    193,456 ( 0.01%)  ???:core::ptr::drop_glue::<alloc::vec::Vec<ps_html::element::Attribute>> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    193,265 ( 0.01%)  ???:<ps_html::filters::js_inline::JsInlineFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    193,058 ( 0.01%)  ???:<u8 as core::fmt::LowerHex>::fmt [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    192,924 ( 0.01%)  ???:<ps_html::filters::css_inline_import_to_link::CssInlineImportToLinkFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    191,339 ( 0.01%)  ???:<ps_js::tokenizer::Tokenizer>::consume_semicolon [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    188,518 ( 0.01%)  ???:<zlib_rs::deflate::State>::init_block [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    187,362 ( 0.01%)  ???:<ps_css::minify::Minifier>::minify_stylesheet [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    184,822 ( 0.01%)  ???:0x0000000000220a10 [/usr/lib/x86_64-linux-gnu/libcrypto.so.3]
+    184,487 ( 0.01%)  ???:<ps_cache::namer::ResourceNamer>::encode [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    183,002 ( 0.01%)  ???:<ps_http::headers::Headers>::remove_all [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    182,312 ( 0.01%)  ???:<regex_syntax::ast::parse::ParserI<&mut regex_syntax::ast::parse::Parser>>::char [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    179,989 ( 0.01%)  ???:<ps_html::metadata::Cursor>::string_field [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    178,920 ( 0.01%)  ???:<ps_html::metadata::CachedResult as core::clone::Clone>::clone [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    178,178 ( 0.01%)  ???:<ps_css::parser::Parser>::parse_any_with_function_depth'2 [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    177,464 ( 0.01%)  ???:<ps_css::property::generated::Prop>::text [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    176,505 ( 0.01%)  ???:<ps_html::filters::image_rewrite::ImageRewriteFilter as ps_html::filter::HtmlFilter>::end_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    176,148 ( 0.01%)  ???:<ps_html::filters::css_combine::CssCombineFilter as ps_html::filter::HtmlFilter>::end_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    174,582 ( 0.01%)  ???:0x000000000021dcc0 [/usr/lib/x86_64-linux-gnu/libcrypto.so.3]
+    174,039 ( 0.01%)  ???:<ps_cache::cache::WriteThroughCache as ps_cache::cache::Cache>::get [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    173,392 ( 0.01%)  ???:fdeflate::huffman::build_table [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    171,000 ( 0.01%)  ???:<ps_html::domain_lawyer::DomainLawyer>::normalize_domain_name [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    170,592 ( 0.01%)  ???:<alloc::raw_vec::RawVec<ps_html::element::NodeData>>::grow_one [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    169,956 ( 0.01%)  ???:<ps_html::filters::amp_document::AmpDocumentFilter as ps_html::filter::HtmlFilter>::characters [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    169,278 ( 0.01%)  ???:<ps_html::server_context::ResourceDriver>::decoded_base_url [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    167,161 ( 0.01%)  ???:<ps_html::filters::js_combine::JsCombineFilter as ps_html::filter::HtmlFilter>::characters [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    166,135 ( 0.01%)  ???:<ps_shm::SharedCounters>::add [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    165,488 ( 0.01%)  ???:<ps_html::server_context::ResourceDriver>::create_input_resource [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    162,630 ( 0.01%)  ???:<&str as core::fmt::Display>::fmt [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    161,944 ( 0.01%)  ???:<ps_shm::write_tracker::WriteTracker>::snapshot [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    161,380 ( 0.01%)  ./string/../sysdeps/x86_64/multiarch/../multiarch/strcmp-sse2.S:strcmp [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    160,630 ( 0.01%)  ???:ps_http::headers::is_comma_separated [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    159,852 ( 0.01%)  ./string/../sysdeps/x86_64/multiarch/strcmp-avx2.S:__strcmp_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    159,731 ( 0.01%)  ???:<ps_html::filters::prioritize_lcp_images::PrioritizeLcpImagesFilter as ps_html::filter::HtmlFilter>::end_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    158,955 ( 0.01%)  ???:<jpeg_decoder::upsampler::UpsamplerH1V1 as jpeg_decoder::upsampler::Upsample>::upsample_row [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    158,954 ( 0.01%)  ???:core::ptr::drop_glue::<alloc::vec::Vec<alloc::vec::Vec<ps_css::selector::SimpleSelectors>>> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    158,671 ( 0.01%)  ???:<ps_html::filters::css_inline::CssInlineFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    154,251 ( 0.01%)  ???:crc32fast::specialized::pclmulqdq::calculate [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    153,685 ( 0.01%)  ???:std::sys::backtrace::__rust_begin_short_backtrace::<jpeg_decoder::worker::multithreaded::create_worker::{closure#0}, ()> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    150,432 ( 0.01%)  ???:<ps_config::options::RewriteOptions>::respect_vary [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    149,851 ( 0.01%)  ???:<ps_cache::cache::LruCache as ps_cache::cache::Cache>::get [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    148,893 ( 0.01%)  ./elf/./elf/dl-lookup.c:_dl_lookup_symbol_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    147,936 ( 0.01%)  ???:<alloc::raw_vec::RawVec<ps_css::ast::Declaration>>::grow_one [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    147,581 ( 0.01%)  ???:ps_http::time::format_http_date [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    146,332 ( 0.01%)  ???:<ps_css::parser::Parser>::parse_statement'2 [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    146,050 ( 0.01%)  ???:<url::parser::Parser>::pop_path [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    145,880 ( 0.01%)  ???:<ps_html::domain_lawyer::DomainLawyer>::map_origin_url [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    144,804 ( 0.01%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x
+    144,540 ( 0.01%)  ???:<ps_config::cookies::CookiePatternSet as core::clone::Clone>::clone [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    144,207 ( 0.01%)  ???:<url::host::Host<alloc::borrow::Cow<str>> as core::fmt::Display>::fmt [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    144,207 ( 0.01%)  ???:url::host::parse_ipv4number [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    144,050 ( 0.01%)  ???:OPENSSL_LH_strhash [/usr/lib/x86_64-linux-gnu/libcrypto.so.3]
+    143,952 ( 0.01%)  ???:<alloc::raw_vec::RawVec<ps_css::rewrite::UrlLocation>>::grow_one [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    143,898 ( 0.01%)  ???:alloc::str::join_generic_copy::<str, u8, alloc::string::String> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    143,820 ( 0.01%)  ???:<ps_html::filters::add_head::AddHeadFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    143,468 ( 0.01%)  ???:0x0000000004f2a6b0 [???]
+    143,370 ( 0.01%)  ???:<alloc::raw_vec::RawVec<alloc::vec::Vec<u8>>>::grow_one [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    142,596 ( 0.01%)  ???:<ps_html::filters::css_inline_import_to_link::CssInlineImportToLinkFilter as ps_html::filter::HtmlFilter>::end_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    142,230 ( 0.01%)  ???:ps_http::time::month_number [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    141,818 ( 0.01%)  ./malloc/../string/bits/string_fortified.h:_int_realloc
+    141,721 ( 0.01%)  ???:__rustc::__rust_realloc [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    139,644 ( 0.01%)  ???:<u32>::from_ascii_bytes_radix_impl [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    138,762 ( 0.01%)  ???:<ps_html::metadata::Cursor>::input [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    137,773 ( 0.01%)  ???:<ps_html::server_context::ResourceDriver>::get_slot [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    137,231 ( 0.01%)  ???:<ps_css::parser::Parser>::parse_string [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    136,886 ( 0.01%)  ???:<ps_css::value::Value>::number_with_unit [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    135,056 ( 0.01%)  ???:<ps_html::filters::meta_tag::MetaTagFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    134,588 ( 0.01%)  ???:<i64>::from_ascii_bytes_radix_impl [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    134,208 ( 0.01%)  ???:<ps_html::filters::critical_images_beacon::CriticalImagesBeaconFilter as ps_html::filter::HtmlFilter>::start_element [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    133,819 ( 0.01%)  ???:<ps_css::parser::Parser>::parse_function [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    133,774 ( 0.01%)  ???:<ps_html::filters::javascript::JavascriptFilter as ps_html::filter::HtmlFilter>::ie_directive [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    133,308 ( 0.01%)  ???:ps_html::filters::logo_detection::element_values [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    132,949 ( 0.01%)  ???:<alloc::collections::btree::map::BTreeMap<alloc::string::String, i64>>::insert [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    132,744 ( 0.01%)  ./stdlib/./stdlib/canonicalize.c:realpath@@GLIBC_2.3 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    132,455 ( 0.01%)  /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_string.c:ngx_vslprintf [/home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/objs/nginx]
+    130,392 ( 0.01%)  ???:<ps_css::parser::Parser>::parse_string_value [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    128,208 ( 0.00%)  ???:ps_http::proto::encode_response [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    127,432 ( 0.00%)  ???:ps_html::filters::css::collect_stylesheet_uris [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    126,615 ( 0.00%)  ???:<ps_html::parser::Dom>::element_attributes [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    126,336 ( 0.00%)  ???:ps_nginx::inplace_url_agreement::url_agrees [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    125,630 ( 0.00%)  ???:<ps_cache::cache::CompressedCache as ps_cache::cache::Cache>::get [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    124,005 ( 0.00%)  ./nptl/./nptl/pthread_mutex_trylock.c:pthread_mutex_trylock@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    122,952 ( 0.00%)  ???:core::ptr::drop_glue::<alloc::vec::Vec<ps_html::cacheable_resource::InputInfo>> [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    122,278 ( 0.00%)  ???:<ps_html::element::Attribute>::name_str [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    122,278 ( 0.00%)  ???:<ps_html::name::HtmlName>::value [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    121,662 ( 0.00%)  ???:<ps_http::proto::Cursor>::read_varint [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+    121,296 ( 0.00%)  ???:<alloc::collections::btree::map::IntoIter<alloc::string::String, alloc::collections::btree::set_val::SetValZST>>::dying_next [/tmp/pagespeed-shared-profile-502aebdd6593131ce9c3add25ccca4418f8c1fcca2b3926ea276cd53f1b1f913.so]
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_hash.c
+--------------------------------------------------------------------------------
+Ir               
+
+-- line 6 ----------------------------------------
+      .           
+      .           
+      .           #include <ngx_config.h>
+      .           #include <ngx_core.h>
+      .           
+      .           
+      .           void *
+      .           ngx_hash_find(ngx_hash_t *hash, ngx_uint_t key, u_char *name, size_t len)
+    684 ( 0.00%)  {
+      .               ngx_uint_t       i;
+      .               ngx_hash_elt_t  *elt;
+      .           
+      .           #if 0
+      .               ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0, "hf:\"%*s\"", len, name);
+      .           #endif
+      .           
+    912 ( 0.00%)      elt = hash->buckets[key % hash->size];
+      .           
+    456 ( 0.00%)      if (elt == NULL) {
+      .                   return NULL;
+      .               }
+      .           
+    708 ( 0.00%)      while (elt->value) {
+    684 ( 0.00%)          if (len != (size_t) elt->len) {
+      .                       goto next;
+      .                   }
+      .           
+  5,940 ( 0.00%)          for (i = 0; i < len; i++) {
+  5,280 ( 0.00%)              if (name[i] != elt->name[i]) {
+      .                           goto next;
+      .                       }
+      .                   }
+      .           
+      .                   return elt->value;
+      .           
+      .               next:
+      .           
+     24 ( 0.00%)          elt = (ngx_hash_elt_t *) ngx_align_ptr(&elt->name[0] + elt->len,
+      .                                                          sizeof(void *));
+      .                   continue;
+      .               }
+      .           
+      .               return NULL;
+    456 ( 0.00%)  }
+      .           
+      .           
+      .           void *
+      .           ngx_hash_find_wc_head(ngx_hash_wildcard_t *hwc, u_char *name, size_t len)
+      .           {
+      .               void        *value;
+      .               ngx_uint_t   i, n, key;
+      .           
+-- line 57 ----------------------------------------
+-- line 245 ----------------------------------------
+      .           }
+      .           
+      .           
+      .           #define NGX_HASH_ELT_SIZE(name)                                               \
+      .               (sizeof(void *) + ngx_align((name)->key.len + 2, sizeof(void *)))
+      .           
+      .           ngx_int_t
+      .           ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
+    171 ( 0.00%)  {
+      .               u_char          *elts;
+      .               size_t           len;
+      .               u_short         *test;
+      .               ngx_uint_t       i, n, key, size, start, bucket_size;
+      .               ngx_hash_elt_t  *elt, **buckets;
+      .           
+     95 ( 0.00%)      if (hinit->max_size == 0) {
+      .                   ngx_log_error(NGX_LOG_EMERG, hinit->pool->log, 0,
+      .                                 "could not build %s, you should "
+      .                                 "increase %s_max_size: %i",
+      .                                 hinit->name, hinit->name, hinit->max_size);
+      .                   return NGX_ERROR;
+      .               }
+      .           
+     95 ( 0.00%)      if (hinit->bucket_size > 65536 - ngx_cacheline_size) {
+      .                   ngx_log_error(NGX_LOG_EMERG, hinit->pool->log, 0,
+      .                                 "could not build %s, too large "
+      .                                 "%s_bucket_size: %i",
+      .                                 hinit->name, hinit->name, hinit->bucket_size);
+      .                   return NGX_ERROR;
+      .               }
+      .           
+  1,636 ( 0.00%)      for (n = 0; n < nelts; n++) {
+    780 ( 0.00%)          if (names[n].key.data == NULL) {
+      .                       continue;
+      .                   }
+      .           
+  2,274 ( 0.00%)          if (hinit->bucket_size < NGX_HASH_ELT_SIZE(&names[n]) + sizeof(void *))
+      .                   {
+      .                       ngx_log_error(NGX_LOG_EMERG, hinit->pool->log, 0,
+      .                                     "could not build %s, you should "
+      .                                     "increase %s_bucket_size: %i",
+      .                                     hinit->name, hinit->name, hinit->bucket_size);
+      .                       return NGX_ERROR;
+      .                   }
+      .               }
+      .           
+     95 ( 0.00%)      test = ngx_alloc(hinit->max_size * sizeof(u_short), hinit->pool->log);
+  4,020 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/os/unix/ngx_alloc.c:ngx_alloc (19x)
+     38 ( 0.00%)      if (test == NULL) {
+      .                   return NGX_ERROR;
+      .               }
+      .           
+     38 ( 0.00%)      bucket_size = hinit->bucket_size - sizeof(void *);
+      .           
+     94 ( 0.00%)      start = nelts / (bucket_size / (2 * sizeof(void *)));
+     57 ( 0.00%)      start = start ? start : 1;
+      .           
+     95 ( 0.00%)      if (hinit->max_size > 10000 && nelts && hinit->max_size / nelts < 100) {
+      .                   start = hinit->max_size - 1000;
+      .               }
+      .           
+  3,718 ( 0.00%)      for (size = start; size <= hinit->max_size; size++) {
+      .           
+      .                   ngx_memzero(test, size * sizeof(u_short));
+      .           
+164,115 ( 0.01%)          for (n = 0; n < nelts; n++) {
+ 81,550 ( 0.00%)              if (names[n].key.data == NULL) {
+      .                           continue;
+      .                       }
+      .           
+121,800 ( 0.00%)              key = names[n].key_hash % size;
+243,600 ( 0.01%)              len = test[key] + NGX_HASH_ELT_SIZE(&names[n]);
+      .           
+      .           #if 0
+      .                       ngx_log_error(NGX_LOG_ALERT, hinit->pool->log, 0,
+      .                                     "%ui: %ui %uz \"%V\"",
+      .                                     size, key, len, &names[n].key);
+      .           #endif
+      .           
+ 81,200 ( 0.00%)              if (len > bucket_size) {
+      .                           goto next;
+      .                       }
+      .           
+ 79,360 ( 0.00%)              test[key] = (u_short) len;
+      .                   }
+      .           
+      .                   goto found;
+      .           
+      .               next:
+      .           
+      .                   continue;
+      .               }
+-- line 335 ----------------------------------------
+-- line 340 ----------------------------------------
+      .                             "could not build optimal %s, you should increase "
+      .                             "either %s_max_size: %i or %s_bucket_size: %i; "
+      .                             "ignoring %s_bucket_size",
+      .                             hinit->name, hinit->name, hinit->max_size,
+      .                             hinit->name, hinit->bucket_size, hinit->name);
+      .           
+      .           found:
+      .           
+  3,223 ( 0.00%)      for (i = 0; i < size; i++) {
+  1,049 ( 0.00%)          test[i] = sizeof(void *);
+      .               }
+      .           
+  1,636 ( 0.00%)      for (n = 0; n < nelts; n++) {
+    780 ( 0.00%)          if (names[n].key.data == NULL) {
+      .                       continue;
+      .                   }
+      .           
+  1,137 ( 0.00%)          key = names[n].key_hash % size;
+  2,274 ( 0.00%)          len = test[key] + NGX_HASH_ELT_SIZE(&names[n]);
+      .           
+  1,554 ( 0.00%)          if (len > 65536 - ngx_cacheline_size) {
+      .                       ngx_log_error(NGX_LOG_EMERG, hinit->pool->log, 0,
+      .                                     "could not build %s, you should "
+      .                                     "increase %s_max_size: %i",
+      .                                     hinit->name, hinit->name, hinit->max_size);
+      .                       ngx_free(test);
+      .                       return NGX_ERROR;
+      .                   }
+      .           
+    379 ( 0.00%)          test[key] = (u_short) len;
+      .               }
+      .           
+     38 ( 0.00%)      len = 0;
+      .           
+  3,223 ( 0.00%)      for (i = 0; i < size; i++) {
+  3,147 ( 0.00%)          if (test[i] == sizeof(void *)) {
+      .                       continue;
+      .                   }
+      .           
+  1,510 ( 0.00%)          test[i] = (u_short) (ngx_align(test[i], ngx_cacheline_size));
+      .           
+    906 ( 0.00%)          len += test[i];
+      .               }
+      .           
+     38 ( 0.00%)      if (hinit->hash == NULL) {
+      .                   hinit->hash = ngx_pcalloc(hinit->pool, sizeof(ngx_hash_wildcard_t)
+      .                                                        + size * sizeof(ngx_hash_elt_t *));
+      .                   if (hinit->hash == NULL) {
+      .                       ngx_free(test);
+      .                       return NGX_ERROR;
+      .                   }
+      .           
+      .                   buckets = (ngx_hash_elt_t **)
+      .                                 ((u_char *) hinit->hash + sizeof(ngx_hash_wildcard_t));
+      .           
+      .               } else {
+     76 ( 0.00%)          buckets = ngx_pcalloc(hinit->pool, size * sizeof(ngx_hash_elt_t *));
+  8,573 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_palloc.c:ngx_pcalloc (19x)
+     38 ( 0.00%)          if (buckets == NULL) {
+      .                       ngx_free(test);
+      .                       return NGX_ERROR;
+      .                   }
+      .               }
+      .           
+     76 ( 0.00%)      elts = ngx_palloc(hinit->pool, len + ngx_cacheline_size);
+  2,425 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_palloc.c:ngx_palloc (19x)
+     38 ( 0.00%)      if (elts == NULL) {
+      .                   ngx_free(test);
+      .                   return NGX_ERROR;
+      .               }
+      .           
+     76 ( 0.00%)      elts = ngx_align_ptr(elts, ngx_cacheline_size);
+      .           
+  3,223 ( 0.00%)      for (i = 0; i < size; i++) {
+  2,098 ( 0.00%)          if (test[i] == sizeof(void *)) {
+      .                       continue;
+      .                   }
+      .           
+    604 ( 0.00%)          buckets[i] = (ngx_hash_elt_t *) elts;
+    906 ( 0.00%)          elts += test[i];
+      .               }
+      .           
+  3,185 ( 0.00%)      for (i = 0; i < size; i++) {
+  1,049 ( 0.00%)          test[i] = 0;
+      .               }
+      .           
+  2,083 ( 0.00%)      for (n = 0; n < nelts; n++) {
+    780 ( 0.00%)          if (names[n].key.data == NULL) {
+      .                       continue;
+      .                   }
+      .           
+  1,137 ( 0.00%)          key = names[n].key_hash % size;
+  1,516 ( 0.00%)          elt = (ngx_hash_elt_t *) ((u_char *) buckets[key] + test[key]);
+      .           
+    758 ( 0.00%)          elt->value = names[n].value;
+    758 ( 0.00%)          elt->len = (u_short) names[n].key.len;
+      .           
+  1,516 ( 0.00%)          ngx_strlow(elt->name, names[n].key.data, names[n].key.len);
+ 39,385 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_string.c:ngx_strlow (379x)
+      .           
+  2,274 ( 0.00%)          test[key] = (u_short) (test[key] + NGX_HASH_ELT_SIZE(&names[n]));
+      .               }
+      .           
+  3,185 ( 0.00%)      for (i = 0; i < size; i++) {
+  4,196 ( 0.00%)          if (buckets[i] == NULL) {
+      .                       continue;
+      .                   }
+      .           
+    302 ( 0.00%)          elt = (ngx_hash_elt_t *) ((u_char *) buckets[i] + test[i]);
+      .           
+    604 ( 0.00%)          elt->value = NULL;
+      .               }
+      .           
+     38 ( 0.00%)      ngx_free(test);
+  2,270 ( 0.00%)  => ???:0x000000000012f8c0 (19x)
+      .           
+     57 ( 0.00%)      hinit->hash->buckets = buckets;
+     38 ( 0.00%)      hinit->hash->size = size;
+      .           
+      .           #if 0
+      .           
+      .               for (i = 0; i < size; i++) {
+      .                   ngx_str_t   val;
+      .                   ngx_uint_t  key;
+      .           
+      .                   elt = buckets[i];
+-- line 461 ----------------------------------------
+-- line 477 ----------------------------------------
+      .           
+      .                       elt = (ngx_hash_elt_t *) ngx_align_ptr(&elt->name[0] + elt->len,
+      .                                                              sizeof(void *));
+      .                   }
+      .               }
+      .           
+      .           #endif
+      .           
+     19 ( 0.00%)      return NGX_OK;
+    152 ( 0.00%)  }
+      .           
+      .           
+      .           ngx_int_t
+      .           ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
+      .               ngx_uint_t nelts)
+      .           {
+      .               size_t                len, dot_len;
+      .               ngx_uint_t            i, n, dot;
+-- line 494 ----------------------------------------
+-- line 628 ----------------------------------------
+      .               }
+      .           
+      .               return NGX_OK;
+      .           }
+      .           
+      .           
+      .           ngx_uint_t
+      .           ngx_hash_key(u_char *data, size_t len)
+    154 ( 0.00%)  {
+      .               ngx_uint_t  i, key;
+      .           
+    154 ( 0.00%)      key = 0;
+      .           
+  7,205 ( 0.00%)      for (i = 0; i < len; i++) {
+ 10,725 ( 0.00%)          key = ngx_hash(key, data[i]);
+      .               }
+      .           
+      .               return key;
+      .           }
+      .           
+      .           
+      .           ngx_uint_t
+      .           ngx_hash_key_lc(u_char *data, size_t len)
+    114 ( 0.00%)  {
+      .               ngx_uint_t  i, key;
+      .           
+    114 ( 0.00%)      key = 0;
+      .           
+  4,398 ( 0.00%)      for (i = 0; i < len; i++) {
+ 15,312 ( 0.00%)          key = ngx_hash(key, ngx_tolower(data[i]));
+      .               }
+      .           
+      .               return key;
+      .           }
+      .           
+      .           
+      .           ngx_uint_t
+      .           ngx_hash_strlow(u_char *dst, u_char *src, size_t n)
+    122 ( 0.00%)  {
+      .               ngx_uint_t  key;
+      .           
+    122 ( 0.00%)      key = 0;
+      .           
+  1,974 ( 0.00%)      while (n--) {
+  3,752 ( 0.00%)          *dst = ngx_tolower(*src);
+  2,680 ( 0.00%)          key = ngx_hash(key, *dst);
+      .                   dst++;
+      .                   src++;
+      .               }
+      .           
+      .               return key;
+    244 ( 0.00%)  }
+      .           
+      .           
+      .           ngx_int_t
+      .           ngx_hash_keys_array_init(ngx_hash_keys_arrays_t *ha, ngx_uint_t type)
+     10 ( 0.00%)  {
+      .               ngx_uint_t  asize;
+      .           
+      .               if (type == NGX_HASH_SMALL) {
+      .                   asize = 4;
+     16 ( 0.00%)          ha->hsize = 107;
+      .           
+      .               } else {
+      .                   asize = NGX_HASH_LARGE_ASIZE;
+      .                   ha->hsize = NGX_HASH_LARGE_HSIZE;
+      .               }
+      .           
+      6 ( 0.00%)      if (ngx_array_init(&ha->keys, ha->temp_pool, asize, sizeof(ngx_hash_key_t))
+      .                   != NGX_OK)
+      .               {
+      .                   return NGX_ERROR;
+      .               }
+      .           
+      6 ( 0.00%)      if (ngx_array_init(&ha->dns_wc_head, ha->temp_pool, asize,
+      .                                  sizeof(ngx_hash_key_t))
+      .                   != NGX_OK)
+      .               {
+      .                   return NGX_ERROR;
+      .               }
+      .           
+      6 ( 0.00%)      if (ngx_array_init(&ha->dns_wc_tail, ha->temp_pool, asize,
+      .                                  sizeof(ngx_hash_key_t))
+      .                   != NGX_OK)
+      .               {
+      .                   return NGX_ERROR;
+      .               }
+      .           
+     12 ( 0.00%)      ha->keys_hash = ngx_pcalloc(ha->temp_pool, sizeof(ngx_array_t) * ha->hsize);
+  9,107 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_palloc.c:ngx_pcalloc (2x)
+      4 ( 0.00%)      if (ha->keys_hash == NULL) {
+      .                   return NGX_ERROR;
+      .               }
+      .           
+     12 ( 0.00%)      ha->dns_wc_head_hash = ngx_pcalloc(ha->temp_pool,
+  9,123 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_palloc.c:ngx_pcalloc (2x)
+      .                                                  sizeof(ngx_array_t) * ha->hsize);
+      4 ( 0.00%)      if (ha->dns_wc_head_hash == NULL) {
+      .                   return NGX_ERROR;
+      .               }
+      .           
+     12 ( 0.00%)      ha->dns_wc_tail_hash = ngx_pcalloc(ha->temp_pool,
+  9,137 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_palloc.c:ngx_pcalloc (2x)
+      .                                                  sizeof(ngx_array_t) * ha->hsize);
+      4 ( 0.00%)      if (ha->dns_wc_tail_hash == NULL) {
+      .                   return NGX_ERROR;
+      .               }
+      .           
+      .               return NGX_OK;
+      8 ( 0.00%)  }
+      .           
+      .           
+      .           ngx_int_t
+      .           ngx_hash_add_key(ngx_hash_keys_arrays_t *ha, ngx_str_t *key, void *value,
+      .               ngx_uint_t flags)
+  1,595 ( 0.00%)  {
+      .               size_t           len;
+      .               u_char          *p;
+      .               ngx_str_t       *name;
+      .               ngx_uint_t       i, k, n, skip, last;
+      .               ngx_array_t     *keys, *hwc;
+      .               ngx_hash_key_t  *hk;
+      .           
+    145 ( 0.00%)      last = key->len;
+      .           
+    435 ( 0.00%)      if (flags & NGX_HASH_WILDCARD_KEY) {
+      .           
+      .                   /*
+      .                    * supported wildcards:
+      .                    *     "*.example.com", ".example.com", and "www.example.*"
+      .                    */
+      .           
+      .                   n = 0;
+      .           
+-- line 758 ----------------------------------------
+-- line 796 ----------------------------------------
+      .                       return NGX_DECLINED;
+      .                   }
+      .               }
+      .           
+      .               /* exact hash */
+      .           
+      .               k = 0;
+      .           
+  6,537 ( 0.00%)      for (i = 0; i < last; i++) {
+  4,358 ( 0.00%)          if (!(flags & NGX_HASH_READONLY_KEY)) {
+ 19,860 ( 0.00%)              key->data[i] = ngx_tolower(key->data[i]);
+      .                   }
+ 12,204 ( 0.00%)          k = ngx_hash(k, key->data[i]);
+      .               }
+      .           
+    290 ( 0.00%)      k %= ha->hsize;
+      .           
+      .               /* check conflicts in exact hash */
+      .           
+    870 ( 0.00%)      name = ha->keys_hash[k].elts;
+      .           
+    290 ( 0.00%)      if (name) {
+    578 ( 0.00%)          for (i = 0; i < ha->keys_hash[k].nelts; i++) {
+    154 ( 0.00%)              if (last != name[i].len) {
+      .                           continue;
+      .                       }
+      .           
+     18 ( 0.00%)              if (ngx_strncmp(key->data, name[i].data, last) == 0) {
+     81 ( 0.00%)  => ???:0x000000000012eee0 (3x)
+      .                           return NGX_BUSY;
+      .                       }
+      .                   }
+      .           
+      .               } else {
+     91 ( 0.00%)          if (ngx_array_init(&ha->keys_hash[k], ha->temp_pool, 4,
+      .                                      sizeof(ngx_str_t))
+      .                       != NGX_OK)
+      .                   {
+      .                       return NGX_ERROR;
+      .                   }
+      .               }
+      .           
+    435 ( 0.00%)      name = ngx_array_push(&ha->keys_hash[k]);
+  2,830 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_array.c:ngx_array_push (145x)
+    290 ( 0.00%)      if (name == NULL) {
+      .                   return NGX_ERROR;
+      .               }
+      .           
+    290 ( 0.00%)      *name = *key;
+      .           
+    435 ( 0.00%)      hk = ngx_array_push(&ha->keys);
+  4,586 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_array.c:ngx_array_push (145x)
+    290 ( 0.00%)      if (hk == NULL) {
+      .                   return NGX_ERROR;
+      .               }
+      .           
+    290 ( 0.00%)      hk->key = *key;
+    580 ( 0.00%)      hk->key_hash = ngx_hash_key(key->data, last);
+ 17,287 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_hash.c:ngx_hash_key (145x)
+    290 ( 0.00%)      hk->value = value;
+      .           
+    145 ( 0.00%)      return NGX_OK;
+      .           
+      .           
+      .           wildcard:
+      .           
+      .               /* wildcard hash */
+      .           
+      .               k = ngx_hash_strlow(&key->data[skip], &key->data[skip], last - skip);
+      .           
+-- line 861 ----------------------------------------
+-- line 1005 ----------------------------------------
+      .               }
+      .           
+      .               hk->key.len = last - 1;
+      .               hk->key.data = p;
+      .               hk->key_hash = 0;
+      .               hk->value = value;
+      .           
+      .               return NGX_OK;
+  1,160 ( 0.00%)  }
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_conf_file.c
+--------------------------------------------------------------------------------
+Ir              
+
+-- line 59 ----------------------------------------
+     .           };
+     .           
+     .           
+     .           ngx_conf_post_t  ngx_conf_size_nonzero_post = { ngx_conf_check_size_nonzero };
+     .           
+     .           
+     .           char *
+     .           ngx_conf_param(ngx_conf_t *cf)
+     6 ( 0.00%)  {
+     .               char             *rv;
+     .               ngx_str_t        *param;
+     .               ngx_buf_t         b;
+     .               ngx_conf_file_t   conf_file;
+     .           
+     1 ( 0.00%)      param = &cf->cycle->conf_param;
+     .           
+     3 ( 0.00%)      if (param->len == 0) {
+     .                   return NGX_CONF_OK;
+     .               }
+     .           
+     .               ngx_memzero(&conf_file, sizeof(ngx_conf_file_t));
+     .           
+     .               ngx_memzero(&b, sizeof(ngx_buf_t));
+     .           
+     .               b.start = param->data;
+-- line 83 ----------------------------------------
+-- line 93 ----------------------------------------
+     .               cf->conf_file = &conf_file;
+     .               cf->conf_file->buffer = &b;
+     .           
+     .               rv = ngx_conf_parse(cf, NULL);
+     .           
+     .               cf->conf_file = NULL;
+     .           
+     .               return rv;
+     6 ( 0.00%)  }
+     .           
+     .           
+     .           static ngx_int_t
+     .           ngx_conf_add_dump(ngx_conf_t *cf, ngx_str_t *filename)
+     .           {
+     .               off_t             size;
+     .               u_char           *p;
+     .               uint32_t          hash;
+-- line 109 ----------------------------------------
+-- line 154 ----------------------------------------
+     .               ngx_rbtree_insert(&cf->cycle->config_dump_rbtree, &sn->node);
+     .           
+     .               return NGX_OK;
+     .           }
+     .           
+     .           
+     .           char *
+     .           ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
+   143 ( 0.00%)  {
+     .               char             *rv;
+     .               ngx_fd_t          fd;
+     .               ngx_int_t         rc;
+     .               ngx_buf_t         buf;
+     .               ngx_conf_file_t  *prev, conf_file;
+     .               enum {
+     .                   parse_file = 0,
+     .                   parse_block,
+     .                   parse_param
+     .               } type;
+     .           
+     .           #if (NGX_SUPPRESS_WARN)
+     9 ( 0.00%)      fd = NGX_INVALID_FILE;
+     9 ( 0.00%)      prev = NULL;
+     .           #endif
+     .           
+    22 ( 0.00%)      if (filename) {
+     .           
+     .                   /* open configuration file */
+     .           
+     .                   fd = ngx_open_file(filename->data, NGX_FILE_RDONLY, NGX_FILE_OPEN, 0);
+     .           
+     4 ( 0.00%)          if (fd == NGX_INVALID_FILE) {
+     .                       ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
+     .                                          ngx_open_file_n " \"%s\" failed",
+     .                                          filename->data);
+     .                       return NGX_CONF_ERROR;
+     .                   }
+     .           
+     4 ( 0.00%)          prev = cf->conf_file;
+     .           
+     4 ( 0.00%)          cf->conf_file = &conf_file;
+     .           
+    10 ( 0.00%)          if (ngx_fd_info(fd, &cf->conf_file->file.info) == NGX_FILE_ERROR) {
+     8 ( 0.00%)  => ???:0x0000000000130100 (1x)
+     .                       ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
+     .                                     ngx_fd_info_n " \"%s\" failed", filename->data);
+     .                   }
+     .           
+     6 ( 0.00%)          cf->conf_file->buffer = &buf;
+     .           
+     8 ( 0.00%)          buf.start = ngx_alloc(NGX_CONF_BUFFER, cf->log);
+   189 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/os/unix/ngx_alloc.c:ngx_alloc (1x)
+     4 ( 0.00%)          if (buf.start == NULL) {
+     .                       goto failed;
+     .                   }
+     .           
+     2 ( 0.00%)          buf.pos = buf.start;
+     2 ( 0.00%)          buf.last = buf.start;
+     4 ( 0.00%)          buf.end = buf.last + NGX_CONF_BUFFER;
+     2 ( 0.00%)          buf.temporary = 1;
+     .           
+     4 ( 0.00%)          cf->conf_file->file.fd = fd;
+     6 ( 0.00%)          cf->conf_file->file.name.len = filename->len;
+     6 ( 0.00%)          cf->conf_file->file.name.data = filename->data;
+     4 ( 0.00%)          cf->conf_file->file.offset = 0;
+     6 ( 0.00%)          cf->conf_file->file.log = cf->log;
+     4 ( 0.00%)          cf->conf_file->line = 1;
+     .           
+     4 ( 0.00%)          type = parse_file;
+     .           
+     4 ( 0.00%)          if (ngx_dump_config
+     .           #if (NGX_CONTROL_API)
+     .                       || ngx_control_api_enabled
+     .           #endif
+     .           #if (NGX_DEBUG)
+     .                       || 1
+     .           #endif
+     .                      )
+     .                   {
+     .                       if (ngx_conf_add_dump(cf, filename) != NGX_OK) {
+     .                           goto failed;
+     .                       }
+     .           
+     .                   } else {
+     4 ( 0.00%)              cf->conf_file->dump = NULL;
+     .                   }
+     .           
+    36 ( 0.00%)      } else if (cf->conf_file->file.fd != NGX_INVALID_FILE) {
+     .           
+     9 ( 0.00%)          type = parse_block;
+     .           
+     .               } else {
+     .                   type = parse_param;
+     .               }
+     .           
+     .           
+     .               for ( ;; ) {
+    11 ( 0.00%)          rc = ngx_conf_read_token(cf);
+     .           
+     .                   /*
+     .                    * ngx_conf_read_token() may return
+     .                    *
+     .                    *    NGX_ERROR             there is error
+     .                    *    NGX_OK                the token terminated by ";" was found
+     .                    *    NGX_CONF_BLOCK_START  the token terminated by "{" was found
+     .                    *    NGX_CONF_BLOCK_DONE   the "}" was found
+-- line 257 ----------------------------------------
+-- line 259 ----------------------------------------
+     .                    */
+     .           
+     .                   if (rc == NGX_ERROR) {
+     .                       goto done;
+     .                   }
+     .           
+     .                   if (rc == NGX_CONF_BLOCK_DONE) {
+     .           
+    18 ( 0.00%)              if (type != parse_block) {
+     .                           ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "unexpected \"}\"");
+     .                           goto failed;
+     .                       }
+     .           
+     .                       goto done;
+     .                   }
+     .           
+   135 ( 0.00%)          if (rc == NGX_CONF_FILE_DONE) {
+     .           
+     4 ( 0.00%)              if (type == parse_block) {
+     .                           ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+     .                                              "unexpected end of file, expecting \"}\"");
+     .                           goto failed;
+     .                       }
+     .           
+     .                       goto done;
+     .                   }
+     .           
+     .                   if (rc == NGX_CONF_BLOCK_START) {
+     .           
+   306 ( 0.00%)              if (type == parse_param) {
+     .                           ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+     .                                              "block directives are not supported "
+     .                                              "in -g option");
+     .                           goto failed;
+     .                       }
+     .                   }
+     .           
+     .                   /* rc == NGX_OK || rc == NGX_CONF_BLOCK_START */
+     .           
+   432 ( 0.00%)          if (cf->handler) {
+     .           
+     .                       /*
+     .                        * the custom handler, i.e., that is used in the http's
+     .                        * "types { ... }" directive
+     .                        */
+     .           
+   172 ( 0.00%)              if (rc == NGX_CONF_BLOCK_START) {
+     .                           ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "unexpected \"{\"");
+     .                           goto failed;
+     .                       }
+     .           
+   344 ( 0.00%)              rv = (*cf->handler)(cf, NULL, cf->handler_conf);
+222,561 ( 0.01%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/http/ngx_http_core_module.c:ngx_http_core_type (86x)
+   172 ( 0.00%)              if (rv == NGX_CONF_OK) {
+     .                           continue;
+     .                       }
+     .           
+     .                       if (rv == NGX_CONF_ERROR) {
+     .                           goto failed;
+     .                       }
+     .           
+     .                       ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s", rv);
+-- line 319 ----------------------------------------
+-- line 330 ----------------------------------------
+     .               }
+     .           
+     .           failed:
+     .           
+     .               rc = NGX_ERROR;
+     .           
+     .           done:
+     .           
+    31 ( 0.00%)      if (filename) {
+    10 ( 0.00%)          if (cf->conf_file->buffer->start) {
+     2 ( 0.00%)              ngx_free(cf->conf_file->buffer->start);
+   170 ( 0.00%)  => ???:0x000000000012f8c0 (1x)
+     .                   }
+     .           
+     8 ( 0.00%)          if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+    10 ( 0.00%)  => ???:0x0000000000130330 (1x)
+     .                       ngx_log_error(NGX_LOG_ALERT, cf->log, ngx_errno,
+     .                                     ngx_close_file_n " %s failed",
+     .                                     filename->data);
+     .                       rc = NGX_ERROR;
+     .                   }
+     .           
+     4 ( 0.00%)          cf->conf_file = prev;
+     .               }
+     .           
+     .               if (rc == NGX_ERROR) {
+     .                   return NGX_CONF_ERROR;
+     .               }
+     .           
+    19 ( 0.00%)      return NGX_CONF_OK;
+   121 ( 0.00%)  }
+     .           
+     .           
+     .           static ngx_int_t
+     .           ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
+     .           {
+     .               char           *rv;
+     .               void           *conf, **confp;
+     .               ngx_uint_t      i, found;
+     .               ngx_str_t      *name;
+     .               ngx_command_t  *cmd;
+     .           
+   116 ( 0.00%)      name = cf->args->elts;
+     .           
+     .               found = 0;
+     .           
+ 8,654 ( 0.00%)      for (i = 0; cf->cycle->modules[i]; i++) {
+     .           
+ 2,091 ( 0.00%)          cmd = cf->cycle->modules[i]->commands;
+ 4,182 ( 0.00%)          if (cmd == NULL) {
+     .                       continue;
+     .                   }
+     .           
+70,227 ( 0.00%)          for ( /* void */ ; cmd->name.len; cmd++) {
+     .           
+37,985 ( 0.00%)              if (name->len != cmd->name.len) {
+     .                           continue;
+     .                       }
+     .           
+ 3,174 ( 0.00%)              if (ngx_strcmp(name->data, cmd->name.data) != 0) {
+   264 ( 0.00%)  => ???:0x000000000012fbc0 (12x)
+     .                           continue;
+     .                       }
+     .           
+ 1,817 ( 0.00%)              found = 1;
+     .           
+   231 ( 0.00%)              if (cf->cycle->modules[i]->type != NGX_CONF_MODULE
+   152 ( 0.00%)                  && cf->cycle->modules[i]->type != cf->module_type)
+     .                       {
+     .                           continue;
+     .                       }
+     .           
+     .                       /* is the directive's location right ? */
+     .           
+   308 ( 0.00%)              if (!(cmd->type & cf->cmd_type)) {
+     .                           continue;
+     .                       }
+     .           
+   446 ( 0.00%)              if (!(cmd->type & NGX_CONF_BLOCK) && last != NGX_OK) {
+     .                           ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+     .                                             "directive \"%s\" is not terminated by \";\"",
+     .                                             name->data);
+     .                           return NGX_ERROR;
+     .                       }
+     .           
+   134 ( 0.00%)              if ((cmd->type & NGX_CONF_BLOCK) && last != NGX_CONF_BLOCK_START) {
+     .                           ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+     .                                              "directive \"%s\" has no opening \"{\"",
+     .                                              name->data);
+     .                           return NGX_ERROR;
+     .                       }
+     .           
+     .                       /* is the directive's argument count right ? */
+     .           
+   116 ( 0.00%)              if (!(cmd->type & NGX_CONF_ANY)) {
+     .           
+   116 ( 0.00%)                  if (cmd->type & NGX_CONF_FLAG) {
+     .           
+     4 ( 0.00%)                      if (cf->args->nelts != 2) {
+     .                                   goto invalid;
+     .                               }
+     .           
+   112 ( 0.00%)                  } else if (cmd->type & NGX_CONF_1MORE) {
+     .           
+    12 ( 0.00%)                      if (cf->args->nelts < 2) {
+     .                                   goto invalid;
+     .                               }
+     .           
+   100 ( 0.00%)                  } else if (cmd->type & NGX_CONF_2MORE) {
+     .           
+     2 ( 0.00%)                      if (cf->args->nelts < 3) {
+     .                                   goto invalid;
+     .                               }
+     .           
+   147 ( 0.00%)                  } else if (cf->args->nelts > NGX_CONF_MAX_ARGS) {
+     .           
+     .                               goto invalid;
+     .           
+   196 ( 0.00%)                  } else if (!(cmd->type & argument_number[cf->args->nelts - 1]))
+     .                           {
+     .                               goto invalid;
+     .                           }
+     .                       }
+     .           
+     .                       /* set up the directive's configuration context */
+     .           
+     .                       conf = NULL;
+     .           
+   116 ( 0.00%)              if (cmd->type & NGX_DIRECT_CONF) {
+    15 ( 0.00%)                  conf = ((void **) cf->ctx)[cf->cycle->modules[i]->index];
+     .           
+   106 ( 0.00%)              } else if (cmd->type & NGX_MAIN_CONF) {
+    16 ( 0.00%)                  conf = &(((void **) cf->ctx)[cf->cycle->modules[i]->index]);
+     .           
+   147 ( 0.00%)              } else if (cf->ctx) {
+    98 ( 0.00%)                  confp = *(void **) ((char *) cf->ctx + cmd->conf);
+     .           
+    98 ( 0.00%)                  if (confp) {
+   147 ( 0.00%)                      conf = confp[cf->cycle->modules[i]->ctx_index];
+     .                           }
+     .                       }
+     .           
+   232 ( 0.00%)              rv = cmd->set(cf, cmd, conf);
+2,371,748 ( 0.09%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/http/ngx_http.c:ngx_http_block (1x)
+575,963 ( 0.02%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/nginx.c:ngx_load_module (1x)
+ 4,840 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/event/ngx_event.c:ngx_events_block (1x)
+   743 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_log.c:ngx_error_log (1x)
+   330 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_conf_file.c:ngx_conf_set_flag_slot (2x)
+    74 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/nginx.c:ngx_set_worker_processes (1x)
+    13 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_conf_file.c:ngx_conf_set_str_slot (1x)
+     .           
+   116 ( 0.00%)              if (rv == NGX_CONF_OK) {
+     .                           return NGX_OK;
+     .                       }
+     .           
+     .                       if (rv == NGX_CONF_ERROR) {
+     .                           return NGX_ERROR;
+     .                       }
+     .           
+     .                       ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+-- line 479 ----------------------------------------
+-- line 513 ----------------------------------------
+     .               size_t       len;
+     .               ssize_t      n, size;
+     .               ngx_uint_t   found, need_space, last_space, sharp_comment, variable;
+     .               ngx_uint_t   quoted, s_quoted, d_quoted, start_line;
+     .               ngx_str_t   *word;
+     .               ngx_buf_t   *b, *dump;
+     .           
+     .               found = 0;
+   310 ( 0.00%)      need_space = 0;
+   155 ( 0.00%)      last_space = 1;
+   155 ( 0.00%)      sharp_comment = 0;
+   155 ( 0.00%)      variable = 0;
+   155 ( 0.00%)      quoted = 0;
+   155 ( 0.00%)      s_quoted = 0;
+   177 ( 0.00%)      d_quoted = 0;
+     .           
+   310 ( 0.00%)      cf->args->nelts = 0;
+   310 ( 0.00%)      b = cf->conf_file->buffer;
+   155 ( 0.00%)      dump = cf->conf_file->dump;
+   155 ( 0.00%)      start = b->pos;
+   310 ( 0.00%)      start_line = cf->conf_file->line;
+     .           
+   310 ( 0.00%)      file_size = ngx_file_size(&cf->conf_file->file.info);
+     .           
+     .               for ( ;; ) {
+     .           
+25,032 ( 0.00%)          if (b->pos >= b->last) {
+     .           
+    20 ( 0.00%)              if (cf->conf_file->file.offset >= file_size) {
+     .           
+    14 ( 0.00%)                  if (cf->args->nelts > 0 || !last_space) {
+     .           
+     .                               if (cf->conf_file->file.fd == NGX_INVALID_FILE) {
+     .                                   ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+     .                                                      "unexpected end of parameter, "
+     .                                                      "expecting \";\"");
+     .                                   return NGX_ERROR;
+     .                               }
+     .           
+-- line 551 ----------------------------------------
+-- line 553 ----------------------------------------
+     .                                                  "unexpected end of file, "
+     .                                                  "expecting \";\" or \"}\"");
+     .                               return NGX_ERROR;
+     .                           }
+     .           
+     .                           return NGX_CONF_FILE_DONE;
+     .                       }
+     .           
+     3 ( 0.00%)              len = b->pos - start;
+     .           
+     6 ( 0.00%)              if (len == NGX_CONF_BUFFER) {
+     .                           cf->conf_file->line = start_line;
+     .           
+     .                           if (d_quoted) {
+     .                               ch = '"';
+     .           
+     .                           } else if (s_quoted) {
+     .                               ch = '\'';
+     .           
+-- line 571 ----------------------------------------
+-- line 577 ----------------------------------------
+     .                           }
+     .           
+     .                           ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+     .                                              "too long parameter, probably "
+     .                                              "missing terminating \"%c\" character", ch);
+     .                           return NGX_ERROR;
+     .                       }
+     .           
+     6 ( 0.00%)              if (len) {
+     .                           ngx_memmove(b->start, start, len);
+     .                       }
+     .           
+    12 ( 0.00%)              size = (ssize_t) (file_size - cf->conf_file->file.offset);
+     .           
+    18 ( 0.00%)              if (size > b->end - (b->start + len)) {
+     .                           size = b->end - (b->start + len);
+     .                       }
+     .           
+     6 ( 0.00%)              n = ngx_read_file(&cf->conf_file->file, b->start + len, size,
+    27 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/os/unix/ngx_files.c:ngx_read_file (1x)
+     .                                         cf->conf_file->file.offset);
+     .           
+     6 ( 0.00%)              if (n == NGX_ERROR) {
+     .                           return NGX_ERROR;
+     .                       }
+     .           
+     6 ( 0.00%)              if (n != size) {
+     .                           ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+     .                                              ngx_read_file_n " returned "
+     .                                              "only %z bytes instead of %z",
+     .                                              n, size);
+     .                           return NGX_ERROR;
+     .                       }
+     .           
+     9 ( 0.00%)              b->pos = b->start + len;
+     6 ( 0.00%)              b->last = b->pos + n;
+     .                       start = b->start;
+     .           
+     6 ( 0.00%)              if (dump) {
+     .                           dump->last = ngx_cpymem(dump->last, b->pos, size);
+     .                       }
+     .                   }
+     .           
+33,368 ( 0.00%)          ch = *b->pos++;
+     .           
+16,684 ( 0.00%)          if (ch == LF) {
+   412 ( 0.00%)              cf->conf_file->line++;
+     .           
+   206 ( 0.00%)              if (sharp_comment) {
+     .                           sharp_comment = 0;
+     .                       }
+     .                   }
+     .           
+16,272 ( 0.00%)          if (sharp_comment) {
+     .                       continue;
+     .                   }
+     .           
+14,744 ( 0.00%)          if (quoted) {
+     .                       quoted = 0;
+     .                       continue;
+     .                   }
+     .           
+14,744 ( 0.00%)          if (need_space) {
+     .                       if (ch == ' ' || ch == '\t' || ch == CR || ch == LF) {
+     .                           last_space = 1;
+     .                           need_space = 0;
+     .                           continue;
+     .                       }
+     .           
+     .                       if (ch == ';') {
+     .                           return NGX_OK;
+-- line 646 ----------------------------------------
+-- line 656 ----------------------------------------
+     .           
+     .                       } else {
+     .                           ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+     .                                              "unexpected \"%c\"", ch);
+     .                           return NGX_ERROR;
+     .                       }
+     .                   }
+     .           
+14,744 ( 0.00%)          if (last_space) {
+     .           
+ 7,440 ( 0.00%)              start = b->pos - 1;
+24,484 ( 0.00%)              start_line = cf->conf_file->line;
+     .           
+27,426 ( 0.00%)              if (ch == ' ' || ch == '\t' || ch == CR || ch == LF) {
+     .                           continue;
+     .                       }
+     .           
+ 4,158 ( 0.00%)              switch (ch) {
+     .           
+     .                       case ';':
+     .                       case '{':
+    27 ( 0.00%)                  if (cf->args->nelts == 0) {
+     .                               ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+     .                                                  "unexpected \"%c\"", ch);
+     .                               return NGX_ERROR;
+     .                           }
+     .           
+    36 ( 0.00%)                  if (ch == '{') {
+     .                               return NGX_CONF_BLOCK_START;
+     .                           }
+     .           
+     .                           return NGX_OK;
+     .           
+     .                       case '}':
+    45 ( 0.00%)                  if (cf->args->nelts != 0) {
+     .                               ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+     .                                                  "unexpected \"}\"");
+     .                               return NGX_ERROR;
+     .                           }
+     .           
+     .                           return NGX_CONF_BLOCK_DONE;
+     .           
+     .                       case '#':
+-- line 698 ----------------------------------------
+-- line 717 ----------------------------------------
+     .                           continue;
+     .           
+     .                       case '$':
+     .                           variable = 1;
+     .                           last_space = 0;
+     .                           continue;
+     .           
+     .                       default:
+ 1,023 ( 0.00%)                  last_space = 0;
+     .                       }
+     .           
+     .                   } else {
+ 7,304 ( 0.00%)              if (ch == '{' && variable) {
+     .                           continue;
+     .                       }
+     .           
+14,892 ( 0.00%)              variable = 0;
+     .           
+ 7,304 ( 0.00%)              if (ch == '\\') {
+     .                           quoted = 1;
+     .                           continue;
+     .                       }
+     .           
+ 7,304 ( 0.00%)              if (ch == '$') {
+     .                           variable = 1;
+     .                           continue;
+     .                       }
+     .           
+ 7,304 ( 0.00%)              if (d_quoted) {
+     .                           if (ch == '"') {
+     .                               d_quoted = 0;
+     .                               need_space = 1;
+     .                               found = 1;
+     .                           }
+     .           
+26,635 ( 0.00%)              } else if (s_quoted) {
+     .                           if (ch == '\'') {
+     .                               s_quoted = 0;
+     .                               need_space = 1;
+     .                               found = 1;
+     .                           }
+     .           
+10,794 ( 0.00%)              } else if (ch == ' ' || ch == '\t' || ch == CR || ch == LF
+     .                                  || ch == ';' || ch == '{')
+     .                       {
+     .                           last_space = 1;
+     .                           found = 1;
+     .                       }
+     .           
+ 6,622 ( 0.00%)              if (found) {
+ 1,023 ( 0.00%)                  word = ngx_array_push(cf->args);
+   285 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_array.c:ngx_array_push (15x)
+   682 ( 0.00%)                  if (word == NULL) {
+     .                               return NGX_ERROR;
+     .                           }
+     .           
+ 1,705 ( 0.00%)                  word->data = ngx_pnalloc(cf->pool, b->pos - 1 - start + 1);
+   225 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_palloc.c:ngx_pnalloc (15x)
+   682 ( 0.00%)                  if (word->data == NULL) {
+     .                               return NGX_ERROR;
+     .                           }
+     .           
+ 1,023 ( 0.00%)                  for (dst = word->data, src = start, len = 0;
+19,965 ( 0.00%)                       src < b->pos - 1;
+ 3,652 ( 0.00%)                       len++)
+     .                           {
+ 7,304 ( 0.00%)                      if (*src == '\\') {
+     .                                   switch (src[1]) {
+     .                                   case '"':
+     .                                   case '\'':
+     .                                   case '\\':
+     .                                       src++;
+     .                                       break;
+     .           
+     .                                   case 't':
+ 3,652 ( 0.00%)                              *dst++ = '\t';
+     .                                       src += 2;
+     .                                       continue;
+     .           
+     .                                   case 'r':
+     .                                       *dst++ = '\r';
+     .                                       src += 2;
+     .                                       continue;
+     .           
+     .                                   case 'n':
+     .                                       *dst++ = '\n';
+     .                                       src += 2;
+     .                                       continue;
+     .                                   }
+     .           
+     .                               }
+10,956 ( 0.00%)                      *dst++ = *src++;
+     .                           }
+   341 ( 0.00%)                  *dst = '\0';
+   341 ( 0.00%)                  word->len = len;
+     .           
+   682 ( 0.00%)                  if (ch == ';') {
+   135 ( 0.00%)                      return NGX_OK;
+     .                           }
+     .           
+   824 ( 0.00%)                  if (ch == '{') {
+     .                               return NGX_CONF_BLOCK_START;
+     .                           }
+     .           
+     .                           found = 0;
+     .                       }
+     .                   }
+     .               }
+     .           }
+     .           
+     .           
+     .           char *
+     .           ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+     9 ( 0.00%)  {
+     .               char        *rv;
+     .               ngx_int_t    n;
+     .               ngx_str_t   *value, file, name;
+     .               ngx_glob_t   gl;
+     .           
+     2 ( 0.00%)      value = cf->args->elts;
+     2 ( 0.00%)      file = value[1];
+     .           
+     .               ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "include %s", file.data);
+     .           
+     6 ( 0.00%)      if (ngx_conf_full_name(cf->cycle, &file, 1) != NGX_OK) {
+    31 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_conf_file.c:ngx_conf_full_name (1x)
+     1 ( 0.00%)          return NGX_CONF_ERROR;
+     .               }
+     .           
+     6 ( 0.00%)      if (strpbrk((char *) file.data, "*?[") == NULL) {
+    53 ( 0.00%)  => ???:0x0000000000130010 (1x)
+     .           
+     .                   ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "include %s", file.data);
+     .           
+     5 ( 0.00%)          return ngx_conf_parse(cf, &file);
+465,789 ( 0.02%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_conf_file.c:ngx_conf_parse'2 (1x)
+     .               }
+     .           
+     .               ngx_memzero(&gl, sizeof(ngx_glob_t));
+     .           
+     .               gl.pattern = file.data;
+     .               gl.log = cf->log;
+     .               gl.test = 1;
+     .           
+-- line 855 ----------------------------------------
+-- line 881 ----------------------------------------
+     .                   if (rv != NGX_CONF_OK) {
+     .                       break;
+     .                   }
+     .               }
+     .           
+     .               ngx_close_glob(&gl);
+     .           
+     .               return rv;
+     9 ( 0.00%)  }
+     .           
+     .           
+     .           ngx_int_t
+     .           ngx_conf_full_name(ngx_cycle_t *cycle, ngx_str_t *name, ngx_uint_t conf_prefix)
+    60 ( 0.00%)  {
+     .               ngx_str_t  *prefix;
+     .           
+    75 ( 0.00%)      prefix = conf_prefix ? &cycle->conf_prefix : &cycle->prefix;
+     .           
+    45 ( 0.00%)      return ngx_get_full_name(cycle->pool, prefix, name);
+ 1,652 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_file.c:ngx_get_full_name (15x)
+    30 ( 0.00%)  }
+     .           
+     .           
+     .           ngx_open_file_t *
+     .           ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name)
+    13 ( 0.00%)  {
+     .               ngx_str_t         full;
+     .               ngx_uint_t        i;
+     .               ngx_list_part_t  *part;
+     .               ngx_open_file_t  *file;
+     .           
+     .           #if (NGX_SUPPRESS_WARN)
+     2 ( 0.00%)      ngx_str_null(&full);
+     .           #endif
+     .           
+     3 ( 0.00%)      if (name->len) {
+     2 ( 0.00%)          full = *name;
+     .           
+     5 ( 0.00%)          if (ngx_conf_full_name(cycle, &full, 0) != NGX_OK) {
+    31 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_conf_file.c:ngx_conf_full_name (1x)
+     .                       return NULL;
+     .                   }
+     .           
+     1 ( 0.00%)          part = &cycle->open_files.part;
+     1 ( 0.00%)          file = part->elts;
+     .           
+     2 ( 0.00%)          for (i = 0; /* void */ ; i++) {
+     .           
+     2 ( 0.00%)              if (i >= part->nelts) {
+     3 ( 0.00%)                  if (part->next == NULL) {
+     .                               break;
+     .                           }
+     .                           part = part->next;
+     .                           file = part->elts;
+     .                           i = 0;
+     .                       }
+     .           
+     1 ( 0.00%)              if (full.len != file[i].name.len) {
+     .                           continue;
+     .                       }
+     .           
+     2 ( 0.00%)              if (ngx_strcmp(full.data, file[i].name.data) == 0) {
+     .                           return &file[i];
+     .                       }
+     .                   }
+     .               }
+     .           
+     4 ( 0.00%)      file = ngx_list_push(&cycle->open_files);
+    19 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_list.c:ngx_list_push (1x)
+     2 ( 0.00%)      if (file == NULL) {
+     .                   return NULL;
+     .               }
+     .           
+     2 ( 0.00%)      if (name->len) {
+     1 ( 0.00%)          file->fd = NGX_INVALID_FILE;
+     2 ( 0.00%)          file->name = full;
+     .           
+     .               } else {
+     .                   file->fd = ngx_stderr;
+     .                   file->name = *name;
+     .               }
+     .           
+     1 ( 0.00%)      file->flush = NULL;
+     1 ( 0.00%)      file->data = NULL;
+     .           
+     .               return file;
+    12 ( 0.00%)  }
+     .           
+     .           
+     .           static void
+     .           ngx_conf_flush_files(ngx_cycle_t *cycle)
+     7 ( 0.00%)  {
+     .               ngx_uint_t        i;
+     .               ngx_list_part_t  *part;
+     .               ngx_open_file_t  *file;
+     .           
+     .               ngx_log_debug0(NGX_LOG_DEBUG_CORE, cycle->log, 0, "flush files");
+     .           
+     1 ( 0.00%)      part = &cycle->open_files.part;
+     1 ( 0.00%)      file = part->elts;
+     .           
+     3 ( 0.00%)      for (i = 0; /* void */ ; i++) {
+     .           
+     4 ( 0.00%)          if (i >= part->nelts) {
+     3 ( 0.00%)              if (part->next == NULL) {
+     .                           break;
+     .                       }
+     .                       part = part->next;
+     .                       file = part->elts;
+     .                       i = 0;
+     .                   }
+     .           
+     5 ( 0.00%)          if (file[i].flush) {
+     .                       file[i].flush(&file[i], cycle->log);
+     .                   }
+     .               }
+     6 ( 0.00%)  }
+     .           
+     .           
+     .           void ngx_cdecl
+     .           ngx_conf_log_error(ngx_uint_t level, ngx_conf_t *cf, ngx_err_t err,
+     .               const char *fmt, ...)
+     .           {
+     .               u_char   errstr[NGX_MAX_CONF_ERRSTR], *p, *last;
+     .               va_list  args;
+-- line 1002 ----------------------------------------
+-- line 1025 ----------------------------------------
+     .               ngx_log_error(level, cf->log, 0, "%*s in %s:%ui",
+     .                             p - errstr, errstr,
+     .                             cf->conf_file->file.name.data, cf->conf_file->line);
+     .           }
+     .           
+     .           
+     .           char *
+     .           ngx_conf_set_flag_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+    12 ( 0.00%)  {
+     .               char  *p = conf;
+     .           
+     .               ngx_str_t        *value;
+     .               ngx_flag_t       *fp;
+     .               ngx_conf_post_t  *post;
+     .           
+     4 ( 0.00%)      fp = (ngx_flag_t *) (p + cmd->offset);
+     .           
+     4 ( 0.00%)      if (*fp != NGX_CONF_UNSET) {
+     2 ( 0.00%)          return "is duplicate";
+     .               }
+     .           
+     4 ( 0.00%)      value = cf->args->elts;
+     .           
+    14 ( 0.00%)      if (ngx_strcasecmp(value[1].data, (u_char *) "on") == 0) {
+    84 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_string.c:ngx_strcasecmp (2x)
+     2 ( 0.00%)          *fp = 1;
+     .           
+    10 ( 0.00%)      } else if (ngx_strcasecmp(value[1].data, (u_char *) "off") == 0) {
+   172 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_string.c:ngx_strcasecmp (2x)
+     .                   *fp = 0;
+     .           
+     .               } else {
+     .                   ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+     .                                "invalid value \"%s\" in \"%s\" directive, "
+     .                                "it must be \"on\" or \"off\"",
+     .                                value[1].data, cmd->name.data);
+     .                   return NGX_CONF_ERROR;
+     .               }
+     .           
+     6 ( 0.00%)      if (cmd->post) {
+     .                   post = cmd->post;
+     .                   return post->post_handler(cf, post, fp);
+     .               }
+     .           
+     .               return NGX_CONF_OK;
+    16 ( 0.00%)  }
+     .           
+     .           
+     .           char *
+     .           ngx_conf_set_str_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+     1 ( 0.00%)  {
+     .               char  *p = conf;
+     .           
+     .               ngx_str_t        *field, *value;
+     .               ngx_conf_post_t  *post;
+     .           
+     1 ( 0.00%)      field = (ngx_str_t *) (p + cmd->offset);
+     .           
+     2 ( 0.00%)      if (field->data) {
+     1 ( 0.00%)          return "is duplicate";
+     .               }
+     .           
+     2 ( 0.00%)      value = cf->args->elts;
+     .           
+     2 ( 0.00%)      *field = value[1];
+     .           
+     3 ( 0.00%)      if (cmd->post) {
+     .                   post = cmd->post;
+     .                   return post->post_handler(cf, post, field);
+     .               }
+     .           
+     .               return NGX_CONF_OK;
+     1 ( 0.00%)  }
+     .           
+     .           
+     .           char *
+     .           ngx_conf_set_str_array_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+     .           {
+     .               char  *p = conf;
+     .           
+     .               ngx_str_t         *value, *s;
+-- line 1103 ----------------------------------------
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_string.c
+--------------------------------------------------------------------------------
+Ir              
+
+-- line 16 ----------------------------------------
+     .           static void ngx_encode_base64_internal(ngx_str_t *dst, ngx_str_t *src,
+     .               const u_char *basis, ngx_uint_t padding);
+     .           static ngx_int_t ngx_decode_base64_internal(ngx_str_t *dst, ngx_str_t *src,
+     .               const u_char *basis);
+     .           
+     .           
+     .           void
+     .           ngx_strlow(u_char *dst, u_char *src, size_t n)
+   534 ( 0.00%)  {
+19,641 ( 0.00%)      while (n) {
+42,091 ( 0.00%)          *dst = ngx_tolower(*src);
+     .                   dst++;
+     .                   src++;
+     .                   n--;
+     .               }
+   534 ( 0.00%)  }
+     .           
+     .           
+     .           size_t
+     .           ngx_strnlen(u_char *p, size_t n)
+     .           {
+     .               size_t  i;
+     .           
+     .               for (i = 0; i < n; i++) {
+-- line 39 ----------------------------------------
+-- line 44 ----------------------------------------
+     .               }
+     .           
+     .               return n;
+     .           }
+     .           
+     .           
+     .           u_char *
+     .           ngx_cpystrn(u_char *dst, u_char *src, size_t n)
+   103 ( 0.00%)  {
+   206 ( 0.00%)      if (n == 0) {
+   103 ( 0.00%)          return dst;
+     .               }
+     .           
+ 7,869 ( 0.00%)      while (--n) {
+ 7,564 ( 0.00%)          *dst = *src;
+     .           
+ 7,564 ( 0.00%)          if (*dst == '\0') {
+     .                       return dst;
+     .                   }
+     .           
+ 3,780 ( 0.00%)          dst++;
+ 3,780 ( 0.00%)          src++;
+     .               }
+     .           
+   101 ( 0.00%)      *dst = '\0';
+     .           
+     .               return dst;
+   103 ( 0.00%)  }
+     .           
+     .           
+     .           u_char *
+     .           ngx_pstrdup(ngx_pool_t *pool, ngx_str_t *src)
+    15 ( 0.00%)  {
+     .               u_char  *dst;
+     .           
+     9 ( 0.00%)      dst = ngx_pnalloc(pool, src->len);
+    93 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_palloc.c:ngx_pnalloc (3x)
+     6 ( 0.00%)      if (dst == NULL) {
+     .                   return NULL;
+     .               }
+     .           
+     .               ngx_memcpy(dst, src->data, src->len);
+     .           
+     .               return dst;
+    15 ( 0.00%)  }
+     .           
+     .           
+     .           /*
+     .            * supported formats:
+     .            *    %[0][width][x][X]O        off_t
+     .            *    %[0][width]T              time_t
+     .            *    %[0][width][u][x|X]z      ssize_t/size_t
+     .            *    %[0][width][u][x|X]d      int/u_int
+-- line 95 ----------------------------------------
+-- line 116 ----------------------------------------
+     .            *    %t                        ptrdiff_t
+     .            *    %S                        null-terminated wchar string
+     .            *    %C                        wchar
+     .            */
+     .           
+     .           
+     .           u_char * ngx_cdecl
+     .           ngx_sprintf(u_char *buf, const char *fmt, ...)
+ 3,168 ( 0.00%)  {
+     .               u_char   *p;
+     .               va_list   args;
+     .           
+ 1,728 ( 0.00%)      va_start(args, fmt);
+ 1,152 ( 0.00%)      p = ngx_vslprintf(buf, (void *) -1, fmt, args);
+197,721 ( 0.01%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_string.c:ngx_vslprintf (288x)
+     .               va_end(args);
+     .           
+     .               return p;
+ 1,440 ( 0.00%)  }
+     .           
+     .           
+     .           u_char * ngx_cdecl
+     .           ngx_snprintf(u_char *buf, size_t max, const char *fmt, ...)
+   580 ( 0.00%)  {
+     .               u_char   *p;
+     .               va_list   args;
+     .           
+   348 ( 0.00%)      va_start(args, fmt);
+   174 ( 0.00%)      p = ngx_vslprintf(buf, buf + max, fmt, args);
+39,064 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_string.c:ngx_vslprintf (58x)
+     .               va_end(args);
+     .           
+     .               return p;
+   290 ( 0.00%)  }
+     .           
+     .           
+     .           u_char * ngx_cdecl
+     .           ngx_slprintf(u_char *buf, u_char *last, const char *fmt, ...)
+   140 ( 0.00%)  {
+     .               u_char   *p;
+     .               va_list   args;
+     .           
+    84 ( 0.00%)      va_start(args, fmt);
+    28 ( 0.00%)      p = ngx_vslprintf(buf, last, fmt, args);
+ 4,599 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_string.c:ngx_vslprintf (14x)
+     .               va_end(args);
+     .           
+     .               return p;
+    70 ( 0.00%)  }
+     .           
+     .           
+     .           u_char *
+     .           ngx_vslprintf(u_char *buf, u_char *last, const char *fmt, va_list args)
+ 3,670 ( 0.00%)  {
+     .               u_char                *p, zero;
+     .               int                    d;
+     .               double                 f;
+     .               size_t                 slen;
+     .               int64_t                i64;
+     .               uint64_t               ui64, frac;
+     .               ngx_msec_t             ms;
+     .               ngx_uint_t             width, sign, hex, max_width, frac_width, scale, n;
+     .               ngx_str_t             *v;
+     .               ngx_variable_value_t  *vv;
+     .           
+20,115 ( 0.00%)      while (*fmt && buf < last) {
+     .           
+     .                   /*
+     .                    * "buf < last" means that we could copy at least one character:
+     .                    * the plain character, "%%", "%c", and minus without the checking
+     .                    */
+     .           
+ 7,312 ( 0.00%)          if (*fmt == '%') {
+     .           
+     .                       i64 = 0;
+     .                       ui64 = 0;
+     .           
+ 6,524 ( 0.00%)              zero = (u_char) ((*++fmt == '0') ? '0' : ' ');
+ 1,384 ( 0.00%)              width = 0;
+ 1,355 ( 0.00%)              sign = 1;
+ 1,355 ( 0.00%)              hex = 0;
+ 2,089 ( 0.00%)              max_width = 0;
+     .                       frac_width = 0;
+ 2,710 ( 0.00%)              slen = (size_t) -1;
+     .           
+10,090 ( 0.00%)              while (*fmt >= '0' && *fmt <= '9') {
+ 6,075 ( 0.00%)                  width = width * 10 + (*fmt++ - '0');
+     .                       }
+     .           
+     .           
+     .                       for ( ;; ) {
+18,522 ( 0.00%)                  switch (*fmt) {
+     .           
+     .                           case 'u':
+   456 ( 0.00%)                      sign = 0;
+     .                               fmt++;
+     .                               continue;
+     .           
+     .                           case 'm':
+     .                               max_width = 1;
+     .                               fmt++;
+     .                               continue;
+     .           
+     .                           case 'X':
+     .                               hex = 2;
+ 2,125 ( 0.00%)                      sign = 0;
+     .                               fmt++;
+     .                               continue;
+     .           
+     .                           case 'x':
+   157 ( 0.00%)                      hex = 1;
+   314 ( 0.00%)                      sign = 0;
+     .                               fmt++;
+     .                               continue;
+     .           
+     .                           case '.':
+     .                               fmt++;
+     .           
+     .                               while (*fmt >= '0' && *fmt <= '9') {
+     .                                   frac_width = frac_width * 10 + (*fmt++ - '0');
+-- line 232 ----------------------------------------
+-- line 242 ----------------------------------------
+     .                           default:
+     .                               break;
+     .                           }
+     .           
+     .                           break;
+     .                       }
+     .           
+     .           
+12,195 ( 0.00%)              switch (*fmt) {
+     .           
+     .                       case 'V':
+    56 ( 0.00%)                  v = va_arg(args, ngx_str_t *);
+     .           
+    35 ( 0.00%)                  buf = ngx_sprintf_str(buf, last, v->data, v->len, hex);
+   231 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_string.c:ngx_sprintf_str (7x)
+     7 ( 0.00%)                  fmt++;
+     .           
+     7 ( 0.00%)                  continue;
+     .           
+     .                       case 'v':
+     .                           vv = va_arg(args, ngx_variable_value_t *);
+     .           
+     .                           buf = ngx_sprintf_str(buf, last, vv->data, vv->len, hex);
+     .                           fmt++;
+     .           
+     .                           continue;
+     .           
+     .                       case 's':
+ 1,253 ( 0.00%)                  p = va_arg(args, u_char *);
+     .           
+   895 ( 0.00%)                  buf = ngx_sprintf_str(buf, last, p, slen, hex);
+ 6,887 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_string.c:ngx_sprintf_str (179x)
+   179 ( 0.00%)                  fmt++;
+     .           
+   179 ( 0.00%)                  continue;
+     .           
+     .                       case 'O':
+   880 ( 0.00%)                  i64 = (int64_t) va_arg(args, off_t);
+     .                           sign = 1;
+     .                           break;
+     .           
+     .                       case 'P':
+   128 ( 0.00%)                  i64 = (int64_t) va_arg(args, ngx_pid_t);
+     .                           sign = 1;
+    16 ( 0.00%)                  break;
+     .           
+     .                       case 'T':
+   880 ( 0.00%)                  i64 = (int64_t) va_arg(args, time_t);
+     .                           sign = 1;
+   110 ( 0.00%)                  break;
+     .           
+     .                       case 'M':
+     .                           ms = (ngx_msec_t) va_arg(args, ngx_msec_t);
+     .                           if ((ngx_msec_int_t) ms == -1) {
+     .                               sign = 1;
+     .                               i64 = -1;
+     .                           } else {
+     .                               sign = 0;
+-- line 297 ----------------------------------------
+-- line 303 ----------------------------------------
+     .                           if (sign) {
+     .                               i64 = (int64_t) va_arg(args, ssize_t);
+     .                           } else {
+     .                               ui64 = (uint64_t) va_arg(args, size_t);
+     .                           }
+     .                           break;
+     .           
+     .                       case 'i':
+    96 ( 0.00%)                  if (sign) {
+   384 ( 0.00%)                      i64 = (int64_t) va_arg(args, ngx_int_t);
+     .                           } else {
+     .                               ui64 = (uint64_t) va_arg(args, ngx_uint_t);
+     .                           }
+     .           
+     .                           if (max_width) {
+   192 ( 0.00%)                      width = NGX_INT_T_LEN;
+     .                           }
+     .           
+     .                           break;
+     .           
+     .                       case 'd':
+ 1,716 ( 0.00%)                  if (sign) {
+ 5,670 ( 0.00%)                      i64 = (int64_t) va_arg(args, int);
+     .                           } else {
+ 2,052 ( 0.00%)                      ui64 = (uint64_t) va_arg(args, u_int);
+     .                           }
+     .                           break;
+     .           
+     .                       case 'l':
+     .                           if (sign) {
+     .                               i64 = (int64_t) va_arg(args, long);
+     .                           } else {
+     .                               ui64 = (uint64_t) va_arg(args, u_long);
+-- line 335 ----------------------------------------
+-- line 402 ----------------------------------------
+     .                           }
+     .           
+     .                           fmt++;
+     .           
+     .                           continue;
+     .           
+     .           #if !(NGX_WIN32)
+     .                       case 'r':
+    16 ( 0.00%)                  i64 = (int64_t) va_arg(args, rlim_t);
+     .                           sign = 1;
+     2 ( 0.00%)                  break;
+     .           #endif
+     .           
+     .                       case 'p':
+     .                           ui64 = (uintptr_t) va_arg(args, void *);
+     .                           hex = 2;
+     .                           sign = 0;
+     .                           zero = '0';
+     .                           width = 2 * sizeof(void *);
+     .                           break;
+     .           
+     .                       case 'c':
+   168 ( 0.00%)                  d = va_arg(args, int);
+    72 ( 0.00%)                  *buf++ = (u_char) (d & 0xff);
+    24 ( 0.00%)                  fmt++;
+     .           
+    24 ( 0.00%)                  continue;
+     .           
+     .                       case 'Z':
+     .                           *buf++ = '\0';
+     .                           fmt++;
+     .           
+     .                           continue;
+     .           
+     .                       case 'N':
+     .           #if (NGX_WIN32)
+     .                           *buf++ = CR;
+     .                           if (buf < last) {
+     .                               *buf++ = LF;
+     .                           }
+     .           #else
+     2 ( 0.00%)                  *buf++ = LF;
+     .           #endif
+     1 ( 0.00%)                  fmt++;
+     .           
+     1 ( 0.00%)                  continue;
+     .           
+     .                       case '%':
+     .                           *buf++ = '%';
+     .                           fmt++;
+     .           
+     .                           continue;
+     .           
+     .                       default:
+     .                           *buf++ = *fmt++;
+     .           
+     .                           continue;
+     .                       }
+     .           
+     .                       if (sign) {
+ 1,832 ( 0.00%)                  if (i64 < 0) {
+     .                               *buf++ = '-';
+     .                               ui64 = (uint64_t) -i64;
+     .           
+     .                           } else {
+   916 ( 0.00%)                      ui64 = (uint64_t) i64;
+     .                           }
+     .                       }
+     .           
+ 5,720 ( 0.00%)              buf = ngx_sprintf_num(buf, last, ui64, zero, hex, width);
+105,116 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/core/ngx_string.c:ngx_sprintf_num (1,144x)
+     .           
+ 2,288 ( 0.00%)              fmt++;
+     .           
+     .                   } else {
+ 6,903 ( 0.00%)              *buf++ = *fmt++;
+     .                   }
+     .               }
+     .           
+     .               return buf;
+ 3,303 ( 0.00%)  }
+     .           
+     .           
+     .           static u_char *
+     .           ngx_sprintf_num(u_char *buf, u_char *last, uint64_t ui64, u_char zero,
+     .               ngx_uint_t hexadecimal, ngx_uint_t width)
+11,440 ( 0.00%)  {
+     .               u_char         *p, temp[NGX_INT64_LEN + 1];
+     .                                  /*
+     .                                   * we need temp[NGX_INT64_LEN] only,
+     .                                   * but icc issues the warning
+     .                                   */
+     .               size_t          len;
+     .               uint32_t        ui32;
+     .               static u_char   hex[] = "0123456789abcdef";
+     .               static u_char   HEX[] = "0123456789ABCDEF";
+     .           
+ 1,144 ( 0.00%)      p = temp + NGX_INT64_LEN;
+     .           
+ 2,288 ( 0.00%)      if (hexadecimal == 0) {
+     .           
+ 2,961 ( 0.00%)          if (ui64 <= (uint64_t) NGX_MAX_UINT32_VALUE) {
+     .           
+     .                       /*
+     .                        * To divide 64-bit numbers and to find remainders
+     .                        * on the x86 platform gcc and icc call the libc functions
+     .                        * [u]divdi3() and [u]moddi3(), they call another function
+     .                        * in its turn.  On FreeBSD it is the qdivrem() function,
+     .                        * its source code is about 170 lines of the code.
+     .                        * The glibc counterpart is about 150 lines of the code.
+-- line 510 ----------------------------------------
+-- line 514 ----------------------------------------
+     .                        * unsigned "i32 / 10" is compiled to
+     .                        *
+     .                        *     (i32 * 0xCCCCCCCD) >> 35
+     .                        */
+     .           
+     .                       ui32 = (uint32_t) ui64;
+     .           
+     .                       do {
+21,577 ( 0.00%)                  *--p = (u_char) (ui32 % 10 + '0');
+ 9,223 ( 0.00%)              } while (ui32 /= 10);
+     .           
+     .                   } else {
+     .                       do {
+     .                           *--p = (u_char) (ui64 % 10 + '0');
+     .                       } while (ui64 /= 10);
+     .                   }
+     .           
+   314 ( 0.00%)      } else if (hexadecimal == 1) {
+     .           
+     .                   do {
+     .           
+     .                       /* the "(uint32_t)" cast disables the BCC's warning */
+ 4,397 ( 0.00%)              *--p = hex[(uint32_t) (ui64 & 0xf)];
+     .           
+ 1,853 ( 0.00%)          } while (ui64 >>= 4);
+     .           
+     .               } else { /* hexadecimal == 2 */
+     .           
+     .                   do {
+     .           
+     .                       /* the "(uint32_t)" cast disables the BCC's warning */
+   157 ( 0.00%)              *--p = HEX[(uint32_t) (ui64 & 0xf)];
+     .           
+     .                   } while (ui64 >>= 4);
+     .               }
+     .           
+     .               /* zero or space padding */
+     .           
+ 2,288 ( 0.00%)      len = (temp + NGX_INT64_LEN) - p;
+     .           
+ 7,636 ( 0.00%)      while (len++ < width && buf < last) {
+   386 ( 0.00%)          *buf++ = zero;
+     .               }
+     .           
+     .               /* number safe copy */
+     .           
+     .               len = (temp + NGX_INT64_LEN) - p;
+     .           
+ 1,144 ( 0.00%)      if (buf + len > last) {
+ 4,576 ( 0.00%)          len = last - buf;
+     .               }
+     .           
+ 1,144 ( 0.00%)      return ngx_cpymem(buf, p, len);
+ 8,008 ( 0.00%)  }
+     .           
+     .           
+     .           static u_char *
+     .           ngx_sprintf_str(u_char *buf, u_char *last, u_char *src, size_t len,
+     .               ngx_uint_t hexadecimal)
+   379 ( 0.00%)  {
+     .               static u_char   hex[] = "0123456789abcdef";
+     .               static u_char   HEX[] = "0123456789ABCDEF";
+     .           
+   372 ( 0.00%)      if (hexadecimal == 0) {
+     .           
+   372 ( 0.00%)          if (len == (size_t) -1) {
+ 4,103 ( 0.00%)              while (*src && buf < last) {
+ 1,710 ( 0.00%)                  *buf++ = *src++;
+     .                       }
+     .           
+     .                   } else {
+    28 ( 0.00%)              len = ngx_min((size_t) (last - buf), len);
+     7 ( 0.00%)              buf = ngx_cpymem(buf, src, len);
+     .                   }
+     .           
+     .               } else if (hexadecimal == 1) {
+     .           
+     .                   if (len == (size_t) -1) {
+     .           
+     .                       while (*src && buf < last - 1) {
+     .                           *buf++ = hex[*src >> 4];
+-- line 594 ----------------------------------------
+-- line 617 ----------------------------------------
+     .                       while (len-- && buf < last - 1) {
+     .                           *buf++ = HEX[*src >> 4];
+     .                           *buf++ = HEX[*src++ & 0xf];
+     .                       }
+     .                   }
+     .               }
+     .           
+     .               return buf;
+    14 ( 0.00%)  }
+     .           
+     .           
+     .           /*
+     .            * We use ngx_strcasecmp()/ngx_strncasecmp() for 7-bit ASCII strings only,
+     .            * and implement our own ngx_strcasecmp()/ngx_strncasecmp()
+     .            * to avoid libc locale overhead.  Besides, we use the ngx_uint_t's
+     .            * instead of the u_char's, because they are slightly faster.
+     .            */
+     .           
+     .           ngx_int_t
+     .           ngx_strcasecmp(u_char *s1, u_char *s2)
+   154 ( 0.00%)  {
+     .               ngx_uint_t  c1, c2;
+     .           
+     .               for ( ;; ) {
+   186 ( 0.00%)          c1 = (ngx_uint_t) *s1++;
+   186 ( 0.00%)          c2 = (ngx_uint_t) *s2++;
+     .           
+   744 ( 0.00%)          c1 = (c1 >= 'A' && c1 <= 'Z') ? (c1 | 0x20) : c1;
+   425 ( 0.00%)          c2 = (c2 >= 'A' && c2 <= 'Z') ? (c2 | 0x20) : c2;
+     .           
+   186 ( 0.00%)          if (c1 == c2) {
+     .           
+    60 ( 0.00%)              if (c1) {
+     .                           continue;
+     .                       }
+     .           
+     2 ( 0.00%)              return 0;
+     .                   }
+     .           
+   150 ( 0.00%)          return c1 - c2;
+     .               }
+     2 ( 0.00%)  }
+     .           
+     .           
+     .           ngx_int_t
+     .           ngx_strncasecmp(u_char *s1, u_char *s2, size_t n)
+ 1,362 ( 0.00%)  {
+     .               ngx_uint_t  c1, c2;
+     .           
+ 2,931 ( 0.00%)      while (n) {
+ 1,942 ( 0.00%)          c1 = (ngx_uint_t) *s1++;
+ 1,942 ( 0.00%)          c2 = (ngx_uint_t) *s2++;
+     .           
+ 7,768 ( 0.00%)          c1 = (c1 >= 'A' && c1 <= 'Z') ? (c1 | 0x20) : c1;
+ 2,913 ( 0.00%)          c2 = (c2 >= 'A' && c2 <= 'Z') ? (c2 | 0x20) : c2;
+     .           
+ 1,942 ( 0.00%)          if (c1 == c2) {
+     .           
+ 1,046 ( 0.00%)              if (c1) {
+     .                           n--;
+     .                           continue;
+     .                       }
+     .           
+     .                       return 0;
+     .                   }
+     .           
+   896 ( 0.00%)          return c1 - c2;
+     .               }
+     .           
+    12 ( 0.00%)      return 0;
+     .           }
+     .           
+     .           
+     .           u_char *
+     .           ngx_strnstr(u_char *s1, char *s2, size_t len)
+     .           {
+     .               u_char  c1, c2;
+     .               size_t  n;
+-- line 694 ----------------------------------------
+-- line 747 ----------------------------------------
+     .               } while (ngx_strncmp(s1, (u_char *) s2, n) != 0);
+     .           
+     .               return --s1;
+     .           }
+     .           
+     .           
+     .           u_char *
+     .           ngx_strcasestrn(u_char *s1, char *s2, size_t n)
+   330 ( 0.00%)  {
+     .               ngx_uint_t  c1, c2;
+     .           
+   165 ( 0.00%)      c2 = (ngx_uint_t) *s2++;
+   440 ( 0.00%)      c2 = (c2 >= 'A' && c2 <= 'Z') ? (c2 | 0x20) : c2;
+     .           
+     .               do {
+     .                   do {
+ 1,485 ( 0.00%)              c1 = (ngx_uint_t) *s1++;
+     .           
+   990 ( 0.00%)              if (c1 == 0) {
+    55 ( 0.00%)                  return NULL;
+     .                       }
+     .           
+ 2,200 ( 0.00%)              c1 = (c1 >= 'A' && c1 <= 'Z') ? (c1 | 0x20) : c1;
+     .           
+   880 ( 0.00%)          } while (c1 != c2);
+     .           
+     .               } while (ngx_strncasecmp(s1, (u_char *) s2, n) != 0);
+     .           
+     .               return --s1;
+   275 ( 0.00%)  }
+     .           
+     .           
+     .           /*
+     .            * ngx_strlcasestrn() is intended to search for static substring
+     .            * with known length in string until the argument last. The argument n
+     .            * must be length of the second substring - 1.
+     .            */
+     .           
+-- line 784 ----------------------------------------
+-- line 920 ----------------------------------------
+     .           
+     .                   return c1 - c2;
+     .               }
+     .           }
+     .           
+     .           
+     .           ngx_int_t
+     .           ngx_filename_cmp(u_char *s1, u_char *s2, size_t n)
+   176 ( 0.00%)  {
+     .               ngx_uint_t  c1, c2;
+     .           
+ 1,596 ( 0.00%)      while (n) {
+   418 ( 0.00%)          c1 = (ngx_uint_t) *s1++;
+   418 ( 0.00%)          c2 = (ngx_uint_t) *s2++;
+     .           
+     .           #if (NGX_HAVE_CASELESS_FILESYSTEM)
+     .                   c1 = tolower(c1);
+     .                   c2 = tolower(c2);
+     .           #endif
+     .           
+   836 ( 0.00%)          if (c1 == c2) {
+     .           
+   712 ( 0.00%)              if (c1) {
+     .                           n--;
+     .                           continue;
+     .                       }
+     .           
+     .                       return 0;
+     .                   }
+     .           
+     .                   /* we need '/' to be the lowest character */
+     .           
+   244 ( 0.00%)          if (c1 == 0 || c2 == 0) {
+     6 ( 0.00%)              return c1 - c2;
+     .                   }
+     .           
+   177 ( 0.00%)          c1 = (c1 == '/') ? 0 : c1;
+   118 ( 0.00%)          c2 = (c2 == '/') ? 0 : c2;
+     .           
+   118 ( 0.00%)          return c1 - c2;
+     .               }
+     .           
+   228 ( 0.00%)      return 0;
+     .           }
+     .           
+     .           
+     .           ngx_int_t
+     .           ngx_atoi(u_char *line, size_t n)
+     7 ( 0.00%)  {
+     .               ngx_int_t  value, cutoff, cutlim;
+     .           
+    14 ( 0.00%)      if (n == 0) {
+     .                   return NGX_ERROR;
+     .               }
+     .           
+     .               cutoff = NGX_MAX_INT_T_VALUE / 10;
+     .               cutlim = NGX_MAX_INT_T_VALUE % 10;
+     .           
+    77 ( 0.00%)      for (value = 0; n--; line++) {
+    84 ( 0.00%)          if (*line < '0' || *line > '9') {
+     .                       return NGX_ERROR;
+     .                   }
+     .           
+    63 ( 0.00%)          if (value >= cutoff && (value > cutoff || *line - '0' > cutlim)) {
+     .                       return NGX_ERROR;
+     .                   }
+     .           
+   105 ( 0.00%)          value = value * 10 + (*line - '0');
+     .               }
+     .           
+     .               return value;
+    14 ( 0.00%)  }
+     .           
+     .           
+     .           /* parse a fixed point number, e.g., ngx_atofp("10.5", 4, 2) returns 1050 */
+     .           
+     .           ngx_int_t
+     .           ngx_atofp(u_char *line, size_t n, size_t point)
+     .           {
+     .               ngx_int_t   value, cutoff, cutlim;
+-- line 999 ----------------------------------------
+-- line 1488 ----------------------------------------
+     .               *dst = '\0';
+     .           
+     .               return dst;
+     .           }
+     .           
+     .           
+     .           uintptr_t
+     .           ngx_escape_uri(u_char *dst, u_char *src, size_t size, ngx_uint_t type)
+    20 ( 0.00%)  {
+     .               u_char          prefix;
+     .               uint32_t       *escape;
+     .               ngx_uint_t      n;
+     .               static u_char   hex[] = "0123456789ABCDEF";
+     .           
+     .               /*
+     .                * Per RFC 3986 only the following chars are allowed in URIs unescaped:
+     .                *
+-- line 1504 ----------------------------------------
+-- line 1657 ----------------------------------------
+     .               static uint32_t  *map[] =
+     .                   { uri, args, uri_component, html, refresh, memcached, memcached,
+     .                     mail_xtext };
+     .           
+     .               static u_char  map_char[] =
+     .                   { '%', '%', '%', '%', '%', '%', '%', '+' };
+     .           
+     .           
+    10 ( 0.00%)      escape = map[type];
+     .               prefix = map_char[type];
+     .           
+    10 ( 0.00%)      if (dst == NULL) {
+     .           
+     .                   /* find the number of the characters to be escaped */
+     .           
+     5 ( 0.00%)          n = 0;
+     .           
+   113 ( 0.00%)          while (size) {
+   397 ( 0.00%)              if (escape[*src >> 5] & (1U << (*src & 0x1f))) {
+    98 ( 0.00%)                  n++;
+     .                       }
+    49 ( 0.00%)              src++;
+     .                       size--;
+     .                   }
+     .           
+     .                   return (uintptr_t) n;
+     .               }
+     .           
+     .               while (size) {
+     .                   if (escape[*src >> 5] & (1U << (*src & 0x1f))) {
+-- line 1686 ----------------------------------------
+-- line 1691 ----------------------------------------
+     .           
+     .                   } else {
+     .                       *dst++ = *src++;
+     .                   }
+     .                   size--;
+     .               }
+     .           
+     .               return (uintptr_t) dst;
+    10 ( 0.00%)  }
+     .           
+     .           
+     .           void
+     .           ngx_unescape_uri(u_char **dst, u_char **src, size_t size, ngx_uint_t type)
+     .           {
+     .               u_char  *d, *s, ch, c, decoded;
+     .               enum {
+     .                   sw_usual = 0,
+-- line 1707 ----------------------------------------
+-- line 2073 ----------------------------------------
+     .           }
+     .           
+     .           
+     .           /* ngx_sort() is implemented as insertion sort because we need stable sort */
+     .           
+     .           void
+     .           ngx_sort(void *base, size_t n, size_t size,
+     .               ngx_int_t (*cmp)(const void *, const void *))
+    12 ( 0.00%)  {
+     .               u_char  *p1, *p2, *p;
+     .           
+     4 ( 0.00%)      p = ngx_alloc(size, ngx_cycle->log);
+   283 ( 0.00%)  => /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/src/os/unix/ngx_alloc.c:ngx_alloc (1x)
+     3 ( 0.00%)      if (p == NULL) {
+     .                   return;
+     .               }
+     .           
+     2 ( 0.00%)      for (p1 = (u_char *) base + size;
+     5 ( 0.00%)           p1 < (u_char *) base + n * size;
+     .                    p1 += size)
+     .               {
+     .                   ngx_memcpy(p, p1, size);
+     .           
+     .                   for (p2 = p1;
+     .                        p2 > (u_char *) base && cmp(p2 - size, p) > 0;
+     .                        p2 -= size)
+     .                   {
+     .                       ngx_memcpy(p2, p2 - size, size);
+     .                   }
+     .           
+     .                   ngx_memcpy(p2, p, size);
+     .               }
+     .           
+     2 ( 0.00%)      ngx_free(p);
+    87 ( 0.00%)  => ???:0x000000000012f8c0 (1x)
+     8 ( 0.00%)  }
+     .           
+     .           
+     .           void
+     .           ngx_explicit_memzero(void *buf, size_t n)
+     .           {
+     .               ngx_memzero(buf, n);
+     .               ngx_memory_barrier();
+     .           }
+-- line 2114 ----------------------------------------
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./elf/../sysdeps/generic/dl-new-hash.h
+  ./elf/../sysdeps/x86_64/dl-machine.h
+  ./elf/../sysdeps/x86_64/tls_get_addr.S
+  ./elf/./elf/dl-lookup.c
+  ./elf/./elf/do-rel.h
+  ./malloc/../string/bits/string_fortified.h
+  ./malloc/./malloc/arena.c
+  ./malloc/./malloc/malloc.c
+  ./nptl/./nptl/pthread_mutex_trylock.c
+  ./stdlib/./stdlib/canonicalize.c
+  ./string/../sysdeps/x86_64/multiarch/../multiarch/strcmp-sse2.S
+  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/strcmp-avx2.S
+
+--------------------------------------------------------------------------------
+Ir                 
+--------------------------------------------------------------------------------
+1,786,323 ( 0.07%)  events annotated
+

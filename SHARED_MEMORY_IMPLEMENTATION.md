@@ -145,9 +145,9 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Cover resource/image/CSS/JS/RUM/lazy/LCP/preload/responsive/HTML caching regressions.
 - [x] Full workspace tests and available sanitizers/model checks; document limits; commit.
 
-### Phase 10 — Performance/docs [PENDING]
+### Phase 10 — Performance/docs [IN PROGRESS]
 
-- [ ] Repeat matched baseline cold/MISS/HIT benchmarks, including multi-worker/concurrent requests.
+- [x] Repeat matched baseline cold/MISS/HIT benchmarks, including multi-worker/concurrent requests.
 - [ ] Attribute cache operations, initialization, parsing, resource processing, integration residual and total request time.
 - [ ] Assess contention, memory use and redundant-work reduction; optimize only measured bottlenecks.
 - [ ] Update README/config/admin documentation and report measured tradeoffs.
@@ -175,14 +175,15 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Next Session Resume Point
 
-**State:** Phases 0–3 implemented and verified (Phase 3 exposes an opt-in assembly API; no production directive/default changed). Latest Phase 3 integration commit is `db778c3`. Phase 4 dependencies: b37464b identity, 6ac47a7 owner table, a707279 leases/revocation. HTML worker integration is the latest tested milestone (inspect git log for its hash). Production directives/defaults remain disabled; coherent cache-writer recovery is pending. Earlier commits: `4d23d3e` baseline/plan, `ff67357` regions, `6aaefe3` bytes/adapter, `6213ac2` lifetime diagnosis, `7cf9997` coherent counter protocol.
+**State at user-requested wrap-up:** Phases 0–9 implemented and verified. Phase 10 is IN PROGRESS: final ordinary benchmarks, two-worker concurrency benchmark, stage timing, strace and Callgrind are saved. No partial Rust changes. Latest prior milestone is `f4f8b6a`; the next local commit contains this checkpoint and profiling artifacts (inspect `git log -3 --oneline`). No push or live deployment performed.
 
-**Exact next action:** Phases 0–8 implemented/verified; inspect latest commit. Phase 9 is running `cargo test --workspace` to phase9-workspace-tests.log and ten ps-shm/ps-cache repetitions to phase9-stress.log; inspect active processes/log completion rather than rerun blindly. On success commit the stress/workspace milestone, recording any unavailable sanitizer limitation. Phase 10 remains: repeat final matched default/shared and multi-worker benchmarks, build profiling feature separately while preserving ordinary module, use stage timings + strace/Callgrind to investigate residual latency, and report limits honestly. Installed localhost request timed out (phase10-localhost-observation.json); do not infer current production timing or attribute historical 13ms from synthetic measurements.
+**Exact next action:** Read this file, inspect git status/recent commits, and verify build state. Review `docs/performance/shared-memory/RESULTS.md` against raw phase10 JSON artifacts; finish Phase 10 documentation/acceptance checklist. Do not repeat completed benchmarks without a reason. Production URL timed out: historical ~13 ms is NOT attributed or resolved. Obtain working production profiling access if needed; isolate Nginx integration overhead separately before making a production attribution claim. Final report/doc review remains pending. Do not mark Phase 10 complete merely because measurements exist.
 
-**Phase 4 outcome:** opt-in domains now use robust tracked transactions and recover killed writers. Legacy default coherence remains unchanged until explicit activation. Exceptional tracking-capacity overflow preserves disk mutations and deliberately disables affected memory shards; offline replacement/new tracker domain restores those shards. Surface this in diagnostics and documentation; it is distinct from ordinary killed-owner recovery.
+**Verified build/test state:** final `cargo test --workspace` completed with 99 result groups, 2,922 reported passes (2,920 primary plus two nested subprocess reports), zero failures. Final `cargo build -p ps-nginx --release` passed and restored ordinary, non-pipeline-profile target module. Logs: phase10-final-workspace-tests.log and phase10-final-release-build.log. No commands intentionally left running.
 
-**Build/test state:** latest broad regression passes 2,098 primary cases, plus two nested subprocess reports. Final targeted html_async suite passes 9 cases (including an added combination regression); release build and scoped strict clippy pass. See end-of-ledger exact commands/results. No incomplete runtime edits. Coherence writer recovery, config defaults/migration, beacons, checkpoints/admin/full stress/final benchmarks remain pending. Nothing pushed or deployed.
+**Deployment constraints:** shared tier remains opt-in; no consistent single-worker gain supports enabling it by default. Initial migration from legacy workers requires a full stop/start. Staged Nginx is 1.31.8; installed service previously 1.31.10, so do not install staged module blindly. Disk remains authoritative checkpoint. Exceptional writer-tracker overflow disables affected memory shards while preserving disk mutation; ordinary killed writers recover automatically.
 
+**Known limits:** perf kernel events denied; no sanitizer run claimed. Isolated profiling residual includes Nginx, uninstrumented Rust, client/socket and scheduling costs. Background CPU/syscall totals overlap requests and cannot be added to HTML latency. Temporary module copies are under /tmp; hashes/build commands are persisted, so rebuild if removed. All new benchmark/profiling tools and raw evidence are included in the checkpoint commit.
 
 ## Phase 0 audit findings (persisted before implementation)
 
@@ -569,3 +570,24 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - Actual two-worker lifecycle/admin tests in Phase 7/8 cover reload allocation changes, overlapped generations and restart; actual four-process evidence tests preserve nonce/merge counts/replay rejection. Existing invalid dimension/header/permission/expiry/purge/backfill/old-token tests all passed. No unavailable sanitizer/model checker is claimed as run; robust behavior was exercised on this Linux host with normal Rust tests and subprocess fault injection. ThreadSanitizer does not model independent mmap-sharing processes; no nightly toolchain/sanitizer environment installed by this task.
 - Phase 8 count correction: final unit log has **408 primary** (54+72+282), not 407; plus two nested reports. Source change was one Nginx diagnostic regression; raw log retained.
 - `perf stat -e task-clock true`: kernel refuses supported events (perf_event_paranoid=4). Do not change host security settings. Phase 10 uses stage timers/strace/Callgrind instead. Read-only installed localhost target timed out; isolated counterpart is available under /var/www/test/aerosky-real-estate-html-responsive-website-template/index.html.
+
+## Phase 10 checkpoint — final benchmarks and profiling
+
+Completed and verified: new `tools/profile_shared_cache.py`; optional concurrent benchmark in `tools/verify_shared_lifecycle.py`; three alternating ordinary default/shared benchmark pairs; isolated Aerosky ordinary and instrumented runs; strace and Callgrind captures; final workspace tests and ordinary release restoration. See `docs/performance/shared-memory/RESULTS.md` and `phase10-*` artifacts for results/provenance. Production latency attribution and final documentation acceptance remain pending.
+
+Exact commands (run from repository root; NGINX=/home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/objs/nginx; MODULE is the path in phase10-ordinary-module.json or phase10-profile-module.json):
+
+```sh
+cargo test --workspace > docs/performance/shared-memory/phase10-final-workspace-tests.log 2>&1
+cargo build -p ps-nginx --release > docs/performance/shared-memory/phase10-final-release-build.log 2>&1
+cargo build -p ps-nginx --release --features pipeline-profile
+python3 tools/benchmark_shared_memory.py --nginx "$NGINX" --module "$MODULE" --output RESULT.json --samples 100 --cold-runs 5 --shared-kb 16384
+# Alternate shared-kb 0/16384 over three pairs; outputs phase10-default-{1,2,3}.json and phase10-shared-{1,2,3}.json.
+python3 tools/verify_shared_lifecycle.py --nginx "$NGINX" --module "$MODULE" --output docs/performance/shared-memory/phase10-concurrency.json --benchmark-requests 400
+python3 tools/profile_shared_cache.py --nginx "$NGINX" --module "$MODULE" --mode plain --samples 100 --output RESULT.json
+# Profile module: plain 100, strace 10, callgrind 5; ordinary module: plain 100. See phase10-profilers.log.
+python3 -m py_compile tools/profile_shared_cache.py tools/verify_shared_lifecycle.py
+git diff --check
+```
+
+Final tests/build passed; Python syntax and diff checks verified at checkpoint. No implementation change was made during wrap-up. Historical baseline is retained, with no claim that runtime differences isolate an individual phase's effect.

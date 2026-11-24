@@ -1,0 +1,147 @@
+mode plain
+{
+  "cold": {
+    "ttfb_ms": 4.059335,
+    "total_ms": 4.116331,
+    "marker": "BYPASS",
+    "pipeline_index": 0,
+    "stages_us": {
+      "filter_init": 32.19,
+      "html_cache_lookup": 55.844,
+      "html_processing": 2325.639,
+      "html_cache_store": 2.114
+    },
+    "outside_instrumented_stages_ms": 1.7005439999999994
+  },
+  "warm_html_hit": {
+    "median_ms": 0.5154190000000001,
+    "ttfb_median_ms": 0.4977465,
+    "markers": [
+      "HIT"
+    ],
+    "stages_median_us": {
+      "filter_init": 0.0,
+      "html_cache_lookup": 44.0225,
+      "html_processing": 0.0,
+      "html_cache_store": 0.0
+    }
+  },
+  "warm_html_miss": {
+    "median_ms": 1.9144885,
+    "ttfb_median_ms": 1.892192,
+    "markers": [
+      "MISS"
+    ],
+    "stages_median_us": {
+      "filter_init": 8.8215,
+      "html_cache_lookup": 36.408,
+      "html_processing": 1122.0935,
+      "html_cache_store": 211.123
+    }
+  },
+  "pagespeed_off": {
+    "median_ms": 0.160604,
+    "ttfb_median_ms": 0.14975349999999998,
+    "markers": [
+      "absent"
+    ]
+  }
+}
+mode strace
+{
+  "cold": {
+    "ttfb_ms": 11.007697,
+    "total_ms": 11.063051,
+    "marker": "BYPASS",
+    "pipeline_index": 0,
+    "stages_us": {
+      "filter_init": 35.276,
+      "html_cache_lookup": 153.636,
+      "html_processing": 6442.972,
+      "html_cache_store": 2.745
+    },
+    "outside_instrumented_stages_ms": 4.428421999999999
+  },
+  "warm_html_hit": {
+    "median_ms": 2.3789024999999997,
+    "ttfb_median_ms": 2.357678,
+    "markers": [
+      "HIT"
+    ],
+    "stages_median_us": {
+      "filter_init": 0.0,
+      "html_cache_lookup": 51.2155,
+      "html_processing": 0.0,
+      "html_cache_store": 0.0
+    }
+  },
+  "warm_html_miss": {
+    "median_ms": 3.8468545,
+    "ttfb_median_ms": 3.8265665,
+    "markers": [
+      "MISS"
+    ],
+    "stages_median_us": {
+      "filter_init": 9.648,
+      "html_cache_lookup": 63.5985,
+      "html_processing": 1130.7845,
+      "html_cache_store": 373.8605
+    }
+  },
+  "pagespeed_off": {
+    "median_ms": 0.429505,
+    "ttfb_median_ms": 0.418509,
+    "markers": [
+      "absent"
+    ]
+  }
+}
+mode callgrind
+{
+  "cold": {
+    "ttfb_ms": 914.813313,
+    "total_ms": 914.85464,
+    "marker": "BYPASS",
+    "pipeline_index": 0,
+    "stages_us": {
+      "filter_init": 11960.702,
+      "html_cache_lookup": 21667.368,
+      "html_processing": 276717.987,
+      "html_cache_store": 1254.315
+    },
+    "outside_instrumented_stages_ms": 603.2542679999999
+  },
+  "warm_html_hit": {
+    "median_ms": 10.465343,
+    "ttfb_median_ms": 10.435477,
+    "markers": [
+      "HIT"
+    ],
+    "stages_median_us": {
+      "filter_init": 0.0,
+      "html_cache_lookup": 2936.898,
+      "html_processing": 0.0,
+      "html_cache_store": 0.0
+    }
+  },
+  "warm_html_miss": {
+    "median_ms": 92.360393,
+    "ttfb_median_ms": 92.309809,
+    "markers": [
+      "MISS"
+    ],
+    "stages_median_us": {
+      "filter_init": 342.928,
+      "html_cache_lookup": 1297.276,
+      "html_processing": 67450.079,
+      "html_cache_store": 14131.548
+    }
+  },
+  "pagespeed_off": {
+    "median_ms": 0.791273,
+    "ttfb_median_ms": 0.780112,
+    "markers": [
+      "absent"
+    ]
+  }
+}
