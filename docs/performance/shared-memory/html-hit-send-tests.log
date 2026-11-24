@@ -1,0 +1,41 @@
+   Compiling ps-cache v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-cache)
+   Compiling ps-js v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-js)
+   Compiling ps-http v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-http)
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+   Compiling ps-admin v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-admin)
+   Compiling ps-nginx v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-nginx)
+warning: unused import: `ps_http::fetch::AsyncFetch`
+   --> crates/ps-nginx/src/file_fetch.rs:611:13
+    |
+611 |         use ps_http::fetch::AsyncFetch;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/ps-nginx/src/send.rs:672:13
+    |
+672 |         let mut make_sink = |metadata: std::sync::Arc<dyn ps_cache::cache::Cache>| {
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-nginx` (lib test) generated 2 warnings (run `cargo fix --lib -p ps-nginx --tests` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.16s
+     Running unittests src/lib.rs (target/debug/build/ps-nginx/7a479a898b863727/out/ps_nginx-7a479a898b863727)
+
+running 9 tests
+test send::tests::html_sink_rewrites_into_fetch ... ok
+test send::tests::pass_through_writes_and_completes ... ok
+test send::tests::limit_reports_distinctly ... ok
+test send::tests::inflated_delivery ... ok
+test send::tests::inflation_failure_drops_the_rest ... ok
+test send::tests::html_sink_drains_driver_image_records ... ok
+test send::tests::html_sink_caches_miss_then_serves_hit ... ok
+test send::tests::html_sink_builds_filters_only_past_lookup ... ok
+test send::tests::html_sink_caches_analytics_cookies_and_names_bypassers ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 275 filtered out; finished in 0.03s
+

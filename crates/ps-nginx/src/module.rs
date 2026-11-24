@@ -2906,14 +2906,23 @@ unsafe fn resource_response(
                     driver.register_serving_filters();
                     driver
                 });
-                let sink = crate::send::HtmlSink::new(
-                    &resolved.core,
-                    &url_string,
-                    content_type_is_xml_like(&content_type),
-                    &ps_side,
-                    crate::pipe::base_fetch_channel_slot(),
-                    resource_driver,
-                );
+                let sink = match resource_driver {
+                    Some(driver) => crate::send::HtmlSink::new_for_resource_driver(
+                        &url_string,
+                        content_type_is_xml_like(&content_type),
+                        &ps_side,
+                        crate::pipe::base_fetch_channel_slot(),
+                        driver,
+                    ),
+                    None => crate::send::HtmlSink::new(
+                        &resolved.core,
+                        &url_string,
+                        content_type_is_xml_like(&content_type),
+                        &ps_side,
+                        crate::pipe::base_fetch_channel_slot(),
+                        None,
+                    ),
+                };
                 (*ctx_ptr).html_sink = Some(sink);
                 drop(ps_side);
                 NGX_OK as ngx_int_t

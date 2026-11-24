@@ -64,7 +64,7 @@ pub struct HtmlSink<'a> {
 
 /// Owned inputs for a lazily-built rewrite driver.
 struct DeferredDriver {
-    options: ps_config::options::RewriteOptions,
+    options: Option<ps_config::options::RewriteOptions>,
     url: String,
     content_is_xml_like: bool,
 }
@@ -89,6 +89,45 @@ impl<'a> HtmlSink<'a> {
         slot: &'a Mutex<Option<crate::pipe::PipeChannel>>,
         resource_driver: Option<Rc<ps_html::server_context::ResourceDriver>>,
     ) -> Self {
+        Self::new_inner(
+            Some(options.clone()),
+            url,
+            content_is_xml_like,
+            fetch,
+            slot,
+            resource_driver,
+        )
+    }
+
+    /// Uses the request driver's existing options snapshot. Cache HITs never
+    /// need a second configuration copy; MISSes borrow it while building the
+    /// parser. Callers needing independent options retain `new` semantics.
+    #[must_use]
+    pub fn new_for_resource_driver(
+        url: &str,
+        content_is_xml_like: bool,
+        fetch: &Arc<SharedBaseFetch>,
+        slot: &'a Mutex<Option<crate::pipe::PipeChannel>>,
+        resource_driver: Rc<ps_html::server_context::ResourceDriver>,
+    ) -> Self {
+        Self::new_inner(
+            None,
+            url,
+            content_is_xml_like,
+            fetch,
+            slot,
+            Some(resource_driver),
+        )
+    }
+
+    fn new_inner(
+        options: Option<ps_config::options::RewriteOptions>,
+        url: &str,
+        content_is_xml_like: bool,
+        fetch: &Arc<SharedBaseFetch>,
+        slot: &'a Mutex<Option<crate::pipe::PipeChannel>>,
+        resource_driver: Option<Rc<ps_html::server_context::ResourceDriver>>,
+    ) -> Self {
         let output = Rc::new(RefCell::new(Vec::new()));
         let html_cache = resource_driver
             .clone()
@@ -98,7 +137,7 @@ impl<'a> HtmlSink<'a> {
             timings: [0; 4],
             driver: None,
             deferred: Some(DeferredDriver {
-                options: options.clone(),
+                options,
                 url: url.to_string(),
                 content_is_xml_like,
             }),
@@ -123,14 +162,25 @@ impl<'a> HtmlSink<'a> {
         let context = ps_html::chain::ChainContext::new(true, true);
         #[cfg(feature = "pipeline-profile")]
         let profile_start = std::time::Instant::now();
-        let mut driver = ps_html::driver::Driver::new(
-            &deferred.options,
-            &context,
-            VecSink {
-                output: Rc::clone(&self.output),
-            },
-            self.resource_driver.clone(),
-        );
+        let build = |options: &ps_config::options::RewriteOptions| {
+            ps_html::driver::Driver::new(
+                options,
+                &context,
+                VecSink {
+                    output: Rc::clone(&self.output),
+                },
+                self.resource_driver.clone(),
+            )
+        };
+        let mut driver = if let Some(options) = deferred.options.as_ref() {
+            build(options)
+        } else {
+            let resource_driver = self
+                .resource_driver
+                .as_ref()
+                .expect("driver-backed options");
+            build(&resource_driver.options())
+        };
         driver.start_parse(deferred.url.as_bytes(), deferred.content_is_xml_like);
         #[cfg(feature = "pipeline-profile")]
         {
@@ -182,11 +232,13 @@ impl<'a> HtmlSink<'a> {
     ) -> Option<ps_cache::html::HtmlCacheEntry> {
         #[cfg(feature = "pipeline-profile")]
         let profile_start = std::time::Instant::now();
-        self.html_cache_request = Some(request.clone());
         let out = self
             .html_cache
             .as_mut()
             .and_then(|session| session.lookup(origin, request, purge, file_mtime, now_ms));
+        // Only rewriting/publication uses this snapshot. HIT completion does
+        // not publish, so do not copy every request header on that path.
+        self.html_cache_request = out.is_none().then(|| request.clone());
         #[cfg(feature = "pipeline-profile")]
         {
             self.timings[1] += profile_start.elapsed().as_nanos();
@@ -648,7 +700,8 @@ mod tests {
                 "http://h/p",
             ));
             // The sink clones what it needs; locals drop freely.
-            let sink = HtmlSink::new(&options, "http://h/p", false, &ps_side, slot, Some(driver));
+            let sink =
+                HtmlSink::new_for_resource_driver("http://h/p", false, &ps_side, slot, driver);
             (sink, ps_side)
         };
         fn get_request() -> ps_http::request::RequestHeaders {
@@ -747,7 +800,7 @@ mod tests {
                 "http://h/p",
             ));
             driver.set_user_agent("Mozilla/5.0 Chrome/120.0.0.0 Safari/537.36");
-            HtmlSink::new(&options, "http://h/p", false, &ps_side, slot, Some(driver))
+            HtmlSink::new_for_resource_driver("http://h/p", false, &ps_side, slot, driver)
         };
         let mut request = ps_http::request::RequestHeaders::new();
         request.set_method(Method::Get);
@@ -799,6 +852,8 @@ mod tests {
         assert!(body.contains("pagespeed.addInstrumentationInit("), "{body}");
         assert!(body.contains("/ngx_pagespeed_beacon"), "{body}");
         assert!(!second.driver_built());
+        assert!(second.html_cache_request.is_none());
+        assert!(second.deferred.as_ref().unwrap().options.is_none());
         second.serve_html_cache_hit(&entry, later_ms);
         // Served: the origin body is swallowed downstream, so no
         // driver, parse, or filter ever runs for this request.
@@ -843,7 +898,7 @@ mod tests {
                 std::rc::Rc::new(std::cell::RefCell::new(options.clone())),
                 "http://h/c",
             ));
-            HtmlSink::new(&options, "http://h/c", false, &ps_side, slot, Some(driver))
+            HtmlSink::new_for_resource_driver("http://h/c", false, &ps_side, slot, driver)
         };
         fn cookie_request(cookies: &str) -> ps_http::request::RequestHeaders {
             let mut request = ps_http::request::RequestHeaders::new();
