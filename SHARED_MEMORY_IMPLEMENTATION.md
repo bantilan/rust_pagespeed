@@ -94,7 +94,7 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Add safe `ps-cache` adapter with existing Cache trait semantics.
 - [x] Run checks; update ledger; commit tested backend (not yet enabled).
 
-### Phase 3 — L1/L2/L3 integration/coherence [PENDING]
+### Phase 3 — L1/L2/L3 integration/coherence [IN PROGRESS — audit only]
 
 - [ ] Introduce opt-in factory wiring and preserve L3 persistence.
 - [ ] Make reads/backfill/writes/deletes coherent across worker L1s, shared L2 and disk.
@@ -172,11 +172,11 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Next Session Resume Point
 
-**State:** Phases 0–2 implemented and verified; Phase 2 milestone commit is the latest `Add bounded shared byte cache and safe cache adapter` commit (inspect git log for its hash). Phase 0=`4d23d3e`, Phase 1=`ff67357`. Existing production cache assembly and defaults are unchanged. No shared cache is enabled; nothing deployed/pushed.
+**State:** Phases 0–2 implemented and verified; Phase 2 milestone commit is `6aaefe3` (`Add bounded shared byte cache and safe cache adapter`). Phase 0=`4d23d3e`, Phase 1=`ff67357`. Existing production cache assembly and defaults are unchanged. No shared cache is enabled; nothing deployed/pushed.
 
-**Exact next action (Phase 3, first incomplete task):** re-read this ledger, inspect status/log, run `cargo test -p ps-shm -p ps-cache`. Then design and implement an opt-in L1/L2/L3 assembly API (config parsing can remain Phase 6). Resolve resettable-counter incarnation/lifetime safety *before* using generations to cache persistent shared values. Inspect `SharedCounters::open` and `caches.rs:SharedCacheCoherence/path_backend` and add a regression reproducing creator death + surviving attached reader + new opener, and full restart with old shared L2 bytes. The existing lifetime-flock protocol does not retain a lock in every attached reader, so blindly reusing its generations is unsafe for L2 persistence. Preserve complete-key/TTL/purge/option validation and avoid filesystem reads on shared hits. Do not mark Phase 3 complete without multi-worker stale-backfill/delete/failed-admission tests.
+**Exact next action (Phase 3, first incomplete task):** re-read this ledger, inspect status/log, run `cargo test -p ps-shm -p ps-cache`. Then design and implement an opt-in L1/L2/L3 assembly API (config parsing can remain Phase 6). Resolve resettable-counter incarnation/lifetime safety *before* using generations to cache persistent shared values. The creator-drop/reset problem is already reproduced by `cargo run -p ps-shm --example shared_lifetime_probe` (log below); do not repeat the audit as if unverified. Convert that diagnostic into a desired-behavior regression when implementing the lifetime fix, then add full restart with old shared L2 bytes. The existing lifetime-flock protocol does not retain a lock in every attached reader, so blindly reusing its generations is unsafe for L2 persistence. Preserve complete-key/TTL/purge/option validation and avoid filesystem reads on shared hits. Do not mark Phase 3 complete without multi-worker stale-backfill/delete/failed-admission tests.
 
-**Latest build state:** release build passes; ps-shm and ps-cache tests pass; Nginx unit tests pass. No incomplete code edits. Known lint suppressions are command-scoped for two existing ps-cache lints. Phases 3–10 remain pending, with phase-specific acceptance checkboxes above.
+**Latest build state:** release build passes; ps-shm and ps-cache tests pass; Nginx unit tests pass. No incomplete code edits. Known lint suppressions are command-scoped for two existing ps-cache lints. Phase 3 coherence audit has begun; implementation and Phases 4–10 remain pending, with phase-specific acceptance checkboxes above.
 
 
 ## Phase 0 audit findings (persisted before implementation)
@@ -263,3 +263,15 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - Cache policy: opaque bytes, no independent TTL decision, fixed slot LRU, explicit TooLarge/Busy/Miss outcomes. Fixed slots trade memory utilization for bounded predictable first implementation. This is NOT evidence of an end-to-end speedup yet: no production assembly/defaults changed. Phase 3 and later phases must assess integration performance and capacity.
 - Baseline/counting clarification: baseline logs include one nested Nginx subprocess test result. Primary baseline count is 2,045, not the naive sum 2,046. The Phase 1 dependent primary count is 337 rather than naive 338. Raw logs retained unchanged.
 - Commit: `git add Cargo.lock SHARED_MEMORY_IMPLEMENTATION.md crates/ps-shm/src/{lib,region,byte_cache}.rs crates/ps-cache/Cargo.toml crates/ps-cache/src/{lib,shared_memory}.rs; git add -f docs/performance/shared-memory/phase2-*.log; git commit -m "Add bounded shared byte cache and safe cache adapter"`. Do not push.
+
+## Phase 3 audit handoff — confirmed generation lifetime defect
+
+- Phase 2 committed as `6aaefe3`; all implementation code remains compiling and verified. No shared cache production wiring yet.
+- New runnable diagnostic: `crates/ps-shm/examples/shared_lifetime_probe.rs`. Uses only a private temporary directory; never opens deployment paths.
+- Exact command: `cargo run -p ps-shm --example shared_lifetime_probe > docs/performance/shared-memory/phase3-lifetime-probe.log 2>&1`.
+- Result (exit 0): `surviving_reader_before=1`, `surviving_reader_after=0`, `generation_reset_while_reader_alive=true`. Dropping the original initializer releases its exclusive lifetime flock; another opener resets counters even though a previously attached handle still maps the file. This confirms the audit finding; it is not a passing correctness regression for desired behavior.
+- Recommended next design constraints: every attached reader must retain lifetime participation; separate bounded initialization serialization from lifetime locking; attach/restart must expose a stable shared incarnation so old persistent L2 generation keys cannot collide after an intentional reset. Keep old/new worker compatibility explicit; do not silently reset a live segment or delete a different live generation's file. A distinct format/filename is safer than changing pthread/counter layout in place.
+- Existing active-writer counts can still strand on a killed writer. Correct fallback to disk is acceptable during Phase 3, but Phase 4 must add fenced ownership/dead-owner recovery before declaring crash recovery complete.
+- First Phase 3 implementation milestone should be the small lifetime/incarnation protocol and tests, separately committed before factory wiring. Then L1/L2/L3 composition can use shared generations consistently for both nested adapters. Verify reads/backfills across mutations, oversized admissions, deletes, TTL/purge and restart before claiming coherence.
+- No approval or external access blocker. The remaining work is implementation, not a user decision. No remote push, live reload, cache purge or deployment performed.
+- This diagnostic/audit commit records the resume point; it does NOT complete Phase 3.
