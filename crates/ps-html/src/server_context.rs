@@ -776,6 +776,7 @@ pub struct ResourceDriver {
     slots: RefCell<HashMap<(NodeId, usize), Rc<RefCell<HtmlResourceSlot>>>>,
     claimed_elements: RefCell<std::collections::HashSet<NodeId>>,
     serving_filters_enabled: Cell<bool>,
+    fetch_dedup_wait: Cell<std::time::Duration>,
     filters: RefCell<HashMap<&'static str, Rc<dyn RewriteFilter>>>,
     debug_output_bytes: RefCell<i64>,
     debug_output_truncated: RefCell<bool>,
@@ -890,6 +891,7 @@ impl ResourceDriver {
             slots: RefCell::new(HashMap::new()),
             claimed_elements: RefCell::new(std::collections::HashSet::new()),
             serving_filters_enabled: Cell::new(false),
+            fetch_dedup_wait: Cell::new(std::time::Duration::from_millis(250)),
             filters: RefCell::new(HashMap::new()),
             debug_output_bytes: RefCell::new(0),
             debug_output_truncated: RefCell::new(false),
@@ -1013,6 +1015,19 @@ impl ResourceDriver {
     #[must_use]
     pub fn beacon_evidence_identity(&self) -> Option<Vec<u8>> {
         self.beacon_evidence_identity.borrow().clone()
+    }
+
+    /// Sets the request's resource reconstruction coordination budget.
+    /// Event-loop integrations should use zero to avoid polling sleeps.
+    /// Larger budgets are capped at the existing 250 ms maximum.
+    pub fn set_fetch_dedup_wait(&self, budget: std::time::Duration) {
+        self.fetch_dedup_wait
+            .set(budget.min(std::time::Duration::from_millis(250)));
+    }
+
+    /// Maximum time spent polling another worker's resource output.
+    pub fn fetch_dedup_wait(&self) -> std::time::Duration {
+        self.fetch_dedup_wait.get()
     }
 
     /// Records a detached rewrite (a context that finalized with

@@ -5360,16 +5360,11 @@ fn fetch_claims_rewrite_and_proceeds_when_owned() {
         claims: std::sync::Mutex::new(Vec::new()),
         contended: false,
     });
-    fixture
-        .server
-        .set_rewrite_coordinator(coordinator.clone());
+    fixture.server.set_rewrite_coordinator(coordinator.clone());
     let driver = fixture.driver_for("http://rewrite_image.test/RewriteImage.html");
     let html = "<head/><body><img src=\"Puzzle.jpg\"/></body>";
-    let output = fixture.parse_with_driver(
-        &driver,
-        "http://rewrite_image.test/RewriteImage.html",
-        html,
-    );
+    let output =
+        fixture.parse_with_driver(&driver, "http://rewrite_image.test/RewriteImage.html", html);
     let srcs = collect_img_srcs(&output);
     assert_eq!(1, srcs.len());
     let serve_driver = fixture.driver_for("http://rewrite_image.test/Puzzle.jpg");
@@ -5396,9 +5391,18 @@ fn fetch_claims_rewrite_and_proceeds_when_owned() {
 
 #[test]
 fn fetch_waits_then_proceeds_when_claimed_elsewhere() {
+    contended_fetch_with_budget(std::time::Duration::from_millis(250));
+}
+
+#[test]
+fn event_loop_fetch_reconstructs_without_polling_when_claimed_elsewhere() {
+    contended_fetch_with_budget(std::time::Duration::ZERO);
+}
+
+fn contended_fetch_with_budget(budget: std::time::Duration) {
     // Contended fetch: another worker owns the rewrite, nothing lands
-    // in time, so the fetch waits the bounded budget and then encodes
-    // locally — never wedged, never skipped.
+    // in time, so the fetch uses its polling budget and then encodes
+    // locally. Event-loop callers choose zero; optimization still runs.
     let fixture = Fixture::new();
     fixture.add_file_to_mock_fetcher(PUZZLE_URL, PUZZLE_JPG, "image/jpeg", 100);
     fixture.add_recompress_image_filters();
@@ -5406,16 +5410,11 @@ fn fetch_waits_then_proceeds_when_claimed_elsewhere() {
         claims: std::sync::Mutex::new(Vec::new()),
         contended: true,
     });
-    fixture
-        .server
-        .set_rewrite_coordinator(coordinator.clone());
+    fixture.server.set_rewrite_coordinator(coordinator.clone());
     let driver = fixture.driver_for("http://rewrite_image.test/RewriteImage.html");
     let html = "<head/><body><img src=\"Puzzle.jpg\"/></body>";
-    let output = fixture.parse_with_driver(
-        &driver,
-        "http://rewrite_image.test/RewriteImage.html",
-        html,
-    );
+    let output =
+        fixture.parse_with_driver(&driver, "http://rewrite_image.test/RewriteImage.html", html);
     let srcs = collect_img_srcs(&output);
     assert_eq!(1, srcs.len());
     let serve_driver = fixture.driver_for("http://rewrite_image.test/Puzzle.jpg");
@@ -5426,21 +5425,28 @@ fn fetch_waits_then_proceeds_when_claimed_elsewhere() {
     )
     .spec()
     .to_string();
+    serve_driver.set_fetch_dedup_wait(budget);
     let ctx = serve_driver.request_context().borrow().clone();
     let mut fetch = BufferingFetch::new(&absolute, ctx);
     let start = std::time::Instant::now();
     assert!(serve_driver.fetch_resource(&absolute, &mut fetch));
     assert!(fetch.success());
     let elapsed = start.elapsed();
-    assert!(
-        elapsed >= std::time::Duration::from_millis(200),
-        "must wait out the budget, took {elapsed:?}"
-    );
+    if !budget.is_zero() {
+        assert!(
+            elapsed >= std::time::Duration::from_millis(200),
+            "must wait out the budget, took {elapsed:?}"
+        );
+    }
+    println!("contended resource fetch: budget={budget:?}, elapsed={elapsed:?}");
     assert!(
         elapsed < std::time::Duration::from_secs(10),
         "wait must stay bounded, took {elapsed:?}"
     );
     assert_eq!(1, coordinator.claims.lock().unwrap().len());
-    assert_eq!(1, fetch_counter(&fixture.server, "fetch_dedup_waits"));
+    assert_eq!(
+        i64::from(!budget.is_zero()),
+        fetch_counter(&fixture.server, "fetch_dedup_waits")
+    );
     assert_eq!(0, fetch_counter(&fixture.server, "fetch_dedup_hits"));
 }

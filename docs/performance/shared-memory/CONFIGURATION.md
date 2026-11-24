@@ -100,3 +100,11 @@ Final ordinary cold/HIT/MISS measurements and profiling limits are documented in
 shows no consistent shared-cache latency advantage, so the shared tier remains
 opt-in. A two-worker concurrent workload showed a lower shared-cache median,
 but one workload/order does not establish a general throughput improvement.
+
+NGINX resource reconstruction uses a zero polling budget when another worker
+owns the rewrite: it checks for completed output once, then reconstructs locally.
+This avoids adding a coordination sleep to the event loop. Ownership/fencing
+and resource optimizations remain active, but competing misses can duplicate
+reconstruction. The Rust ResourceDriver API permits a bounded wait for callers
+that can block (default/maximum 250 ms); this is not an NGINX directive. Cache
+lookups and reconstruction themselves remain synchronous on this serving path.

@@ -177,7 +177,7 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 **State after report-audit milestone:** Phases 0–9 implemented and verified. Phase 10 is IN PROGRESS: final ordinary benchmarks, two-worker concurrency benchmark, stage timing, strace and Callgrind are saved. No partial Rust changes. Benchmarks/profiling checkpoint is `db45d13`; the subsequent report-audit commit corrects stale documentation and independently recomputes the final table (inspect `git log -3 --oneline`). No push or live deployment performed.
 
-**Exact next action:** Latest implementation ef9aeb5; benchmarks b989f48; README b3fdb21. Review `docs/performance/shared-memory/REMAINING_WORK.md` for prioritized source-checked follow-ups. Start by tracing `RewriteContext::await_claimed_output` through NGINX resource handlers to establish whether its synchronous 250 ms polling blocks an event-loop worker; measure before changing scheduling/defaults. Preserve resource reconstruction correctness. Phase 10 remains incomplete: production ~13 ms attribution and contention/memory acceptance evidence remain open. Existing benchmark runs need not be repeated without a relevant source change.
+**Exact next action:** Resource-serving polling refinement implemented and verified: NGINX chooses zero polling while other callers retain configurable bounded waiting. Inspect latest commit for hash. Read REMAINING_WORK.md; next independent task is explicit beacon traffic across reload / offline saturated-shard recovery tests (item 2), or separately scope fully asynchronous NGINX resource reconstruction. Remaining synchronous reconstruction is not fixed by removing polling. Phase 10 production attribution remains open; no deployment performed.
 
 **Verified build/test state:** final `cargo test --workspace` completed with 99 result groups, 2,922 reported passes (2,920 primary plus two nested subprocess reports), zero failures. Final `cargo build -p ps-nginx --release` passed and restored ordinary, non-pipeline-profile target module. Logs: phase10-final-workspace-tests.log and phase10-final-release-build.log. No commands intentionally left running.
 
@@ -615,3 +615,18 @@ Updated README performance section to measured ef9aeb5 cold/HIT/MISS values, sam
 ## Remaining-work review — source inspection only
 
 Reviewed clean tree at b3fdb21, current audit checklist, fetch reconstruction polling, process identity and lifecycle harness. Saved prioritized findings in docs/performance/shared-memory/REMAINING_WORK.md. No new correctness failure established, no code changes or test execution claimed. Earlier F1–F7 are resolved by ef9aeb5; audit's historical missing-feature sections are not current outstanding bugs. Updated Next Session Resume Point to current commits and concrete next investigation.
+
+## Resource wait refinement — in progress
+
+Confirmed module.rs PagespeedResource content-handler branch calls terminal::fetch_resource_body -> ResourceDriver -> RewriteContext fetch directly. Existing contended-owner polling sleeps up to 250 ms on that call stack. Added per-driver bounded budget (default unchanged at 250 ms); NGINX terminal explicitly selects zero, still checking completed bytes once then preserving local reconstruction. Added contended zero-budget regression alongside original bounded-wait test. Pending format/build/tests and timing output; do not mark complete yet.
+
+- Targeted fetch regressions: 5 passed. Serial timing run: zero budget 248.634 ms vs 250 ms budget 519.508 ms, both successful; debug fixture/mock contender only, not actual NGINX latency. Full 124-case image suite and terminal tests/release build running sequentially to resource-wait-{image-suite,nginx-tests,release-build}.log. Poll active command/logs before claiming completion.
+
+## Resource wait refinement — completed and verified
+
+- Request-local `ResourceDriver::set_fetch_dedup_wait(Duration)` caps at 250 ms; existing library callers retain default 250 ms. NGINX terminal sets zero because module.rs invokes it on the event-loop content-handler call stack. One cache probe still precedes existing local reconstruction. Positive-budget sleeps are capped to remaining time.
+- Preserves claims, fencing, completed cached output, actual image/resource reconstruction and response success. Under contention NGINX may duplicate reconstruction instead of sleeping; no resource optimization disabled. Cache/reconstruction work remains synchronous, and this is not a full async-serving implementation or strict total-response deadline.
+- `cargo test -p ps-html --test image_rewrite fetch_ -- --nocapture --test-threads=1 > docs/performance/shared-memory/resource-wait-serial-timing.log 2>&1`: 5 passed, exit 0. Debug/mock-contender elapsed: zero wait 248.634 ms; 250 ms budget 519.508 ms. Not a production benchmark.
+- `cargo test -p ps-html --test image_rewrite -- --test-threads=1 > docs/performance/shared-memory/resource-wait-image-suite.log 2>&1`: 124 passed, zero failures, 60.60 s.
+- `cargo test -p ps-nginx --lib terminal::tests > docs/performance/shared-memory/resource-wait-nginx-tests.log 2>&1`: 12 passed, zero failures.
+- `cargo build -p ps-nginx --release > docs/performance/shared-memory/resource-wait-release-build.log 2>&1`: passed; ordinary module rebuilt. Scoped formatting applied; git diff --check passed. Updated configuration and remaining-work documentation. No push, deployment, live service changes or further benchmark claims.

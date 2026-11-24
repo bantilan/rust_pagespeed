@@ -128,6 +128,9 @@ pub fn fetch_resource_body(
         url,
     ));
     install_request_context(&driver, request_headers);
+    // This is called directly by the NGINX content handler. Never sleep
+    // on its event loop waiting for a background resource owner.
+    driver.set_fetch_dedup_wait(std::time::Duration::ZERO);
     driver.register_serving_filters();
     ps_html::server_context::ResourceDriver::fetch_resource(&driver, url, &mut fetch);
     let mut response = collect_fetch(&fetch);

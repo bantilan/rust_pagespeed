@@ -2,11 +2,13 @@
 
 Source review at b3fdb21; this is not a fresh runtime or full correctness audit. F1–F7 implementation fixes are committed in ef9aeb5. Phase 10 remains open.
 
-## 1. Investigate resource-serving polling (highest priority)
+## 1. Resource-serving polling — refinement implemented and verified
 
-`crates/ps-html/src/rewrite_context.rs`: FETCH_DEDUP_WAIT is fixed at 250 ms; await_claimed_output repeatedly calls HttpCache::find and thread::sleep. This is the optimized-resource fetch/reconstruction path, not HTML rewrite delivery. The bound is a polling budget, not a strict end-to-end deadline: cache calls and scheduling can extend elapsed time, and local reconstruction follows timeout.
+Call trace confirmed: NGINX module.rs PagespeedResource content handler directly calls terminal::fetch_resource_body -> ResourceDriver::fetch_resource -> RewriteContext::fetch. Polling therefore ran on the worker event loop.
 
-Next: trace actual NGINX caller/thread context, profile contended resource requests and unrelated concurrent HTML delivery, then decide whether asynchronous waiting or a configurable budget is warranted. Do not assume observed HTML gains prove resource delivery latency improved. Existing fake-coordinator tests cover claiming/timeouts; add actual competing-worker publication and client responsiveness coverage if changing this path.
+The request driver now exposes a bounded wait budget (default 250 ms retained for existing callers, maximum 250 ms). NGINX selects zero: one completed-output lookup, then the existing local reconstruction fallback. Claims/publication fencing remain active. This removes added polling sleeps, not synchronous cache lookup or image/CSS/JS reconstruction cost. A competing request may reconstruct in parallel instead of waiting; fully asynchronous resource serving would require a separate NGINX event-loop integration milestone.
+
+Targeted serial debug test measured 248.634 ms with zero polling versus 519.508 ms with the existing 250 ms budget; both returned successful image output. Single mocked-contender measurements, not production or end-to-end NGINX benchmarks. Full image suite (124 tests), NGINX terminal suite (12 tests), and ordinary release build passed; exact commands/logs are recorded in the implementation ledger.
 
 ## 2. Complete operational recovery tests
 
@@ -26,4 +28,4 @@ The historical production ~13 ms remains unattributed: the supplied localhost en
 
 SHARED_MEMORY_AUDIT.md retains pre-fix executive summary/missing-feature sections alongside a completed checklist and implementation log. Treat these as historical findings; add a clear supersession/status table rather than deleting the evidence. The progress ledger's older chronological entries also describe work pending at that time; current phase checklist and Next Session Resume Point take precedence.
 
-No source change or deployment was made during this review. Next implementation task is item 1's caller/thread trace and contention measurement, followed by the smallest evidence-supported fix.
+No source change or deployment was made during this review. Next implementation task after this refinement is operational recovery coverage (item 2); asynchronous resource reconstruction remains a separately scoped improvement.

@@ -33,10 +33,6 @@ use super::url_segment_encoder::{DefaultEncoder, UrlSegmentEncoder};
 /// Shared default encoder.
 static DEFAULT_ENCODER: DefaultEncoder = DefaultEncoder;
 
-/// Upper bound a fetch waits for another worker's in-flight output
-/// before reconstructing locally: long enough to catch fast races,
-/// far below typical encode times so a dead owner costs little.
-const FETCH_DEDUP_WAIT: std::time::Duration = std::time::Duration::from_millis(250);
 /// Poll interval while awaiting a claimed output.
 const FETCH_DEDUP_POLL: std::time::Duration = std::time::Duration::from_millis(10);
 
@@ -1299,21 +1295,25 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
         if !coordinator.is_claimed(&super::html_async::single_claim_key(&self.partition_key)) {
             return false;
         }
-        self.driver
-            .server_context()
-            .variable("fetch_dedup_waits")
-            .add(1);
+        let budget = self.driver.fetch_dedup_wait();
+        if !budget.is_zero() {
+            self.driver
+                .server_context()
+                .variable("fetch_dedup_waits")
+                .add(1);
+        }
         let key = self
             .fetch
             .as_ref()
             .map(|state| state.requested_key.clone())
             .unwrap_or_default();
-        let accepts_webp = super::device_properties::accepts_image_format(
-            fetch.request_headers(),
-            "image/webp",
-        );
-        let serve_webp_to_any = self.driver.options().serve_rewritten_webp_urls_to_any_agent();
-        let deadline = std::time::Instant::now() + FETCH_DEDUP_WAIT;
+        let accepts_webp =
+            super::device_properties::accepts_image_format(fetch.request_headers(), "image/webp");
+        let serve_webp_to_any = self
+            .driver
+            .options()
+            .serve_rewritten_webp_urls_to_any_agent();
+        let deadline = std::time::Instant::now() + budget;
         loop {
             let mut ctx = self.driver.request_context().borrow().clone();
             let found = self.driver.server_context().http_cache().find(
@@ -1352,7 +1352,9 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
             if std::time::Instant::now() >= deadline {
                 return false;
             }
-            std::thread::sleep(FETCH_DEDUP_POLL);
+            std::thread::sleep(
+                FETCH_DEDUP_POLL.min(deadline.saturating_duration_since(std::time::Instant::now())),
+            );
         }
     }
 
