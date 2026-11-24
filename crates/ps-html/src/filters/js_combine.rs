@@ -266,8 +266,9 @@ impl JsCombineFilter {
         scripts: Vec<(String, Vec<u8>)>,
         charset: Vec<u8>,
     ) -> Option<crate::metadata::OutputPartitions> {
+        let errors_ttl_ms = driver.options().metadata_input_errors_cache_ttl_ms();
         let mut filter = Self::new(driver);
-        filter.background = Some(Default::default());
+        filter.background = Some(crate::combine_metadata::Recorder::new(errors_ttl_ms));
         filter.meta_tag_charset = charset;
         filter.pending = scripts
             .into_iter()
@@ -455,7 +456,7 @@ impl JsCombineFilter {
             );
             let Some(mut input) = resource else {
                 if let Some(recorder) = &self.background {
-                    recorder.missing(&script.url, self.driver.server_context().now_ms());
+                    recorder.missing_failed(&script.url, self.driver.server_context().now_ms());
                 }
                 continue;
             };

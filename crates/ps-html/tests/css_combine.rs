@@ -2025,3 +2025,77 @@ fn fetch_with_oversized_name_is_refused() {
     assert!(!try_fetch_resource(&fixture, &url));
     assert_eq!(0u64, fixture.fetcher.fetch_count());
 }
+
+#[test]
+fn async_combine_with_missing_member_converges() {
+    use ps_html::background::{BackgroundPool, PoolConfig};
+    use std::time::{Duration, Instant};
+    // A permanently uncombinable candidate (404) must not veto HTML
+    // publication forever: its failure rests on the input-errors TTL
+    // while the combinable files stay combined. (Before the fix the
+    // 1s missing-dependency TTL expired every table, so each render
+    // re-scheduled, detached, and skipped the HTML store: perpetual
+    // BYPASS on affected pages.)
+    let fixture = Fixture::new();
+    fixture.mock_css(&format!("{DOMAIN}a.css"), A_CSS_BODY.as_bytes());
+    fixture.mock_css(&format!("{DOMAIN}b.css"), B_CSS_BODY.as_bytes());
+    // missing.css unscripted: the 404 member.
+    let pool = BackgroundPool::new(
+        PoolConfig {
+            threads: 2,
+            queue_bound: 64,
+        },
+        &fixture.server.statistics_shared(),
+    );
+    fixture.server.set_background_pool(Arc::clone(&pool));
+    let page = format!("{DOMAIN}page.html");
+    let html = format!(
+        "<html><head>{}{}{}</head><body></body></html>",
+        link("a.css", "", true),
+        link("b.css", "", true),
+        link("missing.css", "", true),
+    );
+    let drive = |html: &str| {
+        let driver = fixture.driver_for(&page);
+        let sink = SharedSink::default();
+        let mut parser = Parser::new();
+        parser.add_filter(Box::new(CssCombineFilter::new(driver.clone())) as Box<dyn HtmlFilter>);
+        parser.add_filter(Box::new(WriterFilter::new(sink.clone())));
+        parser.start_parse(page.as_bytes(), false);
+        parser.write(html.as_bytes());
+        parser.finish();
+        (sink.bytes(), driver)
+    };
+    // First render misses and schedules (detached, like any async miss).
+    let (_, driver1) = drive(&html);
+    assert_eq!(1, driver1.detached_rewrites());
+    // Await the background combination.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let completed = fixture
+            .server
+            .statistics()
+            .get_variable("background_jobs_completed")
+            .unwrap()
+            .get();
+        if completed >= 1 {
+            break;
+        }
+        assert!(Instant::now() < deadline, "combination job stalled");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    // Past the short pending-retry window but inside failure memory.
+    fixture.server.timer().borrow_mut().advance_ms(10_000);
+    // Second render hits the partial table: no detach, a+b combined,
+    // and the missing link left intact (never dropped).
+    let (out2, driver2) = drive(&html);
+    assert_eq!(
+        0,
+        driver2.detached_rewrites(),
+        "partial table must stay valid across renders"
+    );
+    let out2 = String::from_utf8(out2).unwrap();
+    assert!(out2.contains(".pagespeed."), "{out2}");
+    assert!(out2.contains("missing.css"), "{out2}");
+    pool.shutdown();
+}

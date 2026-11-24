@@ -124,7 +124,9 @@ impl CssCombineFilter {
     ) -> Option<crate::metadata::OutputPartitions> {
         let mut filter = Self::new(driver.clone());
         filter.current_base = GoogleUrl::new(base);
-        filter.background = Some(Default::default());
+        filter.background = Some(crate::combine_metadata::Recorder::new(
+            driver.options().metadata_input_errors_cache_ttl_ms(),
+        ));
         for (index, (url, authorized)) in inputs.into_iter().enumerate() {
             let input =
                 driver.create_input_resource_unchecked(&GoogleUrl::new(&url), authorized)?;
