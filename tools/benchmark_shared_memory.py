@@ -23,12 +23,15 @@ if args.samples < 1 or args.cold_runs < 1:
     parser.error('sample and cold-run counts must be positive')
 repo = Path(__file__).resolve().parent.parent
 module = Path(args.module).resolve()
+module_bytes = module.read_bytes()
+instrumented = b"PS_PIPELINE_NS" in module_bytes
 template_path = repo / 'docs/performance/shared-memory/nginx-template.conf'
 template = template_path.read_text()
 result = {
     'at': datetime.now(timezone.utc).isoformat(),
     'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo, text=True).strip(),
-    'module_sha256': hashlib.sha256(module.read_bytes()).hexdigest(),
+    'module_sha256': hashlib.sha256(module_bytes).hexdigest(),
+    'pipeline_instrumentation_available': instrumented,
     'nginx': str(Path(args.nginx).resolve()),
     'nginx_version': subprocess.check_output([args.nginx, '-v'], stderr=subprocess.STDOUT, text=True).strip(),
     'template_sha256': hashlib.sha256(template.encode()).hexdigest(),
@@ -53,6 +56,9 @@ for name, page in [('Moto', 'moto-business-html5-responsive-web-template'),
             command.append('--cold-only')
         subprocess.run(command, check=True, stdout=subprocess.DEVNULL)
         data = json.loads(output.read_text())
+        if not instrumented:
+            # Uninstrumented zero counters mean unavailable, not zero fetches.
+            data['resource_fetches'] = None
         data['prefix'] = str(prefix)
         if body.exists():
             normalized = re.sub(rb'<!-- PageSpeed Cache:.*?-->', b'', body.read_bytes())

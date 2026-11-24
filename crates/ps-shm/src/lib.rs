@@ -32,9 +32,10 @@
 //!
 //! This is the one sibling crate without `#![forbid(unsafe_code)]`:
 //! atomic operations on shared memory require `AtomicI64::from_ptr`,
-//! which is an `unsafe fn`. The `unsafe` surface is two tightly-scoped
-//! sites: the mapping call and [`SharedCounters::atomic_at`]; everything
-//! else, including the whole public API, is safe code. Soundness rests
+//! which is an `unsafe fn`. Counter unsafe code is confined to mapping
+//! and [`SharedCounters::atomic_at`]. The Linux [`region`] module additionally
+//! encapsulates process-shared pthread mutexes and guarded raw payload access.
+//! Both public APIs are safe. Counter soundness rests
 //! on: slots are 8-aligned and bounds-checked; the mapping is never
 //! resized or remapped after open; no `&mut` to shared bytes ever exists
 //! (header initialization takes exclusive `&mut self` before sharing,
@@ -49,6 +50,10 @@
 //! per-process by design.
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(missing_docs)]
+
+/// Recoverable fixed-size shared regions (Linux robust pthread mutexes).
+#[cfg(target_os = "linux")]
+pub mod region;
 
 use fs2::FileExt;
 use std::fs::OpenOptions;

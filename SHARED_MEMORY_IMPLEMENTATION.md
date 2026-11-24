@@ -78,15 +78,15 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Capture baseline with current source and matched isolated Nginx; persist raw cold/MISS/HIT data and configuration/output evidence.
 - [x] Commit the verified planning/audit/baseline milestone (commit command below; inspect recent log on resume).
 
-### Phase 1 — Layout, allocation, synchronization and lifecycle [IN PROGRESS]
+### Phase 1 — Layout, allocation, synchronization and lifecycle [COMPLETED]
 
-- [ ] Specify binary layout, version/capacity validation, admission limits and error handling.
-- [ ] Implement mapping lifecycle without resizing/truncating live mappings.
-- [ ] Implement bounded allocation and recoverable cross-process synchronization.
-- [ ] Test attach, incompatible/corrupt headers, permissions, owner death and simultaneous initialization.
-- [ ] Run checks; update ledger; commit independently functional primitives.
+- [x] Specify binary layout, version/capacity validation, admission limits and error handling.
+- [x] Implement mapping lifecycle without resizing/truncating live mappings.
+- [x] Implement bounded allocation and recoverable cross-process synchronization.
+- [x] Test attach, incompatible/corrupt headers, permissions, owner death and simultaneous initialization.
+- [x] Run checks; update ledger; commit independently functional primitives (commit command/result recorded below).
 
-### Phase 2 — Shared-memory cache backend [PENDING]
+### Phase 2 — Shared-memory cache backend [IN PROGRESS]
 
 - [ ] Implement full-key lookup, insert, replace, delete and bounded eviction over Phase 1.
 - [ ] Define oversized-entry/admission/eviction behavior and expose diagnostics.
@@ -172,9 +172,9 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Next Session Resume Point
 
-**State:** Phase 0 complete and verified against `d0f055c`; no existing implementation files modified. Phase 1 next.
+**State:** Phase 0 committed (`4d23d3e`); Phase 1 region implementation fully verified, milestone commit follows. Cache/Nginx behavior unchanged. Phase 2 first incomplete task.
 
-**Exact next action:** implement a Linux-only `ps-shm::region` primitive using MmapRaw, versioned fixed-size headers and robust process-shared pthread mutexes. Use bounded `pthread_mutex_trylock`; invalidate the protected payload after EOWNERDEAD, then call pthread_mutex_consistent. Hold each shard lock over every payload access. Add separate-process owner-death/attach/contention tests before exposing a cache backend. Do not wire into Nginx until Phase 3. Complete Phase 1 alone, update this ledger and commit its passing tests before Phase 2.
+**Exact next action:** implement bounded `ps_shm::byte_cache` over SharedRegion, with complete-key comparisons, explicit busy/admission results, bounded LRU replacement, deletion and oversized replacement invalidation. Start with fixed slots per shard (document memory-utilization tradeoff), keeping every copy under the shard guard so killed-writer recovery can clear a shard safely. Add an unwired ps-cache adapter and separate-process/concurrency/eviction tests. Do not wire Nginx or change defaults until Phase 3.
 
 
 ## Phase 0 audit findings (persisted before implementation)
@@ -196,3 +196,30 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - `python3 tools/benchmark_shared_memory.py --nginx /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/objs/nginx --module /home/gamingph/Projects/Rust/pagespeed-rust/target/release/libps_nginx.so --output docs/performance/shared-memory/baseline.json --samples 100 --cold-runs 5`: exit 0. Five fresh application-cache cold runs and 100 warm HIT/MISS requests per page; same static pages/config, OS caches warm. Moto cold **6.185 ms**, HIT **1.322 ms**, MISS **4.768 ms**. Aroma cold **10.026 ms**, HIT **1.463 ms**, MISS **7.293 ms**. Raw samples, normalized output hashes, module checksum and Nginx version in baseline.json. No live reload/purge.
 - Added reproducible `tools/benchmark_shared_memory.py` and `docs/performance/shared-memory/nginx-template.conf`. Existing implementation code remains unchanged.
 - Milestone commit: `git add SHARED_MEMORY_IMPLEMENTATION.md tools/benchmark_shared_memory.py docs/performance/shared-memory/nginx-template.conf docs/performance/shared-memory/baseline.json; git add -f docs/performance/shared-memory/baseline-tests.log docs/performance/shared-memory/baseline-build.log; git commit -m "Document shared-memory implementation phases and measured baseline"`. No push.
+
+## Phase 1 work in progress
+
+- Phase 0 commit: `4d23d3e`.
+- Added draft `crates/ps-shm/src/region.rs`, exported only on Linux; added libc dependency. Header is 128 bytes; each shard has one 64-byte aligned mutex area plus fixed payload rounded to cache-line stride. Checked bounds: 1–256 shards, nonempty payload, total <= 1 GiB. Layout includes endian/word size/pthread ABI dimensions.
+- Uses MmapRaw so concurrent shared bytes are accessed only through raw pointers inside the guard, never a globally aliased Rust slice. Shard guards are !Send/!Sync and recover EOWNERDEAD by clearing the shard. Try-lock contention immediately returns None. Initialization flock budget is 500 ms; partial nonempty initialization fails closed without reinitializing live pthread storage.
+- Modified files: `crates/ps-shm/Cargo.toml`, `crates/ps-shm/src/lib.rs`, new `crates/ps-shm/src/region.rs`; Cargo.lock may change when dependency resolution runs. No Nginx/cache integration.
+- Current verification: not compiled yet; tests still to add. Exact next action: compile/check `cargo test -p ps-shm`, add independent-process attach, killed-holder, contention, header corruption, size mismatch, allocation overflow, and panic recovery tests. Do not mark Phase 1 complete yet.
+
+## Phase 1 verified tasks (commit pending final checks)
+
+- `cargo test -p ps-shm > docs/performance/shared-memory/phase1-tests.log 2>&1`: **18 passed, 0 failed**, including existing shared counters and new separate-process tests. Initial compile failed due to an ambiguous closure Result error type; fixed with explicit io::Result.
+- Verified checked allocation/overflow, disjoint shards, live mapping size mismatch refusal, reopen without reset, bad/partial header refusal, initialization deadline, 8 independent concurrent openers, actual SIGKILL holder recovery, neighboring shard preservation, panic clearing, 8-thread/8,000-increment serialization, and permission-denied propagation under the non-root development user.
+- No value allocator or cache eviction yet: Phase 1 allocates bounded fixed shard payloads only. Phase 2 owns entry allocation inside these payloads.
+- Removed the obsolete claim that ps-shm has only two unsafe sites; documented the new region guard boundary.
+- Remaining before Phase 1 commit: inspect clippy log, repeat the process/thread tests, verify dependent crates still build/test, and update exact resume point.
+
+- Phase 1 clippy: `cargo clippy -p ps-shm --all-targets -- -D warnings > docs/performance/shared-memory/phase1-clippy.log 2>&1`: exit 0, no warnings.
+- Baseline metadata clarification: ordinary modules compile out pipeline/fetch instrumentation. Benchmark tooling now records `pipeline_instrumentation_available: false` and null fetch metrics, rather than implying zero fetches. Baseline latency samples are unchanged.
+
+## Phase 1 completion
+
+- `python3` loop invoking `cargo test -p ps-shm region::tests -- --test-threads=4` ten times: **100 region test executions passed**, 0 failed; log `docs/performance/shared-memory/phase1-stress.log`.
+- `cargo test -p ps-cache -p ps-nginx --lib > docs/performance/shared-memory/phase1-dependent-tests.log 2>&1`: exit 0; 338 passed, 0 failed.
+- `rustfmt --edition 2021 --check crates/ps-shm/src/region.rs crates/ps-shm/src/lib.rs` and `git diff --check`: passing before commit.
+- Remaining limits: Linux-only primitive, no cache values/eviction yet, no Nginx integration, no new shared-memory defaults. A nonempty unpublished/corrupt initialization file intentionally fails closed until replaced offline; production fallback will be wired in Phase 6. Runtime owner death is tested and recoverable.
+- Phase 1 commit command: `git add Cargo.lock crates/ps-shm/Cargo.toml crates/ps-shm/src/lib.rs crates/ps-shm/src/region.rs SHARED_MEMORY_IMPLEMENTATION.md tools/benchmark_shared_memory.py docs/performance/shared-memory/baseline.json; git add -f docs/performance/shared-memory/phase1-*.log; git commit -m "Add recoverable bounded shared-memory region primitives"`. No push.

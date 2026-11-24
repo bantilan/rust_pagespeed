@@ -1,0 +1,32 @@
+   Compiling ps-shm v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-shm)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.00s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 18 tests
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::different_tables_get_different_files ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+
+   Doc-tests ps_shm
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
