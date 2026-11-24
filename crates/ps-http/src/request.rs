@@ -226,7 +226,8 @@ impl RequestHeaders {
             self.minor_version()
         );
         for (name, value) in self.headers.iter() {
-            if name.eq_ignore_ascii_case(header::COOKIE) || name.eq_ignore_ascii_case(header::COOKIE2)
+            if name.eq_ignore_ascii_case(header::COOKIE)
+                || name.eq_ignore_ascii_case(header::COOKIE2)
             {
                 continue;
             }
@@ -266,10 +267,12 @@ impl RequestHeaders {
     /// unlike the whole-token gzip check above.
     #[must_use]
     pub fn accepts_zstd(&self) -> bool {
-        if !self.headers.has(header::ACCEPT_ENCODING) {
-            return false;
-        }
-        crate::zstd::client_accepts_zstd(Some(&self.headers.lookup_joined(header::ACCEPT_ENCODING)))
+        crate::zstd::client_accepts_zstd_values(
+            self.headers
+                .iter()
+                .filter(|(name, _)| name.eq_ignore_ascii_case(header::ACCEPT_ENCODING))
+                .map(|(_, value)| value),
+        )
     }
 
     /// Whether the request is an Ajax call (`IsXmlHttpRequest`):

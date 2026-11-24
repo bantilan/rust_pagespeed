@@ -1,0 +1,7289 @@
+{
+  "module_sha256": "6cca6beb230ebbcae4e415c4a6957e13d2c13b5173a59d9f0528ae2688abc8cb",
+  "scope": "Ordinary single-worker private NGINX; client wire timing excludes decompression; no deployment/cache purge of installed server",
+  "runs": [
+    {
+      "enabled": false,
+      "prefix": "/tmp/ps-zstd-http-nivsi4og",
+      "config_sha256": "ad5825518bc75e166f72fa01e0990eb91ed4b025faaf5765d93259429fb23522",
+      "identity_hit": {
+        "median_ms": 0.391297,
+        "samples": [
+          {
+            "ms": 1.132502,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.570338,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.427847,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.396588,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.483403,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.438768,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.378323,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.370658,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.388081,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.364696,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.359998,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.522468,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.514262,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.534471,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.489044,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.423379,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.417798,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.424039,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.401005,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.399062,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.383782,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.456111,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.418008,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.386939,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.458145,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.445611,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.501738,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.445551,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.381769,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.37185,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.373634,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.367441,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.363364,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.383472,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.363474,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.378282,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.359987,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.364485,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.428909,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.396306,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.40317,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.391698,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.384193,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.365117,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.363845,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.386548,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.370046,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.380487,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.373003,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.358505,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.426985,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.479766,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.464186,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.394603,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.419521,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.385255,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.386768,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.394333,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.391357,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.405584,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.407017,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.391627,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.422406,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.416205,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.383672,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.381659,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.406506,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.426114,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.45075,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.445681,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.391217,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.449448,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.441603,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.388792,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.384214,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.391237,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379765,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.455499,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.419891,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.43463,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.387049,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.390014,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.383613,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.381017,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.408821,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.447805,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.474987,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.380917,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.380176,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.384624,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.378012,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.384123,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379355,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.378724,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.381568,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.376469,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.380737,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.374706,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.374906,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.400144,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          }
+        ]
+      },
+      "zstd_hit": {
+        "median_ms": 0.38504550000000004,
+        "samples": [
+          {
+            "ms": 0.401817,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.388451,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.452995,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.474896,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.460329,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.385206,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.39261,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.384715,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379234,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.397288,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.386608,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.389574,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.384083,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.380847,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379545,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.388793,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.37186,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.407788,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.384754,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.380116,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.478574,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.461772,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.426314,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379375,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.388361,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.378432,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.374224,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.385206,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.381739,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.404733,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.392169,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.457303,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.44038,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.39297,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.380977,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.382721,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.391618,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.433959,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.507338,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.460529,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.384615,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.37742,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.375608,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.375918,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.378362,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.388582,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.374785,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.389023,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379595,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.37721,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.386317,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.39759,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.420433,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.428748,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.420082,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.425934,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.389173,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.407608,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.368263,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.386468,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379975,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.374846,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.388562,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.375347,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.381147,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.376148,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.373453,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.383953,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.378092,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.385517,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.387931,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.378783,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.381148,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.435011,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.499504,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.442495,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.385166,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.381398,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.383993,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379965,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379945,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.388823,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.381017,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.381538,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.377961,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.381017,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.384925,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379584,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.393411,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.38235,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.385837,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.455911,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.520634,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.423408,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.375397,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.381238,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.373433,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.384283,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.383432,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379935,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          }
+        ]
+      },
+      "identity_miss": {
+        "median_ms": 1.7367810000000001,
+        "samples": [
+          {
+            "ms": 1.840244,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.682071,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.831957,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.681891,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.684566,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.656593,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.671581,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.648207,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.688113,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.646273,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.707089,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.747146,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.653748,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.660139,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.717669,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.746104,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.651423,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.682603,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.67113,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.693944,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.736936,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.761202,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.743278,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.698823,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.734381,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.650911,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.703011,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.878065,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.825655,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.698633,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.783074,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.684647,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.00583,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.673104,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.655441,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.748649,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.848118,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.631905,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.653216,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.670449,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.85955,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.814544,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.673085,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.677523,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.6762,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.736626,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.686139,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.668134,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.635833,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.658397,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.630994,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.648427,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.672974,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.69224,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.714433,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.661542,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.662524,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.659478,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.693113,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.773356,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.768737,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.768697,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.8175,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.760201,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.822379,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.782883,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.736566,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.680909,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.66565,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.669427,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.692462,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.828731,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.738038,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.788395,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.861093,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.674847,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.460808,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.563243,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.999007,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.205261,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.769899,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.736115,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.758518,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.832889,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.781451,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.917541,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.253572,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.866403,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.642475,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.88033,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.82274,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.874539,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.63983,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.116431,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.831927,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.963319,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.983828,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.84932,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.860251,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.887243,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          }
+        ]
+      },
+      "zstd_miss": {
+        "median_ms": 1.786556,
+        "samples": [
+          {
+            "ms": 1.789918,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.735854,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.689816,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.718982,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.708021,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.732217,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.738338,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.709684,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.811789,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.951927,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.786651,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.02699,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.84369,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.801449,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.707901,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.022441,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.066245,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.95369,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.737758,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.713031,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.698582,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.646153,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.675008,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.746755,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.690387,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.692652,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.904225,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.743639,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.739401,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.970432,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.862576,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.731776,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.825957,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.895709,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.740653,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.796129,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.757255,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.742046,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.769538,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.73374,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.751774,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.824363,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.756613,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.774878,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.768937,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.76507,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.747196,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.805637,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.894446,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.759399,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.778045,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.773946,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.795779,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.841235,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.893545,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.78085,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.786461,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.800849,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.784637,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.92764,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.862426,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.761123,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.811949,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.774768,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.773937,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.942639,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.832077,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.786741,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.772995,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.762976,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.763196,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.852868,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.813783,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.778575,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.773707,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.821898,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.795599,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.851717,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.814956,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.754331,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.812833,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.828522,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.794748,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.955805,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.956296,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.831839,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.844122,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.789428,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.765933,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.856827,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.792694,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.779489,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.779669,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.788165,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.751335,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.856677,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.810168,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.787264,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.784478,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.791302,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          }
+        ]
+      },
+      "normalized_html_sha256": "7e56211e6dc37748f41b30ebba2fbd4213806c8f59375120c5a6f664da8e3863",
+      "resource_identity": {
+        "median_ms": 0.223362,
+        "samples": [
+          {
+            "ms": 0.325252,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.331273,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.288992,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.276818,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.278712,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.303019,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.268543,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.274866,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.281457,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.28302,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.266959,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.278883,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.264124,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.268333,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.269585,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.26175,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.2621,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.277039,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.275496,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.258033,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.26194,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.299472,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.248104,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.237293,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.232053,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.227064,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.227114,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218918,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.220221,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.210112,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213327,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218026,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212726,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211393,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212756,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211444,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.277289,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.269515,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.266098,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.301425,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.239377,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.277661,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.287479,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.243605,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.223667,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.225481,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218708,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.231161,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.222114,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.228576,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.222014,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.217315,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216023,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.231813,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212435,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.208408,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.20949,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.247713,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216303,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.210292,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.206344,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.219529,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.208508,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.20951,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.208618,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.224378,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.224739,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.209931,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216423,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.233616,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.206023,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.207797,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.208047,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.227314,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.206905,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.205653,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.223757,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.219078,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.206855,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.206514,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.210592,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.223146,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.249105,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.223817,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.229107,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216283,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211854,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216203,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.215862,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216824,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.223578,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.206474,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212626,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.214008,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211804,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.220571,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218808,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.20931,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.208268,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211323,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          }
+        ]
+      },
+      "resource_zstd": {
+        "median_ms": 0.214925,
+        "samples": [
+          {
+            "ms": 0.219108,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.221614,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.258244,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.268513,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.264906,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.264956,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.249125,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.25147,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.217646,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218778,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.21979,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.217125,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.210082,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.208608,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211414,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213718,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.206795,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.207176,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211875,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.223207,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.209259,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213828,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.210382,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.220441,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.224158,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.252793,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218838,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216693,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.228156,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212175,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.206405,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216504,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.208498,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211644,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213158,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212406,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216543,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.210792,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211013,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211665,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.215332,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213237,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216333,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.224419,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.229518,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213348,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.220201,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211664,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.210261,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.210512,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.220331,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216454,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.21503,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.220141,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.231432,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.210372,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.20926,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.215252,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.227314,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.208108,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.206394,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.206445,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.233406,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.207246,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.207526,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.207877,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.228236,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212676,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.268042,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.22492,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.223246,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.229398,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213848,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.208999,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216704,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.21482,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.210452,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213878,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.215091,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211183,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.214379,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.210923,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.209169,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211765,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.207146,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.215592,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.215762,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.255879,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.226242,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.221894,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.208599,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213458,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212356,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.219189,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212175,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212937,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216173,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218668,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212516,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.227675,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          }
+        ]
+      },
+      "memory_kib": {
+        "Rss": 30112,
+        "Pss": 23849
+      },
+      "passed": true
+    },
+    {
+      "enabled": true,
+      "prefix": "/tmp/ps-zstd-http-0i360u3q",
+      "config_sha256": "ac0c5e808f6b75d09081eaa8feda8515d9639cb4132d0977f6d08ed20345a5af",
+      "identity_hit": {
+        "median_ms": 0.38492000000000004,
+        "samples": [
+          {
+            "ms": 1.131481,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.739573,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.769229,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.645052,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.591029,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.578715,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.552986,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.579768,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.561713,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.57098,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.551173,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.571972,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.635664,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.587332,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.561833,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.571982,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.559258,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.686972,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.781322,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.707632,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.635644,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.61241,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.590428,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.561733,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.541414,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.513221,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.490827,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.477201,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.478634,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.459708,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.461151,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.427677,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.429761,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.416555,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.41363,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.398311,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.391678,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.394814,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.386488,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.418659,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.383883,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.404352,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379745,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.375898,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.383783,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.384344,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.386308,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.38171,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.382511,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.490728,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.403501,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.385496,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.373493,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.379435,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.36626,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.370107,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.400546,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.364176,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.391528,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.365238,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.359938,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.36657,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.363004,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.37662,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.371078,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.365368,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.358836,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.354637,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.429721,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.376479,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.370167,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.365769,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.352593,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.374655,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.357704,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.353476,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.36638,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.352784,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.363615,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.373273,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.363715,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.360529,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.351571,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.367963,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.372711,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.355179,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.3982,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.372111,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.371058,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.376549,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.36156,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.3714,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.368374,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.37142,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.363414,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.351311,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.43982,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.383752,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.367863,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.363915,
+            "wire_bytes": 15105,
+            "encoding": null,
+            "marker": "HIT"
+          }
+        ]
+      },
+      "zstd_hit": {
+        "median_ms": 0.43089299999999997,
+        "samples": [
+          {
+            "ms": 0.49223,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.49222,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.423829,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.405975,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.427186,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.419281,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.405886,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.401317,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.423919,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.457374,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.509773,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.447926,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.422056,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.437646,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.434901,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.420563,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.410133,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.415854,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.463124,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.467182,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.422387,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.427096,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.414221,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.404222,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.39806,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.420934,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.412788,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.404462,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.40847,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.517648,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.477532,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.488904,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.444018,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.421595,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.435262,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.422848,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.424291,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.419952,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.457053,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.444939,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.42942,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.432576,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.418289,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.417868,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.39798,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.40332,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.412207,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.421845,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.399103,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.39243,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.423258,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.474126,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.484325,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.462323,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.423288,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.423058,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.412909,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.401677,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.392189,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.446112,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.472463,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.414501,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.415454,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.420142,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.418329,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.412578,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.420013,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.396047,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.397629,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.401988,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.462433,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.541915,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.519031,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.533759,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.488283,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.495045,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.477341,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.440442,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.42936,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.432366,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.485328,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.484065,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.635013,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.559218,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.445621,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.433468,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.417267,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.482652,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.444229,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.539911,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.49202,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.525534,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.522869,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.533328,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.515575,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.485989,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.467904,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.444349,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.524552,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          },
+          {
+            "ms": 0.468675,
+            "wire_bytes": 3382,
+            "encoding": "zstd",
+            "marker": "HIT"
+          }
+        ]
+      },
+      "identity_miss": {
+        "median_ms": 1.7529525000000001,
+        "samples": [
+          {
+            "ms": 1.955014,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.702031,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.750363,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.038424,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.828673,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.881052,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.23057,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.689196,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.708423,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.716268,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.677023,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.668486,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.693515,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.661804,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.682313,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.704416,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.729643,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.737579,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.735514,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.785841,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.738731,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.719684,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.985492,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.782866,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.813955,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.753258,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.759601,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.753759,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.97383,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.794517,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.831208,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.784648,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.752647,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.82238,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.814005,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.851837,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.815047,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.776623,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.814746,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.814186,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.817221,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.759752,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.797784,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.764009,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.788065,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.828132,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.792213,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.776212,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.783857,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.816299,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.809316,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.882816,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.842119,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.767135,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.906282,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.751726,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.773237,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.786523,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.724554,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.727449,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.770752,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.713784,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.676903,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.726378,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.746075,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.720396,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.729223,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.72791,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.746757,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.716509,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.928834,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.96331,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.819906,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.802513,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.784779,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.828793,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.751525,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.673136,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.700598,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.713062,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.704035,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.704295,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.746736,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.737388,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.694697,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.667675,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.698885,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.703544,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.719434,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.787685,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.756224,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.724564,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.716809,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.705658,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.780772,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.720095,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.713733,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.69646,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.717721,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.704546,
+            "wire_bytes": 15106,
+            "encoding": null,
+            "marker": "MISS"
+          }
+        ]
+      },
+      "zstd_miss": {
+        "median_ms": 1.8222005000000001,
+        "samples": [
+          {
+            "ms": 1.849703,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.910529,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.854803,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.821129,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.79584,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.762697,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.724745,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.999238,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.848,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.844643,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.757628,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.791442,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.802653,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.809997,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.764921,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.78509,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.733751,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.763168,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.760643,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.763649,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.734884,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.769841,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.856066,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.821018,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.049665,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.229508,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.842359,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.777054,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.801721,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.842389,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.780251,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.783526,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.77505,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.818794,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.804196,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.836437,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.790059,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.761755,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.758739,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.766354,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.760202,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.918484,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.219319,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.878257,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.823272,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.81148,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.854351,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.833873,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.79605,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.783787,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.778577,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.802453,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.86369,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.801261,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.852648,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.899368,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.856596,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.856676,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.107206,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.982236,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.883939,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.870874,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.895962,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.860634,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.790329,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.825868,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.881614,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.865553,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.878217,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.898797,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.877185,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.862768,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.859632,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.880351,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.029777,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.056278,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.950366,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.898486,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.054023,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.841457,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.76438,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.754982,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.784107,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.751966,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.744632,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.808876,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.767075,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.747929,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.755132,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.762717,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.767977,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.974311,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 2.113587,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.833342,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.831729,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.80083,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.821048,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.851215,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.865072,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          },
+          {
+            "ms": 1.752407,
+            "wire_bytes": 3383,
+            "encoding": "zstd",
+            "marker": "MISS"
+          }
+        ]
+      },
+      "normalized_html_sha256": "7e56211e6dc37748f41b30ebba2fbd4213806c8f59375120c5a6f664da8e3863",
+      "resource_identity": {
+        "median_ms": 0.2206665,
+        "samples": [
+          {
+            "ms": 0.243165,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.23037,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.229899,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.221804,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218668,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.232995,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.23565,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218337,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.221173,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.227705,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.235139,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.217345,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216864,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.227324,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.222615,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.227254,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.215592,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.243525,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.217275,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.214089,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.2146,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.225571,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218727,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211705,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.220331,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.229889,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212816,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212165,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216203,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.223106,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.220992,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212045,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216073,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.228647,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212305,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.21455,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216163,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.22537,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.220151,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212636,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.215201,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.226012,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218958,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.211874,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.217085,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213367,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.220341,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.210401,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.223747,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.217816,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216243,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.24606,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.22511,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.228807,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.228116,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.228617,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.301616,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.381829,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.342284,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.313779,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.268924,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.247122,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.236201,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.236221,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.226292,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.245288,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.215702,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.21486,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.22014,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.243826,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.221122,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.231281,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216383,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.228146,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.219499,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.22515,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.224228,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.222876,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213698,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212757,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.231572,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218737,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212075,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212246,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.227154,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.245499,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213779,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216924,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.229519,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.213869,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.261509,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.219309,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.235971,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218227,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212626,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.216553,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218437,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.218407,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.212617,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          },
+          {
+            "ms": 0.227034,
+            "wire_bytes": 106153,
+            "encoding": null,
+            "marker": "absent"
+          }
+        ]
+      },
+      "resource_zstd": {
+        "median_ms": 0.4336935,
+        "samples": [
+          {
+            "ms": 0.510164,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.480046,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.440091,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.429861,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.423589,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.433127,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.425833,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.436754,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.435913,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.418059,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.464417,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.429561,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.422557,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.444459,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.444029,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.431765,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.425714,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.420283,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.420905,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.42906,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.417858,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.421205,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.412839,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.415373,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.423549,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.416316,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.417307,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.423088,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.434961,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.415724,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.436554,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.473736,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.497581,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.480528,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.500266,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.489556,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.507089,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.455821,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.428609,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.431494,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.436534,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.430092,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.434009,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.432046,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.427076,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.433328,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.440551,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.437506,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.43461,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.475639,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.433819,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.426274,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.437266,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.424932,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.425804,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.437015,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.426776,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.425402,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.427737,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.436044,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.422286,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.427397,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.426936,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.425172,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.437255,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.421365,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.515636,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.520976,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.47136,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.441724,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.475699,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.441834,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.427156,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.446774,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.425984,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.438669,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.416566,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.441954,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.441113,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.428138,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.446894,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.424802,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.449489,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.427908,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.421966,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.457574,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.506688,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.501478,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.505556,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.453988,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.505686,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.450341,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.433568,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.440402,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.430242,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.426986,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.443939,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.425753,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.438758,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          },
+          {
+            "ms": 0.432125,
+            "wire_bytes": 19649,
+            "encoding": "zstd",
+            "marker": "absent"
+          }
+        ]
+      },
+      "memory_kib": {
+        "Rss": 31528,
+        "Pss": 25299
+      },
+      "passed": true
+    }
+  ],
+  "passed": true
+}

@@ -1,0 +1,75 @@
+   Compiling ps-http v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-http)
+warning: constant `ACCEPT_HEADER_VALUE_MOBILE` is never used
+   --> crates/ps-http/src/user_agent_matcher.rs:938:11
+    |
+938 |     const ACCEPT_HEADER_VALUE_MOBILE: &str = "text/html,application/vnd.wap.xhtml+xml";
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `ACCEPT_HEADER_VALUE_NON_MOBILE` is never used
+   --> crates/ps-http/src/user_agent_matcher.rs:939:11
+    |
+939 |     const ACCEPT_HEADER_VALUE_NON_MOBILE: &str = "text/html";
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `CHROME41_USER_AGENT` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1014:11
+     |
+1014 |     const CHROME41_USER_AGENT: &str = concat!(
+     |           ^^^^^^^^^^^^^^^^^^^
+
+warning: constant `CRI_OS48_USER_AGENT` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1037:11
+     |
+1037 |     const CRI_OS48_USER_AGENT: &str = concat!(
+     |           ^^^^^^^^^^^^^^^^^^^
+
+warning: constant `GOOGLEBOT_USER_AGENT` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1067:11
+     |
+1067 |     const GOOGLEBOT_USER_AGENT: &str =
+     |           ^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `NEXUS6_CHROME44_USER_AGENT` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1156:11
+     |
+1156 |     const NEXUS6_CHROME44_USER_AGENT: &str = concat!(
+     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `SILK_DESKTOP_USER_AGENT` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1236:11
+     |
+1236 |     const SILK_DESKTOP_USER_AGENT: &str = concat!(
+     |           ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `X_WAP_PROFILE_HEADER_VALUE` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1265:11
+     |
+1265 |     const X_WAP_PROFILE_HEADER_VALUE: &str = "http://foo.bar.xml";
+     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `X_WAP_PROFILE` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1266:11
+     |
+1266 |     const X_WAP_PROFILE: &str = "x-wap-profile";
+     |           ^^^^^^^^^^^^^
+
+warning: `ps-http` (lib test) generated 9 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.53s
+     Running unittests src/lib.rs (target/debug/build/ps-http/217dfe2e8dc2328f/out/ps_http-217dfe2e8dc2328f)
+
+running 10 tests
+test zstd::tests::accepts_zstd_quality_rules ... ok
+test zstd::tests::accepts_zstd_token_forms ... ok
+test request::tests::accepts_zstd_negotiation ... ok
+test zstd::tests::compressible_types ... ok
+test zstd::tests::eligibility_rules ... ok
+test zstd::tests::header_application_sets_encoding_and_vary ... ok
+test zstd::tests::header_application_keeps_existing_vary_coverage ... ok
+test zstd::tests::one_shot_round_trips_real_frame ... ok
+test zstd::tests::streaming_empty_input_finishes_valid_frame ... ok
+test zstd::tests::streaming_chunks_decode_to_input ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 155 filtered out; finished in 0.00s
+

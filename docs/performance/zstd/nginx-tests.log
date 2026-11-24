@@ -1,0 +1,327 @@
+   Compiling ps-http v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-http)
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+   Compiling ps-admin v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-admin)
+   Compiling ps-nginx v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-nginx)
+warning: unused import: `ps_http::fetch::AsyncFetch`
+   --> crates/ps-nginx/src/file_fetch.rs:611:13
+    |
+611 |         use ps_http::fetch::AsyncFetch;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/ps-nginx/src/send.rs:673:13
+    |
+673 |         let mut make_sink = |metadata: std::sync::Arc<dyn ps_cache::cache::Cache>| {
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-nginx` (lib test) generated 2 warnings (run `cargo fix --lib -p ps-nginx --tests` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 21.13s
+     Running unittests src/lib.rs (target/debug/build/ps-nginx/0e11ea6e28b64271/out/ps_nginx-0e11ea6e28b64271)
+
+running 291 tests
+test assets::tests::malformed_and_unknown_miss ... ok
+test beacon::tests::escapes_like_cescape ... ok
+test assets::tests::hash_mismatch_goes_private ... ok
+test assets::tests::serves_named_assets ... ok
+test caches::tests::metadata_cap ... ok
+test caches::tests::merge_matrix ... ok
+test caches::tests::path_keys_and_filenames ... ok
+test beacon::tests::beacon_matrix ... ok
+test caches::tests::gc_stale_boot_dirs_keeps_current_boot ... ok
+test caches::tests::default_coherence_never_resets_under_live_readers ... ok
+test caches::tests::unplugged_paths_skip_child_messages ... ok
+test caching::tests::limits_note_and_keep ... ok
+test caching::tests::preserve_policy_matrix ... ok
+test caching::tests::smaxage_rewrite_matrix ... ok
+test conf::tests::cache_path_validation_texts ... ok
+test conf::tests::clone_resets_clear_flag ... ok
+test conf::tests::dummy_ports_descend ... ok
+test conf::tests::factory_delete_guards ... ok
+test conf::tests::loc_merge_four_cases ... ok
+test caches::tests::restart_namespace_prevents_old_shared_generation_hits ... ok
+test caching::tests::disabled_cache_control_carries ... ok
+test conf::tests::merge_options_clear_copies ... ok
+test conf::tests::merge_options_order ... ok
+test caches::tests::shared_tier_serves_another_worker_without_a_disk_entry ... ok
+test conf::tests::server_disabled_and_format ... ok
+test conf::tests::srv_merge_propagates_main_conf ... ok
+test caches::tests::register_merges_and_warns ... ok
+test conf::tests::srv_merge_rejects_missing_cache_path ... ok
+test conf::tests::system_merge_paths_and_domains ... ok
+test conf::tests::srv_merge_seeds_context ... ok
+test conf::tests::system_scalars_merge_when_set ... ok
+test directives::tests::dollar_registers_when_scripts_on ... ok
+test directives::tests::max_args_covers_take5 ... ok
+test directives::tests::ownership_decisions ... ok
+
+running 1 test
+test directives::tests::classification_matches_cxx ... ok
+test directives::tests::fix_ownership_as_non_root_is_noop ... ok
+test directives::tests::prepare_dir_validates_and_creates ... ok
+test factory::tests::constructor_defaults ... ok
+test factory::tests::crash_handler_gate ... ok
+test directives::tests::dollar_handler_expands ... ok
+test factory::tests::fetcher_map_caches_and_warns_once ... ok
+test factory::tests::post_config_matrix ... ok
+test caches::tests::setup_assembly ... ok
+test factory::tests::resolver_lifecycle ... ok
+test factory::tests::root_init_registers_paths ... ok
+test caches::tests::cross_worker_coherence ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 290 filtered out; finished in 0.00s
+
+test factory::tests::set_main_conf_merges_process_scope_only ... ok
+test caches::tests::shared_metadata_retains_html_expiry_purge_and_variant_validation ... ok
+test factory::tests::native_names_fall_through_to_ps_config ... ok
+test caches::tests::cross_worker_coherence ... ok
+test caches::tests::shared_diagnostics_count_aliases_once_and_keep_domain_totals ... ok
+test factory::tests::remote_warnings ... ok
+test factory::tests::shutdown_idempotent ... ok
+test factory::tests::statistics_logging_silent_without_config ... ok
+test factory::tests::system_factory_directives ... ok
+test fetch::tests::copy_policy ... ok
+test fetch::tests::copy_after_last_panics - should panic ... ok
+test fetch::tests::done_twice_panics - should panic ... ok
+test factory::tests::statistics_logging_dumps_now_and_rearms ... ok
+test fetch::tests::gate_matrix ... ok
+test fetch::tests::names_and_bytes ... ok
+test caches::tests::shared_factory_cross_process_put_delete_and_oversized_replacement ... ok
+test fetch::tests::odd_header_code_panics - should panic ... ok
+test fetch::tests::outcome_matrices ... ok
+test fetch::tests::read_callback_matrix ... ok
+test fetch::tests::suppressed_and_failed_events ... ok
+test fetch::tests::zstd_decision_commits_eligible_html ... ok
+test fetch::tests::zstd_decision_declines ... ok
+test fetch_body::tests::exact_body_is_complete ... ok
+test fetch_body::tests::incomplete_headers_at_close_are_not_complete ... ok
+test fetch_body::tests::long_body_at_close_is_not_complete ... ok
+test fetch_body::tests::long_body_is_capped_and_flagged ... ok
+test fetch_body::tests::responses_without_body_are_done_at_headers ... ok
+test fetch_body::tests::short_body_at_close_is_not_complete ... ok
+test fetch_body::tests::unknown_length_accepts_everything_until_close ... ok
+test fetch_body::tests::zero_length_body_rejects_any_bytes ... ok
+test file_fetch::tests::construction_rejects_bad_roots ... ok
+test fetch::tests::zstd_collection_round_trips ... ok
+test file_fetch::tests::host_scheme_and_shape_gate ... ok
+test file_fetch::tests::jail_rejects_escapes ... ok
+test factory::tests::corrupt_shared_mapping_restart_falls_back_to_persistent_disk ... ok
+test file_fetch::tests::missing_file_reports_404_status ... ok
+test file_fetch::tests::missing_dirs_caps_and_types ... ok
+test file_fetch::tests::round_trip_serves_file_headers ... ok
+test file_fetch::tests::static_headers_derive_implicit_caching ... ok
+test file_fetch::tests::routed_resolve_ignores_host_and_scheme ... ok
+test file_fetch::tests::symlink_escape_fails_closed ... ok
+test file_fetch::tests::unmapped_host_still_fails_transport ... ok
+test factory::tests::shared_cache_configuration_budget_disable_and_fallback ... ok
+test fetch::tests::shared_arc_protocol_matches_shadow ... ok
+test factory::tests::thread_counts_finalize_once ... ok
+test filters::etag::tests::internal_etag_matches ... ok
+test filters::etag::tests::staged_nginx_has_gzip ... ok
+test filters::fix_headers::tests::plan_matrix ... ok
+test filters::html_rewrite::tests::encoding_classification ... ok
+test file_fetch::tests::wildcard_matches_one_level ... ok
+test factory::tests::statistics_logging_clamps_nonpositive_interval ... ok
+test filters::html_rewrite::tests::gate_matrix ... ok
+test filters::html_rewrite::tests::strip_and_vary_rules ... ok
+test filters::in_place::tests::header_plan_matrix ... ok
+test filters::in_place::tests::drive_writes_flushes_and_completes ... ok
+test filters::html_rewrite::tests::setup_for_html_caching_replaces_lifetime ... ok
+test filters::in_place::tests::recording_with_lookup_panics - should panic ... ok
+test filters::tests::six_slots_in_load_bearing_order ... ok
+test gzip_rollback::tests::roll_back_resets_this_cycles_slots ... ok
+test gzip_rollback::tests::second_cycle_never_touches_first_cycles_slots ... ok
+test gzip_rollback::tests::unavailable_gzip_stays_disabled ... ok
+test gzip_setter::tests::setter_starts_disarmed ... ok
+test gzip_setter::tests::signature_checks_match_setters ... ok
+test headers::tests::cache_control_joins ... ok
+test headers::tests::outbound_routing_matrix ... ok
+test headers::tests::override_token_strips ... ok
+test headers::tests::request_copy_skips_unhashed ... ok
+test fetch::tests::lifecycle_and_refcounts ... ok
+test filters::html_rewrite::tests::finish_consumes_fabricated_chain ... ok
+test gzip_rollback::tests::roll_back_in_one_cycle_does_not_disable_the_next ... ok
+test headers::tests::version_splits_on_thousands ... ok
+test headers::tests::response_copy_adds_type_and_date ... ok
+test headers::tests::walker_covers_chained_parts ... ok
+test inplace_url_agreement::tests::escaped_slash_reads_alike_once_decoded ... ok
+test inplace_url_agreement::tests::host_case_does_not_matter ... ok
+test inplace_url_agreement::tests::host_the_server_reads_differently_is_left_to_it ... ok
+test inplace_url_agreement::tests::literal_address_hosts_agree ... ok
+test inplace_url_agreement::tests::path_the_server_reads_differently_is_left_to_it ... ok
+test inplace_url_agreement::tests::path_with_query_string_is_optimized_in_place ... ok
+test inplace_url_agreement::tests::percent_encoded_path_is_optimized_in_place ... ok
+test inplace_url_agreement::tests::plain_path_is_optimized_in_place ... ok
+test inplace_url_agreement::tests::slash_runs_are_merged_as_the_server_merges_them ... ok
+test log_bridge::tests::emit_without_sink_goes_to_stderr ... ok
+test log_bridge::tests::fatal_emit_panics_for_dump - should panic ... ok
+test log_bridge::tests::format_matches_cxx ... ok
+test log_bridge::tests::newline_trimmed_once ... ok
+test log_bridge::tests::severities_map ... ok
+test log_bridge::tests::uninstalled_bridge_reports_null ... ok
+test log_bridge::tests::verbosity_follows_debug_level ... ok
+test caches::tests::shared_factory_enrolls_all_path_variants_and_rejects_late_switches ... ok
+test message::tests::crash_set_matches_cxx ... ok
+test message::tests::dump_needs_buffer_and_capacity ... ok
+test message::tests::buffer_sink_reports_without_log ... ok
+test message::tests::formats_carry_tag_and_version ... ok
+test message::tests::handler_defaults_to_null_log ... ok
+test message::tests::install_and_restore_crash_handler ... ok
+test message::tests::levels_map_to_nginx ... ok
+test message::tests::messages_fan_out_to_buffer ... ok
+test mock::tests::chain_composes_to_execution_order ... ok
+test module::tests::async_wait_arms_and_holds ... ok
+test module::tests::async_wait_requires_context - should panic ... ok
+test module::tests::command_table_shape ... ok
+test module::tests::decline_resets_and_advances ... ok
+test module::tests::discard_failure_matrix ... ok
+test module::tests::directive_lines_dispatch ... ok
+test module::tests::dir_prep_line_reports_path ... ok
+test module::tests::init_module_matrix ... ok
+test module::tests::module_tables_export_both_modules ... ok
+test module::tests::phase_insertion_overwrites_and_steps_back ... ok
+test module::tests::factory_fallback_lines ... ok
+test module::tests::postconfiguration_gating ... ok
+test module::tests::shared_statistics_open_without_dirs_falls_back ... ok
+test module::tests::signature_matches_generated_bits ... ok
+test module::tests::stats_log_config_needs_switch_and_dir ... ok
+test module::tests::xml_like_matches_content_types ... ok
+test native_fetch::tests::double_complete_panics - should panic ... ok
+test native_fetch::tests::drop_without_shutdown_panics - should panic ... ok
+test native_fetch::tests::fetcher_key_verbatim ... ok
+test native_fetch::tests::keepalive_rules ... ok
+test native_fetch::tests::lifecycle_queues_activates_completes ... ok
+test native_fetch::tests::message_texts ... ok
+test native_fetch::tests::request_serialization ... ok
+test native_fetch::tests::scheme_strip_matrix ... ok
+test native_fetch::tests::selection_warns_on_serf ... ok
+test native_fetch::tests::shutdown_hands_over_pending_unstarted ... ok
+test native_fetch::tests::user_agent_fixup ... ok
+test options::tests::experiment_gate_and_cookie ... ok
+test options::tests::fast_path_passes_remote_through ... ok
+test options::tests::remote_plan_clones_and_zeroes ... ok
+test options::tests::request_scan_failure_marks_parse_failed ... ok
+test options::tests::directory_request_and_script_merge ... ok
+test origin_fetch::tests::bad_chunk_hex_fails ... ok
+test origin_fetch::tests::chain_without_file_goes_straight_to_origin ... ok
+test origin_fetch::tests::decoder_handles_split_feeds ... ok
+test origin_fetch::tests::chunked_eof_after_terminal_chunk_still_succeeds ... ok
+test origin_fetch::tests::chunked_response_decodes_with_trailers_skipped ... ok
+test origin_fetch::tests::client_headers_forward_but_hop_by_hop_stays ... ok
+test origin_fetch::tests::chain_routes_file_first_then_origin ... ok
+test origin_fetch::tests::close_delimited_reads_to_eof ... ok
+test origin_fetch::tests::https_and_bad_urls_fail_without_connecting ... ok
+test origin_fetch::tests::explicit_host_header_wins_over_url ... ok
+test origin_fetch::tests::empty_path_requests_root_with_query ... ok
+test origin_fetch::tests::garbage_status_line_fails ... ok
+test origin_fetch::tests::head_response_has_no_body ... ok
+test origin_fetch::tests::interim_response_fails ... ok
+test origin_fetch::tests::timeout_override_applies ... ok
+test origin_fetch::tests::oversize_body_fails_fast ... ok
+test origin_fetch::tests::origin_errors_complete_as_errors ... ok
+test origin_fetch::tests::truncated_chunked_fails ... ok
+test origin_fetch::tests::not_modified_succeeds_empty ... ok
+test origin_fetch::tests::truncated_content_length_fails ... ok
+test origin_fetch::tests::differing_content_lengths_fail ... ok
+test pipe::tests::double_install_panics - should panic ... ok
+test origin_fetch::tests::plain_response_serves_with_renormalized_length ... ok
+test origin_fetch::tests::oversize_close_delimited_fails ... ok
+test origin_fetch::tests::unsupported_transfer_coding_fails ... ok
+test origin_fetch::tests::user_agent_gains_native_suffix ... ok
+test pipe::tests::init_texts_verbatim ... ok
+test pipe::tests::round_trip_preserves_type_and_sender ... ok
+test pipe::tests::slot_install_takes_and_posts ... ok
+test pipe::tests::terminate_plan ... ok
+test pipe::tests::writes_fail_after_shutdown ... ok
+test recording::tests::construction_limits ... ok
+test recording::tests::done_flow ... ok
+test recording::tests::full_gating ... ok
+test recording::tests::preliminary_gating ... ok
+test recording::tests::size_rules ... ok
+test recording::tests::saved_cache_control_lifecycle ... ok
+test recording::tests::stats_backend_bumps_console_variables ... ok
+test recording::tests::server_ttl_clamps_shared_entry ... ok
+test request::tests::resource_ctx_defaults ... ok
+test request_body::tests::copy_into_allocated_buffer ... ok
+test request::tests::corrected_bitfields_round_trip ... ok
+test request_body::tests::failed_allocation_is_reported_not_written ... ok
+test request_body::tests::read_error_is_reported ... ok
+test request_body::tests::oversized_body_is_rejected_with_bounded_work ... ok
+test recording::tests::gunzips_when_armed ... ok
+test request_body::tests::reads_body_of_exactly_the_limit ... ok
+test request_body::tests::reads_small_body ... ok
+test resource::tests::branch_matrix ... ok
+test pipe::tests::full_pipe_gives_up_on_budget ... ok
+test resource::tests::gate_matrix ... ok
+test resource::tests::head_downgrades_for_html ... ok
+test resource::tests::html_path_requires_armed_ctx - should panic ... ok
+test rewrite::tests::unavailable_fetcher_fails ... ok
+test routing::tests::dispatch_table ... ok
+test routing::tests::host_port_corners ... ok
+test resource::tests::determined_options_drive_branches ... ok
+test routing::tests::route_access_gates ... ok
+test routing::tests::route_early_branches ... ok
+test routing::tests::subrequest_token_is_substring ... ok
+test routing::tests::url_build_ports ... ok
+test routing::tests::route_admin_matrix ... ok
+test scheduler::tests::cancel_after_run_fails ... ok
+test scheduler::tests::alarms_run_in_deadline_then_insertion_order ... ok
+test scheduler::tests::cancel_runs_cancel_half_once ... ok
+test scheduler::tests::past_deadline_runs_on_add_and_reports_next ... ok
+test scheduler::tests::process_reports_pending_and_skips_blocking_at_zero ... ok
+test scheduler::tests::signal_runs_due_alarms ... ok
+test scheduler::tests::system_clock_reads_epoch_microseconds ... ok
+test routing::tests::route_purge_and_beacon ... ok
+test rewrite::tests::bridge_shares_caches_stats_and_clock ... ok
+test script::tests::executes_and_applies ... ok
+test script::tests::failures_disable ... ok
+test script::tests::substitution_rewrites_args ... ok
+test self_fetch::tests::label_init_matches_cxx ... ok
+test self_fetch::tests::loopback_detection ... ok
+test self_fetch::tests::peer_matching ... ok
+test self_fetch::tests::relabel_round_trip ... ok
+test self_fetch::tests::self_fetch_plan_table ... ok
+test self_fetch::tests::socket_layouts_match_bindgen ... ok
+test module::tests::shared_statistics_open_with_dir_shares ... ok
+test send::tests::html_sink_rewrites_into_fetch ... ok
+test beacon::tests::evidence_half_stores_lcp ... ok
+test send::tests::inflated_delivery ... ok
+test send::tests::html_sink_drains_driver_image_records ... ok
+test send::tests::pass_through_writes_and_completes ... ok
+test send::tests::inflation_failure_drops_the_rest ... ok
+test terminal::tests::admin_config_maps_logging_switch ... ok
+test send::tests::limit_reports_distinctly ... ok
+test terminal::tests::admin_pages_render ... ok
+test send::tests::html_sink_caches_miss_then_serves_hit ... ok
+test file_fetch::tests::html_driver_inlines_file_backed_link ... ok
+test terminal::tests::proxy_head_runs_as_get ... ok
+test send::tests::html_sink_builds_filters_only_past_lookup ... ok
+test terminal::tests::proxy_serves_origin_errors_as_is ... ok
+test terminal::tests::proxy_strips_hop_by_hop_response_headers ... ok
+test terminal::tests::proxy_serves_mapped_origin_verbatim ... ok
+test terminal::tests::simple_asset_outcomes ... ok
+test terminal::tests::simple_messages_wraps_or_warns ... ok
+test terminal::tests::proxy_unmapped_url_fails_to_decline ... ok
+test tests::bindings_target_pinned_nginx ... ok
+test tests::module_name_is_stable ... ok
+test terminal::tests::statistics_console_and_purge_render ... ok
+test zstd_encode::tests::declines_cleanly ... ok
+test zstd_encode::tests::drops_accept_ranges_and_keeps_vary_coverage ... ok
+test zstd_encode::tests::never_bloats_tiny_bodies ... ok
+test zstd_encode::tests::encodes_eligible_css ... ok
+test send::tests::html_sink_caches_analytics_cookies_and_names_bypassers ... ok
+test terminal::tests::resource_garbage_yields_empty ... ok
+test factory::tests::scheduler_thread_starts_once_and_joins_on_drop ... ok
+test scheduler::tests::pump_exits_promptly_on_stop ... ok
+test scheduler::tests::earlier_alarm_wakes_a_waiting_pump ... ok
+test origin_fetch::tests::post_method_fails ... ok
+test origin_fetch::tests::unroutable_host_fails ... ok
+test terminal::tests::proxy_dead_origin_fails_to_decline ... ok
+
+test result: ok. 291 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+

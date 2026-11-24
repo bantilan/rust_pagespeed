@@ -1,0 +1,240 @@
+   Compiling ps-http v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-http)
+warning: constant `ACCEPT_HEADER_VALUE_MOBILE` is never used
+   --> crates/ps-http/src/user_agent_matcher.rs:938:11
+    |
+938 |     const ACCEPT_HEADER_VALUE_MOBILE: &str = "text/html,application/vnd.wap.xhtml+xml";
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `ACCEPT_HEADER_VALUE_NON_MOBILE` is never used
+   --> crates/ps-http/src/user_agent_matcher.rs:939:11
+    |
+939 |     const ACCEPT_HEADER_VALUE_NON_MOBILE: &str = "text/html";
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `CHROME41_USER_AGENT` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1014:11
+     |
+1014 |     const CHROME41_USER_AGENT: &str = concat!(
+     |           ^^^^^^^^^^^^^^^^^^^
+
+warning: constant `CRI_OS48_USER_AGENT` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1037:11
+     |
+1037 |     const CRI_OS48_USER_AGENT: &str = concat!(
+     |           ^^^^^^^^^^^^^^^^^^^
+
+warning: constant `GOOGLEBOT_USER_AGENT` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1067:11
+     |
+1067 |     const GOOGLEBOT_USER_AGENT: &str =
+     |           ^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `NEXUS6_CHROME44_USER_AGENT` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1156:11
+     |
+1156 |     const NEXUS6_CHROME44_USER_AGENT: &str = concat!(
+     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `SILK_DESKTOP_USER_AGENT` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1236:11
+     |
+1236 |     const SILK_DESKTOP_USER_AGENT: &str = concat!(
+     |           ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `X_WAP_PROFILE_HEADER_VALUE` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1265:11
+     |
+1265 |     const X_WAP_PROFILE_HEADER_VALUE: &str = "http://foo.bar.xml";
+     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `X_WAP_PROFILE` is never used
+    --> crates/ps-http/src/user_agent_matcher.rs:1266:11
+     |
+1266 |     const X_WAP_PROFILE: &str = "x-wap-profile";
+     |           ^^^^^^^^^^^^^
+
+warning: `ps-http` (lib test) generated 9 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.80s
+     Running unittests src/lib.rs (target/debug/build/ps-http/217dfe2e8dc2328f/out/ps_http-217dfe2e8dc2328f)
+
+running 169 tests
+test content_type::tests::mime_and_extension_lookup ... ok
+test content_type::tests::predicates ... ok
+test content_type::tests::content_type_parsing ... ok
+test data_url::tests::data_prefixes ... ok
+test data_url::tests::make_base64 ... ok
+test data_url::tests::make_mixed_base64 ... ok
+test data_url::tests::make_mixed_plain ... ok
+test data_url::tests::make_plain ... ok
+test data_url::tests::parse_bad_base64 ... ok
+test data_url::tests::parse_bad_encoding_is_plain ... ok
+test data_url::tests::parse_bad_protocol ... ok
+test data_url::tests::parse_base64 ... ok
+test data_url::tests::parse_corrupt_mime ... ok
+test data_url::tests::parse_mixed_base64 ... ok
+test data_url::tests::parse_mixed_plain ... ok
+test data_url::tests::parse_no_comma ... ok
+test data_url::tests::parse_no_mime ... ok
+test data_url::tests::parse_plain ... ok
+test fetch::tests::google_cache_via_merges_public ... ok
+test fetch::tests::gzip_from_backend_adds_accept_encoding_once ... ok
+test fetch::tests::ungzip_refusals ... ok
+test google_url::tests::add_query_param ... ok
+test google_url::tests::find_relativity ... ok
+test google_url::tests::decomposition ... ok
+test google_url::tests::leaf_extraction ... ok
+test google_url::tests::parse_and_validity ... ok
+test google_url::tests::resolve_against_base ... ok
+test google_url::tests::origin_and_query_presence ... ok
+test headers::tests::lookup_splitting ... ok
+test headers::tests::mutations ... ok
+test google_url::tests::relativize ... ok
+test headers::tests::remove_case_and_rejoin ... ok
+test fetch::tests::gzip_round_trip_and_bookkeeping ... ok
+test headers::tests::update_from_and_http_shape ... ok
+test fetch::tests::inflating_wrapper_flow ... ok
+test http_cache::tests::etag_injection_and_sanitize_on_store ... ok
+test http_cache::tests::keys_versions_fragments_and_gates ... ok
+test inflate::tests::constants_match_cxx ... ok
+test http_cache::tests::expiry_fallback_and_failure_memory ... ok
+test http_cache::tests::put_find_round_trip_and_stats ... ok
+test headers::tests::predicates ... ok
+test http_cache::tests::compression_and_gzip_negotiation ... ok
+test inflate::tests::corruption_fails ... ok
+test inflate::tests::bad_trailer_fails ... ok
+test inflate::tests::gzip_round_trip ... ok
+test inflate::tests::limit_fails_closed ... ok
+test inflate::tests::misuse_is_rejected ... ok
+test inflate::tests::preset_dictionary_fails ... ok
+test inflate::tests::truncated_waits_for_more ... ok
+test inflate::tests::tiny_output_buffers ... ok
+test mock::tests::conditional_304 ... ok
+test mock::tests::failure_injection ... ok
+test mock::tests::serve_and_count ... ok
+test names::tests::header_sets_sorted ... ok
+test names::tests::reason_phrases ... ok
+test parser::tests::headers_goldens ... ok
+test parser::tests::response_split_and_verbatim_body ... ok
+test proto::tests::golden_wire_bytes ... ok
+test proto::tests::scalar_round_trip_and_presence ... ok
+test purger::tests::target_and_gates ... ok
+test inflate::tests::zlib_and_raw_deflate ... ok
+test query::tests::empty_scan_finds_nothing ... ok
+test query::tests::bare_switch_query_and_headers ... ok
+test query::tests::cookies_apply_and_record ... ok
+test query::tests::filters_list_resets ... ok
+test query::tests::get_query_options_wraps_scan ... ok
+test query::tests::headers_consumed_selectively ... ok
+test query::tests::invalid_short_circuits ... ok
+test query::tests::query_strip_keeps_others ... ok
+test query::tests::override_token_gates ... ok
+test query::tests::related_options_apply ... ok
+test query::tests::resource_option_units ... ok
+test query::tests::response_token_always_stripped ... ok
+test query_params::tests::best_effort_passes_malformed_through ... ok
+test query::tests::xhr_disables_ajax_filters ... ok
+test query::tests::sticky_needs_context ... ok
+test query_params::tests::builds_and_renders ... ok
+test query_params::tests::lookup1_rejects_repeats_decodes_bad_escapes ... ok
+test query_params::tests::parses_pairs_and_bare_names ... ok
+test query_params::tests::unescapes_plus_and_hex ... ok
+test request::tests::accepts_zstd_negotiation ... ok
+test parser::tests::overlong_line_fails ... ok
+test request::tests::context_timing ... ok
+test request::tests::header_scan_applies_client_options ... ok
+test request::tests::header_scan_consumes_option_headers ... ok
+test request::tests::header_scan_honors_the_override_token ... ok
+test request::tests::http_string_shape ... ok
+test request::tests::http_string_without_cookies ... ok
+test request::tests::method_from_string_covers_table ... ok
+test request::tests::methods_and_properties ... ok
+test request::tests::xhr_cookies_and_sticky ... ok
+test response::tests::binary_presence_quirks ... ok
+test response::tests::caching_matrix ... ok
+test response::tests::combine_complete_value_unchanged ... ok
+test response::tests::combine_fills_missing_charset ... ok
+test response::tests::caching_writers_match_cxx ... ok
+test response::tests::combine_without_charset ... ok
+test response::tests::do_not_correct_valid_date ... ok
+test response::tests::first_line_parsing ... ok
+test response::tests::fixup_missing_date ... ok
+test response::tests::fixup_stale_date ... ok
+test response::tests::fixup_stale_date_with_expires ... ok
+test response::tests::fixup_stale_date_with_max_age ... ok
+test response::tests::gzip_and_length_helpers ... ok
+test response::tests::imminence_window ... ok
+test response::tests::merge_complete_value_unchanged ... ok
+test response::tests::merge_update_and_http_shape ... ok
+test response::tests::missing_date_removes_expires ... ok
+test response::tests::must_revalidate_blocks_heuristic ... ok
+test response::tests::proxy_cacheable_matrix ... ok
+test time::tests::golden_dates ... ok
+test response::tests::sanitize_and_force ... ok
+test time::tests::utc_breakdown_matches_http_date ... ok
+test time::tests::pivot_and_round_trip ... ok
+test inflate::tests::gzip_split_at_every_boundary ... ok
+test user_agent_matcher::tests::doesnt_support_dns_prefetch ... ok
+test user_agent_matcher::tests::doesnt_support_avif_rewritten_urls ... ok
+test user_agent_matcher::tests::doesnt_support_webp ... ok
+test user_agent_matcher::tests::chrome_build_number_test ... ok
+test user_agent_matcher::tests::doesnt_support_animated_webp ... ok
+test user_agent_matcher::tests::desktop_bot_supports_js_defer ... ok
+test user_agent_matcher::tests::avif_browser_version_boundaries ... ok
+test user_agent_matcher::tests::is_android_user_agent_test ... ok
+test user_agent_matcher::tests::ie11_no_defer_js ... ok
+test user_agent_matcher::tests::is_ios_user_agent_test ... ok
+test user_agent_matcher::tests::is_ie_test ... ok
+test user_agent_matcher::tests::doesnt_support_webp_lossless_alpha ... ok
+test user_agent_matcher::tests::modern_firefox_webp_without_accept_header ... ok
+test user_agent_matcher::tests::mobile_bot_supports_js_defer ... ok
+test user_agent_matcher::tests::mobilization ... ok
+test user_agent_matcher::tests::modern_mobile_and_tablet_detection ... ok
+test user_agent_matcher::tests::modern_chromium_build_number_parsing ... ok
+test user_agent_matcher::tests::not_supports_js_defer_allow_mobile ... ok
+test user_agent_matcher::tests::not_supports_image_inlining ... ok
+test user_agent_matcher::tests::supports_animated_webp ... ok
+test user_agent_matcher::tests::not_supports_js_defer ... ok
+test user_agent_matcher::tests::get_device_type_for_ua ... ok
+test user_agent_matcher::tests::supports_avif_rewritten_urls ... ok
+test user_agent_matcher::tests::supports_dns_prefetch_using_rel_prefetch ... ok
+test user_agent_matcher::tests::supports_dns_prefetch ... ok
+test user_agent_matcher::tests::supports_lazyload_images ... ok
+test user_agent_matcher::tests::supports_image_inlining ... ok
+test user_agent_matcher::tests::supports_js_defer_allow_mobile ... ok
+test user_agent_matcher::tests::webp_capable_lacking_accept_header ... ok
+test user_agent_matcher::tests::supports_js_defer ... ok
+test user_agent_matcher::tests::exceeds_chrome_build_and_patch_test ... ok
+test user_agent_matcher::tests::supports_webp_lossless_alpha ... ok
+test value::tests::malformed_blobs_fail ... ok
+test value::tests::round_trips_both_orders ... ok
+test zstd::tests::accepts_zstd_quality_rules ... ok
+test zstd::tests::accepts_zstd_token_forms ... ok
+test zstd::tests::compressible_types ... ok
+test zstd::tests::eligibility_rules ... ok
+test zstd::tests::header_application_keeps_existing_vary_coverage ... ok
+test zstd::tests::header_application_sets_encoding_and_vary ... ok
+test zstd::tests::one_shot_round_trips_real_frame ... ok
+test user_agent_normalizer::tests::ie ... ok
+test zstd::tests::streaming_empty_input_finishes_valid_frame ... ok
+test zstd::tests::streaming_chunks_decode_to_input ... ok
+test user_agent_normalizer::tests::android_chrome_unaffected ... ok
+test user_agent_normalizer::tests::dalvik ... ok
+test user_agent_normalizer::tests::with_all ... ok
+test user_agent_normalizer::tests::mobile_chrome ... ok
+test user_agent_normalizer::tests::browser ... ok
+test zstd::tests::concurrent_threads_encode_independent_frames ... ok
+test domain_registry::tests::minimal_private_suffix_cases ... ok
+test zstd::tests::interleaved_streams_flush_and_reuse_without_cross_response_state ... ok
+test zstd::tests::large_responses_are_encoded_without_retaining_workspaces ... ok
+test zstd::tests::reused_bulk_context_keeps_independent_frames_and_original_ratio ... ok
+
+test result: ok. 169 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests ps_http
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
