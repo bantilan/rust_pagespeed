@@ -125,12 +125,12 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Choose/document defaults using measured results, not assumptions.
 - [x] Config/unit/live isolated tests; commit.
 
-### Phase 7 — Reload/checkpoint/restart recovery [PENDING]
+### Phase 7 — Reload/checkpoint/restart recovery [COMPLETED — disk remains authoritative]
 
-- [ ] Test overlapping worker generations and configuration/layout size changes.
-- [ ] Implement optional bounded checkpoint/restore if needed beyond authoritative disk persistence; document decision explicitly.
-- [ ] Test full restart, killed workers, corrupt/truncated checkpoint and failed writes.
-- [ ] Verify no hit-path flush/checkpoint I/O; commit.
+- [x] Test overlapping worker generations and configuration/layout size changes.
+- [x] Implement optional bounded checkpoint/restore if needed beyond authoritative disk persistence; document decision explicitly.
+- [x] Test full restart, killed workers, corrupt/truncated checkpoint and failed writes.
+- [x] Verify no hit-path flush/checkpoint I/O; commit.
 
 ### Phase 8 — Admin/aggregated statistics [PENDING]
 
@@ -177,7 +177,7 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 **State:** Phases 0–3 implemented and verified (Phase 3 exposes an opt-in assembly API; no production directive/default changed). Latest Phase 3 integration commit is `db778c3`. Phase 4 dependencies: b37464b identity, 6ac47a7 owner table, a707279 leases/revocation. HTML worker integration is the latest tested milestone (inspect git log for its hash). Production directives/defaults remain disabled; coherent cache-writer recovery is pending. Earlier commits: `4d23d3e` baseline/plan, `ff67357` regions, `6aaefe3` bytes/adapter, `6213ac2` lifetime diagnosis, `7cf9997` coherent counter protocol.
 
-**Exact next action:** Phases 4/5 committed cd6c507; Phase 6 explicit configuration is verified (inspect latest commit). Begin Phase 7 with actual isolated Nginx master+two-worker reload overlap tests: hold an active old-worker response, change shared size and SIGHUP, verify old/new workers coexist and new optimized HTML remains valid. Then stop/restart all workers and validate disk recovery/incarnation. Keep initial legacy-to-shared activation full-stop-only as documented. Decide checkpoint scope (disk is already write-through authoritative; never snapshot live pthread state) and document it. Phase 8 aggregated diagnostics and Phase 9/10 full stress/profiling remain pending.
+**Exact next action:** Phases 0–7 verified (inspect latest commits; Phase 7 lifecycle tool/test/documentation commit follows 71bf7f5). Begin Phase 8 aggregated diagnostics: expose shared byte capacity/usage/hit/miss/eviction/admission/busy/error and ownership/recovery information in admin without mislabeling local histograms. Metrics must count in shared memory or use actual process-shared Statistics handles; do not sum per-worker copies of capacity/usage. Include multi-worker verification and reset/reload semantics. Then Phase 9 final stress/workspace checks and Phase 10 profiling attribution/repeated benchmarks. Initial activation from legacy binaries remains full-stop-only.
 
 **Phase 4 outcome:** opt-in domains now use robust tracked transactions and recover killed writers. Legacy default coherence remains unchanged until explicit activation. Exceptional tracking-capacity overflow preserves disk mutations and deliberately disables affected memory shards; offline replacement/new tracker domain restores those shards. Surface this in diagnostics and documentation; it is distinct from ordinary killed-owner recovery.
 
@@ -522,3 +522,18 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - Output quality: default/shared Moto normalized SHA 889b7c10af1d2ce7c7c158cfe6700347dc8e5d8169fd0df84ce58ae125386298, 15031 bytes, 15 pagespeed refs; Aroma SHA c691571e4644b28bebd771d586a7625b62b3bdcb8a3848cd87b5216a4847fcf6, 34068 bytes, 23 refs. Exact equality, no removed optimizations. Ordinary build lacks pipeline instrumentation, so residual latency is not attributed yet.
 - Benchmark records module/config hashes and now records dirty source state; these runs used uncommitted Phase 6 factory on cd6c507, followed by this milestone commit. Added CONFIGURATION.md and README link covering admission, separate overhead, conservative fallback, C++ naming comparison and mandatory initial full restart.
 - Phase 7–10 remain incomplete. No deployment, push or unrelated changes discarded.
+
+## Phase 7 reload/recovery — design before edits
+
+- Phase 6 commit 71bf7f5. Add isolated Nginx lifecycle validation using the matched staged executable/module, two workers and a real master. Keep a throttled old-worker response active while SIGHUP switches shared allocation size, then verify simultaneous old/new worker existence and valid optimized HTML. Stop/start all workers on the same cache directory and verify persisted optimized HTML survives.
+- Existing disk write-through is the authoritative checkpoint: do not serialize native pthread mutex bytes into a portable checkpoint. Same-boot mapped bytes are opportunistic; boot identity/layout checks reject unsafe state, missing memory reconstructs from validated disk entries. Optional separate byte checkpoints add no correctness benefit yet and are intentionally not implemented. Document this decision and measure restart behavior.
+- Full legacy-to-new activation remains full-stop-only; graceful overlap test covers the same new coherence protocol, not unsupported mixed old binaries.
+
+## Phase 7 final verification
+
+- Added `tools/verify_shared_lifecycle.py`: private prefix/listen port, real master/two workers, held throttled static response guarantees old worker remains alive during SIGHUP. A changed budget creates another bounded byte layout while retaining the same writer/coordinator domain. New-worker PID must differ from both original PIDs; master child list proves generation overlap. Then complete stop/start verifies disk-backed optimized HTML persists. Cleanup signals only the isolated process group, including failure paths.
+- `python3 tools/verify_shared_lifecycle.py --nginx /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/objs/nginx --module target/release/libps_nginx.so --output docs/performance/shared-memory/phase7-lifecycle.json > docs/performance/shared-memory/phase7-lifecycle.log 2>&1`: exit 0. Raw JSON includes prefix, module SHA, before/reload/restart worker PIDs and identical normalized output hash/length/ref count; two byte mappings confirm size change.
+- Five repetitions of the same command to /tmp result files: exit 0, all passed; phase7-lifecycle-stress.log includes raw outcomes. Initial raw-body-length assertion failed due solely to cache timestamp-comment width; corrected to normalized bytes, with unchanged normalized hash, then all repetitions passed.
+- `cargo test -p ps-nginx --lib factory::tests > docs/performance/shared-memory/phase7-restart-tests.log 2>&1`: 18 passed. New regression closes all handles, corrupts/truncates the shared byte file, restarts the factory, verifies startup fallback message and unchanged persisted metadata via disk/L1. Other tests cover SIGKILL mutation boundaries, partial headers, permissions, layout mismatch and boot rejection from Phases 1–5.
+- Checkpoint decision: existing write-through disk is authoritative; no additional byte checkpoint format/thread/flush is warranted. Native pthread state is never serialized/restored. Same-boot mappings are opportunistic and boot/layout-validated. Documented in CONFIGURATION.md. No hit-path checkpoint I/O introduced.
+- Scoped rustfmt, Python syntax and git diff --check required before milestone commit. Only factory test code changed since the Phase 6 release module; lifecycle module hash unchanged. No deployment or remote push.

@@ -63,3 +63,17 @@ Ordinary release builds omit pipeline instrumentation. They cannot attribute the
 historical 13ms residual; a profiling build and matched instrumented run are
 required. Baseline/raw measurements and their build provenance live beside this
 file. No module has been installed or live Nginx configuration changed.
+
+Same-protocol graceful reloads are verified with a real two-worker Nginx master,
+an active throttled old-worker response, a shared-byte budget change from 1MiB to
+2MiB, and new optimized responses. The normalized HTML digest and optimized URL
+count remain identical across reload and complete restart. Reproduce with
+`tools/verify_shared_lifecycle.py`; raw evidence is in `phase7-lifecycle.json`.
+The initial transition from older binaries still requires a full stop/start.
+
+The authoritative restart checkpoint is the existing write-through disk cache.
+There is no separate serialized shared-memory checkpoint: native pthread state
+must never be restored as a portable snapshot. Corrupt/truncated shared bytes
+fall back to validated disk entries; missing/expired disk entries are optimized
+again asynchronously. A regression verifies persisted metadata survives a
+corrupt shared mapping. No hit-path flush, fsync, or checkpoint timer was added.

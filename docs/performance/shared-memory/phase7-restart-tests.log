@@ -1,0 +1,45 @@
+   Compiling ps-nginx v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-nginx)
+warning: unused import: `ps_http::fetch::AsyncFetch`
+   --> crates/ps-nginx/src/file_fetch.rs:611:13
+    |
+611 |         use ps_http::fetch::AsyncFetch;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/ps-nginx/src/send.rs:620:13
+    |
+620 |         let mut make_sink = |metadata: std::sync::Arc<dyn ps_cache::cache::Cache>| {
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-nginx` (lib test) generated 2 warnings (run `cargo fix --lib -p ps-nginx --tests` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.31s
+     Running unittests src/lib.rs (target/debug/build/ps-nginx/7a479a898b863727/out/ps_nginx-7a479a898b863727)
+
+running 18 tests
+test factory::tests::crash_handler_gate ... ok
+test factory::tests::constructor_defaults ... ok
+test factory::tests::native_names_fall_through_to_ps_config ... ok
+test factory::tests::fetcher_map_caches_and_warns_once ... ok
+test factory::tests::remote_warnings ... ok
+test factory::tests::post_config_matrix ... ok
+test factory::tests::resolver_lifecycle ... ok
+test factory::tests::root_init_registers_paths ... ok
+test factory::tests::set_main_conf_merges_process_scope_only ... ok
+test factory::tests::shutdown_idempotent ... ok
+test factory::tests::statistics_logging_silent_without_config ... ok
+test factory::tests::system_factory_directives ... ok
+test factory::tests::thread_counts_finalize_once ... ok
+test factory::tests::statistics_logging_clamps_nonpositive_interval ... ok
+test factory::tests::statistics_logging_dumps_now_and_rearms ... ok
+test factory::tests::shared_cache_configuration_budget_disable_and_fallback ... ok
+test factory::tests::corrupt_shared_mapping_restart_falls_back_to_persistent_disk ... ok
+test factory::tests::scheduler_thread_starts_once_and_joins_on_drop ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 263 filtered out; finished in 0.02s
+

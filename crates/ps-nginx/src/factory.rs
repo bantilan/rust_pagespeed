@@ -1224,6 +1224,62 @@ mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn corrupt_shared_mapping_restart_falls_back_to_persistent_disk() {
+        let directory =
+            std::env::temp_dir().join(format!("ps-corrupt-restart-{}", std::process::id()));
+        let mut options = NgxOptions::new();
+        options.system.file_cache_path = directory.to_string_lossy().into_owned();
+        let make = || {
+            let mut factory = DriverFactory::new("", -1);
+            factory
+                .shared_memory_caches
+                .insert(options.system.file_cache_path.clone(), 1024);
+            factory
+        };
+        let mut first = make();
+        first.root_init(&[&options]);
+        let cache = first.caches.setup_caches(&options).unwrap().metadata_cache;
+        cache.put("persisted", b"valid disk entry");
+        drop(cache);
+        drop(first);
+        let boot = std::fs::read_to_string("/proc/sys/kernel/random/boot_id").unwrap();
+        let domain = directory.join(".pagespeed-lru/shared-v2").join(boot.trim());
+        let mapping = std::fs::read_dir(&domain)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| {
+                path.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .starts_with("bytes-v2-")
+            })
+            .unwrap();
+        // No live handle remains: model a corrupt/truncated opportunistic tier.
+        std::fs::write(mapping, b"invalid checkpoint").unwrap();
+        let mut restarted = make();
+        let messages = restarted.root_init(&[&options]);
+        assert!(
+            messages
+                .iter()
+                .any(|message| message.contains("using existing disk/L1 caches")),
+            "{messages:?}"
+        );
+        let cache = restarted
+            .caches
+            .setup_caches(&options)
+            .unwrap()
+            .metadata_cache;
+        assert_eq!(
+            cache.get("persisted").value.as_deref(),
+            Some(b"valid disk entry".as_slice())
+        );
+        drop(cache);
+        drop(restarted);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     #[test]
     fn post_config_matrix() {
         let factory = DriverFactory::new("", -1);

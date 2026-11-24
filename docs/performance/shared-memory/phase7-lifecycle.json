@@ -1,0 +1,30 @@
+{
+  "prefix": "/tmp/ps-shared-lifecycle-2k79zbc8",
+  "module_sha256": "24ed32bf5b72f65dcfed977a982cb5e2a6b6f0aa0a3be345fea26a61fa8114b0",
+  "commit": "71bf7f55ce6103496005801158500283c09803da",
+  "passed": true,
+  "before": [
+    3951466,
+    "cfd78a9f9fcd7d10de0348fa8c923516eb8cbf60e9ab293dc5169881fe4ad654",
+    15031,
+    15
+  ],
+  "after_reload": [
+    3951492,
+    "cfd78a9f9fcd7d10de0348fa8c923516eb8cbf60e9ab293dc5169881fe4ad654",
+    15031,
+    15
+  ],
+  "after_restart": [
+    3951499,
+    "cfd78a9f9fcd7d10de0348fa8c923516eb8cbf60e9ab293dc5169881fe4ad654",
+    15031,
+    15
+  ],
+  "held_old_worker": 3951466,
+  "byte_mappings": [
+    "cache/.pagespeed-lru/shared-v2/5cd0fda2-e658-4e6d-bf01-0b4853c317ea/bytes-v2-16-3-16384.dat",
+    "cache/.pagespeed-lru/shared-v2/5cd0fda2-e658-4e6d-bf01-0b4853c317ea/bytes-v2-16-7-16384.dat"
+  ],
+  "checkpoint_policy": "validated existing write-through disk cache; no native mutex checkpoint"
+}
