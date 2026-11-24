@@ -599,3 +599,11 @@ Final tests/build passed; Python syntax and diff checks verified at checkpoint. 
 - Independently recomputed every final default/shared latency-table row from the raw request samples using Python json/statistics: all four rows agree; 15 cold / 300 HIT / 300 MISS samples each. Saved exact medians/sample counts in phase10-report-audit.json.
 - Corrected CONFIGURATION.md's stale pending Phase 7/8 statements, linked final results from README, and documented why shared caching remains opt-in. Admin behavior text already matches the implemented shared gauges.
 - `git diff --check`: passed. No deployment, push, new production profiling, or claimed resolution of historical 13 ms. Phase 10 remains IN PROGRESS; continue from Next Session Resume Point.
+
+## Requested current-commit benchmark — completed
+
+User requested a new comparison column. HEAD is ef9aeb5 (new audit fixes since prior checkpoint); initial working tree clean. Building ordinary release to ef9aeb5-benchmark-build.log, then isolated matched Nginx cold/HIT/MISS benchmarks with default and explicit 16 MiB shared tiers, 100 warm samples and five cold runs per page. Preserve historical columns; label current isolated methodology explicitly. Next action: inspect build completion, run tools/benchmark_shared_memory.py for both modes, persist raw results and add column to ../benchmark.md plus repository report. No live deployment changes.
+
+- Completed ordinary release build (27.23 s) and both five-run/100-sample-per-warm-phase benchmarks, exit 0. Default Moto cold/HIT/MISS: 3.641/0.461/1.857 ms; Aroma 4.927/0.485/2.704 ms. Shared Moto 4.323/0.466/1.895; Aroma 5.090/0.498/2.734. 500 confirmed HIT samples/page/mode. All ten warm bodies/page match prior normalized output hashes (15/23 optimized references).
+- Saved ef9aeb5-{default,shared}.json/log, build log and ef9aeb5-comparison.md. Added new rightmost column in ../benchmark.md; that parent file is outside this Git repository, so the committed comparison report preserves the requested table inside the repository too.
+- No source edits, deployment or pushes. Build and benchmark quality/HIT checks provide verification for this data-only milestone. Phase 10 production attribution remains incomplete; resume from existing Next Session Resume Point.
