@@ -15,16 +15,16 @@ your C++ configuration when switching over.
 
 ## Performance
 
-Measured 2026-11-23 on localhost (`curl %{time_total}`), Moto/Aroma template
-pages, same filter config throughout. Full methodology and raw samples:
+Measured on localhost (`curl %{time_total}`), Moto/Aroma template pages,
+same filter config throughout. Full methodology and raw samples:
 [`../benchmark.md`](../benchmark.md).
 
-| Test case | C++ 1.15 (cold) | Rust before (`f03a58a`) | Rust now (`81efe1f`) |
+| Test case | C++ 1.15 (cold) | Rust before (`f03a58a`) | Rust now (`9063416`) |
 |---|---|---|---|
-| Moto first load | 2 ms | 86 ms | 22 ms |
-| Moto repeat (HTML hit) | 3 ms | 7 ms | 1 ms |
-| Aroma first load | 4 ms | 154 ms | 34 ms |
-| Aroma repeat (HTML hit) | 3 ms | 7 ms | 1 ms |
+| Moto first load | 2 ms | 86 ms | 6 ms |
+| Moto repeat (HTML hit) | 3 ms | 7 ms | 2 ms |
+| Aroma first load | 4 ms | 154 ms | 8 ms |
+| Aroma repeat (HTML hit) | 3 ms | 7 ms | 2 ms |
 
 Rewriting verified intact on warmed pages (26/32 `pagespeed` URLs, matching
 the C++ 25–32 range): the speedup comes from deferred work, not disabled
@@ -59,7 +59,10 @@ Legend: ✅ supported · 🔶 partial · 📋 planned · ❌ not supported (out 
 | Critical-image beaconing + LCP learning | ✅ | ✅ | Beacon finder, evidence store, LCP prioritization |
 | Full RUM instrumentation filter | ✅ | 📋 code present | Filter implemented, chain wiring pending |
 | **Automatic logo detection for LCP** | ❌ | ✅ **Rust-only** | Confidence-based (WP/custom/SVG/CSS-bg); keeps logos out of auto-preload |
+| **LCP fallback hero** | ❌ | ✅ **Rust-only** | Empty/stale evidence never leaves the visual hero bare |
 | Async HTML (deadline-detach) | ✅ threads | ✅ adapted | Fire-and-forget rewrite jobs; first view serves originals, next view hits |
+| **Async CSS/JS combination** | ✅ threads | ✅ adapted | Background combiners with failure memory; uncombinable members never block HTML caching |
+| **Background admin reporting** | ✅ | ✅ | Worker completions land on the admin images page |
 | Admin / console / statistics / graphs | ✅ | ✅ | `ps-admin` + cross-process shared counters |
 | Gzip handling, Vary, downstream caching | ✅ | ✅ | |
 | Apache module | ✅ | ❌ | NGINX only |
@@ -74,6 +77,18 @@ Legend: ✅ supported · 🔶 partial · 📋 planned · ❌ not supported (out 
   background (C++ deadline-detach parity under load); warmed views are
   identical. Nothing is ever skipped — only deferred.
 - **Logo-aware LCP** is new functionality with no C++ counterpart.
+- **Combine failure memory**: uncombinable candidates (404s, uncacheable
+  origins) rest on the input-errors TTL instead of re-detaching every
+  render, so one bad asset can't disable HTML caching.
+
+## Resource usage
+
+Measured live (12 nginx workers): ~213 MB total RSS, 11–25 MB per worker
+depending on cache warmth, against 15 GB system RAM. Per-worker memory is
+dominated by the bounded 8 MiB LRU tier plus message buffers and the
+rewrite thread pool; the file cache lives on disk. Regex tables compile
+once at worker startup and serving filters construct lazily, so steady
+requests carry no initialization overhead.
 
 ## Layout
 
@@ -128,6 +143,7 @@ this repo in `../rust_pagespeed_compiler/build_from_source_to_deb.sh`.
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — workspace crate designs
 - [`docs/ASYNC_REWRITING.md`](docs/ASYNC_REWRITING.md) — async model, stats, benchmarks
+- [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) + [`docs/performance/`](docs/performance/) — request-path measurements and raw JSON
 - [`docs/AUDIT.md`](docs/AUDIT.md) — inventory of the C++ originals
 - [`docs/MAPPING.md`](docs/MAPPING.md) — which C++ owner feeds which crate
 - [`docs/PLAN.md`](docs/PLAN.md) — build order
