@@ -177,7 +177,7 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 **State after report-audit milestone:** Phases 0–9 implemented and verified. Phase 10 is IN PROGRESS: final ordinary benchmarks, two-worker concurrency benchmark, stage timing, strace and Callgrind are saved. No partial Rust changes. Benchmarks/profiling checkpoint is `db45d13`; the subsequent report-audit commit corrects stale documentation and independently recomputes the final table (inspect `git log -3 --oneline`). No push or live deployment performed.
 
-**Exact next action:** Resource-serving polling refinement implemented and verified: NGINX chooses zero polling while other callers retain configurable bounded waiting. Inspect latest commit for hash. Read REMAINING_WORK.md; next independent task is explicit beacon traffic across reload / offline saturated-shard recovery tests (item 2), or separately scope fully asynchronous NGINX resource reconstruction. Remaining synchronous reconstruction is not fixed by removing polling. Phase 10 production attribution remains open; no deployment performed.
+**Exact next action:** Items 1 and 2 of the remaining-work review are verified (resource polling refinement; real beacon reload tests; offline tracker replacement regression). Inspect latest commit. Next review item 3's Phase 10 contention/memory/duplicate-work acceptance gaps; keep production ~13 ms unattributed. Optional follow-up: fully asynchronous NGINX resource serving, and end-to-end u64 epoch exhaustion distinct from tested writer-slot exhaustion. Do not rerun completed tests/benchmarks without a reason; no deployment or push performed.
 
 **Verified build/test state:** final `cargo test --workspace` completed with 99 result groups, 2,922 reported passes (2,920 primary plus two nested subprocess reports), zero failures. Final `cargo build -p ps-nginx --release` passed and restored ordinary, non-pipeline-profile target module. Logs: phase10-final-workspace-tests.log and phase10-final-release-build.log. No commands intentionally left running.
 
@@ -630,3 +630,30 @@ Confirmed module.rs PagespeedResource content-handler branch calls terminal::fet
 - `cargo test -p ps-html --test image_rewrite -- --test-threads=1 > docs/performance/shared-memory/resource-wait-image-suite.log 2>&1`: 124 passed, zero failures, 60.60 s.
 - `cargo test -p ps-nginx --lib terminal::tests > docs/performance/shared-memory/resource-wait-nginx-tests.log 2>&1`: 12 passed, zero failures.
 - `cargo build -p ps-nginx --release > docs/performance/shared-memory/resource-wait-release-build.log 2>&1`: passed; ordinary module rebuilt. Scoped formatting applied; git diff --check passed. Updated configuration and remaining-work documentation. No push, deployment, live service changes or further benchmark claims.
+
+## Operational recovery coverage — in progress
+
+User authorized item 2. Add isolated real-NGINX beacon issuance/acceptance/replay across old/new workers, validating persisted evidence rather than HTTP status alone; add disk-backed offline tracker replacement test with all old handles dropped before removing tracker files. Do not remove live domains. Tests pending; no completion claim.
+
+## Operational recovery coverage — completed and verified
+
+- Added `tools/verify_beacon_reload.py`: fresh isolated two-worker NGINX, actual browser-supported UA, emitted JS nonce/options identity, real form beacon POST, SIGHUP, old-worker hold response and new-worker PID verification. A read-only oracle decodes persisted compressed beacon-evidence/1 records; does not use HTTP success as evidence of acceptance.
+- Two orderings: pre-reload nonce accepted by new worker (pending nonce survives); accepted pre-reload evidence retained and replay rejected by new worker. Checks exact valid count/generation, nonce consumption, unchanged record on replay, old worker alive during final checks. Six additional repetitions passed (three per ordering), recorded with module/config hashes and PIDs.
+- First harness draft used an unsupported test UA and correctly found no beacon; switched to a supported Chrome UA. This was a test setup issue, not a production change. Production code unchanged for this milestone.
+- Added disk-backed `offline_domain_replacement_restores_admission_and_preserves_disk`: fill all 64 tracker slots, replace one key/delete another, verify persistent bypass and disk correctness, drop every old cache/tracker handle, replace only offline tracker directory, reopen with new namespace, verify persisted replacement/deletion and actual memory backfill admission. No live mappings removed. This covers slot-exhaustion bypass recovery; end-to-end u64 epoch exhaustion remains separate.
+
+Commands/results (repository root):
+
+```sh
+cargo test -p ps-cache --lib tracked_coherence::tests > docs/performance/shared-memory/offline-domain-recovery-tests.log 2>&1
+# 3 passed, including existing killed-writer and saturation tests.
+cargo test -p ps-cache --lib > docs/performance/shared-memory/recovery-cache-suite.log 2>&1
+# 74 passed, zero failures; nested killed-process report also passes.
+python3 tools/verify_beacon_reload.py --nginx ../.nginx-build/nginx-1.31.8/objs/nginx --module target/release/libps_nginx.so --output docs/performance/shared-memory/beacon-reload.json
+python3 tools/verify_beacon_reload.py --nginx ../.nginx-build/nginx-1.31.8/objs/nginx --module target/release/libps_nginx.so --output docs/performance/shared-memory/beacon-accepted-before-reload.json --accept-before-reload
+# Both passed; repeated three times each to beacon-reload-repetitions.json/log.
+python3 -m py_compile tools/verify_beacon_reload.py
+git diff --check
+```
+
+Used ordinary release from resource-wait milestone (module SHA in JSON). No production Rust changes; no unnecessary rebuild/full workspace rerun for test/harness-only changes. Existing HTML-cache HIT/RUM tests remain previous verified evidence; this new minimal-page test exercises actual nonce/report state across reload rather than claiming new HTML HIT coverage. Phase 10 still incomplete.

@@ -403,3 +403,7 @@ new architecture, judged on its own merits above — mostly sound.
   txn kill test, Overload matrix, contention stress tests, pooled
   benchmark medians; extended + live-verified the lifecycle script;
   full suite green ×2 (100 ok lines). Uncommitted working tree.
+
+## Post-audit operational coverage update
+
+The previously uncovered explicit beacon pacing across real reload is now tested by `tools/verify_beacon_reload.py` in both nonce acceptance orderings. Six repeated isolated NGINX runs validate new/overlapping worker identities, persisted evidence count/generation and replay rejection; see beacon-reload-repetitions.json. Offline recovery after writer-slot exhaustion also has a disk-backed cache-adapter regression (all old handles dropped before tracker replacement). End-to-end u64 epoch exhaustion and full asynchronous NGINX serving remain separate follow-ups. This update supersedes those earlier missing-coverage statements without altering historical audit findings.

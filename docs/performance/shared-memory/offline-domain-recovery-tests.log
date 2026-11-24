@@ -1,0 +1,11 @@
+   Compiling ps-cache v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-cache)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.82s
+     Running unittests src/lib.rs (target/debug/build/ps-cache/2be0efa45aec8a38/out/ps_cache-2be0efa45aec8a38)
+
+running 3 tests
+test tracked_coherence::tests::nested_adapters_recover_terminated_writer_and_preserve_saturated_deletes ... ok
+test tracked_coherence::tests::offline_domain_replacement_restores_admission_and_preserves_disk ... ok
+test tracked_coherence::tests::killed_disk_writer_restores_nested_memory_hits ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 71 filtered out; finished in 0.01s
+

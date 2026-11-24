@@ -219,4 +219,63 @@ mod tests {
         drop(coherence);
         std::fs::remove_dir_all(directory).unwrap();
     }
+    #[test]
+    fn offline_domain_replacement_restores_admission_and_preserves_disk() {
+        let directory = std::env::temp_dir().join(format!(
+            "ps-tracked-offline-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let domain = directory.join("tracker");
+        std::fs::create_dir_all(&domain).unwrap();
+        let disk = file(&directory);
+        let coherence = Arc::new(TrackedCoherence::open(&domain, "before:".into()).unwrap());
+        let cache = WriteThroughCache::new(
+            Arc::new(MemoryCache::new()),
+            disk.clone(),
+            WRITE_THROUGH_UNLIMITED,
+        )
+        .with_coherence(coherence.clone());
+        cache.put("keep", b"old");
+        cache.put("delete", b"old");
+        let full: Vec<_> = (0..ps_shm::write_tracker::WRITER_SLOTS)
+            .map(|_| coherence.tracker.try_begin(0).unwrap().unwrap())
+            .collect();
+        cache.put("keep", b"persisted replacement");
+        cache.delete("delete");
+        drop(full);
+        assert!(coherence.snapshot("keep").is_none());
+        assert!(coherence.snapshot("delete").is_none());
+        assert_eq!(cache.get("keep").value.unwrap(), b"persisted replacement");
+        assert!(cache.get("delete").value.is_none());
+        // Simulate a full stop: no tracker/cache handles survive removal.
+        drop(cache);
+        drop(coherence);
+        drop(disk);
+        std::fs::remove_dir_all(&domain).unwrap();
+        std::fs::create_dir(&domain).unwrap();
+        let coherence = Arc::new(TrackedCoherence::open(&domain, "after:".into()).unwrap());
+        let memory = Arc::new(MemoryCache::new());
+        let cache =
+            WriteThroughCache::new(memory.clone(), file(&directory), WRITE_THROUGH_UNLIMITED)
+                .with_coherence(coherence.clone());
+        assert_eq!(cache.get("keep").value.unwrap(), b"persisted replacement");
+        let generation = coherence
+            .snapshot("keep")
+            .expect("new domain admits memory again");
+        assert_eq!(
+            memory
+                .get(&coherence.memory_key(generation, "keep"))
+                .value
+                .unwrap(),
+            b"persisted replacement"
+        );
+        assert!(cache.get("delete").value.is_none());
+        drop(cache);
+        drop(coherence);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 }

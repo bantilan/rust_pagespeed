@@ -108,3 +108,11 @@ and resource optimizations remain active, but competing misses can duplicate
 reconstruction. The Rust ResourceDriver API permits a bounded wait for callers
 that can block (default/maximum 250 ms); this is not an NGINX directive. Cache
 lookups and reconstruction themselves remain synchronous on this serving path.
+
+Operational recovery checks are reproducible with
+`tools/verify_beacon_reload.py` (add `--accept-before-reload` for the alternate
+ordering) and the cache test
+`offline_domain_replacement_restores_admission_and_preserves_disk`.
+The beacon harness validates persisted acceptance/replay state across real
+worker generations; the offline test closes all old handles before replacing
+tracker storage and verifies disk state plus restored memory admission.
