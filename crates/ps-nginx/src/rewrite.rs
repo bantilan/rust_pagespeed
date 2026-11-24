@@ -42,6 +42,7 @@ pub fn html_context(
     start_ms: i64,
     fetcher: Arc<dyn AsyncFetcher>,
 ) -> Rc<HtmlServerContext> {
+    HtmlServerContext::prepare_for_requests();
     let mut context =
         HtmlServerContext::new_with_metadata(http_backend, metadata, fetcher, start_ms);
     context.set_statistics(statistics);

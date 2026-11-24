@@ -1,0 +1,22 @@
+{
+  "at": "2026-11-24T10:27:34.222361+08:00",
+  "method": "Own single worker Nginx processes, same Moto HTML; after three consecutive HITs record VmRSS, issue 1000 sequential requests, record VmRSS again. Linux RSS is allocator-dependent; driver lifetime separately covered by regression tests.",
+  "variants": {
+    "before": {
+      "rss_before_kib": 22064,
+      "rss_after_kib": 33732,
+      "rss_growth_kib": 11668,
+      "markers": {
+        "HIT": 1000
+      }
+    },
+    "after": {
+      "rss_before_kib": 22136,
+      "rss_after_kib": 22496,
+      "rss_growth_kib": 360,
+      "markers": {
+        "HIT": 1000
+      }
+    }
+  }
+}

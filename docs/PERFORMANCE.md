@@ -178,3 +178,69 @@ requested immediate HTML fallback policy. A matched C++ binary benchmark has not
 been run, so these results establish the Rust improvement, not a claim of beating
 C++ overall. Cross-worker optimization-job deduplication is also not added: jobs
 deduplicate within each worker pool, while the new LRU coherence spans workers.
+
+
+## Follow-up: worker initialization and resource-servant lifetime
+
+Measured after `c984b33`, with the working-tree changes in `server_context.rs`
+and the Nginx rewrite bridge. These changes are not deployed.
+
+Callgrind identified 9,671,041 instructions in `TokenizerPatterns::new` under
+`ResourceDriver::register_serving_filters` on the first request. Eight tokenizer
+regexes were compiled before the HTML-cache lookup. This is an inclusive call
+count, not an exclusive request-time percentage: the profile also includes
+startup and background optimizers.
+
+The Nginx bridge now prepares the shared tokenizer and capability tables during
+worker initialization. Compilation is moved to startup, not removed; request
+measurements exclude process startup. Built-in resource servants are enabled by
+an inexpensive flag and constructed only when their filter ID is requested.
+They are no longer stored inside the driver: the former driver → servant →
+driver strong-reference cycle retained a driver even on a pure HTML-cache hit.
+Explicit custom servants still take precedence. All seven built-in IDs remain
+available and run their existing implementations.
+
+Matched ordinary release builds used the same Nginx 1.31.8 executable, page
+files, filter configuration, request client, Host and port. Cold values are
+medians of five empty application-cache processes per page and build, alternating
+builds; OS caches were warm. Warm values use 100 requests per phase.
+
+| Page / path | c984b33 | Working tree |
+|---|---:|---:|
+| Moto: Cold HTML | 8.539 ms | 5.471 ms |
+| Moto: Warm HTML HIT | 1.369 ms | 1.357 ms |
+| Moto: Warm HTML MISS | 4.303 ms | 4.354 ms |
+| Aroma: Cold HTML | 10.451 ms | 7.579 ms |
+| Aroma: Warm HTML HIT | 1.432 ms | 1.393 ms |
+| Aroma: Warm HTML MISS | 6.026 ms | 6.242 ms |
+
+Cold delivery improved about 36% for Moto and 27% for Aroma. Warm timings are
+roughly unchanged; MISS values increased slightly in this sample, so this is not
+an established steady-state latency improvement. The warmed HTML SHA-256 values
+match exactly between builds after removing only the cache timestamp comment:
+
+- Moto: `889b7c10af1d2ce7c7c158cfe6700347dc8e5d8169fd0df84ce58ae125386298` (15031 bytes).
+- Aroma: `c691571e4644b28bebd771d586a7625b62b3bdcb8a3848cd87b5216a4847fcf6` (34068 bytes).
+
+A separate own-process test measured Linux VmRSS before and after 1,000 verified
+HTML-cache HITs on Moto:
+
+| Build | RSS growth |
+|---|---:|
+| c984b33 | 11,668 KiB |
+| Working tree | 360 KiB |
+
+RSS is allocator-dependent, but the regression test independently proves that
+registration and lookup of every built-in servant release their driver reference.
+The custom-servant precedence test also passes. All 1,975 tests in
+`cargo test -p ps-html -p ps-nginx` passed, including resource serving, HTML cache,
+async combination failures, image conversion, and RUM coverage. No filters or
+resource processors were disabled. Formatting checks were scoped to the two
+modified Rust files; unrelated files already fail workspace-wide formatting.
+
+Raw measurements: [latency](performance/worker-init-lazy-servants.json) and
+[retention](performance/worker-init-retention.json). The existing
+`tools/profile_html.py` reproduces each phase with isolated configurations;
+change `load_module` to the corresponding release artifact and use a fresh
+`FileCachePath` for cold repetitions. First-load HTML delivery does not include
+completion of background resource optimization.

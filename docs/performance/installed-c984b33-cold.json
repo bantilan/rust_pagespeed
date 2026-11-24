@@ -1,0 +1,87 @@
+{
+  "at": "2026-11-24T10:15:07.165732+08:00",
+  "commit": "c984b33",
+  "method": "Five fresh foreground Nginx processes and empty application caches per page; installed module; curl time_total; OS caches not flushed; same static files and filter configuration as prior diagnostic config",
+  "pages": {
+    "Moto": {
+      "median_ms": 8.175999999999998,
+      "samples": [
+        {
+          "ms": 8.475999999999999,
+          "marker": "BYPASS",
+          "status": 200,
+          "bytes": 14499,
+          "prefix": "/tmp/ps-c984b33-cold-_oddx18s"
+        },
+        {
+          "ms": 8.175999999999998,
+          "marker": "BYPASS",
+          "status": 200,
+          "bytes": 14499,
+          "prefix": "/tmp/ps-c984b33-cold-338teukn"
+        },
+        {
+          "ms": 8.095,
+          "marker": "BYPASS",
+          "status": 200,
+          "bytes": 14499,
+          "prefix": "/tmp/ps-c984b33-cold-mvmatjof"
+        },
+        {
+          "ms": 8.361,
+          "marker": "BYPASS",
+          "status": 200,
+          "bytes": 14499,
+          "prefix": "/tmp/ps-c984b33-cold-upvddwoq"
+        },
+        {
+          "ms": 7.907000000000001,
+          "marker": "BYPASS",
+          "status": 200,
+          "bytes": 14499,
+          "prefix": "/tmp/ps-c984b33-cold-q_yntrk6"
+        }
+      ]
+    },
+    "Aroma": {
+      "median_ms": 11.119,
+      "samples": [
+        {
+          "ms": 11.119,
+          "marker": "BYPASS",
+          "status": 200,
+          "bytes": 33468,
+          "prefix": "/tmp/ps-c984b33-cold-idhlqiv4"
+        },
+        {
+          "ms": 10.821000000000002,
+          "marker": "BYPASS",
+          "status": 200,
+          "bytes": 33468,
+          "prefix": "/tmp/ps-c984b33-cold-ldsezkpx"
+        },
+        {
+          "ms": 12.302999999999999,
+          "marker": "BYPASS",
+          "status": 200,
+          "bytes": 33468,
+          "prefix": "/tmp/ps-c984b33-cold-dpdii29d"
+        },
+        {
+          "ms": 11.223,
+          "marker": "BYPASS",
+          "status": 200,
+          "bytes": 33468,
+          "prefix": "/tmp/ps-c984b33-cold-qj8heb0g"
+        },
+        {
+          "ms": 10.677000000000001,
+          "marker": "BYPASS",
+          "status": 200,
+          "bytes": 33468,
+          "prefix": "/tmp/ps-c984b33-cold-ci8m1fyj"
+        }
+      ]
+    }
+  }
+}

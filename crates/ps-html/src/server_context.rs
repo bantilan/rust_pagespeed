@@ -230,6 +230,14 @@ pub struct ServerContext {
 }
 
 impl ServerContext {
+    /// Compiles immutable capability and tokenizer tables during worker setup.
+    /// HTML requests (including cache hits) must not pay the one-time regex
+    /// compilation cost. These are the same tables used by all optimizers.
+    pub fn prepare_for_requests() {
+        let _ = ps_http::user_agent_matcher::UserAgentMatcher::shared();
+        let _ = ps_js::tokenizer::TokenizerPatterns::shared();
+    }
+
     /// Builds a context over explicit components (tests inject a mock
     /// fetcher, memory cache, and controllable clock).
     #[must_use]
@@ -745,6 +753,7 @@ pub struct ResourceDriver {
     claimants: RefCell<Vec<Rc<dyn Fn(&GoogleUrl) -> bool>>>,
     slots: RefCell<HashMap<(NodeId, usize), Rc<RefCell<HtmlResourceSlot>>>>,
     claimed_elements: RefCell<std::collections::HashSet<NodeId>>,
+    serving_filters_enabled: Cell<bool>,
     filters: RefCell<HashMap<&'static str, Rc<dyn RewriteFilter>>>,
     debug_output_bytes: RefCell<i64>,
     debug_output_truncated: RefCell<bool>,
@@ -858,6 +867,7 @@ impl ResourceDriver {
             claimants: RefCell::new(Vec::new()),
             slots: RefCell::new(HashMap::new()),
             claimed_elements: RefCell::new(std::collections::HashSet::new()),
+            serving_filters_enabled: Cell::new(false),
             filters: RefCell::new(HashMap::new()),
             debug_output_bytes: RefCell::new(0),
             debug_output_truncated: RefCell::new(false),
@@ -1644,31 +1654,38 @@ impl ResourceDriver {
         self.filters.borrow_mut().insert(filter.id(), filter);
     }
 
-    /// Registers every serving filter (`AddFilters` shape):
-    /// `.pagespeed.` fetches decode to a filter id and 404 without
-    /// its servant, so serving drivers register the full set.
-    /// Tests keep bare drivers unless they register explicitly.
+    /// Enables built-in resource servants. Construct them only when a URL
+    /// actually needs one; storing a servant here would retain its driver
+    /// through a strong-reference cycle on every HTML request.
     pub fn register_serving_filters(self: &Rc<Self>) {
-        use super::filters::cache_extender::CacheExtenderFilter;
-        use super::filters::css::CssFilter;
-        use super::filters::css_combine::CssCombineFilter;
-        use super::filters::image_combine::ImageCombineFilter;
-        use super::filters::image_rewrite::ImageRewriteFilter;
-        use super::filters::javascript::JavascriptFilter;
-        use super::filters::js_combine::JsCombineFilter;
-        self.add_filter(Rc::new(CacheExtenderFilter::new(self.clone())));
-        self.add_filter(Rc::new(CssFilter::new(self.clone())));
-        self.add_filter(Rc::new(CssCombineFilter::new(self.clone())));
-        self.add_filter(Rc::new(ImageCombineFilter::new(self.clone())));
-        self.add_filter(Rc::new(ImageRewriteFilter::new(self.clone())));
-        self.add_filter(Rc::new(JavascriptFilter::new(self.clone())));
-        self.add_filter(Rc::new(JsCombineFilter::new(self.clone())));
+        self.serving_filters_enabled.set(true);
     }
 
-    /// Looks up a serving filter (`FindFilter`).
+    /// Looks up an explicitly registered servant, or constructs a built-in
+    /// servant for this operation. Custom registrations take precedence.
     #[must_use]
-    pub fn find_filter(&self, id: &str) -> Option<Rc<dyn RewriteFilter>> {
-        self.filters.borrow().get(id).cloned()
+    pub fn find_filter(self: &Rc<Self>, id: &str) -> Option<Rc<dyn RewriteFilter>> {
+        if let Some(filter) = self.filters.borrow().get(id).cloned() {
+            return Some(filter);
+        }
+        if !self.serving_filters_enabled.get() {
+            return None;
+        }
+        use super::filters::{
+            cache_extender::CacheExtenderFilter, css::CssFilter, css_combine::CssCombineFilter,
+            image_combine::ImageCombineFilter, image_rewrite::ImageRewriteFilter,
+            javascript::JavascriptFilter, js_combine::JsCombineFilter,
+        };
+        Some(match id {
+            "ce" => Rc::new(CacheExtenderFilter::new(self.clone())),
+            "cf" => Rc::new(CssFilter::new(self.clone())),
+            "cc" => Rc::new(CssCombineFilter::new(self.clone())),
+            "is" => Rc::new(ImageCombineFilter::new(self.clone())),
+            "ic" => Rc::new(ImageRewriteFilter::new(self.clone())),
+            "jm" => Rc::new(JavascriptFilter::new(self.clone())),
+            "jc" => Rc::new(JsCombineFilter::new(self.clone())),
+            _ => return None,
+        })
     }
 
     /// Marks an element claimed by its creating filter: C++
@@ -2164,6 +2181,45 @@ mod tests {
             Rc::new(RefCell::new(options)),
             "http://test.com/page.html",
         ))
+    }
+
+    #[test]
+    fn serving_filters_are_lazy_and_do_not_retain_the_driver() {
+        let driver = driver_with(RewriteOptions::new());
+        let weak = Rc::downgrade(&driver);
+        assert!(driver.find_filter("jm").is_none());
+        driver.register_serving_filters();
+        driver.register_serving_filters();
+        assert!(driver.filters.borrow().is_empty());
+        assert_eq!(1, Rc::strong_count(&driver));
+        for id in ["ce", "cf", "cc", "is", "ic", "jm", "jc"] {
+            let filter = driver.find_filter(id).expect("built-in servant");
+            assert_eq!(id, filter.id());
+            drop(filter);
+            assert_eq!(
+                1,
+                Rc::strong_count(&driver),
+                "servant retained driver: {id}"
+            );
+        }
+        assert!(driver.find_filter("unknown").is_none());
+        drop(driver);
+        assert!(weak.upgrade().is_none());
+    }
+
+    #[test]
+    fn custom_servant_overrides_lazy_builtin() {
+        struct Custom;
+        impl super::super::rewrite_filter::RewriteFilter for Custom {
+            fn id(&self) -> &'static str {
+                "jm"
+            }
+        }
+        let driver = driver_with(RewriteOptions::new());
+        let custom: Rc<dyn super::super::rewrite_filter::RewriteFilter> = Rc::new(Custom);
+        driver.add_filter(custom.clone());
+        driver.register_serving_filters();
+        assert!(Rc::ptr_eq(&custom, &driver.find_filter("jm").unwrap()));
     }
 
     #[test]
