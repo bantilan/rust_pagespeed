@@ -1,0 +1,1180 @@
+iteration 1
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test ownership::tests::subprocess_entry ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::subprocess_entry ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+
+running 1 test
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::coherent_subprocess_entry ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test tests::different_tables_get_different_files ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+iteration 2
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::subprocess_entry ... ok
+
+running 1 test
+test tests::coherent_subprocess_entry ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::different_tables_get_different_files ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::second_mapping_shares_values ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+iteration 3
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::coherent_subprocess_entry ... ok
+
+running 1 test
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::different_tables_get_different_files ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::second_mapping_shares_values ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+iteration 4
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+
+running 1 test
+test tests::coherent_subprocess_entry ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test tests::different_tables_get_different_files ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+
+iteration 5
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test ownership::tests::subprocess_entry ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test tests::coherent_subprocess_entry ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+
+running 1 test
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::different_tables_get_different_files ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+iteration 6
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test ownership::tests::subprocess_entry ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::coherent_subprocess_entry ... ok
+
+running 1 test
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test tests::different_tables_get_different_files ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::second_mapping_shares_values ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+
+iteration 7
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::coherent_subprocess_entry ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+
+running 1 test
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::different_tables_get_different_files ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+iteration 8
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::coherent_subprocess_entry ... ok
+
+running 1 test
+test process_identity::tests::current_process_and_reused_pid ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::different_tables_get_different_files ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+
+iteration 9
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test tests::coherent_subprocess_entry ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test tests::different_tables_get_different_files ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+
+running 1 test
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+iteration 10
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::subprocess_entry ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test tests::coherent_subprocess_entry ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+
+running 1 test
+test tests::different_tables_get_different_files ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+iteration 11
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test ownership::tests::subprocess_entry ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::coherent_subprocess_entry ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+
+running 1 test
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test tests::different_tables_get_different_files ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+iteration 12
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::coherent_subprocess_entry ... ok
+
+running 1 test
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::different_tables_get_different_files ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+
+iteration 13
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::subprocess_entry ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::coherent_subprocess_entry ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+
+running 1 test
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::different_tables_get_different_files ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+
+iteration 14
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test tests::coherent_subprocess_entry ... ok
+
+running 1 test
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::different_tables_get_different_files ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+
+iteration 15
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test tests::coherent_subprocess_entry ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+
+running 1 test
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::different_tables_get_different_files ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::second_mapping_shares_values ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+
+iteration 16
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::coherent_subprocess_entry ... ok
+
+running 1 test
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::different_tables_get_different_files ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+iteration 17
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test ownership::tests::subprocess_entry ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test region::tests::subprocess_entry ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::coherent_subprocess_entry ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+running 1 test
+
+test tests::different_tables_get_different_files ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+iteration 18
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test tests::coherent_subprocess_entry ... ok
+
+running 1 test
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::different_tables_get_different_files ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+iteration 19
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test ownership::tests::subprocess_entry ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test tests::coherent_subprocess_entry ... ok
+test tests::different_tables_get_different_files ... ok
+
+running 1 test
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test tests::second_mapping_shares_values ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+iteration 20
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 45 tests
+test byte_cache::tests::dimensions_are_checked_without_resizing_existing_files ... ok
+test byte_cache::tests::exact_keys_empty_values_replace_and_delete ... ok
+test byte_cache::tests::contended_mutations_invalidate_old_values_without_waiting ... ok
+test byte_cache::tests::subprocess_entry ... ok
+test byte_cache::tests::matching_hash_is_not_sufficient_and_bad_lengths_are_bounded ... ok
+test ownership::tests::contention_never_publishes_or_claims ... ok
+test byte_cache::tests::oversized_replacement_cannot_leave_old_value ... ok
+test process_identity::tests::command_parentheses_do_not_shift_starttime ... ok
+test process_identity::tests::uncertain_liveness_never_means_dead ... ok
+test process_identity::tests::current_process_and_reused_pid ... ok
+test region::tests::allocation_is_checked_and_payloads_are_disjoint ... ok
+test ownership::tests::exact_keys_capacity_release_and_fencing ... ok
+test ownership::tests::subprocess_entry ... ok
+test byte_cache::tests::independent_process_and_reopen_share_values ... ok
+test region::tests::atomic_invalidation_is_shared_and_never_wraps ... ok
+test ownership::tests::panic_revokes_other_jobs_without_reusing_tokens ... ok
+test region::tests::another_machine_boot_cannot_reuse_pthread_state ... ok
+test process_identity::tests::reaped_independent_process_is_dead ... ok
+test region::tests::open_permission_failure_propagates ... ok
+test region::tests::invalid_or_partial_header_fails_closed ... ok
+test region::tests::panic_clears_partial_payload_and_releases_lock ... ok
+test region::tests::subprocess_entry ... ok
+test region::tests::separate_mapping_observes_bytes_without_reset_or_resize ... ok
+
+running 1 test
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test byte_cache::tests::killed_writer_recovers_to_miss_and_accepts_new_data ... ok
+test tests::coherent_subprocess_entry ... ok
+test tests::coherent_readers_prevent_creator_drop_reset ... ok
+test tests::coherent_full_stop_resets_with_a_new_namespace ... ok
+test byte_cache::tests::concurrent_payloads_are_never_torn ... ok
+test tests::dynamic_attach_reattaches_and_persists ... ok
+test tests::different_tables_get_different_files ... ok
+test region::tests::killed_holder_is_recovered_without_touching_another_shard ... ok
+test region::tests::threads_serialize_payload_updates ... ok
+test tests::dynamic_rejects_empty_and_overlong ... ok
+test tests::fixed_slots_add_get_set_swap ... ok
+test tests::concurrent_dynamic_attach_shares_one_slot ... ok
+test tests::concurrent_adds_do_not_lose_updates ... ok
+test tests::second_mapping_shares_values ... ok
+test tests::table_hash_is_stable_and_sensitive ... ok
+test byte_cache::tests::lru_replacement_and_churn_keep_fixed_allocation ... ok
+test ownership::tests::independent_owner_deduplicates_and_recovers_after_kill ... ok
+test region::tests::separate_processes_can_initialize_and_attach ... ok
+test tests::legacy_sibling_cleanup_cannot_unlink_live_coherent_tables ... ok
+test byte_cache::tests::independent_processes_never_publish_torn_payloads ... ok
+test tests::surviving_process_keeps_incarnation_after_creator_exits ... ok
+test region::tests::initialization_contention_has_a_deadline ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+

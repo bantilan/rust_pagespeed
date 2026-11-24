@@ -62,6 +62,9 @@ pub mod region;
 #[cfg(target_os = "linux")]
 pub mod process_identity;
 
+#[cfg(target_os = "linux")]
+pub mod ownership;
+
 use fs2::FileExt;
 use std::fs::OpenOptions;
 use std::io;
@@ -700,6 +703,21 @@ mod tests {
 
     #[test]
     fn coherent_full_stop_resets_with_a_new_namespace() {
+        // A concurrent test's fork can temporarily inherit our lifetime fd
+        // until exec. Run this full-stop assertion in its own single-test
+        // process so no other test can fork while the mapping is open.
+        if std::env::var_os("PS_SHM_FULL_STOP_CHILD").is_none() {
+            let status = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "tests::coherent_full_stop_resets_with_a_new_namespace",
+                ])
+                .env("PS_SHM_FULL_STOP_CHILD", "1")
+                .status()
+                .unwrap();
+            assert!(status.success());
+            return;
+        }
         let scratch = Scratch::new();
         let first = coherent(&scratch);
         let before = first.incarnation().unwrap();

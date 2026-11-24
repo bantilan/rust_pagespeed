@@ -101,10 +101,11 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Verify negative entries, expiration, purge, failed writes/admission, concurrent backfill and multi-worker races.
 - [x] Benchmark integration before changing defaults; commit tested integration.
 
-### Phase 4 — Cross-process single flight/crash recovery [IN PROGRESS — identity dependency verified]
+### Phase 4 — Cross-process single flight/crash recovery [IN PROGRESS — ownership primitives verified; integration pending]
 
 - [x] Implement and verify conservative Linux PID/start-time liveness dependency.
-- [ ] Design bounded owner/fencing table keyed by options-aware rewrite identity.
+- [x] Implement bounded exact-key owner/fencing primitive with protected publication and subprocess crash tests.
+- [ ] Specify cache-domain/options job identity and integrate coordinator with optimization publication.
 - [ ] Integrate async resource and combination scheduling without HTML waits.
 - [ ] Recover killed owners, queue rejection, panic, shutdown and PID reuse safely.
 - [ ] Multiprocess duplicate-work and stale-owner tests; commit tested coordination.
@@ -173,9 +174,9 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Next Session Resume Point
 
-**State:** Phases 0–3 implemented and verified (Phase 3 exposes an opt-in assembly API; no production directive/default changed). Latest integration commit is `Integrate coherent L1 shared-memory L2 and persistent L3 caches`; inspect git log for its hash. Earlier commits: `4d23d3e` baseline/plan, `ff67357` regions, `6aaefe3` bytes/adapter, `6213ac2` lifetime diagnosis, `7cf9997` coherent counter protocol.
+**State:** Phases 0–3 implemented and verified (Phase 3 exposes an opt-in assembly API; no production directive/default changed). Latest Phase 3 integration commit is `db778c3`. Phase 4 identity dependency is committed as `b37464b`; owner-table primitive is the following tested milestone (inspect git log for its hash). Runtime integration remains pending. Earlier commits: `4d23d3e` baseline/plan, `ff67357` regions, `6aaefe3` bytes/adapter, `6213ac2` lifetime diagnosis, `7cf9997` coherent counter protocol.
 
-**Exact next action:** inspect status/log and read the Phase 4 identity results at the end. The standalone process-identity dependency is implemented; Phase 4 ownership integration remains pending. Specify and implement a separate bounded owner table with non-reused fencing tokens and atomic publication authorization. Account for whole-shard reset after robust mutex owner death: old jobs must lose publication rights without ever reusing their tokens. Integrate only fire-and-forget HTML optimization closures, with cache-path plus options-aware keys. Keep procfs reads off HTML threads and foreground/IPRO waiters unchanged. Add actual subprocess deduplication, killed-owner, full-table and stale-publication tests.
+**Exact next action:** inspect status/log and current build, then integrate the new `ps_shm::ownership::OwnershipTable` into fire-and-forget HTML optimization worker closures via a safe coordinator abstraction. Read the Phase 4 owner-table results at the end first. Namespace exact job keys by canonical cache-path domain and effective options. Split final metadata publication from fetch/optimization so `try_finish` holds the claim lock through publication. Implement bounded worker-side completion/release retry or deferred cleanup: dropping a token after Busy would strand a live-owner record. Handle unsupported long keys without permanently disabling optimization. Keep procfs reads off HTML threads and preserve foreground/IPRO waiter semantics. Add real multi-worker scheduling/dedup, queue/panic/shutdown and publication regressions before enabling.
 
 **Additional Phase 4 requirement:** legacy-style active-writer counters in the new coherent domain still remain nonzero after an abruptly killed disk writer and safely bypass memory indefinitely. Implement bounded dead-writer recovery or an owner-aware coherence protocol as part of crash recovery. Shared regions' byte-lock recovery alone does not repair those counters.
 
@@ -378,3 +379,25 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - No runtime integration yet, so no new HTML latency result is claimed. Baseline and Phase 3 cache microbenchmark remain the measured performance evidence.
 - Phase 4 remains IN PROGRESS. Owner-table layout, publication fencing, background integration, stranded coherence-writer recovery and subprocess deduplication remain pending; Phases 5–10 unchanged.
 - Milestone commit command: `git add SHARED_MEMORY_IMPLEMENTATION.md crates/ps-shm/src/lib.rs crates/ps-shm/src/process_identity.rs; git add -f docs/performance/shared-memory/phase4-*.log; git commit -m "Add conservative Linux process identity for ownership recovery"`. No push.
+
+## Phase 4 owner-table sub-milestone — design before edits
+
+- Separate fixed owner table: one robust region shard, 1–1024 non-evictable running records, exact keys up to 1024 bytes. Full/oversized/busy outcomes are explicit; integrations must retain valid-original fallback and retry/fallback processing for unsupported keys.
+- Allocate tokens from the region's saturating atomic epoch, outside resettable payload. Whole-shard owner-death/panic clearing revokes old records; later claims cannot reuse their tokens. Exhaustion fails closed. Never hold this lock during fetch/optimization.
+- A `try_finish` closure checks exact token and holds the table lock through final publication, then clears the record. Callers must retry Busy completion/release on workers; there is intentionally no best-effort Drop that could strand a live PID record silently. Integration must implement bounded retry/deferred cleanup before this can ship.
+- Liveness reads occur only during background claims; unknown owners remain protected. Dead unrelated owners are reclaimed only when capacity requires it. Byte-serving pool jobs are not affected.
+
+## Phase 4 owner-table verification progress
+
+- Added `crates/ps-shm/src/ownership.rs`, exported on Linux. One bounded robust shard, 1–1024 slots, 1024-byte exact job keys, explicit Busy/Full/KeyTooLong/Exhausted outcomes. Live/unknown owners are never evicted. Token serial comes from the non-resettable atomic epoch and cannot wrap; tokens also bind device/inode to reject accidental cross-table use.
+- Final publication and token validation occur inside the same guard. No fetching/optimization belongs there. Panic/owner-death clears records but leaves token serial intact, revoking all old claims safely. Caller must explicitly retry contended completion/release; runtime integration is NOT implemented yet.
+- Actual child-process tests verify protected duplicate job, SIGKILL outside/inside robust lock, newer token after recovery and rejection of stale publication. Additional tests cover full admission, long keys, exact identity, two independent handles, wrong mapping, panic revocation, lock contention, publication lock coverage and capacity mismatch.
+- Broader testing exposed a pre-existing full-stop test assumption: concurrent fork/exec can temporarily inherit an open lifetime flock. The full-stop reset test now executes in an isolated single-test child, so it proves a genuine full stop rather than weakening live mapping safety.
+- `cargo test -p ps-shm` to phase4-ownership-tests.log: 45 primary cases passed before final publication-lock test.
+- Python loop of `cargo test -p ps-shm --lib`, 20 iterations to phase4-ownership-stress.log: 900 primary cases passed (plus 20 nested isolated test reports), before final publication-lock test.
+- Final `cargo test -p ps-shm -p ps-cache -p ps-nginx --lib > docs/performance/shared-memory/phase4-ownership-dependent-tests.log 2>&1`: exit 0, 391 primary cases (46 + 66 + 279), plus two nested subprocess harness reports, zero failures.
+- `cargo clippy -p ps-shm --all-targets -- -D warnings > docs/performance/shared-memory/phase4-ownership-clippy.log 2>&1`: exit 0, no lint suppressions.
+- `cargo build -p ps-nginx --release > docs/performance/shared-memory/phase4-ownership-build.log 2>&1`: exit 0, 22.17s optimized build. No deployment or request-level benchmark claim.
+- Remaining Phase 4 requirements: HTML coordinator/publication integration, bounded release/retry/shutdown cleanup, killed coherence-writer counter recovery, end-to-end duplicate work regression. This sub-milestone alone does not enable shared single flight in Nginx.
+
+- Final scoped rustfmt and `git diff --check` pass. Commit: `git add SHARED_MEMORY_IMPLEMENTATION.md crates/ps-shm/src/{lib,ownership}.rs; git add -f docs/performance/shared-memory/phase4-ownership-*.log; git commit -m "Add bounded fenced cross-process ownership primitives"`. No push.
