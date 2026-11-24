@@ -118,12 +118,12 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Preserve per-request sampling/nonces, learned-evidence cache keys and cached-HTML RUM.
 - [x] Multiprocess reports/sampling plus HTML HIT/MISS regressions; commit.
 
-### Phase 6 — NGINX config/defaults/fallback [PENDING]
+### Phase 6 — NGINX config/defaults/fallback [COMPLETED — explicit opt-in]
 
-- [ ] Add enable/size/admission configuration with inheritance and validation.
-- [ ] Handle unsupported platform, permission, exhaustion, incompatible mapping and startup failure gracefully.
-- [ ] Choose/document defaults using measured results, not assumptions.
-- [ ] Config/unit/live isolated tests; commit.
+- [x] Add enable/size/admission configuration with inheritance and validation.
+- [x] Handle unsupported platform, permission, exhaustion, incompatible mapping and startup failure gracefully.
+- [x] Choose/document defaults using measured results, not assumptions.
+- [x] Config/unit/live isolated tests; commit.
 
 ### Phase 7 — Reload/checkpoint/restart recovery [PENDING]
 
@@ -177,7 +177,7 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 **State:** Phases 0–3 implemented and verified (Phase 3 exposes an opt-in assembly API; no production directive/default changed). Latest Phase 3 integration commit is `db778c3`. Phase 4 dependencies: b37464b identity, 6ac47a7 owner table, a707279 leases/revocation. HTML worker integration is the latest tested milestone (inspect git log for its hash). Production directives/defaults remain disabled; coherent cache-writer recovery is pending. Earlier commits: `4d23d3e` baseline/plan, `ff67357` regions, `6aaefe3` bytes/adapter, `6213ac2` lifetime diagnosis, `7cf9997` coherent counter protocol.
 
-**Exact next action:** Phase 4 runtime writer recovery and Phase 5 transactional beacon evidence are implemented and verified; inspect latest commit. Begin Phase 6: wire explicit `CreateSharedMemoryMetadataCache FileCachePath size_kb` configuration through DriverFactory::root_init with dimension checks, startup fallback, and isolated Nginx config/runtime tests. C++ system_caches.cc keys explicit names by FileCachePath. Keep defaults off until final workload benchmark; existing local LRU remains enabled. Require/document a full stop/start for initial migration from legacy coherence (overlapping old binaries are not safe), and test new-protocol graceful reload/layout changes in Phase 7. Then aggregated diagnostics (Phase 8), final stress and matched request/profile benchmarks (9/10).
+**Exact next action:** Phases 4/5 committed cd6c507; Phase 6 explicit configuration is verified (inspect latest commit). Begin Phase 7 with actual isolated Nginx master+two-worker reload overlap tests: hold an active old-worker response, change shared size and SIGHUP, verify old/new workers coexist and new optimized HTML remains valid. Then stop/restart all workers and validate disk recovery/incarnation. Keep initial legacy-to-shared activation full-stop-only as documented. Decide checkpoint scope (disk is already write-through authoritative; never snapshot live pthread state) and document it. Phase 8 aggregated diagnostics and Phase 9/10 full stress/profiling remain pending.
 
 **Phase 4 outcome:** opt-in domains now use robust tracked transactions and recover killed writers. Legacy default coherence remains unchanged until explicit activation. Exceptional tracking-capacity overflow preserves disk mutations and deliberately disables affected memory shards; offline replacement/new tracker domain restores those shards. Surface this in diagnostics and documentation; it is distinct from ordinary killed-owner recovery.
 
@@ -505,3 +505,20 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 - `cargo build -p ps-nginx --release > docs/performance/shared-memory/phase5-resumed-build.log 2>&1`: passes, 0.08s incremental after probe rebuilt release. No deployment or push.
 - `send::tests::html_sink_builds_filters_only_past_lookup` verifies cached HTML retains per-load JS timestamp, instrumentation init and beacon endpoint while HIT builds no filters; critical-images beacon integration and 4-process evidence update tests pass.
 - Shared bytes are still explicitly opt-in API only. Defaults/config activation, old/new binary migration, live Nginx reload tests, admin aggregation, complete final profiling remain incomplete Phases 6–10.
+
+## Phase 6 configuration — design before edits
+
+- Phases 4/5 committed cd6c507. Add process-scope CreateSharedMemoryMetadataCache using explicit FileCachePath name, size in KiB. 0 disables that named cache; accepted enabled range 1MiB–256MiB. Fixed 16 shards, 16KiB combined key/value slots, dimension count chosen so mmap allocation does not exceed requested bytes. Tracking/ownership/transaction overhead is separately bounded and documented.
+- Factory stores requests while parsing; root_init enrolls all contexts before handles escape. Unsupported OS, missing named path, permission/layout/startup errors log a reason and retain the existing disk/L1 backend without per-request retries. Do not enable defaults automatically: local L1 already defaults on, and shared coherence has a measured hot-L1 overhead.
+- Activation from legacy binaries/coherence requires full stop/start; no live deployment modified here. New-protocol reload/layout changes remain Phase 7 tests. Directive semantics compared with original system_caches.cc; explicit cache names match FileCachePath. Rust additionally accepts 0 as explicit disable and bounds allocation range.
+
+## Phase 6 final verification and measured requests
+
+- Added DriverFactory named shared-cache requests, 0=disabled, 1024..262144KiB enabled validation, fixed-slot dimensions bounded by byte budget, startup enrollment of all canonical path contexts, once-at-startup fallback logging. Existing lower-scope ignore behavior preserved. Fixed 16KiB key+value admission; oversized entries retain disk persistence. No automatic shared default.
+- `cargo test -p ps-nginx --lib factory::tests > docs/performance/shared-memory/phase6-config-tests.log 2>&1`: 17 passed. `cargo test -p ps-nginx --lib > docs/performance/shared-memory/phase6-nginx-tests.log 2>&1`: 280 primary passed plus one nested report. Budget tests verify actual RegionLayout bytes <= configured budget at min/default/max; enable/zero-disable/unregistered-path fallback covered. Region permission/layout/corruption tests from earlier phases remain passing.
+- `cargo build -p ps-nginx --release > docs/performance/shared-memory/phase6-build.log 2>&1`: passes, 5.51s optimized. Scoped clippy passes (phase6-clippy.log). Python benchmark syntax verified.
+- `python3 tools/benchmark_shared_memory.py --nginx /home/gamingph/Projects/Rust/.nginx-build/nginx-1.31.8/objs/nginx --module target/release/libps_nginx.so --output docs/performance/shared-memory/phase6-default-requests.json --samples 100 --cold-runs 5` and same with `--shared-kb 16384 --output docs/performance/shared-memory/phase6-shared-requests.json`: both exit 0; stdout phase6-request-benchmarks.log. Fresh isolated processes/caches, OS caches warm; no installed server changes. Shared runs verify all expected mapping files exist, refusing silent fallback. Module SHA identical for both: 24ed32bf5b72f65dcfed977a982cb5e2a6b6f0aa0a3be345fea26a61fa8114b0.
+- Current default (cold / HIT / MISS ms): Moto **4.299 / 0.452 / 1.843**; Aroma **5.709 / 0.512 / 2.627**. Shared16MiB: Moto **4.469 / 0.633 / 1.829**; Aroma **5.645 / 0.488 / 2.668**. No consistent single-worker win, so shared defaults remain off. Each has five cold samples and 100 warm HIT/MISS samples, raw data retained; not a statistical multi-run conclusion. Historical baseline used another runtime state and must not be used to attribute these overall lower medians to shared caching.
+- Output quality: default/shared Moto normalized SHA 889b7c10af1d2ce7c7c158cfe6700347dc8e5d8169fd0df84ce58ae125386298, 15031 bytes, 15 pagespeed refs; Aroma SHA c691571e4644b28bebd771d586a7625b62b3bdcb8a3848cd87b5216a4847fcf6, 34068 bytes, 23 refs. Exact equality, no removed optimizations. Ordinary build lacks pipeline instrumentation, so residual latency is not attributed yet.
+- Benchmark records module/config hashes and now records dirty source state; these runs used uncommitted Phase 6 factory on cd6c507, followed by this milestone commit. Added CONFIGURATION.md and README link covering admission, separate overhead, conservative fallback, C++ naming comparison and mandatory initial full restart.
+- Phase 7–10 remain incomplete. No deployment, push or unrelated changes discarded.

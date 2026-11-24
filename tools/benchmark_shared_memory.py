@@ -18,7 +18,10 @@ parser.add_argument('--output', required=True)
 parser.add_argument('--samples', type=int, default=100)
 parser.add_argument('--cold-runs', type=int, default=5)
 parser.add_argument('--port', type=int, default=18088)
+parser.add_argument('--shared-kb', type=int, default=0, help='Explicit shared cache budget, 0 uses existing default stack')
 args = parser.parse_args()
+if args.shared_kb and not 1024 <= args.shared_kb <= 262144:
+    parser.error('shared-kb must be 0 or 1024..262144')
 if args.samples < 1 or args.cold_runs < 1:
     parser.error('sample and cold-run counts must be positive')
 repo = Path(__file__).resolve().parent.parent
@@ -36,6 +39,9 @@ result = {
     'nginx_version': subprocess.check_output([args.nginx, '-v'], stderr=subprocess.STDOUT, text=True).strip(),
     'template_sha256': hashlib.sha256(template.encode()).hexdigest(),
     'method': 'Fresh isolated application caches/processes; OS caches warm; first full run has HIT/MISS/OFF phases; remaining runs cold-only. Request timings exclude process launch. HTTP client and sampling are tools/profile_html.py.',
+    'shared_kb': args.shared_kb,
+    'working_tree_dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=repo)),
+    'source_diff_sha256': hashlib.sha256(subprocess.check_output(['git', 'diff', '--', 'crates', 'tools'], cwd=repo)).hexdigest(),
     'pages': {},
 }
 for name, page in [('Moto', 'moto-business-html5-responsive-web-template'),
@@ -46,6 +52,8 @@ for name, page in [('Moto', 'moto-business-html5-responsive-web-template'),
         (prefix / 'conf').mkdir()
         (prefix / 'logs').mkdir()
         config = template.replace('@MODULE@', str(module)).replace('@PREFIX@', str(prefix)).replace('@PORT@', str(args.port))
+        if args.shared_kb:
+            config = config.replace(f'pagespeed FileCachePath {prefix}/cache;', f'pagespeed FileCachePath {prefix}/cache;\npagespeed CreateSharedMemoryMetadataCache {prefix}/cache {args.shared_kb};')
         (prefix / 'conf/nginx.conf').write_text(config)
         output = prefix / 'measurements.json'
         body = prefix / 'warm.html'
@@ -55,11 +63,18 @@ for name, page in [('Moto', 'moto-business-html5-responsive-web-template'),
         if run:
             command.append('--cold-only')
         subprocess.run(command, check=True, stdout=subprocess.DEVNULL)
+        if args.shared_kb:
+            domain = prefix / 'cache/.pagespeed-lru/shared-v2'
+            required = ('bytes-v2-*.dat', 'rewrite-owners-v2-256.dat', 'metadata-transactions-v1.dat', 'tracked-writers-v1/writer-slots-v1')
+            missing = [pattern for pattern in required if not list(domain.glob('*/' + pattern))]
+            if missing:
+                raise RuntimeError(f'shared-cache activation incomplete: {missing}; inspect {prefix}')
         data = json.loads(output.read_text())
         if not instrumented:
             # Uninstrumented zero counters mean unavailable, not zero fetches.
             data['resource_fetches'] = None
         data['prefix'] = str(prefix)
+        data['config_sha256'] = hashlib.sha256(config.encode()).hexdigest()
         if body.exists():
             normalized = re.sub(rb'<!-- PageSpeed Cache:.*?-->', b'', body.read_bytes())
             data['normalized_html_sha256'] = hashlib.sha256(normalized).hexdigest()

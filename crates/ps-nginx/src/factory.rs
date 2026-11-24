@@ -130,6 +130,8 @@ pub struct DriverFactory {
     pub fetchers: HashMap<String, NativeFetcher>,
     /// Cache system (paths registered at init).
     pub caches: SystemCaches,
+    /// Explicit shared cache requests, keyed by FileCachePath; zero disables.
+    pub shared_memory_caches: HashMap<String, u64>,
     /// Worker statistics registry (cross-process shared counters
     /// once `init_module` swaps in the mapped table; the null
     /// registry built here only serves pre-config callers).
@@ -198,6 +200,7 @@ impl DriverFactory {
             background_pool: None,
             fetchers: HashMap::new(),
             caches: SystemCaches::new(),
+            shared_memory_caches: HashMap::new(),
             statistics: Arc::new(ps_stats::core::Statistics::new()),
             stats_log: None,
             message_buffer: Arc::new(Mutex::new(ps_admin::log_buffer::LogBuffer::disabled())),
@@ -218,6 +221,18 @@ impl DriverFactory {
                 options.unplugged(),
                 now_ms,
             ));
+        }
+        for (path, kb) in &self.shared_memory_caches {
+            if *kb == 0 {
+                continue;
+            }
+            #[cfg(target_os = "linux")]
+            match shared_cache_dimensions(*kb).and_then(|dimensions| self.caches.enable_shared_memory(path, dimensions)) {
+                Ok(()) => messages.push(format!("Shared cache enabled for {path}: budget {kb} KiB; initial activation requires a full restart.")),
+                Err(error) => messages.push(format!("Shared cache unavailable for {path}: {error}; using existing disk/L1 caches.")),
+            }
+            #[cfg(not(target_os = "linux"))]
+            messages.push(format!("Shared cache unavailable for {path}: unsupported platform; using existing disk/L1 caches."));
         }
         messages.extend(self.caches.root_init_messages());
         messages
@@ -661,9 +676,8 @@ pub fn apply_factory_directive_1(
 
 /// Applies a two-arg system factory directive
 /// (`SystemRewriteDriverFactory::ParseAndSetOption2`: only
-/// `CreateSharedMemoryMetadataCache`). Shared memory is
-/// unsupported, so configured caches fail closed after the
-/// verbatim size parse.
+/// `CreateSharedMemoryMetadataCache`). Allocation happens during root init;
+/// startup failure retains the existing disk/L1 cache stack.
 pub fn apply_factory_directive_2(
     factory: &mut DriverFactory,
     directive: &str,
@@ -674,20 +688,46 @@ pub fn apply_factory_directive_2(
     if !directive.eq_ignore_ascii_case("CreateSharedMemoryMetadataCache") {
         return FactoryDirectiveOutcome::NotFactory;
     }
-    let _ = (factory, arg1);
     if scope < Scope::LegacyProcess {
         return FactoryDirectiveOutcome::WarnIgnored(format!(
             "'{directive}' is global and is ignored at this scope"
         ));
     }
-    match parse_int64(arg2) {
-        Some(kb) if kb >= 0 => FactoryDirectiveOutcome::Invalid(
-            "shared-memory metadata cache needs server integration".to_string(),
-        ),
-        _ => FactoryDirectiveOutcome::Invalid(
-            "size_kb must be a positive 64-bit integer".to_string(),
-        ),
+    let Some(kb) = parse_int64(arg2).filter(|kb| *kb >= 0) else {
+        return FactoryDirectiveOutcome::Invalid(
+            "size_kb must be a positive 64-bit integer".into(),
+        );
+    };
+    if arg1.is_empty() {
+        return FactoryDirectiveOutcome::Invalid("cache name must be a FileCachePath".into());
     }
+    if kb != 0 && !(1024..=262_144).contains(&kb) {
+        return FactoryDirectiveOutcome::Invalid(
+            "shared cache size_kb must be 0 (disabled) or 1024..262144".into(),
+        );
+    }
+    if factory.shared_memory_caches.contains_key(arg1) {
+        return FactoryDirectiveOutcome::Invalid(format!("Cache named {arg1} already exists."));
+    }
+    factory
+        .shared_memory_caches
+        .insert(arg1.to_string(), kb as u64);
+    FactoryDirectiveOutcome::Ok
+}
+
+#[cfg(target_os = "linux")]
+fn shared_cache_dimensions(kb: u64) -> Result<ps_shm::byte_cache::ByteCacheOptions, String> {
+    let bytes = kb.checked_mul(1024).ok_or("shared cache size overflow")?;
+    if !(1024..=262_144).contains(&kb) {
+        return Err("invalid shared cache budget".into());
+    }
+    // Account for region header, shard mutex/header, alignment, slot header.
+    let entries = ((bytes - 128) / 16 - 192) / (16_384 + 32);
+    Ok(ps_shm::byte_cache::ByteCacheOptions {
+        shards: 16,
+        entries_per_shard: (entries as usize).min(1024),
+        bytes_per_entry: 16_384,
+    })
 }
 
 /// Post-configuration validation per server context
@@ -1061,9 +1101,9 @@ mod tests {
             NotFactory,
             apply_factory_directive_1(&mut factory, "RewriteLevel", "x", Scope::ProcessStrict)
         );
-        // Shared-memory metadata caches fail closed after parsing.
+        // Shared-memory metadata caches are allocated at root init.
         assert_eq!(
-            Invalid("shared-memory metadata cache needs server integration".to_string()),
+            Ok,
             apply_factory_directive_2(
                 &mut factory,
                 "CreateSharedMemoryMetadataCache",
@@ -1105,6 +1145,83 @@ mod tests {
                 Scope::Server
             )
         );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn shared_cache_configuration_budget_disable_and_fallback() {
+        for kb in [1024, 16_384, 262_144] {
+            let options = shared_cache_dimensions(kb).unwrap();
+            let payload = 64 + options.entries_per_shard * (32 + options.bytes_per_entry);
+            let layout = ps_shm::region::RegionLayout::new(options.shards, payload).unwrap();
+            assert!(layout.mapped_bytes() as u64 <= kb * 1024);
+        }
+        let mut factory = DriverFactory::new("", -1);
+        let directory = std::env::temp_dir().join(format!("ps-directive-{}", std::process::id()));
+        let mut options = NgxOptions::new();
+        options.system.file_cache_path = directory.to_string_lossy().into_owned();
+        assert_eq!(
+            apply_factory_directive_2(
+                &mut factory,
+                "CreateSharedMemoryMetadataCache",
+                &options.system.file_cache_path,
+                "1024",
+                Scope::ProcessStrict
+            ),
+            FactoryDirectiveOutcome::Ok
+        );
+        let messages = factory.root_init(&[&options]);
+        assert!(
+            messages
+                .iter()
+                .any(|message| message.contains("Shared cache enabled")),
+            "{messages:?}"
+        );
+        assert!(factory
+            .caches
+            .setup_caches(&options)
+            .unwrap()
+            .http_backend
+            .name()
+            .contains("SharedMemoryCache"));
+        let mut disabled = DriverFactory::new("", -1);
+        assert_eq!(
+            apply_factory_directive_2(
+                &mut disabled,
+                "CreateSharedMemoryMetadataCache",
+                &options.system.file_cache_path,
+                "0",
+                Scope::ProcessStrict
+            ),
+            FactoryDirectiveOutcome::Ok
+        );
+        disabled.root_init(&[&options]);
+        assert!(!disabled
+            .caches
+            .setup_caches(&options)
+            .unwrap()
+            .http_backend
+            .name()
+            .contains("SharedMemoryCache"));
+        let mut failed = DriverFactory::new("", -1);
+        assert_eq!(
+            apply_factory_directive_2(
+                &mut failed,
+                "CreateSharedMemoryMetadataCache",
+                "/unregistered",
+                "1024",
+                Scope::ProcessStrict
+            ),
+            FactoryDirectiveOutcome::Ok
+        );
+        let messages = failed.root_init(&[&options]);
+        assert!(messages
+            .iter()
+            .any(|message| message.contains("using existing disk/L1")));
+        drop(factory);
+        drop(disabled);
+        drop(failed);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
