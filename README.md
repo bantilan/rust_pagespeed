@@ -9,31 +9,66 @@ with the C++ original.
 ## Status: serving production traffic
 
 The module is installed and serving rewritten traffic (HTML, WebP/AVIF images,
-proxy mode). The full workspace suite (97 suites) and live compatibility
-checks against the C++ module pass. It is still maturing: keep backups of
+proxy mode). The latest recorded full workspace run passed 2,920 primary tests across
+99 result groups, including C++ compatibility coverage (see the
+[verification record](SHARED_MEMORY_IMPLEMENTATION.md)). It is still maturing: keep backups of
 your C++ configuration when switching over.
 
 ## Performance
 
-Linux shared caching is available through explicit `CreateSharedMemoryMetadataCache FileCachePath size_kb` configuration. See [configuration, migration, and measured tradeoffs](docs/performance/shared-memory/CONFIGURATION.md). Initial activation from legacy workers requires a full stop/start; the shared tier is not enabled automatically. See the [measured latency results and profiling limits](docs/performance/shared-memory/RESULTS.md).
+Latest measured build: **`ef9aeb5`**, tested on 2026-11-24 with the default
+cache configuration and an ordinary release module against NGINX 1.31.8.
 
-Measured on localhost (`curl %{time_total}`), Moto/Aroma template pages,
-same filter config throughout. Full methodology and raw samples:
-[`../benchmark.md`](../benchmark.md).
+| Page | First HTML delivery | Warm HTML cache HIT | Warm metadata, HTML cache MISS |
+|---|---:|---:|---:|
+| Moto | **3.64 ms** | **0.46 ms** | **1.86 ms** |
+| Aroma | **4.93 ms** | **0.49 ms** | **2.70 ms** |
 
-| Test case | C++ 1.15 (cold) | Rust before (`f03a58a`) | Rust now (`9063416`) |
-|---|---|---|---|
-| Moto first load | 2 ms | 86 ms | 6 ms |
-| Moto repeat (HTML hit) | 3 ms | 7 ms | 2 ms |
-| Aroma first load | 4 ms | 154 ms | 8 ms |
-| Aroma repeat (HTML hit) | 3 ms | 7 ms | 2 ms |
+First-delivery values are medians of five requests with fresh processes and
+empty application caches. Each warm value pools 500 requests across five runs;
+all HIT samples were confirmed HTML cache hits. Tests used an isolated local
+NGINX worker and a Python HTTP client; OS filesystem caches were not flushed.
+These measurements exclude process startup and do not measure completion of
+background resource optimization.
 
-Rewriting verified intact on warmed pages (26/32 `pagespeed` URLs, matching
-the C++ 25–32 range): the speedup comes from deferred work, not disabled
-filters. Component-level before/after numbers (filter init 1937→136µs,
-signature 1220→59ns, 50-page cold pass with 20ms origins 515→3ms) live in
-[`docs/ASYNC_REWRITING.md`](docs/ASYNC_REWRITING.md) and the
-`timing_breakdown` / `async_workload` examples.
+HTML rewriting uses cached resource metadata. Missing metadata schedules
+background optimization and returns the original URL; later requests use the
+optimized URL. Warmed HTML retained the same normalized output across every
+run and both cache modes, including 15 optimized resource references on Moto
+and 23 on Aroma.
+
+The [current benchmark report](docs/performance/shared-memory/ef9aeb5-comparison.md)
+contains raw-data links, exact commands, the historical comparison table, and
+results with shared caching enabled. Older measurements used different clients
+and NGINX builds, so they do not establish a controlled speedup ratio. The
+[profiling checkpoint](docs/performance/shared-memory/RESULTS.md) records stage
+costs and remaining attribution limits, including the unresolved historical
+production latency.
+
+### Shared caching
+
+Linux supports an optional bounded shared-memory metadata tier between the
+local LRU and persistent disk cache:
+
+```nginx
+# Inside http {}; use the same FileCachePath for both directives.
+pagespeed FileCachePath /var/cache/pagespeed;
+pagespeed CreateSharedMemoryMetadataCache /var/cache/pagespeed 16384;
+```
+
+The example allocates a 16 MiB byte-cache budget; bounded coordination mappings
+are additional. Shared caching remains **opt-in**: the latest single-worker
+run measured Moto/Aroma HTML hits at 0.47/0.50 ms, with no consistent advantage
+over the default stack. Its cross-worker reuse and coordination should be
+evaluated under the intended workload.
+
+Initial activation over legacy workers requires a **full stop/start**.
+Subsequent same-protocol graceful reloads are tested. See
+[configuration, recovery, and admin diagnostics](docs/performance/shared-memory/CONFIGURATION.md)
+for deployment details.
+
+Earlier component benchmarks and asynchronous-workload examples are documented
+in [the async rewriting guide](docs/ASYNC_REWRITING.md).
 
 ## Features vs C++ PageSpeed
 
@@ -149,7 +184,9 @@ this repo in `../rust_pagespeed_compiler/build_from_source_to_deb.sh`.
 - [`docs/AUDIT.md`](docs/AUDIT.md) — inventory of the C++ originals
 - [`docs/MAPPING.md`](docs/MAPPING.md) — which C++ owner feeds which crate
 - [`docs/PLAN.md`](docs/PLAN.md) — build order
-- [`../benchmark.md`](../benchmark.md) — production latency table vs C++
+- [`docs/performance/shared-memory/ef9aeb5-comparison.md`](docs/performance/shared-memory/ef9aeb5-comparison.md) — latest benchmark, raw results, and historical comparison
+- [`docs/performance/shared-memory/CONFIGURATION.md`](docs/performance/shared-memory/CONFIGURATION.md) — shared-cache configuration, lifecycle, and admin metrics
+- [`../benchmark.md`](../benchmark.md) — historical localhost latency comparisons
 
 ## Original sources are preserved
 
