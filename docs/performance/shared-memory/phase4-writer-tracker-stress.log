@@ -1,0 +1,280 @@
+iteration 1
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.01s
+
+iteration 2
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.02s
+
+iteration 3
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.01s
+
+iteration 4
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.02s
+
+iteration 5
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.02s
+
+iteration 6
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.02s
+
+iteration 7
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.01s
+
+iteration 8
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.02s
+
+iteration 9
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.01s
+
+iteration 10
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.01s
+
+iteration 11
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.02s
+
+iteration 12
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.01s
+
+iteration 13
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.01s
+
+iteration 14
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.01s
+
+iteration 15
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.03s
+
+iteration 16
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.02s
+
+iteration 17
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.02s
+
+iteration 18
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.01s
+
+iteration 19
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.01s
+
+iteration 20
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/build/ps-shm/9c7ff1344c7c4c0b/out/ps_shm-9c7ff1344c7c4c0b)
+
+running 6 tests
+test write_tracker::tests::dead_thread_recovery_preserves_a_live_overlapping_writer ... ok
+test write_tracker::tests::overlapping_writes_keep_memory_unavailable_until_last_completion ... ok
+test write_tracker::tests::bounded_capacity_and_panic_cleanup ... ok
+test write_tracker::tests::subprocess_entry ... ok
+test write_tracker::tests::slot_reuse_repairs_other_shards_and_exhaustion_never_wraps ... ok
+test write_tracker::tests::killed_writers_recover_at_each_publication_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.02s
+

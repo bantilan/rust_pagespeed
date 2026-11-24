@@ -285,6 +285,19 @@ impl SharedRegion {
         Ok(())
     }
 
+    // Dedicated tracking regions interpret the reserved word as an active-slot
+    // bitmap, never as a byte-cache epoch. No non-atomic access is permitted.
+    pub(crate) fn set_tracking_bit(&self, shard: usize, bit: u64) -> io::Result<()> {
+        self.epoch_cell(shard)?
+            .fetch_or(bit, std::sync::atomic::Ordering::SeqCst);
+        Ok(())
+    }
+    pub(crate) fn clear_tracking_bit(&self, shard: usize, bit: u64) -> io::Result<()> {
+        self.epoch_cell(shard)?
+            .fetch_and(!bit, std::sync::atomic::Ordering::SeqCst);
+        Ok(())
+    }
+
     /// Attempts once, without waiting: `None` means another holder is active.
     /// After owner death the payload is cleared before access is granted. A
     /// corrupt/unrecoverable mutex returns an error for higher-layer fallback.

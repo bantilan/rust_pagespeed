@@ -65,6 +65,9 @@ pub mod process_identity;
 #[cfg(target_os = "linux")]
 pub mod ownership;
 
+#[cfg(target_os = "linux")]
+pub mod write_tracker;
+
 use fs2::FileExt;
 use std::fs::OpenOptions;
 use std::io;
