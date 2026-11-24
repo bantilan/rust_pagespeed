@@ -719,3 +719,13 @@ User requested an implementation improvement after installed latency review. Sou
 - git diff --check passed; no push/deployment, no full workspace rerun beyond full affected NGINX crate suite. Phase10 and historical tail attribution remain open. Exact resume point updated.
 
 - Additional HIT-only paired follow-up: tools/compare_html_hit_modules.py starts simultaneous private instances at127.0.0.2/127.0.0.3 on the same18093 port/virtualhost.500 alternating request pairs/page, allHIT and identical output: Moto old1.366/new1.395ms (paired delta+0.027ms), Aroma old1.433/new1.416ms (delta-0.014ms). Mixed result; no net consistent speedup claim. Initial different-port fixture failed exact output hashes (CSS origin-dependent hashes); corrected same-port binding, no masked content differences. Raw paired JSON/log saved. Syntax/diff checks passed. This is a setup-allocation optimization candidate, not a validated production-tail fix.
+
+## Requested latency retest — in progress
+
+HEAD9929fc2, clean tree initially. Installed on-disk module now03b71dcaff4a3bc4125688dc45e397bd376a6159e62cacf0be2cdf09e68c7987; stagedd812d... remains unchanged. Saved old/new module hashes verified. First checks overlapped; outputs preserved under exploratory-* and excluded from comparison. Clean run now executes three500-pair/page isolated comparisons, then installed100-sample phases sequentially (html-hit-retest-clean.log). Inspect completion/pass flags before reporting; no code/deployment changes.
+
+## Requested latency retest — completed
+
+- Clean sequential three×500paired requests/page: Moto before1.409/after1.384ms (median paired delta-0.022ms); Aroma1.401/1.408ms (delta+0.004ms). AllHIT/equal output; mixed result, no broad latency-gain claim. Initial overlapping measurements are explicitly excluded exploratory artifacts.
+- Installed100normal samples/page allHIT and200: Moto1.506ms, Aroma1.596ms, Aerosky1.588ms. MISS4.526/6.335/4.896ms;OFF0.666/0.692/0.690ms;keepalive1.108/1.301/1.137ms. Installed on-disk hash03b71d... differs from staged and previous installedfile. OFF baseline also slower than prior run; no causal source/regression claim. Data/report in LATENCY_RETEST.md and raw JSON/logs.
+- No code/source/deployment changes. Benchmark assertions, sample/status/marker checks and git diff --check passed. Resume pending stage attribution/direct resource counting, not more unpaired timing claims.
