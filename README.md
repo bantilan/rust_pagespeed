@@ -15,7 +15,7 @@ your C++ configuration when switching over.
 
 ## Performance
 
-Linux shared caching is available through explicit `CreateSharedMemoryMetadataCache FileCachePath size_kb` configuration. See [configuration, migration, and measured tradeoffs](docs/performance/shared-memory/CONFIGURATION.md). Initial activation from legacy workers requires a full stop/start; the shared tier is not enabled automatically.
+Linux shared caching is available through explicit `CreateSharedMemoryMetadataCache FileCachePath size_kb` configuration. See [configuration, migration, and measured tradeoffs](docs/performance/shared-memory/CONFIGURATION.md). Initial activation from legacy workers requires a full stop/start; the shared tier is not enabled automatically. See the [measured latency results and profiling limits](docs/performance/shared-memory/RESULTS.md).
 
 Measured on localhost (`curl %{time_total}`), Moto/Aroma template pages,
 same filter config throughout. Full methodology and raw samples:

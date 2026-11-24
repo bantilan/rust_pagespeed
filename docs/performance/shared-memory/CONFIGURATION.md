@@ -19,15 +19,15 @@ The byte mapping fits within this budget using 16 shards and fixed slots with a
 allocator trades internal slack for predictable allocation; it does not remove
 resource optimization, image conversions, HTML caching or RUM. Each cache domain
 also allocates bounded ownership, writer-tracking, transaction and counter
-mappings (outside the byte budget). Exact totals/aggregation diagnostics remain
-Phase 8 work; this is not a claim that total process RSS equals the byte budget.
+mappings (outside the byte budget). Mapping totals and cross-worker diagnostics are exposed by the admin gauges
+described below; total process RSS is not equal to the byte budget.
 
 Initial migration from a binary/coherence stack predating this protocol requires
 a **full stop/start**, with every writer to the same disk path enrolled. Do not
 activate it by graceful reload over legacy workers. Mixed protocol writers can
 invalidate each other's assumptions. Subsequent same-protocol reloads and size
-changes must retain the same boot-qualified domain; Phase 7 live overlap tests
-are still pending. Do not remove/truncate live mappings.
+changes retain the same boot-qualified domain; live overlap tests are described
+below. Do not remove/truncate live mappings.
 
 Startup mapping errors retain the disk/LRU stack and log the reason once during
 configuration initialization. Unsupported platforms also retain that stack.
@@ -94,3 +94,9 @@ statistics does not reset their source: the next admin sample restores cumulativ
 values. Mapping gauges separately report byte storage, metrics, owner slots,
 writer tracking, transaction locks and coherent-lifetime counters. All these
 allocations are bounded, including when cache admission or ownership is busy.
+
+Final ordinary cold/HIT/MISS measurements and profiling limits are documented in
+[the performance checkpoint](RESULTS.md). The final single-worker comparison
+shows no consistent shared-cache latency advantage, so the shared tier remains
+opt-in. A two-worker concurrent workload showed a lower shared-cache median,
+but one workload/order does not establish a general throughput improvement.

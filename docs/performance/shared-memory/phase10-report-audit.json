@@ -1,0 +1,63 @@
+{
+  "verified_at": "2026-11-24T07:34:47.887425+00:00",
+  "source_checkpoint": "db45d13",
+  "method": "Pool raw request total_ms samples; median before rounding; no new benchmark execution",
+  "rows": [
+    {
+      "mode": "default",
+      "page": "Moto",
+      "sample_counts": {
+        "cold": 15,
+        "hit": 300,
+        "miss": 300
+      },
+      "median_ms": {
+        "cold": 4.159252,
+        "hit": 0.4883125,
+        "miss": 1.8252575
+      }
+    },
+    {
+      "mode": "default",
+      "page": "Aroma",
+      "sample_counts": {
+        "cold": 15,
+        "hit": 300,
+        "miss": 300
+      },
+      "median_ms": {
+        "cold": 5.472443,
+        "hit": 0.4828175,
+        "miss": 2.6553555
+      }
+    },
+    {
+      "mode": "shared",
+      "page": "Moto",
+      "sample_counts": {
+        "cold": 15,
+        "hit": 300,
+        "miss": 300
+      },
+      "median_ms": {
+        "cold": 4.36302,
+        "hit": 0.47198700000000005,
+        "miss": 1.8913605
+      }
+    },
+    {
+      "mode": "shared",
+      "page": "Aroma",
+      "sample_counts": {
+        "cold": 15,
+        "hit": 300,
+        "miss": 300
+      },
+      "median_ms": {
+        "cold": 5.704893,
+        "hit": 0.50032,
+        "miss": 2.680813
+      }
+    }
+  ]
+}

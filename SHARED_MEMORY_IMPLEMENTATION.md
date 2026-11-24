@@ -150,7 +150,7 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Repeat matched baseline cold/MISS/HIT benchmarks, including multi-worker/concurrent requests.
 - [ ] Attribute cache operations, initialization, parsing, resource processing, integration residual and total request time.
 - [ ] Assess contention, memory use and redundant-work reduction; optimize only measured bottlenecks.
-- [ ] Update README/config/admin documentation and report measured tradeoffs.
+- [x] Update README/config/admin documentation and report measured tradeoffs.
 - [ ] Final tests/build, clean staged milestone commits, no push, final resume/completion state.
 
 ## Modified files and commits
@@ -175,9 +175,9 @@ Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Next Session Resume Point
 
-**State at user-requested wrap-up:** Phases 0–9 implemented and verified. Phase 10 is IN PROGRESS: final ordinary benchmarks, two-worker concurrency benchmark, stage timing, strace and Callgrind are saved. No partial Rust changes. Latest prior milestone is `f4f8b6a`; the next local commit contains this checkpoint and profiling artifacts (inspect `git log -3 --oneline`). No push or live deployment performed.
+**State after report-audit milestone:** Phases 0–9 implemented and verified. Phase 10 is IN PROGRESS: final ordinary benchmarks, two-worker concurrency benchmark, stage timing, strace and Callgrind are saved. No partial Rust changes. Benchmarks/profiling checkpoint is `db45d13`; the subsequent report-audit commit corrects stale documentation and independently recomputes the final table (inspect `git log -3 --oneline`). No push or live deployment performed.
 
-**Exact next action:** Read this file, inspect git status/recent commits, and verify build state. Review `docs/performance/shared-memory/RESULTS.md` against raw phase10 JSON artifacts; finish Phase 10 documentation/acceptance checklist. Do not repeat completed benchmarks without a reason. Production URL timed out: historical ~13 ms is NOT attributed or resolved. Obtain working production profiling access if needed; isolate Nginx integration overhead separately before making a production attribution claim. Final report/doc review remains pending. Do not mark Phase 10 complete merely because measurements exist.
+**Exact next action:** Read this file, inspect git status/recent commits, and verify build state. Final latency table has been independently recomputed (phase10-report-audit.json); README/config documentation is reconciled. Next review the remaining Phase 10 contention/memory/redundant-work acceptance evidence; avoid assuming a single concurrency result proves general improvement. Do not repeat completed benchmarks without a reason. Production URL timed out: historical ~13 ms is NOT attributed or resolved. Obtain working production profiling access if needed; isolate Nginx integration overhead separately before making a production attribution claim. Final report/doc review remains pending. Do not mark Phase 10 complete merely because measurements exist.
 
 **Verified build/test state:** final `cargo test --workspace` completed with 99 result groups, 2,922 reported passes (2,920 primary plus two nested subprocess reports), zero failures. Final `cargo build -p ps-nginx --release` passed and restored ordinary, non-pipeline-profile target module. Logs: phase10-final-workspace-tests.log and phase10-final-release-build.log. No commands intentionally left running.
 
@@ -591,3 +591,11 @@ git diff --check
 ```
 
 Final tests/build passed; Python syntax and diff checks verified at checkpoint. No implementation change was made during wrap-up. Historical baseline is retained, with no claim that runtime differences isolate an individual phase's effect.
+
+## Report-audit milestone (usage-bounded continuation)
+
+- Clean tree and recent commits inspected before work; no Rust implementation changes.
+- `cargo check -p ps-nginx --release`: exit 0, 7.85 seconds. Previous full workspace/release results remain in phase10-final logs; no unnecessary full rerun for documentation-only changes.
+- Independently recomputed every final default/shared latency-table row from the raw request samples using Python json/statistics: all four rows agree; 15 cold / 300 HIT / 300 MISS samples each. Saved exact medians/sample counts in phase10-report-audit.json.
+- Corrected CONFIGURATION.md's stale pending Phase 7/8 statements, linked final results from README, and documented why shared caching remains opt-in. Admin behavior text already matches the implemented shared gauges.
+- `git diff --check`: passed. No deployment, push, new production profiling, or claimed resolution of historical 13 ms. Phase 10 remains IN PROGRESS; continue from Next Session Resume Point.

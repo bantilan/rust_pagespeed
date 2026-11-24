@@ -13,7 +13,7 @@ Median milliseconds, pooled across three alternating default/shared pairs, 300 H
 | Aroma | Default | 5.472 | 0.483 | 2.655 |
 | Aroma | Shared | 5.705 | 0.500 | 2.681 |
 
-No consistent single-worker advantage: shared cache remains opt-in. Raw data: phase10-default-1/2/3.json and phase10-shared-1/2/3.json. Historical baseline at d0f055c was Moto 6.185/1.322/4.768 ms and Aroma 10.026/1.463/7.293 ms (cold/HIT/MISS); runtime/load differed, so decreases cannot be assigned to one implementation phase. Earlier primitive-only phases did not expose an enabled production request path; no invented per-phase request timings are supplied.
+No consistent single-worker advantage: shared cache remains opt-in. Raw data: phase10-default-1/2/3.json and phase10-shared-1/2/3.json. Independent recomputation from these samples is saved in phase10-report-audit.json (15 cold and 300 samples per warm phase per row). Historical baseline at d0f055c was Moto 6.185/1.322/4.768 ms and Aroma 10.026/1.463/7.293 ms (cold/HIT/MISS); runtime/load differed, so decreases cannot be assigned to one implementation phase. Earlier primitive-only phases did not expose an enabled production request path; no invented per-phase request timings are supplied.
 
 Two workers, eight clients, 400 Moto HIT requests per mode: shared median 1.676 ms, default 1.987 ms. This is one workload/order (shared followed by full-stop default), not a general throughput conclusion. See phase10-concurrency.json.
 
