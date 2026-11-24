@@ -153,33 +153,47 @@ Add bounded, cross-process shared resource/metadata caching and optimization coo
 - [x] Update README/config/admin documentation and report measured tradeoffs.
 - [ ] Final tests/build, clean staged milestone commits, no push, final resume/completion state.
 
-## Modified files and commits
+## Current milestone index
 
-- `SHARED_MEMORY_IMPLEMENTATION.md`: this ledger (new).
-- No task commits yet. Do not include unrelated future user changes in milestone commits.
+Historical chronological entries below retain their original status and test
+results. They must not override the phase checklist or current resume point.
 
-## Exact commands / latest results
+| Commit | Tested milestone |
+|---|---|
+| `ef9aeb5` | Audit fixes F1–F7, additional regressions/lifecycle coverage |
+| `b989f48` | Current-build default/shared cold/HIT/MISS benchmarks |
+| `83c0a82` | Remove NGINX resource coordination polling; 124 image + 12 terminal tests and release build |
+| `5d434c9` | Explicit beacon reload and offline domain recovery; 74 cache tests |
+| `f5e21a3` | Worker scaling/cache pressure matrix and bounded-queue probe |
 
-Run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
+See [current audit disposition](SHARED_MEMORY_AUDIT.md#current-status--supersedes-the-historical-assessment-below)
+and [remaining work](docs/performance/shared-memory/REMAINING_WORK.md).
+No remote pushes or live deployment changes were performed by these milestones.
 
-- `git status --short`: clean at task start.
-- `git log -5 --oneline`: HEAD `d0f055c`, parents `9063416`, `c984b33`, `2bcaea5`, `cef5556`.
-- `cat crates/ps-shm/Cargo.toml; head -95 crates/ps-shm/src/lib.rs`: existing dependencies `memmap2`, `fs2`; mmap counter protocol audited at high level, full cache audit pending.
-- Build/test/baseline commands: not yet run for this task. Prior session results are not accepted as current verification.
+## Latest verification and historical baseline
 
-## Known issues / blocked tasks
+Commands run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
-- No blockers established. Baseline tooling must use matching Nginx/module ABI: repository defaults target staged Nginx 1.31.8, while the installed service previously used 1.31.10.
-- Permission to change live deployment is not required for isolated tests; do not reload or purge the live service just to establish a baseline.
-- Do not claim shared storage alone solves beacon races, single flight, or L1 coherence.
+- Latest ordinary release build: `cargo build -p ps-nginx --release`, passed in 22.01 s; matrix-build.log. Latest benchmark runtime code remains `83c0a82` (later additions are tests/examples/docs).
+- Latest scoped regression: 74 cache tests passed (recovery-cache-suite.log); earlier resource-wait milestone passed 124 image and 12 terminal tests.
+- Latest performance milestone: 24 worker/cache-pressure runs and seven queue probes passed; worker-matrix*.json and background-pressure-repeat.json. These do not substitute for a full workspace rerun after future source changes.
+- Retained pre-follow-up full workspace evidence: phase10-final-workspace-tests.log, 2,920 primary passes plus two nested subprocess reports, 99 result groups. Audit follow-up separately records its own runs; do not present the older log as a fresh run of subsequent source changes.
+- Initial baseline snapshot was `d0f055c`, clean tree; original command/audit observations remain in Phase 0 history. All later commands/results are recorded under their milestone headings.
+
+## Known issues and limits
+
+- Phase 10 remains incomplete: historical production attribution and direct duplicate-fetch/encode measurement are open.
+- Installed Aerosky responds now; 20 warm enabled requests measured ~0.488 ms median. Installed module hash differs from staged; production strace attach was denied. No security settings changed.
+- Module ABI must match NGINX: staged build targets 1.31.8, installed service previously 1.31.10. Do not reload or purge the live service for isolated tests.
+- Shared tier stays opt-in. Initial migration from legacy protocol workers requires full stop/start. Test coverage is not a blanket production-readiness or sanitizer claim.
 
 ## Next Session Resume Point
 
-**State after worker-matrix milestone:** Phases 0–9 implemented and verified. Phase 10 is IN PROGRESS: final ordinary benchmarks, two-worker concurrency benchmark, stage timing, strace and Callgrind are saved. No partial Rust changes. Benchmarks/profiling checkpoint is `db45d13`; the subsequent report-audit commit corrects stale documentation and independently recomputes the final table (inspect `git log -3 --oneline`). No push or live deployment performed.
+**State after documentation reconciliation:** Phases 0–9 have implemented/verified milestones; Phase 10 remains IN PROGRESS. Items 1/2 and the worker/pressure measurement milestone are committed; item 4 now separates current status from historical findings. No incomplete source edits. Inspect recent commits; latest runtime source change is `83c0a82`, latest performance evidence `f5e21a3`.
 
-**Exact next action:** Items 1/2 verified; item 3 now has 24 isolated worker/cache-pressure runs plus seven bounded-queue probes (WORKER_MATRIX.md and raw JSON). Shared latency is mixed, so keep opt-in; counters do not prove direct fetch/encode savings. Next independent milestone: instrument/measure actual per-resource duplicate fetch/encode work, or reconcile historical audit presentation (item 4). Installed Aerosky now responds (20 warm requests ~0.488 ms), but installed binary differs and strace attach was denied; historical 13 ms attribution remains open. No deployment/push. Fully asynchronous resource serving and u64 epoch exhaustion are separate follow-ups.
+**Exact next action:** Read current audit status and REMAINING_WORK.md. Next implementation milestone should directly instrument/count duplicate resource fetches/encodes under contention with matched options and output validation. Counters currently do not prove work savings. Production historical13ms attribution remains open: localhost now responds but installed module differs and ptrace attach was denied. Fully asynchronous NGINX reconstruction, u64 epoch-exhaustion coverage and sanitizer/model checks are separate follow-ups. Do not repeat completed benchmarks or mark Phase10 complete without new evidence.
 
-**Verified build/test state:** final `cargo test --workspace` completed with 99 result groups, 2,922 reported passes (2,920 primary plus two nested subprocess reports), zero failures. Final `cargo build -p ps-nginx --release` passed and restored ordinary, non-pipeline-profile target module. Logs: phase10-final-workspace-tests.log and phase10-final-release-build.log. No commands intentionally left running.
+**Verified build/test state:** Current ordinary release build passed (matrix-build.log); resource-wait image/terminal regressions and recovery cache suite passed at their respective milestones. Full workspace result in phase10-final-workspace-tests.log predates later follow-ups; do not claim it freshly verifies them. No background command is intentionally left running. Documentation-only reconciliation uses relative-link/anchor validation and git diff --check, without unnecessary test/build reruns.
 
 **Deployment constraints:** shared tier remains opt-in; no consistent single-worker gain supports enabling it by default. Initial migration from legacy workers requires a full stop/start. Staged Nginx is 1.31.8; installed service previously 1.31.10, so do not install staged module blindly. Disk remains authoritative checkpoint. Exceptional writer-tracker overflow disables affected memory shards while preserving disk mutation; ordinary killed writers recover automatically.
 
@@ -672,3 +686,7 @@ Item 3 authorized. Plan: fresh isolated master/two-tier/default configurations, 
 - Conclusions: mixed shared-cache latency, bounded pressure behavior, lower concurrent MISS with more workers; no consistent completed-job reduction, no measured unique resource bytes/encodes savings, no historical13ms attribution. Leave Phase10 incomplete. Progress saved; no remote push/deployment. Benchmark-only changes do not require full workspace rerun.
 
 - Final script smoke check with `--workers 1 --repeats 1 --samples 8 --cold-requests 4` passed both modes; raw worker-matrix-smoke.json/log saved. README links and all matrix pass flags verified. Remaining steps are evidence gaps documented above, not incomplete source edits.
+
+## Audit/progress presentation reconciliation — completed
+
+Added current disposition table for F1–F7 and later verification, explicitly labeled original executive/phase/missing-coverage sections historical, preserved original findings and logs, and distinguished initial review-only constraints from authorized fixes. Replaced stale ledger "no task commits/builds yet" sections with milestone index and dated-by-source verification scope. Updated resume point and remaining-work status. No runtime/source behavior changed. Relative Markdown file/anchor checks and git diff --check passed; no unnecessary tests for documentation-only changes. Phase10 remains incomplete; no default-on recommendation or historical latency-resolution claim.

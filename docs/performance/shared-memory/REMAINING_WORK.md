@@ -24,8 +24,8 @@ See [WORKER_MATRIX.md](WORKER_MATRIX.md): 18 randomized default/shared16MiB runs
 
 Remaining: directly measure unique fetch/encode work rather than treating local/global dedup counters as bytes/encodes saved; broader workloads and peak-memory/leak profiling before general production claims. Historical ~13 ms remains unattributed. Aerosky now responds with a 0.488 ms warm median in a small read-only sample, but installed module differs and strace attachment was denied. See raw artifacts and report; no security settings were changed.
 
-## 4. Reconcile audit and progress presentation
+## 4. Audit and progress presentation — reconciled
 
-SHARED_MEMORY_AUDIT.md retains pre-fix executive summary/missing-feature sections alongside a completed checklist and implementation log. Treat these as historical findings; add a clear supersession/status table rather than deleting the evidence. The progress ledger's older chronological entries also describe work pending at that time; current phase checklist and Next Session Resume Point take precedence.
+[The audit's current status](../../../SHARED_MEMORY_AUDIT.md#current-status--supersedes-the-historical-assessment-below) now separates resolved F1–F7 and verified follow-up coverage from historical findings. Original evidence remains intact, with historical headings/notes. The ledger's stale initial status sections were replaced by a current milestone index and verification scope; older chronological entries remain historical.
 
-No source change or deployment was made during this review. Next task is remaining performance acceptance (item 3); asynchronous resource reconstruction remains a separately scoped improvement.
+Next implementation task: direct per-resource fetch/encode measurement under contention. Production attribution remains open; fully asynchronous resource serving, end-to-end epoch exhaustion, and sanitizer/model verification require separate work. Documentation reconciliation does not mark Phase 10 complete.

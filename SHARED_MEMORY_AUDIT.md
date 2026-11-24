@@ -6,9 +6,44 @@ optimization ownership, transactional beacons, lifecycle, admin) vs claims in
 **Method:** source inspection, execution-path tracing, test/evidence review,
 targeted re-verification. Checklist items below are NOT trusted until marked
 VERIFIED with file:line evidence.
-**Constraints:** review only — no production code/config/commit/deploy changes.
+**Initial audit constraints:** review only — no production code/config/commit/deploy changes. Later user-authorized fixes and verification are distinguished in the current status and appendices.
 
-## Resume state (auditor working notes — keep current)
+## Current status — supersedes the historical assessment below
+
+Reconciled against commits through `f5e21a3`. The original audit findings and
+pre-fix conclusions are preserved below as historical evidence; they are not
+a list of current unresolved bugs. Follow-up implementation was authorized by
+the user after the initial review-only audit.
+
+| Item | Current disposition | Verification / evidence |
+|---|---|---|
+| F1: contended puts invalidate a shard | Resolved in `ef9aeb5` | Contended-put preservation regression; original finding below |
+| F2: default L1 resettable generations | Resolved in `ef9aeb5` | Default tracked coherence and recovery regressions |
+| F3: unused coordination counters | Resolved in `ef9aeb5` | Dead counter registrations removed |
+| F4: fetch reconstruction bypasses ownership | Claim coordination added in `ef9aeb5`; event-loop polling removed in `83c0a82` | [Fetch regression log](docs/performance/shared-memory/resource-wait-serial-timing.log); contended NGINX requests can still reconstruct concurrently |
+| F5: stale boot directories | Resolved in `ef9aeb5` | Boot-directory GC and regression |
+| F6: metrics failure before fencing | Resolved in `ef9aeb5` | Fence-before-metrics ordering and saturation coverage |
+| F7: lifecycle coverage gaps | Extended in `ef9aeb5`, explicit beacon coverage added in `5d434c9` | [Six beacon reload runs](docs/performance/shared-memory/beacon-reload-repetitions.json), lifecycle crash/config-change checks |
+| Permanent memory-bypass recovery | Verified for writer-slot exhaustion in `5d434c9` | [Disk-backed offline replacement regression](docs/performance/shared-memory/offline-domain-recovery-tests.log) |
+| Multi-run medians, worker scaling and pressure | Measured in `b989f48` / `f5e21a3` | [Current build](docs/performance/shared-memory/ef9aeb5-comparison.md), [worker matrix](docs/performance/shared-memory/WORKER_MATRIX.md) |
+| Production historical ~13 ms | Unattributed; not reproduced in the later small warm sample | [Installed observation](docs/performance/shared-memory/matrix-localhost-warm.json); production tracing denied |
+| Direct duplicate fetch/encode savings | Not measured | Ownership/job counters are proxies, not resource-byte or encode counts |
+| Sanitizers/model checking, end-to-end u64 epoch exhaustion | Not verified by these milestones | Primitive/process tests do not imply this coverage |
+
+**Current conclusion:** shared caching remains opt-in. No consistent latency
+advantage or direct reduction in resource work has been established across the
+measured workloads. Fully asynchronous NGINX resource reconstruction remains a
+separate task; removing polling does not remove synchronous encoding/cache I/O.
+Phases 0–9 have verified milestones; Phase 10 remains incomplete.
+
+For the exact next task use the
+[implementation resume point](SHARED_MEMORY_IMPLEMENTATION.md#next-session-resume-point)
+and [remaining work](docs/performance/shared-memory/REMAINING_WORK.md).
+The historical phase table, missing-feature inventory, findings and original
+verification log below describe the audit snapshot, not later source revisions.
+
+## Historical auditor working notes
+
 
 - Status: IMPLEMENTATION COMPLETE (user-authorized follow-up). All
   findings F1–F7 resolved with regression tests; missing tests added
@@ -36,7 +71,7 @@ VERIFIED with file:line evidence.
   review; admin aggregation; perf review; C++ diff; re-run key tests;
   benchmark spot-checks; severity pass; final grades.
 
-## 0. Executive summary and production-readiness assessment
+## 0. Historical executive summary and production-readiness assessment
 
 **Verdict: sound core design with real verification behind most claims; NOT
 ready for default-on; acceptable as opt-in after F1+F2 are addressed.**
@@ -59,7 +94,7 @@ dedup headline covers worker jobs only. No Critical findings. No
 incorrectness found in the opt-in happy path; every failure mode reviewed
 degrades toward misses/fallbacks, never toward corrupt serves.
 
-## 1. Independently verified implementation status per phase
+## 1. Historical implementation status per phase
 
 | Phase | Claimed | Auditor verdict | Evidence |
 |---|---|---|---|
@@ -75,7 +110,7 @@ degrades toward misses/fallbacks, never toward corrupt serves.
 | 9 concurrency/regressions | COMPLETED | VERIFIED | 99/99 suites re-ran green incl. multiprocess kill-9 tests |
 | 10 perf/docs | IN PROGRESS (69%) | PLAUSIBLE | Methodology reviewed (strong provenance); warm medians single-run; see §5 |
 
-## 2. Missing or partially implemented features
+## 2. Historical missing or partially implemented features
 
 All VERIFIED by code inspection (not by trusting the ledger):
 
@@ -281,7 +316,7 @@ function, evidence, and impact. No finding without a code reference.*
   per-lookup String allocs; skip full-table dead-scan when a free slot
   was already found.
 
-## 5. Missing tests and benchmarks
+## 5. Historical missing tests and benchmarks
 
 - **Tests:** (a) transactional `update()` has only cross-thread tests —
   add a cross-process kill-during-update test mirroring the tracked
