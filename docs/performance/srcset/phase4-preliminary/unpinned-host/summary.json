@@ -1,0 +1,110 @@
+{
+  "scope": "loopback fresh HTTP connections, PassThrough+RUM,25ms synthetic origin; no image processing/network resources",
+  "cold_definition": "first measured request in fresh isolated process+disk cache; process startup excluded",
+  "warm_miss_definition": "unique HTML paths in same warm process after HIT oracle; no resource optimizers in fixture",
+  "cache_key_policy_separation_verified": true,
+  "cases": {
+    "off": {
+      "cold": {
+        "count": 5,
+        "median_ms": 31.113170000026003,
+        "p95_ms": 31.464701001823414,
+        "batch_medians_ms": [
+          31.268653001461644,
+          31.464701001823414,
+          31.113170000026003,
+          30.761409005208407,
+          30.56288600055268
+        ],
+        "batch_median_range_ms": [
+          30.56288600055268,
+          31.464701001823414
+        ]
+      },
+      "warm_html_misses": {
+        "count": 100,
+        "median_ms": 29.356985996855656,
+        "p95_ms": 30.284574000688735,
+        "batch_medians_ms": [
+          29.319410499738296,
+          29.513550998672144,
+          29.47771849721903,
+          29.25404300185619,
+          29.013977000431623
+        ],
+        "batch_median_range_ms": [
+          29.013977000431623,
+          29.513550998672144
+        ]
+      },
+      "warm": {
+        "count": 100,
+        "median_ms": 0.6920704981894232,
+        "p95_ms": 0.8726100058993325,
+        "batch_medians_ms": [
+          0.693938502081437,
+          0.6927614958840422,
+          0.6252044986467808,
+          0.731158499547746,
+          0.6916090023878496
+        ],
+        "batch_median_range_ms": [
+          0.6252044986467808,
+          0.731158499547746
+        ]
+      }
+    },
+    "on": {
+      "cold": {
+        "count": 5,
+        "median_ms": 30.959272000472993,
+        "p95_ms": 31.85031500470359,
+        "batch_medians_ms": [
+          31.763832994329277,
+          30.959272000472993,
+          30.750710000575054,
+          30.67600000213133,
+          31.85031500470359
+        ],
+        "batch_median_range_ms": [
+          30.67600000213133,
+          31.85031500470359
+        ]
+      },
+      "warm_html_misses": {
+        "count": 100,
+        "median_ms": 29.52236200144398,
+        "p95_ms": 30.633458998636343,
+        "batch_medians_ms": [
+          29.436299999360926,
+          29.54999349822174,
+          29.611669498990523,
+          29.86754499579547,
+          28.872260998468846
+        ],
+        "batch_median_range_ms": [
+          28.872260998468846,
+          29.86754499579547
+        ]
+      },
+      "warm": {
+        "count": 100,
+        "median_ms": 0.6988375025684945,
+        "p95_ms": 0.9141779955825768,
+        "batch_medians_ms": [
+          0.7141870009945706,
+          0.6806789970141836,
+          0.7016185008978937,
+          0.6645579996984452,
+          0.7296204967133235
+        ],
+        "batch_median_range_ms": [
+          0.6645579996984452,
+          0.7296204967133235
+        ]
+      }
+    }
+  },
+  "module_sha256": "b613ebc43ae4342ece7abe070c22915b4af67233902a3bc9d4e48575a1c03f12",
+  "source_commit": "15ca285e8818780c7aeeb3331081e85af64da159"
+}

@@ -1,0 +1,55 @@
+diff --git a/crates/ps-html/src/filters/srcset_sizes.rs b/crates/ps-html/src/filters/srcset_sizes.rs
+index 7c2dcd1..a618e4a 100644
+--- a/crates/ps-html/src/filters/srcset_sizes.rs
++++ b/crates/ps-html/src/filters/srcset_sizes.rs
+@@ -50,11 +50,17 @@ impl SrcsetSizesFilter {
+         }
+     }
+ 
+-    fn blocks(dom: &Dom, id: NodeId) -> bool {
+-        dom.element_keyword(id) == Keyword::Noscript
+-            || dom.element_name_equals(id, b"picture")
+-            || dom.element_name_equals(id, b"template")
+-            || dom.element_name_equals(id, b"svg")
++    fn blocks(dom: &Dom, id: NodeId, keyword: Keyword) -> bool {
++        match keyword {
++            Keyword::Noscript => true,
++            // These HTML5 names have no entry in the C++ keyword table.
++            Keyword::NotAKeyword => {
++                dom.element_name_equals(id, b"picture")
++                    || dom.element_name_equals(id, b"template")
++                    || dom.element_name_equals(id, b"svg")
++            }
++            _ => false,
++        }
+     }
+ 
+     // Duplicate attributes are ambiguous; do not choose one to overwrite.
+@@ -124,13 +130,14 @@ impl HtmlFilter for SrcsetSizesFilter {
+         self.blocked_depth = 0;
+     }
+     fn start_element(&mut self, dom: &mut Dom, _lexer: &Lexer, id: NodeId) {
+-        if Self::blocks(dom, id) {
++        let keyword = dom.element_keyword(id);
++        if Self::blocks(dom, id, keyword) {
+             self.blocked_depth += 1;
+             return;
+         }
+-        if dom.element_attributes(id).len() > 64
+-            || self.blocked_depth != 0
+-            || dom.element_keyword(id) != Keyword::Img
++        if self.blocked_depth != 0
++            || keyword != Keyword::Img
++            || dom.element_attributes(id).len() > 64
+             || !dom.is_rewritable_ignoring_end(id)
+             || dom
+                 .find_attribute(id, Keyword::DataPagespeedNoTransform)
+@@ -144,7 +151,7 @@ impl HtmlFilter for SrcsetSizesFilter {
+         self.apply(dom, id);
+     }
+     fn end_element(&mut self, dom: &mut Dom, _lexer: &Lexer, id: NodeId) {
+-        if Self::blocks(dom, id) {
++        if self.blocked_depth != 0 && Self::blocks(dom, id, dom.element_keyword(id)) {
+             self.blocked_depth = self.blocked_depth.saturating_sub(1);
+         }
+     }

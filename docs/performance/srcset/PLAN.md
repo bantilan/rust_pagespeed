@@ -1,6 +1,6 @@
 # Srcset-only filter: resumable implementation
 
-Status: Phases0–3 verified; Phase4 pending. Baseline source9b6435b. Phase3 implements opt-in output behavior; default-off remains unchanged, no live edits/deployment. User explicitly excludes background variant generation. One independently functional/tested phase per session is the intended usage boundary.
+Status: Phases0–3 verified; Phase4 IN PROGRESS (checkpoint, final reruns pending). Baseline source9b6435b. Phase3 implements opt-in output behavior; default-off remains unchanged, no live edits/deployment. User explicitly excludes background variant generation. One independently functional/tested phase per session is the intended usage boundary.
 
 ## Scope and architectural decisions
 
@@ -101,7 +101,19 @@ This existing-build observational sample is not a controlled off/on comparison, 
 
 ## Next Session Resume Point
 
-Read this plan and SHARED_MEMORY_IMPLEMENTATION.md resume section; inspect git status/log. Phases0–3 verified. Start Phase4: verify last tests/build; create isolated same-build off/on benchmark fixture, separately cold, warm metadata/HTML MISS and HTML HIT. Preserve prior baseline source9b6435b if comparison needed. Test cache-key isolation and RUM per-request handling with actual policy; browser viewport/DPR currentSrc/transfer bytes and preload alignment. No live cache clearing/deployment or image variants. Stage tests before measurements; no extrapolation from helper ns to total request savings. SrcsetSizes driver filter now works opt-in; README example exists, release/deployment and browser benchmarks remain pending. No commands running.
+Phase4 is IN PROGRESS, not complete. Current guard optimization compiles and passes171HTMLlibrary+29driver+26LCP+9srcset tests (phase4-tests.log). Matched NGINX1.31.10 release build29.53s and diagnostic release build37.40s pass. No commands running, no live deployment. First next action: run `target/release/examples/srcset_driver_latency > docs/performance/srcset/phase4-driver-after-guards.json` alone with no concurrent builds/tests. Compare with phase4-driver-before-guards.json; do not claim improvement before measuring. Then rerun browser, both beacon orderings and benchmark tools against current module, because stored browser/cache/beacon evidence predates guard changes. Commands below. Next peak RSS and final results/doc reconciliation; do not mark Phase4 done if unverified cases remain. Prior broader Phase10 latency attribution still separate.
+```bash
+cd /home/gamingph/Projects/Rust/pagespeed-rust
+# Read ledger/plan, git status/log, verify prior tests first.
+target/release/examples/srcset_driver_latency > docs/performance/srcset/phase4-driver-after-guards.json
+# Run sequentially; no other benchmark/build load.
+python3 tools/verify_srcset_browser.py --nginx /home/gamingph/Projects/Rust/rust_pagespeed_compiler/nginx-build/nginx-1.31.10/objs/nginx --module target/release/libps_nginx.so --output docs/performance/srcset/phase4-browser-after-guards.json
+python3 tools/verify_beacon_reload.py --nginx /home/gamingph/Projects/Rust/rust_pagespeed_compiler/nginx-build/nginx-1.31.10/objs/nginx --module target/release/libps_nginx.so --output docs/performance/srcset/phase4-beacon-after-guards.json --early-html-cache --zstd --srcset-policy
+python3 tools/verify_beacon_reload.py --nginx /home/gamingph/Projects/Rust/rust_pagespeed_compiler/nginx-build/nginx-1.31.10/objs/nginx --module target/release/libps_nginx.so --output docs/performance/srcset/phase4-beacon-preaccepted-after-guards.json --early-html-cache --zstd --srcset-policy --accept-before-reload
+python3 tools/benchmark_srcset_latency.py --nginx /home/gamingph/Projects/Rust/rust_pagespeed_compiler/nginx-build/nginx-1.31.10/objs/nginx --module target/release/libps_nginx.so --output-dir docs/performance/srcset/phase4-final
+/usr/bin/time -v target/release/examples/srcset_driver_latency off 100 > /tmp/srcset-off.json 2> /tmp/srcset-off-rss.log
+/usr/bin/time -v target/release/examples/srcset_driver_latency on 100 > /tmp/srcset-on.json 2> /tmp/srcset-on-rss.log
+```
 
 
 ## Phase1 contract (before implementation)
@@ -147,3 +159,18 @@ Add SrcsetSizes chain slot in early-pre, ahead of image rewriting (which removes
 - `cargo test -p ps-nginx --lib -- --test-threads=1`:293passed0failed2.54s; phase3-nginx-tests.log. Existing warning output retained, no release build/deployment claimed.
 - rustfmt for newfilter/test and gitdiffcheck passed. README documents actual syntax, execution order, explicit CSS responsibility, caps/skips, author preload alignment and no generated variants/byte-savings guarantee. Referenced install/common template/config-filter docs in chain header do not exist in this checkout; README is the actual config documentation updated.
 - Modified chain.rs,driver.rs,filters/mod.rs,newfilters/srcset_sizes.rs,tests/srcset_sizes.rs,README,plan/ledger and test artifacts. No full-request performance claim: helper measurements from Phase2 unchanged; Phase4 isolates new enabled-filter overhead and checks browser/cache/RUM behavior.
+
+## Phase4 execution plan before changes
+
+Use isolated NGINX1.31.10+matched release module, no production changes. Synthetic FastCGI fixture with fixed25ms origin delay, source-provided real 300/768/800 JPEGs and explicit CSS slot, policyoff/on samebuild. Repeated unique paths measure first HTML MISS (process warm but resource/HTML keys cold); forced no-cache warm requests measure HTML MISS with resources/cache infrastructure warm; identical path measures early HTML HIT. Report markers/counts and all samples, avoid labeling process startup as cold latency. Add actual policy to existing RUM-only cache oracle and beacon-reload oracle. Browser via installed Chrome/CDP in disposable profile at multiple viewports/DPRs, record currentSrc, CSS/natural/file dimensions and transfer sizes; no generated deployment variants (synthetic fixture images only). Verify only actual supplied candidates and no promised640candidate. Preserve raw data, exact commands and build hash. Stop at Phase4 checkpoint; record any unverified item explicitly.
+
+## Phase4 interruption checkpoint
+
+User requested usage-budget wrapup. All code/tool/evidence saved; no deployment. Before-guard results are observations, not final current-module verification:
+- Browser24cases pass,3off/onpairs reduce selected fixturebytes,9unchanged;412px×1.75DPR remains768w.
+- Both beacon/reload orderings pass with sizes+earlyHTML+Zstd; RUM cache oracle verifies clock retained and normalized body same on HIT with0origin calls.
+- CanonicalHostlocalhost pinned sameURL persistence test passes across policyoff/on, shared disk directory. Benchmark rawdata under phase4-before-guards (5cold+100warmMISS+100HIT per mode). Off/on medians30.527/31.075ms cold;28.990/29.062ms warmMISS;0.701/0.686ms HIT,25ms syntheticorigin. Batch ranges overlap; no established speedup or regression attribution. Corefullresourcecold/MISS behavior is NOT measured by PassThrough+RUM fixture.
+- Driver beforeguard: resource setup0.741/0.812us;filter setup4.758/5.167us;HTML511.349/552.756us;total516.985/558.760us.0fetches.1000paragraph34KB fixture. Guard change avoids name comparisons for known tags and endchecks outside blockedcontexts; tests pass, performance afterchange NOT yet measured.
+- Tool files: verify_early_html_cache.py adds optional policy/samples/cache-dir plus canonicalHost; verify_beacon_reload.py adds optional policy; new verify_srcset_browser.py uses ChromeCDPpipe/Pillow; new benchmark_srcset_latency.py sequentialalternating5pairs + sharedcacheoracle. New Rust diagnostic stages request setup/filter setup/HTML/drop separately; optionaloff/on100 enables RSS samples.
+- phase4-preliminary files explicitly excluded (overlappingbuild or unpinnedHost); phase4-guard.patch retains exact runtime diff. Build attempt with nonexistent example was a command typo, failed immediately; correct matched build succeeded. Initial Pythonvenv failed missingensurepip; browser uses installedPillow andChrome directly; no packages installed.
+- Required next validation: afterguard reruns, RSS, actual cache/RUM report, final RESULTS.md; targeted large/malformed enabled-filter latency and realistic core/resourcewarmMISS measurements remain unverified. Historical production13ms overhead not attributed by these synthetic tests. Do not deploy or claim comprehensive Phase4 completion.

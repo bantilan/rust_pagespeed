@@ -23,6 +23,7 @@ parser.add_argument('--port', type=int, default=18091)
 parser.add_argument('--zstd', action='store_true', help='Enable/accept zstd and decode HTML before checking nonce behavior')
 parser.add_argument('--accept-before-reload', action='store_true', help='Accept before reload, then ensure new workers preserve evidence and reject replay')
 parser.add_argument('--early-html-cache', action='store_true', help='Exercise opt-in pre-origin HTML cache lookup')
+parser.add_argument('--srcset-policy', action='store_true', help='Exercise targeted sizes alongside real beacon/reload behavior')
 args = parser.parse_args()
 repo = Path(__file__).resolve().parent.parent
 prefix = Path(tempfile.mkdtemp(prefix='ps-beacon-reload-'))
@@ -30,6 +31,8 @@ prefix = Path(tempfile.mkdtemp(prefix='ps-beacon-reload-'))
 (prefix / 'logs').mkdir()
 (prefix / 'hold.bin').write_bytes(b'x' * 65536)
 (prefix / 'page.html').write_text('<html><head><title>Beacon reload</title></head><body><img src="/hero.jpg"></body></html>')
+if args.srcset_policy:
+    (prefix / 'page.html').write_text('<html><head><title>Beacon reload</title></head><body><img class="hero" src="/hero.jpg" srcset="/hero.jpg 300w, /hero-large.jpg 800w" sizes="100vw"></body></html>')
 config = (repo / 'docs/performance/shared-memory/nginx-template.conf').read_text()
 config = config.replace('@MODULE@', str(Path(args.module).resolve())).replace('@PREFIX@', str(prefix)).replace('@PORT@', str(args.port))
 config = config.replace('master_process off;', 'master_process on;').replace('worker_processes 1;', 'worker_processes 2;')
@@ -40,6 +43,8 @@ if args.early_html_cache:
     config = config.replace('pagespeed RewriteLevel CoreFilters;', 'pagespeed RewriteLevel CoreFilters;\npagespeed HtmlCacheEarlyLookup on;')
 if args.zstd:
     config = config.replace('pagespeed RewriteLevel CoreFilters;', 'pagespeed RewriteLevel CoreFilters;\npagespeed EnableFilters compress_zstd;')
+if args.srcset_policy:
+    config = config.replace('pagespeed RewriteLevel CoreFilters;', 'pagespeed RewriteLevel CoreFilters;\npagespeed SrcsetSizesEnabled on;\npagespeed SrcsetSizesClass hero;\npagespeed SrcsetSizes "(max-width: 800px) calc(100vw - 60px), 645px";')
 (prefix / 'conf/nginx.conf').write_text(config)
 subprocess.run([args.nginx, '-t', '-p', str(prefix) + '/', '-c', 'conf/nginx.conf'], check=True, capture_output=True)
 result = {'passed': False, 'zstd': args.zstd, 'prefix': str(prefix), 'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo, text=True).strip(),
@@ -110,6 +115,9 @@ try:
     match = re.search(rb"pagespeed\.CriticalImages\.Run\('([^']*)','([^']*)','([^']*)',(?:true|false),(?:true|false),'([^']*)'\)", body)
     assert match, body[-2000:]
     endpoint, page_url, options_hash, nonce = [v.decode() for v in match.groups()]
+    if args.srcset_policy:
+        assert b'sizes="(max-width: 800px) calc(100vw - 60px), 645px"' in body, body[-2000:]
+        result['srcset_policy_applied'] = True
     if args.zstd:
         assert result.get('decoded_zstd_responses', 0) > 0, 'HTML was not zstd encoded'
     initial = evidence()

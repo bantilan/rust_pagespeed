@@ -22,7 +22,14 @@ p.add_argument('--nginx', required=True)
 p.add_argument('--module', required=True)
 p.add_argument('--output', required=True)
 p.add_argument('--rum-only', action='store_true', help='Isolate RUM clock retention with add_instrumentation; core beacon sampling tested separately')
+p.add_argument('--srcset-policy', choices=['off', 'on'], help='Include a targeted width-srcset policy fixture (use with --rum-only)')
+p.add_argument('--samples', type=int, default=20)
+p.add_argument('--cache-dir', help='Reuse an isolated cache directory to check policy key separation')
 a = p.parse_args()
+assert a.samples > 0
+if a.srcset_policy:
+    assert a.rum_only, 'Use RUM-only cacheable fixture; core nonce behavior has a separate oracle'
+
 root = Path(tempfile.mkdtemp(prefix='ps-early-html-'))
 (root / 'logs').mkdir()
 counts = {}
@@ -71,6 +78,8 @@ class Origin(socketserver.BaseRequestHandler):
         time.sleep(.025)  # Explicit synthetic origin cost, not production timing.
         cookie = 'Set-Cookie: session=private\r\n' if uri.startswith('/private') else ''
         body = b'<html><head><title>Origin counter</title></head><body>' + b'hello world ' * 4000 + b'</body></html>'
+        if a.srcset_policy:
+            body = body.replace(b'</body>', b"<img class='hero' src='/300.jpg' srcset='/300.jpg 300w, /768.jpg 768w, /800.jpg 800w' sizes='100vw'></body>")
         response = ('Status: 200 OK\r\nContent-Type: text/html\r\nCache-Control: public, max-age=60\r\n' + cookie + '\r\n').encode() + body
         self.request.sendall(struct.pack('!BBHHBB', 1, 6, req, len(response), 0, 0) + response)
         self.request.sendall(struct.pack('!BBHHBB', 1, 6, req, 0, 0, 0))
@@ -80,6 +89,7 @@ origin = socketserver.ThreadingTCPServer(('127.0.0.1', 0), Origin)
 origin.daemon_threads = True
 threading.Thread(target=origin.serve_forever, daemon=True).start()
 s = socket.socket(); s.bind(('127.0.0.1', 0)); port = s.getsockname()[1]; s.close()
+cache_dir = Path(a.cache_dir).resolve() if a.cache_dir else root / 'cache'
 conf = f'''load_module {Path(a.module).resolve()};
 worker_processes 1;
 master_process off;
@@ -88,7 +98,7 @@ error_log {root}/logs/error.log notice;
 events {{ worker_connections 128; }}
 http {{
  access_log off;
- pagespeed FileCachePath {root}/cache;
+ pagespeed FileCachePath {cache_dir};
  server {{
   listen 127.0.0.1:{port};
   server_name localhost;
@@ -107,6 +117,8 @@ http {{
 '''
 if a.rum_only:
     conf = conf.replace('  pagespeed on;', '  pagespeed on;\n  pagespeed RewriteLevel PassThrough;\n  pagespeed EnableFilters add_instrumentation;')
+if a.srcset_policy:
+    conf = conf.replace('  pagespeed on;', f'  pagespeed on;\n  pagespeed SrcsetSizesEnabled {a.srcset_policy};\n  pagespeed SrcsetSizesClass hero;\n  pagespeed SrcsetSizes "(max-width: 800px) calc(100vw - 60px), 645px";')
 (root / 'nginx.conf').write_text(conf)
 proc = None
 
@@ -115,9 +127,13 @@ def get(path='/', headers=None):
     start = time.perf_counter()
     try:
         browser = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36'} if a.rum_only else {}
-        c.request('GET', path, headers={**browser, **(headers or {})})
+        c.request('GET', path, headers={'Host': 'localhost', **browser, **(headers or {})})
         r = c.getresponse(); body = r.read()
         assert r.status == 200, (r.status, body[:100])
+        if a.srcset_policy:
+            expected = b"sizes='(max-width: 800px) calc(100vw - 60px), 645px'" if a.srcset_policy == 'on' else b"sizes='100vw'"
+            assert expected in body, body[-2000:]
+            assert b"srcset='/300.jpg 300w, /768.jpg 768w, /800.jpg 800w'" in body
         marker = body.rsplit(b'PageSpeed Cache:', 1)[-1].split(b'|', 1)[0].strip().decode()
         return {'ms': (time.perf_counter() - start) * 1000, 'marker': marker, 'bytes': len(body),
                 'rum_browser_clock': b'window.mod_pagespeed_start = Number(new Date())' in body,
@@ -137,7 +153,7 @@ try:
     cold = get()
     assert cold['marker'] == 'MISS', cold
     before = counts.get('/', 0)
-    warm = [get() for _ in range(20)]
+    warm = [get() for _ in range(a.samples)]
     assert all(x['marker'] == 'HIT' for x in warm), warm
     assert all(x['body_hash'] == cold['body_hash'] for x in warm), warm
     if a.rum_only:
@@ -150,7 +166,13 @@ try:
     private = [get('/private') for _ in range(2)]
     assert counts['/private'] == 2, counts
     assert all(x['marker'] == 'BYPASS' for x in private), private
-    result = {'synthetic_origin_delay_ms': 25, 'cold': cold, 'warm': warm,
+    warm_misses = [get(f'/warm-miss-{i}') for i in range(a.samples)] if a.srcset_policy else []
+    assert all(x['marker'] == 'MISS' for x in warm_misses), warm_misses
+    result = {'srcset_policy': a.srcset_policy, 'cache_directory': str(cache_dir), 'canonical_host': 'localhost', 'warm_html_misses': warm_misses,
+              'module_sha256': hashlib.sha256(Path(a.module).read_bytes()).hexdigest(),
+              'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'fixture_scope': 'PassThrough + RUM, synthetic25msorigin, no resource optimizers; core beacon tested separately',
+              'synthetic_origin_delay_ms': 25, 'cold': cold, 'warm': warm,
               'warm_median_ms': statistics.median(x['ms'] for x in warm),
               'origin_counts': counts, 'warm_hits_skipped_origin': True,
               'cookie_auth_cachecontrol_range_bypass_verified': True,
