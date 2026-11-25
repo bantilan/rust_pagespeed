@@ -84,7 +84,7 @@ try:
     assert mime == 'image/avif', (mime, optimized)
     assert b'ftypavif' in body[:64], body[:64]
     assert len(body) < Path(a.image).stat().st_size
-    result = {'source': 'https://localhost/hero.jpg', 'tls_origin_running': False,
+    result = {'source': f'https://localhost:{port}/hero.jpg', 'tls_origin_running': False,
         'requests': rows, 'optimized_url': optimized, 'mime': mime,
         'original_bytes': Path(a.image).stat().st_size, 'optimized_bytes': len(body),
         'optimized_sha256': hashlib.sha256(body).hexdigest(),
