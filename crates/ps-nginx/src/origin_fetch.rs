@@ -410,7 +410,10 @@ impl AsyncFetcher for ChainedFetcher {
     }
 
     fn supports_https(&self) -> bool {
-        false
+        // Advertise the local-file capability so resource construction does
+        // not reject same-site HTTPS before the jailed file leg can run.
+        // Foreign HTTPS still fails closed in the HTTP-only network leg.
+        self.file.as_ref().is_some_and(AsyncFetcher::supports_https) || self.origin.supports_https()
     }
 
     fn timeout_ms(&self) -> i64 {
@@ -1089,7 +1092,7 @@ mod tests {
         assert!(!file.can_fetch("http://origin.test/remote.css"));
         let stub = Stub::once(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nremote");
         let chain = ChainedFetcher::new(Some(file), OriginFetcher::default());
-        assert!(!chain.supports_https());
+        assert!(chain.supports_https());
         // Mapped name serves from disk.
         let mut local = BufferingFetch::new(
             "http://proxy.test/local.css",
@@ -1099,6 +1102,20 @@ mod tests {
         chain.fetch("http://proxy.test/local.css", &mut local);
         assert!(local.success());
         assert_eq!(b"local", local.body());
+        for (url, expected) in [
+            ("https://proxy.test/local.css", Some(b"local".as_slice())),
+            ("https://proxy.test/missing.css", None),
+            ("https://foreign.test/local.css", None),
+        ] {
+            let mut result =
+                BufferingFetch::new(url, RequestContext::new(HttpOptions::default_for_tests()));
+            *result.request_headers_mut() = get_headers();
+            chain.fetch_with_timeout(url, &mut result, 100);
+            assert_eq!(result.success(), expected.is_some(), "{url}");
+            if let Some(bytes) = expected {
+                assert_eq!(result.body(), bytes);
+            }
+        }
         // Foreign name falls through to the origin.
         let mut remote = BufferingFetch::new(
             &stub.url("/remote.css"),

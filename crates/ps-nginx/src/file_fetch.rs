@@ -3,7 +3,7 @@
 //! C++ fetches same-server inputs through nginx subrequests; the
 //! sync bridge cannot park for them, so this fetcher reads the
 //! server root directly (zero-config where the C++ needs no
-//! `LoadFromFile` mapping either). Mapping is strict: `http`
+//! `LoadFromFile` mapping either). Mapping is strict: `http` and `https`
 //! URLs whose host matches a server name, paths unescaped then
 //! jailed under the canonical root (`..`, NUL, and escaping
 //! symlinks fail closed), regular files under the cacheable
@@ -18,7 +18,7 @@
 //! Known gaps: per-location roots/aliases/`try_files`/index
 //! resolution stay unmapped (server root only); regex server
 //! names never match; non-UTF8 filenames fail closed;
-//! `https` fails (no TLS); ports are ignored; extension table
+//! Local HTTPS URLs need no TLS connection; ports are ignored; extension table
 //! approximates mime.types.
 
 use ps_http::content_type::extension_to_content_type;
@@ -100,7 +100,7 @@ impl FileFetcher {
     /// `..` escapes.
     fn join_root(&self, url: &str) -> Option<PathBuf> {
         let gurl = GoogleUrl::new(url);
-        if !gurl.is_web_valid() || gurl.scheme() != "http" {
+        if !gurl.is_web_valid() || !matches!(gurl.scheme(), "http" | "https") {
             return None;
         }
         if !self.host_matches(&gurl.host()) {
@@ -261,7 +261,8 @@ impl AsyncFetcher for FileFetcher {
     }
 
     fn supports_https(&self) -> bool {
-        false
+        // HTTPS names are resolved inside the same host/root jail, not over TLS.
+        true
     }
 }
 
@@ -409,10 +410,11 @@ mod tests {
     fn host_scheme_and_shape_gate() {
         let scratch = Scratch::new(&[("a.css", b"a{}")]);
         let fetcher = scratch.fetcher();
-        // Wrong host, https, garbage: all fail.
+        // Foreign hosts and non-web schemes never map.
         for url in [
             "http://evil.example/a.css",
-            "https://localhost/a.css",
+            "https://evil.example/a.css",
+            "ftp://localhost/a.css",
             "not a url",
             "http://localhost/",
             "http://localhost",
@@ -425,6 +427,45 @@ mod tests {
         assert!(scratch
             .fetch(&fetcher, "http://localhost/a.css?v=1&x=2")
             .success());
+    }
+
+    #[test]
+    fn https_reads_local_bytes_with_the_same_jail_and_headers() {
+        let scratch = Scratch::new(&[("uploads/image.jpg", b"local-image")]);
+        let fetcher = scratch.fetcher();
+        assert!(fetcher.supports_https());
+        let fetch = scratch.fetch(&fetcher, "https://LOCALHOST/uploads/image.jpg?v=1");
+        assert!(fetch.success());
+        assert_eq!(fetch.body(), b"local-image");
+        assert_eq!(
+            fetch
+                .response_headers()
+                .headers()
+                .lookup1("Content-Type")
+                .as_deref(),
+            Some("image/jpeg")
+        );
+        for url in [
+            "https://foreign.test/uploads/image.jpg",
+            "https://localhost/uploads/%2e%2e/%2e%2e/secret",
+            "https://localhost/uploads/image.jpg%00",
+            "https://localhost/missing.jpg",
+            "https://localhost/uploads/",
+        ] {
+            assert!(!scratch.fetch(&fetcher, url).success(), "{url}");
+        }
+        #[cfg(unix)]
+        {
+            let outside = Scratch::new(&[("secret.jpg", b"secret")]);
+            std::os::unix::fs::symlink(
+                outside.dir.join("secret.jpg"),
+                scratch.dir.join("escape.jpg"),
+            )
+            .unwrap();
+            assert!(!scratch
+                .fetch(&fetcher, "https://localhost/escape.jpg")
+                .success());
+        }
     }
 
     #[test]
