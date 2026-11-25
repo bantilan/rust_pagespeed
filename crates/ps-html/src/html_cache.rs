@@ -668,6 +668,30 @@ impl HtmlCacheSession {
                 .push_str(&String::from_utf8(encoded.clone()).expect("evidence codec emits UTF-8"));
             beacon_identity = Some(encoded);
         }
+        // Font learning participation: the confirmed set joins the
+        // identity so learned confirmations version the variant away
+        // (content-addressed refresh). Unlearned variants cache under
+        // the empty marker, matching the filter's snapshot; beacon
+        // merges rekey later requests instead of blocking publication.
+        // No settled check: worst case orphans one variant, and the
+        // filter snapshots inputs per render so output stays coherent.
+        if options.enabled(ps_config::filter::Filter::PreloadCriticalFonts) {
+            use ps_cache::cache::KeyState;
+            let server = self.driver.server_context();
+            let oh = server
+                .hasher()
+                .hash(self.driver.options_signature().as_bytes());
+            let key = super::font_store::confirmed_key(&self.url, &oh, &self.device_suffix);
+            let blob = match server.metadata_cache().get(&key) {
+                ps_cache::cache::Lookup {
+                    state: KeyState::Available,
+                    value: Some(blob),
+                } => blob,
+                _ => Vec::new(),
+            };
+            identity.push_str("\nfont-beacon:");
+            identity.push_str(&String::from_utf8_lossy(&blob));
+        }
         Ok(Eligibility {
             key: html_codec::html_cache_key(&identity),
             ttl_ms,
@@ -920,6 +944,63 @@ mod tests {
         fn counter(&self, name: &str) -> i64 {
             self.driver.server_context().variable(name).get()
         }
+    }
+
+    #[test]
+    fn font_confirmed_set_versions_cache_key() {
+        let harness = Harness::new();
+        harness
+            .options
+            .borrow_mut()
+            .filters_mut()
+            .enable(Filter::PreloadCriticalFonts);
+        let session = harness.session();
+        let origin = harness.ok_origin();
+        let request = harness.get_request();
+        let options = harness.options.borrow().clone();
+        let before = session
+            .eligibility_key(&origin, &request, &options, None, START_MS)
+            .expect("eligible")
+            .key;
+        // Learning a confirmation rekeys the variant.
+        let server = harness.driver.server_context();
+        let oh = server
+            .hasher()
+            .hash(harness.driver.options_signature().as_bytes());
+        let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
+            harness.driver.request_properties().device_type(),
+        );
+        let mut confirmed = std::collections::HashSet::new();
+        confirmed.insert((
+            "manrope".to_string(),
+            400,
+            crate::font_discovery::FontStyle::Normal,
+        ));
+        server.metadata_cache().put(
+            &crate::font_store::confirmed_key(PAGE_URL, &oh, &suffix),
+            crate::font_store::encode_confirmed(&confirmed).as_bytes(),
+        );
+        let after = session
+            .eligibility_key(&origin, &request, &options, None, START_MS)
+            .expect("eligible")
+            .key;
+        assert_ne!(before, after);
+        // Disabled filter: confirmations do not perturb keys.
+        let mut plain = harness.options.borrow().clone();
+        plain.filters_mut().disable(Filter::PreloadCriticalFonts);
+        let unkeyed = session
+            .eligibility_key(&origin, &request, &plain, None, START_MS)
+            .expect("eligible")
+            .key;
+        server.metadata_cache().put(
+            &crate::font_store::confirmed_key(PAGE_URL, &oh, &suffix),
+            b"font-confirmed/1\n1\nmanrope\t700\tn\n",
+        );
+        let unkeyed_after = session
+            .eligibility_key(&origin, &request, &plain, None, START_MS)
+            .expect("eligible")
+            .key;
+        assert_eq!(unkeyed, unkeyed_after);
     }
 
     #[test]
@@ -1358,6 +1439,7 @@ mod tests {
             lcp_kind: finder::LCP_KIND_IMG.to_string(),
             lcp_image_url: String::new(),
             nonce,
+            font_families: Vec::new(),
         };
         assert_eq!(
             finder::accept_beacon(&mut evidence, &report, START_MS),

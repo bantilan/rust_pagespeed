@@ -17,6 +17,7 @@ pub enum StaticAsset {
     ClientDomainRewriter,
     CriticalCssBeaconJs,
     CriticalImagesBeaconJs,
+    FontPreloadBeaconJs,
     DedupInlinedImages,
     LazyloadImages,
     DelayImages,
@@ -60,6 +61,12 @@ pub fn get_asset(asset: StaticAsset, debug: bool) -> &'static [u8] {
         }
         (StaticAsset::CriticalImagesBeaconJs, true) => {
             include_bytes!("../assets/critical_images_beacon_dbg.js").as_slice()
+        }
+        (StaticAsset::FontPreloadBeaconJs, false) => {
+            include_bytes!("../assets/font_preload_beacon_opt.js").as_slice()
+        }
+        (StaticAsset::FontPreloadBeaconJs, true) => {
+            include_bytes!("../assets/font_preload_beacon_dbg.js").as_slice()
         }
         (StaticAsset::AddInstrumentation, false) => {
             include_bytes!("../assets/add_instrumentation_opt.js").as_slice()
@@ -139,6 +146,20 @@ mod tests {
         assert_ne!(
             get_asset(StaticAsset::DeterministicJs, false),
             get_asset(StaticAsset::DeterministicJs, true)
+        );
+    }
+
+    #[test]
+    fn font_preload_beacon_markers() {
+        for debug in [false, true] {
+            let js = get_asset(StaticAsset::FontPreloadBeaconJs, debug);
+            assert!(contains(js, b"FontPreloads"));
+            assert!(contains(js, b"document.fonts"));
+            assert!(contains(js, b"sendBeacon"));
+        }
+        assert_ne!(
+            get_asset(StaticAsset::FontPreloadBeaconJs, false),
+            get_asset(StaticAsset::FontPreloadBeaconJs, true)
         );
     }
 

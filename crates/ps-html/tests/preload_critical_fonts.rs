@@ -1,0 +1,417 @@
+//! Automatic critical font preloads (`preload_critical_fonts`).
+#[path = "harness.rs"]
+mod harness;
+
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::Arc;
+
+use ps_cache::cache::MemoryCache;
+use ps_cache::hash::MockHasher;
+use ps_config::filter::Filter;
+use ps_config::options::RewriteOptions;
+use ps_html::chain::{build_chain, ChainContext, ChainFilter};
+use ps_html::driver::Driver;
+use ps_html::filters::preload_critical_fonts::{
+    PreloadCriticalFontsFilter, FONT_PRELOAD_BEACON_CONFIRMED, FONT_PRELOAD_CACHE_HIT,
+    FONT_PRELOAD_CACHE_MISS, FONT_PRELOAD_DISCOVERED, FONT_PRELOAD_PRELOADED, FONT_PRELOAD_SKIPPED,
+};
+use ps_html::parser::Parser;
+use ps_html::server_context::{ResourceDriver, ServerContext};
+use ps_http::mock::MockUrlFetcher;
+
+const PAGE: &str = "https://test.com/page";
+const START_MS: i64 = 1_700_000_000_000;
+
+const MANROPE_CSS: &str = "@font-face {\n  font-family: 'Manrope';\n  font-style: normal;\n  font-weight: 400;\n  src: url(https://cdn.test/manrope-400.woff2) format('woff2');\n}\nbody { font-family: Manrope, sans-serif; }\n";
+
+fn fixture_with_fetcher() -> (
+    Rc<ServerContext>,
+    Rc<RefCell<RewriteOptions>>,
+    Arc<MockUrlFetcher>,
+) {
+    let fetcher = Arc::new(MockUrlFetcher::new());
+    let mut server = ServerContext::new_with_metadata(
+        Arc::new(MemoryCache::new()),
+        Arc::new(MemoryCache::new()),
+        fetcher.clone(),
+        START_MS,
+    );
+    server.set_hasher(Arc::new(MockHasher::new()));
+    let server = Rc::new(server);
+    let options = Rc::new(RefCell::new(RewriteOptions::new()));
+    options.borrow_mut().add_domain("http://test.com/");
+    options.borrow_mut().add_domain("https://test.com/");
+    (server, options, fetcher)
+}
+
+fn fixture() -> (Rc<ServerContext>, Rc<RefCell<RewriteOptions>>) {
+    let (server, options, _) = fixture_with_fetcher();
+    (server, options)
+}
+
+fn driver_for(
+    server: &Rc<ServerContext>,
+    options: &Rc<RefCell<RewriteOptions>>,
+) -> Rc<ResourceDriver> {
+    Rc::new(ResourceDriver::new(server.clone(), options.clone(), PAGE))
+}
+
+fn render_filter(driver: &Rc<ResourceDriver>, html: &str) -> String {
+    let out = harness::run_with_filters(html.as_bytes(), |parser: &mut Parser| {
+        parser
+            .add_early_pre_render_filter(Box::new(PreloadCriticalFontsFilter::new(driver.clone())));
+    });
+    String::from_utf8(out).unwrap()
+}
+
+fn stat(server: &Rc<ServerContext>, name: &str) -> i64 {
+    server.variable(name).get()
+}
+
+#[test]
+fn inline_face_emits_preload_first_in_head() {
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    let html = format!(
+        "<html><head><title>t</title><style>{MANROPE_CSS}</style></head>\
+         <body><p style=\"font-family: Manrope\">hi</p></body></html>"
+    );
+    let out = render_filter(&driver, &html);
+    assert!(out.contains("rel=\"preload\""), "{out}");
+    assert!(out.contains("as=\"font\""), "{out}");
+    assert!(out.contains("type=\"font/woff2\""), "{out}");
+    assert!(
+        out.contains("href=\"https://cdn.test/manrope-400.woff2\""),
+        "{out}"
+    );
+    assert!(out.contains("crossorigin=\"anonymous\""), "{out}");
+    // Earliest in head: ahead of the title.
+    let preload = out.find("rel=\"preload\"").unwrap();
+    let title = out.find("<title>").unwrap();
+    assert!(preload < title, "{out}");
+    assert_eq!(stat(&server, FONT_PRELOAD_DISCOVERED), 1);
+    assert_eq!(stat(&server, FONT_PRELOAD_PRELOADED), 1);
+}
+
+#[test]
+fn caps_two_preloads_and_prunes() {
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    let css = "@font-face { font-family: A; src: url(https://x.test/a.woff2); }\n\
+         @font-face { font-family: B; src: url(https://x.test/b.woff2); }\n\
+         @font-face { font-family: C; src: url(https://x.test/c.woff2); }\n\
+         body { font-family: A; } h1 { font-family: B; } p { font-family: C; }";
+    let html = format!("<html><head><style>{css}</style></head><body></body></html>");
+    let out = render_filter(&driver, &html);
+    assert_eq!(out.matches("rel=\"preload\"").count(), 2, "{out}");
+    assert!(out.contains("https://x.test/a.woff2"), "{out}");
+    assert!(out.contains("https://x.test/b.woff2"), "{out}");
+    // c.woff2 appears only in the style block, never preloaded.
+    assert_eq!(out.matches("c.woff2").count(), 1, "{out}");
+    // Priority order preserved (a before b).
+    assert!(
+        out.find("https://x.test/a.woff2").unwrap() < out.find("https://x.test/b.woff2").unwrap(),
+        "{out}"
+    );
+    assert_eq!(stat(&server, FONT_PRELOAD_SKIPPED), 0);
+    // Icon-only and subset faces never emit.
+    let css = "@font-face { font-family: Icons; src: url(https://x.test/i.woff2); \
+         unicode-range: U+E000-F8FF; }\n\
+         @font-face { font-family: Cyr; src: url(https://x.test/c.woff2); \
+         unicode-range: U+0400-04FF; }\n\
+         body { font-family: Icons; } p { font-family: Cyr; }";
+    let html = format!("<html><head><style>{css}</style></head><body></body></html>");
+    let out = render_filter(&driver, &html);
+    assert!(!out.contains("rel=\"preload\""), "{out}");
+}
+
+#[test]
+fn skips_unsafe_and_duplicate_markup() {
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    // Author preload wins: no duplicate.
+    let html = format!(
+        "<html><head><link rel=\"preload\" as=\"font\" type=\"font/woff2\" \
+         href=\"https://cdn.test/manrope-400.woff2\" crossorigin=\"anonymous\">\
+         <style>{MANROPE_CSS}</style></head><body></body></html>"
+    );
+    let out = render_filter(&driver, &html);
+    assert_eq!(out.matches("rel=\"preload\"").count(), 1, "{out}");
+    // No head: nothing emitted, nothing panics.
+    let out = render_filter(&driver, "<p>no head here</p>");
+    assert!(!out.contains("rel=\"preload\""), "{out}");
+    // Print-only style ignored.
+    let html = format!(
+        "<html><head><style media=\"print\">{MANROPE_CSS}</style></head>\
+         <body></body></html>"
+    );
+    let out = render_filter(&driver, &html);
+    assert!(!out.contains("rel=\"preload\""), "{out}");
+}
+
+#[test]
+fn external_stylesheet_loads_and_caches() {
+    let (server, options, fetcher) = fixture_with_fetcher();
+    fetcher.set_simple_response(
+        "https://test.com/theme.css",
+        "text/css",
+        MANROPE_CSS.as_bytes(),
+    );
+    let driver = driver_for(&server, &options);
+    let html = "<html><head><link rel=\"stylesheet\" href=\"/theme.css\"></head>\
+         <body><p style=\"font-family: Manrope\">hi</p></body></html>";
+    let out = render_filter(&driver, html);
+    assert!(out.contains("manrope-400.woff2"), "{out}");
+    assert!(out.contains("type=\"font/woff2\""), "{out}");
+    // Second render reuses the cached decision (no re-parse).
+    let driver = driver_for(&server, &options);
+    let out = render_filter(&driver, html);
+    assert!(out.contains("manrope-400.woff2"), "{out}");
+    assert_eq!(stat(&server, FONT_PRELOAD_CACHE_MISS), 1);
+    assert_eq!(stat(&server, FONT_PRELOAD_CACHE_HIT), 1);
+}
+
+#[test]
+fn failed_sheet_decision_revalidates_past_failure_ttl() {
+    let (server, options, fetcher) = fixture_with_fetcher();
+    // No fetcher response: the sheet load fails outright.
+    let driver = driver_for(&server, &options);
+    let html = "<html><head><link rel=\"stylesheet\" href=\"/theme.css\"></head>\
+         <body><p style=\"font-family: Manrope\">hi</p></body></html>";
+    let first = render_filter(&driver, &html);
+    assert!(!first.contains("manrope-400.woff2"), "{first}");
+    assert_eq!(stat(&server, FONT_PRELOAD_CACHE_MISS), 1);
+    // Within the window the partial decision replays.
+    let driver = driver_for(&server, &options);
+    let second = render_filter(&driver, &html);
+    assert_eq!(stat(&server, FONT_PRELOAD_CACHE_HIT), 1);
+    assert!(!second.contains("manrope-400.woff2"), "{second}");
+    // The sheet lands; past the 300s default failure TTL plus the
+    // retry margin the decision recomputes and really re-fetches.
+    fetcher.set_simple_response(
+        "https://test.com/theme.css",
+        "text/css",
+        MANROPE_CSS.as_bytes(),
+    );
+    server.timer().borrow_mut().advance_ms(400_000);
+    let driver = driver_for(&server, &options);
+    let third = render_filter(&driver, &html);
+    assert_eq!(stat(&server, FONT_PRELOAD_CACHE_MISS), 2);
+    assert!(third.contains("manrope-400.woff2"), "{third}");
+}
+
+#[test]
+fn pending_sheet_skips_store_and_retries_next_visit() {
+    let (server, options, fetcher) = fixture_with_fetcher();
+    fetcher.set_waiting(true);
+    let driver = driver_for(&server, &options);
+    let html = "<html><head><link rel=\"stylesheet\" href=\"/theme.css\"></head>\
+         <body><p style=\"font-family: Manrope\">hi</p></body></html>";
+    let first = render_filter(&driver, &html);
+    assert!(!first.contains("manrope-400.woff2"), "{first}");
+    // Still pending: no decision stored, every visit recomputes.
+    let driver = driver_for(&server, &options);
+    let second = render_filter(&driver, &html);
+    assert!(!second.contains("manrope-400.woff2"), "{second}");
+    assert_eq!(stat(&server, FONT_PRELOAD_CACHE_MISS), 2);
+    assert_eq!(stat(&server, FONT_PRELOAD_CACHE_HIT), 0);
+    // The fetch completes; the next visit discovers and stores.
+    fetcher.set_simple_response(
+        "https://test.com/theme.css",
+        "text/css",
+        MANROPE_CSS.as_bytes(),
+    );
+    fetcher.call_callbacks();
+    let driver = driver_for(&server, &options);
+    let third = render_filter(&driver, &html);
+    assert!(third.contains("manrope-400.woff2"), "{third}");
+    let driver = driver_for(&server, &options);
+    render_filter(&driver, &html);
+    assert_eq!(stat(&server, FONT_PRELOAD_CACHE_HIT), 1);
+}
+
+#[test]
+fn nested_imports_resolve() {
+    let (server, options, fetcher) = fixture_with_fetcher();
+    fetcher.set_simple_response(
+        "https://test.com/a.css",
+        "text/css",
+        b"@import url(\"b.css\");\nbody { font-family: Manrope; }",
+    );
+    fetcher.set_simple_response("https://test.com/b.css", "text/css", MANROPE_CSS.as_bytes());
+    let driver = driver_for(&server, &options);
+    let html = "<html><head><link rel=\"stylesheet\" href=\"/a.css\"></head><body></body></html>";
+    let out = render_filter(&driver, html);
+    assert!(out.contains("manrope-400.woff2"), "{out}");
+}
+
+#[test]
+fn beacon_confirmation_lifts_pruning() {
+    use ps_html::font_discovery::FontStyle;
+    use ps_html::font_store;
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    // Confirm the icon family via the metadata blob directly.
+    let mut confirmed = std::collections::HashSet::new();
+    confirmed.insert(("icons".to_string(), 400, FontStyle::Normal));
+    let page_url = driver.base_url().spec().to_string();
+    let oh = server.hasher().hash(driver.options_signature().as_bytes());
+    let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
+        driver.request_properties().device_type(),
+    );
+    server.metadata_cache().put(
+        &font_store::confirmed_key(&page_url, &oh, &suffix),
+        font_store::encode_confirmed(&confirmed).as_bytes(),
+    );
+    let css = "@font-face { font-family: Icons; src: url(https://x.test/i.woff2); \
+         unicode-range: U+E000-F8FF; }\nbody { font-family: Icons; }";
+    let html = format!("<html><head><style>{css}</style></head><body></body></html>");
+    let out = render_filter(&driver, &html);
+    assert!(out.contains("https://x.test/i.woff2"), "{out}");
+    assert_eq!(stat(&server, FONT_PRELOAD_BEACON_CONFIRMED), 1);
+    assert_eq!(stat(&server, FONT_PRELOAD_PRELOADED), 1);
+}
+
+#[test]
+fn chain_plans_slot_when_enabled() {
+    let (server, options) = fixture();
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(ps_config::filter::Filter::PreloadCriticalFonts);
+    let plan = ps_html::chain::build_chain(
+        &options.borrow(),
+        &ps_html::chain::ChainContext::new(true, true),
+    );
+    assert!(plan.post.contains(&ChainFilter::PreloadCriticalFonts));
+    let _ = server;
+}
+
+#[test]
+fn beacon_js_injected_while_unconfirmed() {
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    let html = format!(
+        "<html><head><style>{MANROPE_CSS}</style></head>\
+         <body><p style=\"font-family: Manrope\">hi</p></body></html>"
+    );
+    let out = render_filter(&driver, &html);
+    assert!(out.contains("pagespeed.FontPreloads.Run("), "{out}");
+    assert!(out.contains("data-pagespeed-no-defer"), "{out}");
+    // A nonce was issued into the page's outstanding set.
+    let page_url = driver.base_url().spec().to_string();
+    let oh = server.hasher().hash(driver.options_signature().as_bytes());
+    let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
+        driver.request_properties().device_type(),
+    );
+    let blob = match server
+        .metadata_cache()
+        .get(&ps_html::font_store::nonces_key(&page_url, &oh, &suffix))
+    {
+        ps_cache::cache::Lookup {
+            state: ps_cache::cache::KeyState::Available,
+            value: Some(blob),
+        } => blob,
+        _ => panic!("nonces blob missing"),
+    };
+    let nonces = ps_html::font_store::decode_nonces(&String::from_utf8(blob).unwrap());
+    assert_eq!(nonces.pending.len(), 1);
+}
+
+#[test]
+fn beacon_js_withheld_once_confirmed() {
+    use ps_html::font_discovery::FontStyle;
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    let mut confirmed = std::collections::HashSet::new();
+    confirmed.insert(("manrope".to_string(), 400, FontStyle::Normal));
+    let page_url = driver.base_url().spec().to_string();
+    let oh = server.hasher().hash(driver.options_signature().as_bytes());
+    let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
+        driver.request_properties().device_type(),
+    );
+    server.metadata_cache().put(
+        &ps_html::font_store::confirmed_key(&page_url, &oh, &suffix),
+        ps_html::font_store::encode_confirmed(&confirmed).as_bytes(),
+    );
+    let html = format!(
+        "<html><head><style>{MANROPE_CSS}</style></head>\
+         <body><p style=\"font-family: Manrope\">hi</p></body></html>"
+    );
+    let out = render_filter(&driver, &html);
+    assert!(!out.contains("FontPreloads.Run"), "{out}");
+}
+
+#[test]
+fn decision_hit_keeps_beacon_while_learnable() {
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    let html = format!(
+        "<html><head><style>{MANROPE_CSS}</style></head>\
+         <body><p style=\"font-family: Manrope\">hi</p></body></html>"
+    );
+    let first = render_filter(&driver, &html);
+    assert!(first.contains("pagespeed.FontPreloads.Run("), "{first}");
+    assert_eq!(stat(&server, FONT_PRELOAD_CACHE_MISS), 1);
+    // Same inputs: the cached decision replays, but learning is
+    // still open so the beacon must ship again.
+    let second = render_filter(&driver, &html);
+    assert_eq!(stat(&server, FONT_PRELOAD_CACHE_HIT), 1);
+    assert!(second.contains("rel=\"preload\""), "{second}");
+    assert!(second.contains("pagespeed.FontPreloads.Run("), "{second}");
+}
+
+#[test]
+fn decision_hit_stays_quiet_once_learned() {
+    use ps_html::font_discovery::FontStyle;
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    let mut confirmed = std::collections::HashSet::new();
+    confirmed.insert(("manrope".to_string(), 400, FontStyle::Normal));
+    let page_url = driver.base_url().spec().to_string();
+    let oh = server.hasher().hash(driver.options_signature().as_bytes());
+    let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
+        driver.request_properties().device_type(),
+    );
+    server.metadata_cache().put(
+        &ps_html::font_store::confirmed_key(&page_url, &oh, &suffix),
+        ps_html::font_store::encode_confirmed(&confirmed).as_bytes(),
+    );
+    let html = format!(
+        "<html><head><style>{MANROPE_CSS}</style></head>\
+         <body><p style=\"font-family: Manrope\">hi</p></body></html>"
+    );
+    let first = render_filter(&driver, &html);
+    assert!(!first.contains("FontPreloads.Run"), "{first}");
+    let second = render_filter(&driver, &html);
+    assert_eq!(stat(&server, FONT_PRELOAD_CACHE_HIT), 1);
+    assert!(second.contains("rel=\"preload\""), "{second}");
+    assert!(!second.contains("FontPreloads.Run"), "{second}");
+}
+
+#[test]
+fn driver_run_emits_through_chain() {
+    let (server, options) = fixture();
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(ps_config::filter::Filter::PreloadCriticalFonts);
+    let html = format!(
+        "<html><head><style>{MANROPE_CSS}</style></head>\
+         <body><p style=\"font-family: Manrope\">hi</p></body></html>"
+    );
+    let sink = harness::SharedSink::default();
+    let mut driver = Driver::new(
+        &options.borrow(),
+        &ChainContext::new(true, true),
+        sink.clone(),
+        Some(driver_for(&server, &options)),
+    );
+    driver.start_parse(PAGE.as_bytes(), false);
+    driver.write(html.as_bytes());
+    driver.finish();
+    let out = String::from_utf8(sink.bytes()).unwrap();
+    assert!(out.contains("rel=\"preload\""), "{out}");
+    assert!(out.contains("manrope-400.woff2"), "{out}");
+}

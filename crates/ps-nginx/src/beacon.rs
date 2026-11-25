@@ -95,6 +95,7 @@ pub fn handle_beacon_evidence(
     query_params.parse_from_untrusted_string(params);
     let options_hash = query_params.lookup1_unescaped(beacon_finder::PARAM_OPTIONS_HASH)?;
     let report = parse_beacon_report(&query_params);
+    merge_font_beacon(&options_hash, &report, page_url, user_agent, server, now_ms);
     if report.html_hashes.is_none() {
         return None;
     }
@@ -105,6 +106,72 @@ pub fn handle_beacon_evidence(
     finder.update(page_url, &options_hash, suffix, |evidence| {
         beacon_finder::accept_beacon(evidence, &report, now_ms)
     })
+}
+
+/// Merges font triples from a beacon report: validates the font
+/// nonce against the page's outstanding set, then unions triples
+/// into the confirmed blob (capped). Independent of the image half.
+fn merge_font_beacon(
+    options_hash: &str,
+    report: &beacon_finder::BeaconReport,
+    page_url: &str,
+    user_agent: &str,
+    server: &ps_html::server_context::ServerContext,
+    now_ms: i64,
+) {
+    use ps_cache::cache::KeyState;
+    use ps_html::filters::preload_critical_fonts::{
+        FONT_PRELOAD_BEACON_ACCEPTED, FONT_PRELOAD_BEACON_REJECTED,
+    };
+    if report.font_families.is_empty() {
+        return;
+    }
+    let matcher = ps_http::user_agent_matcher::UserAgentMatcher::new();
+    let device = matcher.device_type_for_ua(user_agent);
+    let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(device);
+    let cache = server.metadata_cache();
+    let nonces_key = ps_html::font_store::nonces_key(page_url, options_hash, suffix);
+    let mut nonces = match cache.get(&nonces_key) {
+        ps_cache::cache::Lookup {
+            state: KeyState::Available,
+            value: Some(blob),
+        } => String::from_utf8(blob)
+            .map(|text| ps_html::font_store::decode_nonces(&text))
+            .unwrap_or_default(),
+        _ => ps_html::font_store::FontNonces::default(),
+    };
+    if !ps_html::font_store::consume_nonce(&mut nonces, &report.nonce, now_ms) {
+        server.variable(FONT_PRELOAD_BEACON_REJECTED).add(1);
+        return;
+    }
+    cache.put(
+        &nonces_key,
+        ps_html::font_store::encode_nonces(&nonces).as_bytes(),
+    );
+    let confirmed_key = ps_html::font_store::confirmed_key(page_url, options_hash, suffix);
+    let mut confirmed = match cache.get(&confirmed_key) {
+        ps_cache::cache::Lookup {
+            state: KeyState::Available,
+            value: Some(blob),
+        } => String::from_utf8(blob)
+            .map(|text| ps_html::font_store::decode_confirmed(&text))
+            .unwrap_or_default(),
+        _ => std::collections::HashSet::new(),
+    };
+    let before = confirmed.len();
+    for triple in &report.font_families {
+        if confirmed.len() >= 64 {
+            break;
+        }
+        confirmed.insert(triple.clone());
+    }
+    if confirmed.len() != before {
+        cache.put(
+            &confirmed_key,
+            ps_html::font_store::encode_confirmed(&confirmed).as_bytes(),
+        );
+    }
+    server.variable(FONT_PRELOAD_BEACON_ACCEPTED).add(1);
 }
 
 /// Parses the LCP/nonce evidence report: a stamped LCP hash joins
@@ -138,6 +205,11 @@ fn parse_beacon_report(query_params: &QueryParams) -> BeaconReport {
     }
     if let Some(nonce) = query_params.lookup1_unescaped(beacon_finder::PARAM_NONCE) {
         report.nonce = nonce;
+    }
+    if let Some(fonts) = query_params.lookup1_unescaped(beacon_finder::PARAM_FONT_FAMILIES) {
+        if !fonts.is_empty() {
+            report.font_families = beacon_finder::parse_font_families(&fonts);
+        }
     }
     report
 }
@@ -270,5 +342,87 @@ mod tests {
             "http://h/hero.png",
             record
         ));
+    }
+
+    #[test]
+    fn font_half_merges_confirmed_triples() {
+        use ps_cache::cache::{Cache, KeyState};
+        let metadata: std::sync::Arc<dyn ps_cache::cache::Cache> =
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new());
+        let server = crate::rewrite::html_context(
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new()),
+            std::sync::Arc::clone(&metadata),
+            std::sync::Arc::new(ps_stats::core::Statistics::new()),
+            0,
+            std::sync::Arc::new(crate::rewrite::UnavailableFetcher),
+        );
+        // Seed a pending font nonce directly.
+        let mut nonces = ps_html::font_store::FontNonces::default();
+        ps_html::font_store::issue_nonce(&mut nonces, "fontnonce1".to_string(), 1000);
+        metadata.put(
+            &ps_html::font_store::nonces_key("http://h/p", "oh1", "@Desktop"),
+            ps_html::font_store::encode_nonces(&nonces).as_bytes(),
+        );
+        // Bad nonce rejects without merging.
+        handle_beacon_evidence(
+            "url=http://h/p&oh=oh1&n=wrong&ff=Manrope%7C700%7Cn",
+            "http://h/p",
+            "Test/1.0",
+            &server,
+            1000,
+        );
+        assert_eq!(
+            server
+                .statistics()
+                .get_variable("preload_critical_fonts_beacon_rejected")
+                .map(|variable| variable.get()),
+            Some(1)
+        );
+        // Issued nonce accepts and unions triples (lowercased).
+        handle_beacon_evidence(
+            "url=http://h/p&oh=oh1&n=fontnonce1&ff=Manrope%7C700%7Cn,Icons%7C400%7Cn",
+            "http://h/p",
+            "Test/1.0",
+            &server,
+            1000,
+        );
+        let blob = match metadata.get(&ps_html::font_store::confirmed_key(
+            "http://h/p",
+            "oh1",
+            "@Desktop",
+        )) {
+            ps_cache::cache::Lookup {
+                state: KeyState::Available,
+                value: Some(blob),
+            } => String::from_utf8(blob).unwrap(),
+            _ => panic!("confirmed blob missing"),
+        };
+        let confirmed = ps_html::font_store::decode_confirmed(&blob);
+        assert_eq!(confirmed.len(), 2);
+        assert!(confirmed
+            .iter()
+            .any(|(family, weight, _)| { family == "manrope" && *weight == 700 }));
+        assert_eq!(
+            server
+                .statistics()
+                .get_variable("preload_critical_fonts_beacon_accepted")
+                .map(|variable| variable.get()),
+            Some(1)
+        );
+        // Consumed nonces do not validate twice.
+        handle_beacon_evidence(
+            "url=http://h/p&oh=oh1&n=fontnonce1&ff=Other%7C400%7Cn",
+            "http://h/p",
+            "Test/1.0",
+            &server,
+            1000,
+        );
+        assert_eq!(
+            server
+                .statistics()
+                .get_variable("preload_critical_fonts_beacon_rejected")
+                .map(|variable| variable.get()),
+            Some(2)
+        );
     }
 }

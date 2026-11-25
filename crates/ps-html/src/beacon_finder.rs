@@ -39,6 +39,13 @@ pub const PARAM_LCP_KIND: &str = "lcpk";
 pub const PARAM_LCP_URL: &str = "lcpu";
 /// Maximum accepted LCP URL length (`kBeaconLcpUrlMaxLength`).
 pub const LCP_URL_MAX_LENGTH: usize = 2048;
+/// Loaded-font triples parameter (`family|weight|style`, comma
+/// joined; style is one of `n`, `i`, `o`).
+pub const PARAM_FONT_FAMILIES: &str = "ff";
+/// Maximum accepted font triples per beacon.
+pub const FONT_TRIPLES_MAX_COUNT: usize = 8;
+/// Maximum accepted font family bytes per triple.
+pub const FONT_FAMILY_MAX_LENGTH: usize = 128;
 
 /// LCP kind: `<img>` element (`kLcpKindImg`).
 pub const LCP_KIND_IMG: &str = "img";
@@ -51,6 +58,48 @@ pub const LCP_KIND_TEXT: &str = "text";
 #[must_use]
 pub fn valid_lcp_kind(kind: &str) -> bool {
     kind == LCP_KIND_IMG || kind == LCP_KIND_BACKGROUND || kind == LCP_KIND_TEXT
+}
+
+/// Parses reported font triples (`family|weight|style`, comma
+/// joined): lowercases families, validates ranges, drops malformed
+/// entries, caps the count. Never fails outright — a beacon with no
+/// usable triples simply confirms nothing.
+#[must_use]
+pub fn parse_font_families(value: &str) -> Vec<(String, u32, crate::font_discovery::FontStyle)> {
+    use crate::font_discovery::FontStyle;
+    let mut out = Vec::new();
+    for item in value.split(',') {
+        if out.len() == FONT_TRIPLES_MAX_COUNT {
+            break;
+        }
+        let mut parts = item.split('|');
+        let (Some(family), Some(weight), Some(style), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
+            continue;
+        };
+        let family = family.trim().to_ascii_lowercase();
+        if family.is_empty() || family.len() > FONT_FAMILY_MAX_LENGTH {
+            continue;
+        }
+        let Ok(weight) = weight.trim().parse::<u32>() else {
+            continue;
+        };
+        if !(1..=1000).contains(&weight) {
+            continue;
+        }
+        let style = match style.trim() {
+            "n" => FontStyle::Normal,
+            "i" => FontStyle::Italic,
+            "o" => FontStyle::Oblique,
+            _ => continue,
+        };
+        let triple = (family, weight, style);
+        if !out.contains(&triple) {
+            out.push(triple);
+        }
+    }
+    out
 }
 
 /* Support, sampling, and nonce constants. */
@@ -512,6 +561,9 @@ pub struct BeaconReport {
     pub lcp_image_url: String,
     /// Reported nonce (`""` when absent).
     pub nonce: String,
+    /// Reported loaded font triples (family, weight, style), capped
+    /// and validated at parse; empty when the beacon carries none.
+    pub font_families: Vec<(String, u32, crate::font_discovery::FontStyle)>,
 }
 
 /// Outcome of merging a beacon report.
@@ -665,6 +717,35 @@ impl BeaconFinder {
 mod tests {
     use super::*;
 
+    #[test]
+    fn font_triples_parse_validate_and_cap() {
+        use crate::font_discovery::FontStyle;
+        assert_eq!(
+            parse_font_families("Manrope|700|n,Icons|400|i"),
+            vec![
+                ("manrope".to_string(), 700, FontStyle::Normal),
+                ("icons".to_string(), 400, FontStyle::Italic),
+            ]
+        );
+        // Oblique, whitespace, duplicates.
+        assert_eq!(
+            parse_font_families(" A |400|o , A|400|o"),
+            vec![("a".to_string(), 400, FontStyle::Oblique)]
+        );
+        // Malformed entries drop; never fail outright.
+        assert!(parse_font_families("").is_empty());
+        assert!(parse_font_families("manrope|bogus|n").is_empty());
+        assert!(parse_font_families("manrope|0|n").is_empty());
+        assert!(parse_font_families("manrope|400|x").is_empty());
+        assert!(parse_font_families("manrope|400").is_empty());
+        assert!(parse_font_families("|400|n").is_empty());
+        let many = (0..20)
+            .map(|i| format!("f{i}|400|n"))
+            .collect::<Vec<_>>()
+            .join(",");
+        assert_eq!(parse_font_families(&many).len(), FONT_TRIPLES_MAX_COUNT);
+    }
+
     #[cfg(target_os = "linux")]
     #[test]
     fn multiprocess_evidence_updates_preserve_nonces_and_reports() {
@@ -779,6 +860,7 @@ mod tests {
             lcp_kind: kind.to_string(),
             lcp_image_url: url.to_string(),
             nonce: nonce.to_string(),
+            font_families: Vec::new(),
         }
     }
 

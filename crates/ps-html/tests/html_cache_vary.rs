@@ -176,6 +176,7 @@ fn seed_learned_beacon(harness: &VaryHarness) -> ps_html::beacon_finder::BeaconE
         lcp_kind: finder::LCP_KIND_IMG.to_string(),
         lcp_image_url: String::new(),
         nonce,
+        font_families: Vec::new(),
     };
     assert_eq!(
         finder::accept_beacon(&mut evidence, &report, START_MS),

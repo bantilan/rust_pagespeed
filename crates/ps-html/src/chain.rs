@@ -64,6 +64,7 @@ pub enum ChainFilter {
     RewrittenContentScanning,
     InsertDnsPrefetch,
     PrioritizeLcpImages,
+    PreloadCriticalFonts,
     InsertAmpLink,
     AddInstrumentation,
     DeferIframe,
@@ -132,6 +133,7 @@ impl ChainFilter {
             ChainFilter::RewrittenContentScanning => "RewrittenContentScanningFilter",
             ChainFilter::InsertDnsPrefetch => "InsertDnsPrefetchFilter",
             ChainFilter::PrioritizeLcpImages => "PrioritizeLcpImagesFilter",
+            ChainFilter::PreloadCriticalFonts => "PreloadCriticalFontsFilter",
             ChainFilter::InsertAmpLink => "InsertAmpLinkFilter",
             ChainFilter::AddInstrumentation => "AddInstrumentationFilter",
             ChainFilter::DeferIframe => "DeferIframeFilter",
@@ -503,6 +505,9 @@ pub fn build_chain(options: &RewriteOptions, ctx: &ChainContext) -> ChainPlan {
     }
     if enabled(options, Filter::PrioritizeLcpImages) {
         plan.post.push(ChainFilter::PrioritizeLcpImages);
+    }
+    if enabled(options, Filter::PreloadCriticalFonts) {
+        plan.post.push(ChainFilter::PreloadCriticalFonts);
     }
     if enabled(options, Filter::InsertAmpLink) {
         plan.post.push(ChainFilter::InsertAmpLink);

@@ -113,10 +113,11 @@ pub enum Filter {
     // so every C++ discriminant (and every stored bit position) keeps
     // its value.
     CompressZstd = 95,
+    PreloadCriticalFonts = 96,
 }
 
 /// Number of filters (`kEndOfFilters`).
-pub const NUM_FILTERS: usize = 96;
+pub const NUM_FILTERS: usize = 97;
 
 impl Filter {
     /// All filters in enum order.
@@ -217,9 +218,10 @@ impl Filter {
         Filter::StripLegacyPolyfills,
         Filter::StripScripts,
         Filter::CompressZstd,
+        Filter::PreloadCriticalFonts,
     ];
 
-    /// Converts a C++ enum value (`0..96`) to a filter.
+    /// Converts a C++ enum value (`0..97`) to a filter.
     #[must_use]
     pub const fn from_repr(value: u8) -> Option<Filter> {
         // `as` casts are not allowed on enums in const fn here, so index ALL.
@@ -329,6 +331,7 @@ impl Filter {
             "slp",
             "ss",
             "cz",
+            "pf",
         ];
         IDS[self as usize]
     }
@@ -434,6 +437,7 @@ impl Filter {
             "Strip Legacy Polyfills",
             "Strip Scripts",
             "Compress Zstd",
+            "Preload Critical Fonts",
         ];
         NAMES[self as usize]
     }
@@ -441,7 +445,7 @@ impl Filter {
     /// Looks up a filter by URL id (`LookupFilterById`; case-sensitive).
     #[must_use]
     pub fn from_id(id: &str) -> Option<Filter> {
-        // Linear scan over 96 entries; the C++ binary search is O(log n)
+        // Linear scan over 97 entries; the C++ binary search is O(log n)
         // but both are trivial here. Sorted-by-id order is irrelevant.
         Filter::ALL.iter().find(|f| f.id() == id).copied()
     }
@@ -454,8 +458,8 @@ impl Filter {
     /// `ServeDeprecationNotice`) have no public name and return `None`.
     #[must_use]
     pub fn from_name(name: &str) -> Option<Filter> {
-        // 94 entries in gperf order.
-        const MAP: [(&str, Filter); 94] = [
+        // 95 entries in gperf order.
+        const MAP: [(&str, Filter); 95] = [
             ("add_base_tag", Filter::AddBaseTag),
             ("add_head", Filter::AddHead),
             ("add_ids", Filter::AddIds),
@@ -539,6 +543,7 @@ impl Filter {
             ("outline_css", Filter::OutlineCss),
             ("outline_javascript", Filter::OutlineJavascript),
             ("pedantic", Filter::Pedantic),
+            ("preload_critical_fonts", Filter::PreloadCriticalFonts),
             ("prioritize_lcp_images", Filter::PrioritizeLcpImages),
             ("prioritize_critical_css", Filter::PrioritizeCriticalCss),
             ("recompress_jpeg", Filter::RecompressJpeg),
@@ -581,7 +586,8 @@ impl Filter {
     }
 }
 
-/// Core filters (`kCoreFilterSet`, 30 entries, C++ order).
+/// Core filters (`kCoreFilterSet`, 31 entries, C++ order plus the
+/// Rust-port `PreloadCriticalFonts`, on by default).
 pub const CORE_FILTERS: &[Filter] = &[
     Filter::AddHead,
     Filter::CombineCss,
@@ -613,6 +619,8 @@ pub const CORE_FILTERS: &[Filter] = &[
     Filter::RewriteStyleAttributesWithUrl,
     Filter::StripImageColorProfile,
     Filter::StripImageMetaData,
+    // Rust-port extension appended last (enum order, not alphabetical).
+    Filter::PreloadCriticalFonts,
 ];
 
 /// Optimize-for-bandwidth filters (`kOptimizeForBandwidthFilterSet`, 15).
@@ -1386,19 +1394,25 @@ mod tests {
     #[test]
     fn enum_order_and_count() {
         assert_eq!(Filter::ALL.len(), NUM_FILTERS);
-        assert_eq!(NUM_FILTERS, 96);
+        assert_eq!(NUM_FILTERS, 97);
         for (i, f) in Filter::ALL.iter().enumerate() {
             assert_eq!(*f as usize, i, "discriminant drift at {f:?}");
             assert_eq!(Filter::from_repr(i as u8), Some(*f));
         }
-        assert_eq!(Filter::from_repr(96), None);
+        assert_eq!(Filter::from_repr(97), None);
         // Boundary sentinels from C++ (`kFirstFilter`, last filter).
         assert_eq!(Filter::ALL[0], Filter::AddBaseTag);
         assert_eq!(Filter::ALL[94], Filter::StripScripts);
-        // Rust-port extension appended past the C++ set.
+        // Rust-port extensions appended past the C++ set.
         assert_eq!(Filter::ALL[95], Filter::CompressZstd);
         assert_eq!(Filter::CompressZstd.id(), "cz");
         assert_eq!(Filter::CompressZstd.display_name(), "Compress Zstd");
+        assert_eq!(Filter::ALL[96], Filter::PreloadCriticalFonts);
+        assert_eq!(Filter::PreloadCriticalFonts.id(), "pf");
+        assert_eq!(
+            Filter::PreloadCriticalFonts.display_name(),
+            "Preload Critical Fonts"
+        );
     }
 
     #[test]
@@ -1531,6 +1545,14 @@ mod tests {
             Filter::from_name("Compress_Zstd"),
             Some(Filter::CompressZstd)
         );
+        assert_eq!(
+            Filter::from_name("preload_critical_fonts"),
+            Some(Filter::PreloadCriticalFonts)
+        );
+        assert_eq!(
+            Filter::from_name("Preload_Critical_Fonts"),
+            Some(Filter::PreloadCriticalFonts)
+        );
         // Aliases.
         assert_eq!(
             Filter::from_name("inline_preview_images"),
@@ -1578,7 +1600,8 @@ mod tests {
                 "duplicate in set"
             );
         }
-        assert_eq!(CORE_FILTERS.len(), 30);
+        assert_eq!(CORE_FILTERS.len(), 31);
+        assert!(CORE_FILTERS.contains(&Filter::PreloadCriticalFonts));
         assert_eq!(BANDWIDTH_FILTERS.len(), 15);
         assert_eq!(TEST_FILTERS.len(), 17);
         assert_eq!(DANGEROUS_FILTERS.len(), 14);
@@ -1821,9 +1844,9 @@ mod tests {
         set.remove(Filter::RewriteCss);
         assert_eq!(set.len(), 1);
         let set = FilterSet::from_slice(CORE_FILTERS);
-        assert_eq!(set.len(), 30);
+        assert_eq!(set.len(), 31);
         let round: Vec<Filter> = set.iter().collect();
-        assert_eq!(round.len(), 30);
+        assert_eq!(round.len(), 31);
         // Iteration is in enum order.
         let mut sorted = round.clone();
         sorted.sort();

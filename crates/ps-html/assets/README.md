@@ -26,3 +26,9 @@ Source: `mod_pagespeed/net/instaweb/genfiles/rewriter/` (checked-in build
 outputs of the Closure Compiler over `net/instaweb/rewriter/*.js`).
 Regenerate by rebuilding those genfiles and re-copying; `static_assets`
 tests pin distinguishing markers so a stale copy fails loudly.
+
+Exception: `font_preload_beacon_opt.js` / `font_preload_beacon_dbg.js`
+are hand-written for the Rust port (no Closure source exists): the dbg
+build is the reviewed source of truth, the opt build its manual
+minification. Keep the two behavior-identical; the marker test below
+pins both entry points.

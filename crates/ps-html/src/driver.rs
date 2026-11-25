@@ -157,6 +157,13 @@ impl Driver {
                             filters::prioritize_lcp_images::PrioritizeLcpImagesFilter::new(driver),
                         ) as Box<dyn crate::filter::HtmlFilter>
                     }),
+                    ChainFilter::PreloadCriticalFonts => resource_driver.clone().map(|driver| {
+                        Box::new(
+                            filters::preload_critical_fonts::PreloadCriticalFontsFilter::new(
+                                driver,
+                            ),
+                        ) as Box<dyn crate::filter::HtmlFilter>
+                    }),
                     ChainFilter::AddInstrumentation => {
                         let beacon = options.beacon_url().unwrap_or_else(|| {
                             ps_config::options::BeaconUrl::parse("/ngx_pagespeed_beacon")

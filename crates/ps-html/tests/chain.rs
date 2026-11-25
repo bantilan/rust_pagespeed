@@ -985,7 +985,12 @@ fn level_golden_core() {
             "ImageRewriteFilter",
             "CacheExtenderFilter",
         ],
-        &["MetaTagFilter", "SupportNoscriptFilter", "HtmlWriterFilter"],
+        &[
+            "PreloadCriticalFontsFilter",
+            "MetaTagFilter",
+            "SupportNoscriptFilter",
+            "HtmlWriterFilter",
+        ],
     );
 }
 
@@ -1028,6 +1033,7 @@ fn level_golden_testing() {
         ],
         &[
             "ResponsiveImageSecondFilter",
+            "PreloadCriticalFontsFilter",
             "InsertAmpLinkFilter",
             "DeferIframeFilter",
             "JsDisableFilter",
@@ -1086,6 +1092,7 @@ fn level_golden_all() {
             "ResponsiveImageSecondFilter",
             "InsertDnsPrefetchFilter",
             "PrioritizeLcpImagesFilter",
+            "PreloadCriticalFontsFilter",
             "InsertAmpLinkFilter",
             "AddInstrumentationFilter",
             "DeferIframeFilter",

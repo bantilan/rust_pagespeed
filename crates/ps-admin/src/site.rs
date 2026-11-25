@@ -253,6 +253,14 @@ impl AdminSite {
             Self::dashboard_counter(stats, "javascript_blocks_minified", &previous);
         let css_rewrites = Self::dashboard_counter(stats, "css_filter_blocks_rewritten", &previous);
         let image_rewrites = Self::dashboard_counter(stats, "image_rewrites", &previous);
+        let fonts_preloaded =
+            Self::dashboard_counter(stats, "preload_critical_fonts_preloaded", &previous);
+        let fonts_discovered =
+            Self::dashboard_counter(stats, "preload_critical_fonts_discovered", &previous);
+        let fonts_skipped =
+            Self::dashboard_counter(stats, "preload_critical_fonts_skipped", &previous);
+        let fonts_confirmed =
+            Self::dashboard_counter(stats, "preload_critical_fonts_beacon_confirmed", &previous);
         let total_rewrites = javascript_rewrites + css_rewrites + image_rewrites;
         let html_publications = Self::dashboard_counter(stats, "html_cache_inserts", &previous);
         let html_served = Self::dashboard_counter(stats, "html_cache_bytes_served", &previous);
@@ -285,7 +293,7 @@ impl AdminSite {
         );
         fetch.handle_write(
             format!(
-                "<div class='pagespeed-dashboard-card-note'>Since this admin instance initialized</div></article><article class='pagespeed-dashboard-card'><div class='pagespeed-dashboard-card-label'>SUCCESSFUL REWRITES</div><div class='pagespeed-dashboard-value'>{total_rewrites}</div><div class='pagespeed-dashboard-card-note'>Across image, CSS, and JavaScript resources</div></article><article class='pagespeed-dashboard-card'><div class='pagespeed-dashboard-card-label'>IMAGE REWRITES</div><a class='pagespeed-dashboard-image-link' href='images'><div class='pagespeed-dashboard-value'>{image_rewrites}</div><span>Inspect recent optimized images</span></a></article></div>"
+                "<div class='pagespeed-dashboard-card-note'>Since this admin instance initialized</div></article><article class='pagespeed-dashboard-card'><div class='pagespeed-dashboard-card-label'>SUCCESSFUL REWRITES</div><div class='pagespeed-dashboard-value'>{total_rewrites}</div><div class='pagespeed-dashboard-card-note'>Across image, CSS, and JavaScript resources</div></article><article class='pagespeed-dashboard-card'><div class='pagespeed-dashboard-card-label'>IMAGE REWRITES</div><a class='pagespeed-dashboard-image-link' href='images'><div class='pagespeed-dashboard-value'>{image_rewrites}</div><span>Inspect recent optimized images</span></a></article><article class='pagespeed-dashboard-card'><div class='pagespeed-dashboard-card-label'>FONT PRELOADS</div><div class='pagespeed-dashboard-value'>{fonts_preloaded}</div><div class='pagespeed-dashboard-card-note'>{fonts_discovered} discovered · {fonts_skipped} skipped · {fonts_confirmed} beacon-confirmed</div></article></div>"
             )
             .as_bytes(),
         );
