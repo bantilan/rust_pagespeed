@@ -170,6 +170,34 @@ API. No optimization logic may live behind `unsafe` in `ps-nginx`.
 Release builds use `opt-level = 3`, full LTO, and `codegen-units = 1`
 (see the workspace `Cargo.toml`).
 
+## AVIF runtime dependency
+
+**AVIF conversion requires the external `avifenc` executable on every server
+running the module.** Enabling `convert_to_avif` or installing the PageSpeed
+module alone does not install this encoder. Without it, AVIF conversion fails
+and images can remain in another format, such as WebP or JPEG.
+
+On Ubuntu/Debian, install and verify it:
+
+```bash
+sudo apt update
+sudo apt install libavif-bin
+command -v avifenc
+avifenc --version
+```
+
+The executable must be available in the NGINX worker environment's `PATH` and
+executable by its user. A successful AVIF test on a development machine does
+not verify this dependency on the production server.
+
+After installing the encoder, purge the affected PageSpeed resource and HTML
+cache entries, or allow them to expire. Existing cached WebP/JPEG results may
+otherwise continue to be served. Request the page again to warm background
+optimization; verify the image response's **`Content-Type: image/avif`**, rather
+than relying on its URL extension. The client must advertise AVIF support, and
+existing eligibility, conversion limits, and fallback rules still apply—installing
+the encoder does not force every image to become AVIF.
+
 ## Building and testing
 
 Requires a Rust stable toolchain:

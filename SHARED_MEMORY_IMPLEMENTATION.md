@@ -810,3 +810,7 @@ User authorizes fix. Before: HTTPSheader.jpg returnsJPEG712226bytes despiteAVIFA
 ## Latest latency check — verified 2026-11-25 05:16 UTC
 
 Userrequestedread-onlybenchmark after231832finstall.30localHITs/group:identity14.761ms,p9515.250;zstd14.8785ms,p9516.351;keepalive0.86264ms.90localrequestsall200/HIT. Public10all200:8HITmedian307.498ms,2MISS346.840/381.699ms,allmedian336.8545ms; notclaimallHITorregressioncause. RewrittenheaderstillWebP80042bytes,servicesactive,nolingeringsockets. No serverchanges/runtimeedits. Rawdata appendeddocs/performance/https-file-images, resumeimplementationstateunchanged.
+
+## AVIF deployment dependency documentation — completed
+
+User requested README advice after live diagnosis: avifenc missing onproduction (libavif-bin Installed:none, Candidate1.3.0-1ubuntu4). Added prominent AVIF runtime dependency section beforebuilding: Ubuntu/Debianaptinstall/versioncheck, everyproductionserver/workerPATH/execution requirements, module/filteraloneinsufficient, cachedWebP/JPEGpurge/expiry and backgroundwarmup, verifyContent-Type notextension, eligibility/fallbacklimitsretained. Documentationonly; no productioninstallation/configchanges. Verified referencedexternalencoder in crates/ps-image/src/avif.rs; gitdiffcheckpassed. No runtime tests needed for prose-only change.
