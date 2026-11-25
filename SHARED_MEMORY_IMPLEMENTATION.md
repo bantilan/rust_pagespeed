@@ -814,3 +814,7 @@ Userrequestedread-onlybenchmark after231832finstall.30localHITs/group:identity14
 ## AVIF deployment dependency documentation — completed
 
 User requested README advice after live diagnosis: avifenc missing onproduction (libavif-bin Installed:none, Candidate1.3.0-1ubuntu4). Added prominent AVIF runtime dependency section beforebuilding: Ubuntu/Debianaptinstall/versioncheck, everyproductionserver/workerPATH/execution requirements, module/filteraloneinsufficient, cachedWebP/JPEGpurge/expiry and backgroundwarmup, verifyContent-Type notextension, eligibility/fallbacklimitsretained. Documentationonly; no productioninstallation/configchanges. Verified referencedexternalencoder in crates/ps-image/src/avif.rs; gitdiffcheckpassed. No runtime tests needed for prose-only change.
+
+## Live latency check — 2026-11-26
+
+User requested live latency check only. Completed public and SSH-loopback read-only probes of homepage/hello-world/sample-page, fresh TLS and keepalive,3warmups+20samples each. Commands/raw results/method/limitations: docs/performance/live-20261126/RESULTS.md and adjacent scripts/JSON. Keepalive local medians0.899/1.080/0.995ms; public71.928/75.166/71.643ms, all20HITs/page. Fresh local TLS~13ms dominates total~14ms; not Rust stage profiling or attribution of historical residual. Fresh public samples18HIT+1MISS+1BYPASS/page; no reliable cold/MISS benchmark. No source edits/deploy/purge/restart. Scripts completed, no background commands. Existing feature implementation resume point is not replaced by this measurement request.

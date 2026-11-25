@@ -1,0 +1,1054 @@
+{
+  "scope": "server loopback TLS",
+  "at_utc": "2026-11-25T18:29:22Z",
+  "method": "HTTP/1.1 fresh TLS connections, identity encoding, 3 warmups then 20 sequential requests per URL; existing caches; no purge/config changes",
+  "pages": {
+    "/": {
+      "summary": {
+        "HIT": {
+          "n": 20,
+          "ttfb_ms": {
+            "median": 14.238499999999998,
+            "p95": 15.571,
+            "min": 13.769,
+            "max": 16.347
+          },
+          "total_ms": {
+            "median": 14.403500000000001,
+            "p95": 15.682000000000002,
+            "min": 13.913,
+            "max": 16.503
+          },
+          "tls_ready_ms": {
+            "median": 13.03,
+            "p95": 13.956,
+            "min": 12.628,
+            "max": 15.200999999999999
+          }
+        }
+      },
+      "rows": [
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 15.778,
+          "total_ms": 15.916,
+          "connect_ms": 0.195,
+          "tls_ready_ms": 14.321,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 15.011999999999999,
+          "total_ms": 15.184,
+          "connect_ms": 0.11,
+          "tls_ready_ms": 13.690000000000001,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.881,
+          "total_ms": 15.015,
+          "connect_ms": 0.14300000000000002,
+          "tls_ready_ms": 13.634,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.345,
+          "total_ms": 14.468,
+          "connect_ms": 0.12000000000000001,
+          "tls_ready_ms": 13.112,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.831000000000001,
+          "total_ms": 14.973,
+          "connect_ms": 0.116,
+          "tls_ready_ms": 13.528,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.409,
+          "total_ms": 14.592,
+          "connect_ms": 0.11900000000000001,
+          "tls_ready_ms": 13.25,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.235,
+          "total_ms": 14.387,
+          "connect_ms": 0.122,
+          "tls_ready_ms": 12.966999999999999,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.241999999999999,
+          "total_ms": 14.42,
+          "connect_ms": 0.118,
+          "tls_ready_ms": 13.093,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.995000000000001,
+          "total_ms": 14.136,
+          "connect_ms": 0.133,
+          "tls_ready_ms": 12.886999999999999,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.054,
+          "total_ms": 14.205,
+          "connect_ms": 0.14300000000000002,
+          "tls_ready_ms": 12.936,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.769,
+          "total_ms": 13.913,
+          "connect_ms": 0.11299999999999999,
+          "tls_ready_ms": 12.703000000000001,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.221,
+          "total_ms": 14.369,
+          "connect_ms": 0.108,
+          "tls_ready_ms": 12.92,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.785,
+          "total_ms": 13.941,
+          "connect_ms": 0.10900000000000001,
+          "tls_ready_ms": 12.628,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.46,
+          "total_ms": 14.587,
+          "connect_ms": 0.121,
+          "tls_ready_ms": 13.306999999999999,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 15.571,
+          "total_ms": 15.682000000000002,
+          "connect_ms": 0.118,
+          "tls_ready_ms": 13.956,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.609,
+          "total_ms": 14.748000000000001,
+          "connect_ms": 0.152,
+          "tls_ready_ms": 13.379,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.342,
+          "total_ms": 14.469,
+          "connect_ms": 0.11900000000000001,
+          "tls_ready_ms": 13.198,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.827,
+          "total_ms": 13.974,
+          "connect_ms": 0.12300000000000001,
+          "tls_ready_ms": 12.683,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.809999999999999,
+          "total_ms": 13.953999999999999,
+          "connect_ms": 0.106,
+          "tls_ready_ms": 12.639,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.875,
+          "total_ms": 14.022,
+          "connect_ms": 0.115,
+          "tls_ready_ms": 12.755,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.302,
+          "total_ms": 14.454,
+          "connect_ms": 0.115,
+          "tls_ready_ms": 13.164,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 16.347,
+          "total_ms": 16.503,
+          "connect_ms": 0.156,
+          "tls_ready_ms": 15.200999999999999,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.951,
+          "total_ms": 14.078999999999999,
+          "connect_ms": 0.101,
+          "tls_ready_ms": 12.773,
+          "bytes": 58329,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        }
+      ]
+    },
+    "/hello-world/": {
+      "summary": {
+        "HIT": {
+          "n": 20,
+          "ttfb_ms": {
+            "median": 13.988,
+            "p95": 14.669,
+            "min": 13.635,
+            "max": 14.952
+          },
+          "total_ms": {
+            "median": 14.18,
+            "p95": 14.867,
+            "min": 13.857,
+            "max": 15.256
+          },
+          "tls_ready_ms": {
+            "median": 12.769,
+            "p95": 13.360000000000001,
+            "min": 12.368,
+            "max": 13.424999999999999
+          }
+        }
+      },
+      "rows": [
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "BYPASS",
+          "ttfb_ms": 103.002,
+          "total_ms": 103.198,
+          "connect_ms": 0.129,
+          "tls_ready_ms": 12.901,
+          "bytes": 82015,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "MISS",
+          "ttfb_ms": 102.202,
+          "total_ms": 102.37,
+          "connect_ms": 0.118,
+          "tls_ready_ms": 13.852,
+          "bytes": 78932,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.122,
+          "total_ms": 14.293,
+          "connect_ms": 0.101,
+          "tls_ready_ms": 12.728,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.894,
+          "total_ms": 14.08,
+          "connect_ms": 0.111,
+          "tls_ready_ms": 12.768,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.22,
+          "total_ms": 14.399000000000001,
+          "connect_ms": 0.11299999999999999,
+          "tls_ready_ms": 12.974,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.431,
+          "total_ms": 14.607,
+          "connect_ms": 0.122,
+          "tls_ready_ms": 13.261000000000001,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.437999999999999,
+          "total_ms": 14.633000000000001,
+          "connect_ms": 0.12999999999999998,
+          "tls_ready_ms": 13.185,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.988999999999999,
+          "total_ms": 14.17,
+          "connect_ms": 0.107,
+          "tls_ready_ms": 12.802,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.669,
+          "total_ms": 14.867,
+          "connect_ms": 0.111,
+          "tls_ready_ms": 13.360000000000001,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.341,
+          "total_ms": 14.525,
+          "connect_ms": 0.11,
+          "tls_ready_ms": 13.113,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.942,
+          "total_ms": 14.134,
+          "connect_ms": 0.10900000000000001,
+          "tls_ready_ms": 12.677000000000001,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.981,
+          "total_ms": 14.164,
+          "connect_ms": 0.149,
+          "tls_ready_ms": 12.759,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.94,
+          "total_ms": 14.101,
+          "connect_ms": 0.125,
+          "tls_ready_ms": 12.639,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.181,
+          "total_ms": 14.366,
+          "connect_ms": 0.121,
+          "tls_ready_ms": 12.831999999999999,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.987,
+          "total_ms": 14.181,
+          "connect_ms": 0.107,
+          "tls_ready_ms": 12.661,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.635,
+          "total_ms": 13.857,
+          "connect_ms": 0.114,
+          "tls_ready_ms": 12.468,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.081,
+          "total_ms": 14.27,
+          "connect_ms": 0.146,
+          "tls_ready_ms": 12.849,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.024,
+          "total_ms": 14.209,
+          "connect_ms": 0.114,
+          "tls_ready_ms": 12.77,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.68,
+          "total_ms": 13.857,
+          "connect_ms": 0.11,
+          "tls_ready_ms": 12.368,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.964,
+          "total_ms": 14.173,
+          "connect_ms": 0.10500000000000001,
+          "tls_ready_ms": 12.71,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.977,
+          "total_ms": 14.179,
+          "connect_ms": 0.134,
+          "tls_ready_ms": 12.649000000000001,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.952,
+          "total_ms": 15.256,
+          "connect_ms": 0.16899999999999998,
+          "tls_ready_ms": 13.424999999999999,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.971,
+          "total_ms": 14.172,
+          "connect_ms": 0.11,
+          "tls_ready_ms": 12.735,
+          "bytes": 78931,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        }
+      ]
+    },
+    "/sample-page/": {
+      "summary": {
+        "HIT": {
+          "n": 20,
+          "ttfb_ms": {
+            "median": 13.9085,
+            "p95": 22.53,
+            "min": 13.463,
+            "max": 22.825000000000003
+          },
+          "total_ms": {
+            "median": 14.088999999999999,
+            "p95": 22.731,
+            "min": 13.605,
+            "max": 23.028
+          },
+          "tls_ready_ms": {
+            "median": 12.698,
+            "p95": 21.142999999999997,
+            "min": 12.414,
+            "max": 21.454
+          }
+        }
+      },
+      "rows": [
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "BYPASS",
+          "ttfb_ms": 81.387,
+          "total_ms": 81.53399999999999,
+          "connect_ms": 0.122,
+          "tls_ready_ms": 12.992,
+          "bytes": 67184,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "MISS",
+          "ttfb_ms": 73.561,
+          "total_ms": 73.718,
+          "connect_ms": 0.11,
+          "tls_ready_ms": 12.465,
+          "bytes": 67201,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.681,
+          "total_ms": 14.854,
+          "connect_ms": 0.12000000000000001,
+          "tls_ready_ms": 13.384,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.437,
+          "total_ms": 14.636,
+          "connect_ms": 0.125,
+          "tls_ready_ms": 13.129,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.891,
+          "total_ms": 14.064,
+          "connect_ms": 0.116,
+          "tls_ready_ms": 12.48,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 15.588,
+          "total_ms": 15.941,
+          "connect_ms": 0.16799999999999998,
+          "tls_ready_ms": 13.905000000000001,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.85,
+          "total_ms": 14.013,
+          "connect_ms": 0.106,
+          "tls_ready_ms": 12.652,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.674000000000001,
+          "total_ms": 13.84,
+          "connect_ms": 0.13899999999999998,
+          "tls_ready_ms": 12.467,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.925999999999998,
+          "total_ms": 14.113999999999999,
+          "connect_ms": 0.118,
+          "tls_ready_ms": 12.479000000000001,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.030000000000001,
+          "total_ms": 14.202,
+          "connect_ms": 0.115,
+          "tls_ready_ms": 12.712,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 15.399,
+          "total_ms": 15.635,
+          "connect_ms": 0.122,
+          "tls_ready_ms": 13.963,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.56,
+          "total_ms": 14.712,
+          "connect_ms": 0.133,
+          "tls_ready_ms": 13.166,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 22.825000000000003,
+          "total_ms": 23.028,
+          "connect_ms": 0.177,
+          "tls_ready_ms": 21.454,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 14.659,
+          "total_ms": 14.824,
+          "connect_ms": 0.124,
+          "tls_ready_ms": 13.466000000000001,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 18.873,
+          "total_ms": 19.044999999999998,
+          "connect_ms": 0.162,
+          "tls_ready_ms": 17.735999999999997,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.703999999999999,
+          "total_ms": 13.865,
+          "connect_ms": 0.091,
+          "tls_ready_ms": 12.606,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.806000000000001,
+          "total_ms": 13.978000000000002,
+          "connect_ms": 0.134,
+          "tls_ready_ms": 12.684000000000001,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.689,
+          "total_ms": 13.872,
+          "connect_ms": 0.101,
+          "tls_ready_ms": 12.465,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.887,
+          "total_ms": 14.064,
+          "connect_ms": 0.108,
+          "tls_ready_ms": 12.75,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.815,
+          "total_ms": 14.009,
+          "connect_ms": 0.131,
+          "tls_ready_ms": 12.629,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.463,
+          "total_ms": 13.605,
+          "connect_ms": 0.125,
+          "tls_ready_ms": 12.414,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 22.53,
+          "total_ms": 22.731,
+          "connect_ms": 0.156,
+          "tls_ready_ms": 21.142999999999997,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_ms": 13.753,
+          "total_ms": 13.947,
+          "connect_ms": 0.11299999999999999,
+          "tls_ready_ms": 12.531,
+          "bytes": 67200,
+          "server": [
+            "nginx/1.31.10+183c879"
+          ],
+          "rum": false
+        }
+      ]
+    }
+  }
+}
