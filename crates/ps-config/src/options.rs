@@ -2039,6 +2039,12 @@ impl RewriteOptions {
         )
     }
 
+    /// Opt-in automatic sizing policy, independent of manual class rules.
+    #[must_use]
+    pub fn srcset_auto_sizes(&self) -> bool {
+        matches!(self.get_by_name("SrcsetAutoSizes"), Some(Value::Bool(true)))
+    }
+
     /// Dedicated srcset layout policy; disabled until explicitly enabled.
     #[must_use]
     pub fn srcset_sizes_enabled(&self) -> bool {
@@ -4757,6 +4763,44 @@ mod tests {
             .set_option("HtmlCacheEarlyLookup", "on", Scope::Server)
             .unwrap();
         assert!(options.html_cache_early_lookup());
+    }
+
+    #[test]
+    fn automatic_srcset_option_scope_merge_and_signatures() {
+        let defaults = RewriteOptions::new();
+        assert!(!defaults.srcset_auto_sizes());
+        let mut options = defaults.clone();
+        assert!(options
+            .set_option("SrcsetAutoSizes", "on", Scope::Query)
+            .is_err());
+        assert_eq!(options.signature(), defaults.signature());
+        assert!(options
+            .set_option("SrcsetAutoSizes", "maybe", Scope::Server)
+            .is_err());
+        options
+            .set_option("SrcsetAutoSizes", "on", Scope::Directory)
+            .unwrap();
+        assert!(options.srcset_auto_sizes());
+        assert!(!options.srcset_sizes_enabled());
+        assert!(options.srcset_sizes_class().is_empty());
+        assert!(options.srcset_sizes().is_empty());
+        assert_ne!(options.signature(), defaults.signature());
+        let signature = options.signature_shared();
+        assert!(std::sync::Arc::ptr_eq(
+            &signature,
+            &options.signature_shared()
+        ));
+        let mut inherited = defaults.clone();
+        inherited.merge(&options);
+        assert!(inherited.srcset_auto_sizes());
+        assert_eq!(inherited.signature(), options.signature());
+        let mut disabled = RewriteOptions::new();
+        disabled
+            .set_option("SrcsetAutoSizes", "off", Scope::Directory)
+            .unwrap();
+        inherited.merge(&disabled);
+        assert!(!inherited.srcset_auto_sizes());
+        assert_ne!(inherited.signature(), options.signature());
     }
 
     #[test]

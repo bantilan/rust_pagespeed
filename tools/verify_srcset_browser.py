@@ -21,6 +21,7 @@ p.add_argument('--nginx', required=True)
 p.add_argument('--module', required=True)
 p.add_argument('--chrome', default='/usr/bin/google-chrome')
 p.add_argument('--output', required=True)
+p.add_argument('--native-auto-probe', action='store_true', help='Probe browser-native lazy sizes=auto with static markup; does not test an automatic module filter')
 a = p.parse_args()
 root = Path(tempfile.mkdtemp(prefix='ps-srcset-browser-'))
 (root / 'logs').mkdir()
@@ -33,7 +34,12 @@ page = '''<html><head><style>body{margin:0}.slot{width:calc(100vw - 60px);max-wi
 <body><div class="slot"><img class="hero" width="800" height="600" src="/800.jpg" srcset="/300.jpg 300w, /768.jpg 768w, /800.jpg 800w" sizes="(max-width: 800px) 100vw, 800px"></div></body></html>'''
 for mode in ['off', 'on']:
     (root / mode).mkdir()
-    (root / mode / 'index.html').write_text(page)
+    fixture = page
+    if a.native_auto_probe:
+        fixture = fixture.replace('<img class=', '<img loading="lazy" class=')
+        if mode == 'on':
+            fixture = fixture.replace('sizes="', 'sizes="auto, ', 1)
+    (root / mode / 'index.html').write_text(fixture)
 s = socket.socket(); s.bind(('127.0.0.1', 0)); port = s.getsockname()[1]; s.close()
 conf = f'''load_module {Path(a.module).resolve()};
 worker_processes 1;
@@ -57,6 +63,10 @@ http {{
  }}
 }}
 '''
+if a.native_auto_probe:
+    # Static fixture probe is independent of the future automatic filter.
+    conf = conf.replace('location /on/ { pagespeed SrcsetSizesEnabled on; }',
+                        'location /on/ { pagespeed SrcsetSizesEnabled off; }')
 (root / 'nginx.conf').write_text(conf)
 
 class Chrome:
@@ -109,7 +119,8 @@ proc = browser = None
 result = {'passed': False, 'prefix': str(root), 'cases': [],
           'module_sha256': hashlib.sha256(Path(a.module).read_bytes()).hexdigest(),
           'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
-          'fixture': 'Only supplied300/768/800JPEGs; PassThrough+sizes policy, no image conversion or variants',
+          'fixture': 'Static native lazy-auto browser probe; automatic module filter NOT implemented' if a.native_auto_probe else 'Only supplied300/768/800JPEGs; PassThrough+sizes policy, no image conversion or variants',
+          'native_auto_probe': a.native_auto_probe,
           'jpeg_bytes': {str(w): (root / f'{w}.jpg').stat().st_size for w in [300, 768, 800]}}
 try:
     subprocess.run([a.nginx, '-t', '-p', str(root), '-c', str(root / 'nginx.conf')], check=True, capture_output=True)
@@ -134,7 +145,7 @@ try:
                 browser.call('Network.setCacheDisabled', {'cacheDisabled': True}, session)
                 browser.call('Page.enable', session=session)
                 browser.call('Page.navigate', {'url': f'http://127.0.0.1:{port}/{mode}/index.html'}, session)
-                expression = '''new Promise((resolve,reject)=>{let tries=0;const timer=setInterval(()=>{const i=document.querySelector('img');if(i&&i.complete&&i.naturalWidth){clearInterval(timer);const r=performance.getEntriesByName(i.currentSrc).at(-1);resolve({viewport:innerWidth,dpr:devicePixelRatio,currentSrc:i.currentSrc,sizes:i.sizes,srcset:i.srcset,cssWidth:i.getBoundingClientRect().width,naturalWidth:i.naturalWidth,naturalHeight:i.naturalHeight,transferSize:r?.transferSize,encodedBodySize:r?.encodedBodySize});}else if(++tries>200){clearInterval(timer);reject('image load timeout');}},25)})'''
+                expression = '''new Promise((resolve,reject)=>{let tries=0;const timer=setInterval(()=>{const i=document.querySelector('img');if(i&&i.complete&&i.naturalWidth){clearInterval(timer);const entries=performance.getEntriesByType('resource').filter(r=>r.initiatorType==='img');const r=performance.getEntriesByName(i.currentSrc).at(-1);resolve({imageRequests:entries.map(r=>({url:r.name,bytes:r.encodedBodySize})),loading:i.loading,viewport:innerWidth,dpr:devicePixelRatio,currentSrc:i.currentSrc,sizes:i.sizes,srcset:i.srcset,cssWidth:i.getBoundingClientRect().width,naturalWidth:i.naturalWidth,naturalHeight:i.naturalHeight,transferSize:r?.transferSize,encodedBodySize:r?.encodedBodySize});}else if(++tries>200){clearInterval(timer);reject('image load timeout');}},25)})'''
                 evaluated = browser.call('Runtime.evaluate', {'expression': expression, 'awaitPromise': True, 'returnByValue': True}, session)
                 assert 'exceptionDetails' not in evaluated, evaluated
                 sample = evaluated['result']['value']
@@ -144,9 +155,12 @@ try:
                 sample.update(mode=mode, fileWidth=selected, fileHeight=selected * 3 // 4)
                 assert sample['encodedBodySize'] == result['jpeg_bytes'][str(selected)], sample
                 if mode == 'on':
-                    assert sample['sizes'] == '(max-width: 800px) calc(100vw - 60px), 645px', sample
+                    assert sample['sizes'] == ('auto, (max-width: 800px) 100vw, 800px' if a.native_auto_probe else '(max-width: 800px) calc(100vw - 60px), 645px'), sample
                 else:
                     assert sample['sizes'] == '(max-width: 800px) 100vw, 800px', sample
+                if a.native_auto_probe:
+                    assert sample['loading'] == 'lazy', sample
+                    assert len(sample['imageRequests']) == 1, sample
                 result['cases'].append(sample)
                 browser.call('Target.closeTarget', {'targetId': target})
     for i in range(0, len(result['cases']), 2):
