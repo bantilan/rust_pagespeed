@@ -1,6 +1,6 @@
 # Srcset-only filter: resumable implementation
 
-Status: Phase0 verified; Phase1 pending. Baseline source9b6435b. No runtime filter/configuration behavior changed, no live edits/deployment. User explicitly excludes background variant generation. One independently functional/tested phase per session is the intended usage boundary.
+Status: Phases0–1 verified; Phase2 pending. Baseline source9b6435b. Phase1 adds configuration groundwork only; no HTML-output changes or live edits/deployment. User explicitly excludes background variant generation. One independently functional/tested phase per session is the intended usage boundary.
 
 ## Scope and architectural decisions
 
@@ -33,12 +33,12 @@ Status: Phase0 verified; Phase1 pending. Baseline source9b6435b. No runtime filt
 - [x] Persist parse/serialize and live warm HTML-HIT baselines with raw data/commands.
 - [x] Record honest limits, future benchmark requirements and exact resume point.
 
-### Phase1 — opt-in configuration: PENDING
+### Phase1 — opt-in configuration: VERIFIED
 
-- [ ] Specify filter and targeted sizes-rule syntax, validation/scope/defaults and byte/rule/candidate caps before editing runtime code.
-- [ ] Prefer a separate srcset-only filter over hijacking C++ responsive_images.
-- [ ] Implement default-off configuration, effective-options signature/key separation, invalid-value tests and config-only milestone commit.
-- [ ] Decide whether candidate changes provide a measurable benefit beyond explicit sizes correction; avoid implementing redundant URL rewriting already provided by image_rewrite.
+- [x] Specify filter and targeted sizes-rule syntax, validation/scope/defaults and byte/rule/candidate caps before editing runtime code.
+- [x] Prefer a separate srcset-only filter over hijacking C++ responsive_images.
+- [x] Implement default-off configuration, effective-options signature/key separation, invalid-value tests and config-only milestone commit.
+- [x] Decide whether candidate changes provide a measurable benefit beyond explicit sizes correction; avoid implementing redundant URL rewriting already provided by image_rewrite.
 
 ### Phase2 — existing candidate handling: PENDING
 
@@ -98,4 +98,17 @@ This existing-build observational sample is not a controlled off/on comparison, 
 
 ## Next Session Resume Point
 
-Read this plan and SHARED_MEMORY_IMPLEMENTATION.md resume section, inspect git status/log. Phase0 is finished. Start Phase1 by reviewing filter IDs/options tables and existing rule/config parsers; write the proposed separate srcset filter and targeted sizes-rule contract/limits into this plan, then implement/test configuration only. Do not restart audit, generate image variants, enable incomplete responsive_images, deploy, or promise a640candidate absent a real source. No background commands intentionally left running after checkpoint. No current blockers; rule syntax/meaning is the first implementation decision.
+Read this plan and SHARED_MEMORY_IMPLEMENTATION.md resume section, inspect git status/log. Phases0–1 verified. Next implement Phase2 bounded candidate validation in ps-html before parsing:16KiB/64candidates, reject ambiguous descriptors and malformed lists unchanged. Add default-off/no-policy byte-equivalence tests; preserve existing image URL optimization. Then Phase3 wires the separate driver filter and class-targeted sizes replacement for safe width lists only. No background variants, deployment or byte-saving claims. Config exists but has no HTML effect yet. No commands intentionally running.
+
+
+## Phase1 contract (before implementation)
+
+Configuration groundwork uses three Directory-scope scalar options: SrcsetSizesEnabled (false), SrcsetSizesClass (empty), SrcsetSizes (empty). Enablement is a dedicated boolean for a future separate driver filter, not an alias for responsive_images. One exact, case-sensitive HTML class token selects img elements; location inheritance can replace the scalar policy. Empty class/value means no policy. Class maximum128bytes, sizes maximum1024bytes. Values reject control characters, HTML delimiters, quotes, semicolons and unbalanced parentheses; CSS semantics remain the administrator's responsibility, not inferred or advertised as fully validated. No query overrides. All three table-backed values inherit existing merge/signature invalidation. Future candidate handling caps input at16KiB and64candidates before allocating candidate lists; reject oversize declarations unchanged. Existing URL rewriting is already sufficient: no new mapping/discovery machinery is needed. Phase1 adds no markup behavior; the driver implementation follows in later phases.
+
+### Phase1 verification
+
+- Baseline `cargo test -p ps-config --lib --quiet`:89passed. After config:90passed,0failed (0.01s); existing unused Scope import warning retained.
+- `cargo test -p ps-nginx --lib config -- --test-threads=1`:7passed,0failed, compile5.64s.
+- `cargo test -p ps-nginx --lib directive_lines_dispatch -- --test-threads=1`:1passed,0failed; compile4.64s, includes all three new directives. Existing file_fetch/send warnings unchanged.
+- `rustfmt --edition 2021 crates/ps-config/src/options.rs`, `git diff --check`:passed. Tests rebuild downstream HTML/HTTP/NGINX crates; no release build or deployment claimed.
+- Modified options.rs/properties_table.inc.rs/property.rs, module.rs directive regression and both progress documents. Existing baselines retained; no meaningful latency comparison yet because policy does not run on HTML. Full CSS semantic validation is intentionally not claimed; bounded delimiter validation only.

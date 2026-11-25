@@ -3794,6 +3794,18 @@ mod tests {
         assert_eq!(GzipCall::None, out.gzip);
         assert!(out.dir_prep.is_none());
         assert!(options.is_some());
+        // Srcset layout policy uses the normal scalar directive path.
+        for args in [
+            ["SrcsetSizesEnabled", "on"],
+            ["SrcsetSizesClass", "wp-image-7"],
+            ["SrcsetSizes", "(max-width: 800px) 100vw, 645px"],
+        ] {
+            apply_directive_line(&mut options, &mut factory, Scope::Directory, &args).unwrap();
+        }
+        let policy = &options.as_ref().unwrap().core;
+        assert!(policy.srcset_sizes_enabled());
+        assert_eq!(policy.srcset_sizes_class(), "wp-image-7");
+        assert_eq!(policy.srcset_sizes(), "(max-width: 800px) 100vw, 645px");
         // ClearInheritedScripts flags the level object.
         apply_directive_line(
             &mut options,

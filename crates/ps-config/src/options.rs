@@ -2039,6 +2039,33 @@ impl RewriteOptions {
         )
     }
 
+    /// Dedicated srcset layout policy; disabled until explicitly enabled.
+    #[must_use]
+    pub fn srcset_sizes_enabled(&self) -> bool {
+        matches!(
+            self.get_by_name("SrcsetSizesEnabled"),
+            Some(Value::Bool(true))
+        )
+    }
+
+    /// Exact HTML class token. Empty means no matching policy.
+    #[must_use]
+    pub fn srcset_sizes_class(&self) -> String {
+        match self.get_by_name("SrcsetSizesClass") {
+            Some(Value::Str(value)) => value,
+            _ => String::new(),
+        }
+    }
+
+    /// Administrator-supplied CSS value; CSS semantics are not inferred.
+    #[must_use]
+    pub fn srcset_sizes(&self) -> String {
+        match self.get_by_name("SrcsetSizes") {
+            Some(Value::Str(value)) => value,
+            _ => String::new(),
+        }
+    }
+
     /// Sets HTML caching.
     pub fn set_html_cache(&mut self, value: bool) {
         self.invalidate_signature();
@@ -4053,6 +4080,36 @@ pub fn trim_url_quotes(value: &str) -> &str {
 
 /// Parses a scalar/composite value for a property (`SetFromString`).
 fn parse_value(prop: &Property, text: &str) -> Option<Value> {
+    // Validate before allocating the owned table value. Empty values allow
+    // inherited policies to be cleared independently of directive ordering.
+    if prop.name == "SrcsetSizesClass"
+        && (text.len() > 128
+            || text.chars().any(|c| {
+                c.is_whitespace() || c.is_control() || matches!(c, '<' | '>' | '\'' | '"')
+            }))
+    {
+        return None;
+    }
+    if prop.name == "SrcsetSizes" {
+        if text.len() > 1024 {
+            return None;
+        }
+        let mut depth = 0usize;
+        for c in text.chars() {
+            if c.is_control() || matches!(c, '<' | '>' | '\'' | '"' | ';' | '{' | '}' | '\\') {
+                return None;
+            }
+            match c {
+                '(' => depth += 1,
+                ')' if depth == 0 => return None,
+                ')' => depth -= 1,
+                _ => {}
+            }
+        }
+        if depth != 0 {
+            return None;
+        }
+    }
     match prop.kind {
         PropKind::Bool => parse_bool(text).map(Value::Bool),
         PropKind::Int => {
@@ -4700,6 +4757,60 @@ mod tests {
             .set_option("HtmlCacheEarlyLookup", "on", Scope::Server)
             .unwrap();
         assert!(options.html_cache_early_lookup());
+    }
+
+    #[test]
+    fn srcset_policy_scope_validation_merge_and_signature() {
+        let base = RewriteOptions::new();
+        assert!(!base.srcset_sizes_enabled());
+        assert!(base.srcset_sizes_class().is_empty());
+        assert!(base.srcset_sizes().is_empty());
+        let mut policy = base.clone();
+        for (name, value) in [
+            ("SrcsetSizesEnabled", "on"),
+            ("SrcsetSizesClass", "wp-image-7"),
+            (
+                "SrcsetSizes",
+                "(max-width: 800px) calc(100vw - 60px), 645px",
+            ),
+        ] {
+            assert!(policy.set_option(name, value, Scope::Query).is_err());
+            let before = policy.signature();
+            policy.set_option(name, value, Scope::Directory).unwrap();
+            assert_ne!(before, policy.signature());
+        }
+        let mut merged = base.clone();
+        merged.merge(&policy);
+        assert_eq!(merged.signature(), policy.signature());
+        assert!(merged.srcset_sizes_enabled());
+        assert_eq!(merged.srcset_sizes_class(), "wp-image-7");
+        assert_eq!(merged.srcset_sizes(), policy.srcset_sizes());
+        let signature = policy.signature();
+        for (name, value) in [
+            ("SrcsetSizesClass", "two classes"),
+            ("SrcsetSizesClass", "bad\n"),
+            ("SrcsetSizes", "(100vw"),
+            ("SrcsetSizes", "100vw)"),
+            ("SrcsetSizes", "100vw;"),
+            ("SrcsetSizes", "\"100vw\""),
+            ("SrcsetSizes", "100vw\n"),
+        ] {
+            assert!(policy.set_option(name, value, Scope::Server).is_err());
+            assert_eq!(policy.signature(), signature);
+        }
+        assert!(policy
+            .set_option("SrcsetSizesClass", &"x".repeat(129), Scope::Server)
+            .is_err());
+        assert!(policy
+            .set_option("SrcsetSizes", &"x".repeat(1025), Scope::Server)
+            .is_err());
+        policy
+            .set_option("SrcsetSizesClass", "", Scope::Server)
+            .unwrap();
+        policy.set_option("SrcsetSizes", "", Scope::Server).unwrap();
+        assert!(policy.srcset_sizes_class().is_empty());
+        assert!(policy.srcset_sizes().is_empty());
+        assert_ne!(policy.signature(), signature);
     }
 
     #[test]
