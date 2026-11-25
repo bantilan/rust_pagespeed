@@ -23,7 +23,8 @@ Status: A0/A1a/A2 verified; native automatic sizing implemented for eligible aut
 - [x] A1b identity primitives: bounded server-scope placement digest, streaming original-document hash and bounded wire/manifest checks.
 - [ ] A3 integration prerequisites: runtime identity producer, original-document completeness/streaming fallback, stylesheet epoch/TTL invalidation, nonce-bound issued manifest (identity helpers alone do not implement these).
 - [x] A2 implement native automatic sizing for eligible existing lazy images with browser fallback tests, no loading/LCP changes. Separate benchmark/commit.
-- [ ] A3 extend beacon JS/receiver with viewport+element identity/rendered widths, strict payload/count/numeric bounds, nonce validation, generation and TTL. Shared metadata transaction/crash/reload tests; preserve old beacon decoding. No markup inference yet.
+- [x] A3a nonce-bound transactional evidence store, codec/caps/TTL/epoch/effectivehintgeneration; memorythread and Linuxmultiprocess replay/update tests.
+- [ ] A3b runtime identity/manifest producer, bounded browsercollector and receiver; existingbeacon compatibility, crash/reload integration and actualmetadataadapter checks. No markup inference yet.
 - [ ] A4 conservative validated evidence consumer for eager images with explicit observed-range fallbacks; duplicate-image placement isolation, LCP preload alignment and HTML-cache tests.
 - [ ] A5 desktop/mobile/orientation/DPR browser tests, repeated same URL in different slots, changing CSS/stale evidence, first visit, unsupported browser/noJS, multiworker/reload/RUM. Ensure no extra downloads or variants.
 - [ ] A6 controlled off/on cold/resourcewarm HTMLMISS/HTMLHIT timings, JS/beacon bytes/CPU, queue/resource counts, README and release delivery. No production speed claims without measured evidence.
@@ -34,7 +35,7 @@ crates/ps-html/assets/critical_images_beacon_dbg.js:getImageRenderedMap emits rw
 
 ## Next Session Resume Point
 
-Placementidentity/wire milestoneverified: automatic_sizes.rs now has incremental originalHTML SHA256fingerprint (8MiBcap,noHTMLbuffer), bounded domain/length-framedSHA256 placementidentity(page/options/document/styleepoch/ordinal/src/srcset/sizes), bounded measurementwireparser(8192bytes,64slots,positiveviewport/width64ths), issuedmanifestmembershipcheck. SHA2 0.10.9locked.177HTMLlibrary+12srcsettests pass; lockedNGINXcheck passes4.06s. All helpers currently UNCALLED byruntime. Next A3: wire trusted layout/document/styleidentityproducer, nonce-bound issuedmanifest and JScollection, mergevalidatedbatch+noncereplaystate atomically into sharedmetadata. Needoriginaldocumentcompletebeforeidentity; streamed/unknownlayoutfallthrough muststayoriginal, stylesheetepoch+TTL/invalidation cannotbe assumed solved. Existingbeacon URLhashnoncecodec unchanged; do not accept arbitrarybrowserID. Then A4learnedinitialHTML/preloadconsumer. No manualbreakpoints,newvariants,deploymentorrequestlatencyspeedupclaims. NativeA2unchanged; allcommandsfinished.
+A3a transactional store verified (automatic_sizes_store.rs). Onecohort key storesimmutable64-slotmanifest,128noncehistory(includingconsumed),64measuredrecords,5minfixedTTL/60snonce,epoch+effectivehintgeneration. register/accept useoneCache::update;unknownslot/capacity/error rejectswholebatchwithoutnonceconsumption. Replayandgeneration/TTLepoch tested.184HTMLlibrary+12srcsetpass;NGINXlockedcheck1.48s. Includes8-threadsame-nonce and4-processFileCache+TransactionalCache regressions. No runtimeJS/HTTPproducer/consumerwired; automaticLCP stillinactive. Next A3b: derivecompleteoriginaldocument/style-scopetrustedidentity atdriverstage (streamflush/unknownstylefallback), registermanifest+unpredictablenonce, stampplacementIDs, addboundedviewport/widthcollector andreceiver ontransactionalmetadataadapter. Preserveexistingcriticalbeaconprotocol; doNOTsplitmeasurementnonce/stateacrosskeys. A4thenapplylearnedinitialHTML/preload andincludeepoch+generation+expiryinHTMLcacheeligibility, notgenerationalone. NativeA2unchanged,nomanuallayoutvalues/variants/deploy; no runningcommands.
 
 ## A1a contract before source edits
 
@@ -131,3 +132,27 @@ rustfmt --edition 2021 crates/ps-html/src/automatic_sizes.rs
 git diff --check
 ```
 Focusedbaseline3tests passed;firstexpanded5tests passed(auto-identity-tests.log);finalfullsuite177library+12srcsetpassed0.69s/0.01s(auto-identity-regressions.log). NGINXlockeddevcheck4.06s(auto-identity-build.log),notreleasebuild/deployment. Added3tests totalsince174:placementisolation/inputbounds,wireparse/manifest/caps,andstreamhash/chunk/overflow. Nativebrowsertestsnotrerunbecause runtimecallsitesunchanged. No requestbenchmarkaddedforuncalledhelpers; SHA256cost mustbemeasuredwhenintegrated. Allcommandsended,nolivechanges/no push.
+
+## A3a transactional evidence store — before edits
+
+Onekey pertrusted page/options/document/style scope containsimmutableissuedslotset≤64,noncehistory≤128(pending+consumed),MeasuredSizes≤64,5minute fixedrecordTTL,60secondnoncelifetime andeffectivehintgeneration. Registration requires exactsameissuedmanifest underalive scope; conflictfailsclosed. Noncereusedunderalive recordrejected evenafterconsumption. Acceptance validateswholebatch andissuedmembers,mergesallor-none,consumesnonceinSAMEmetadataCache::update;failedbounds/unknownslots do notconsumeit. Generationchangesonlywhen sizes(id,emptyfallback) changes(count-onlysamplesnot),oneincrementperbatch. Contention/errorlookup =>retry/None,not accepted. Availablelookup requiredforvaliddecode; corruptioncannotrestore nonce. Requires same transactional backend as existingbeaconcohort; plain Cache defaultupdate is notcrossprocesssafe. Codec≤256KiB,strictcounts/uniqueids/version/base64/numeric checks;TTLnotextendedbyreports. No HTTP/JSactivation inthismilestone; nextconnecttrustedproducer/collection/receiver, preserveoldbeaconprotocol. Tests memorythreads+LinuxprocesssharedFileCache/TransactionalCache, replay,expiry,capacity,manifestmismatch,conflictandgeneration.
+
+## A3a verified transaction-store checkpoint
+
+New automatic_sizes_store module plus MeasuredSizes.identity getter. No Driver/NGINXhandler/JS/HTMLcachecallbacks modified; this stage is API implementation only, not liveLCP support. Store API requires backend with process-safe Cache::update; default traitimplementation doesnotguaranteecrossprocessatomicity. Tests useMemoryCache(threadlock) andFileCachewrappedinTransactionalCache(Linuxrobusttransaction). Backendwritepersistenceisbest-effort as existingCachecontract; no strongercrashdurability claimed.
+
+Recordnamespaceautomatic-sizes-cohort-v1:<server-scope-digest>, versionautomatic-sizes-store/1, strict≤256KiBdecode, uniqueissued64hexIDs≤64,noncesexact11web64chars≤128, measurements≤64 andvalididentitymatching. Ownseparatecohort, existingbeaconcodecremainsunchanged. Pendingandconsumednoncehistorykeptuntilfixed5minTTL,noreuseunderaliveepoch. Registrationrequiresmatchingimmutablemanifest. Nonceexpires60s,negative/future-issued/expiredtimefailsclosed. registernewcohortresetusesfirstnonceasepoch;dependentHTMLmustincludeepoch+generationandexpiry soTTLresetgen0cannotcollidewitholdgeneration. TTLneverextendedonreports.
+
+Acceptance underonetransaction: validissuednonce+manifest,mergeallrecords,consumeexactnonce,writeoneblob. Unknownidentity/invalidfields/capacity returnswithoutcommit;nopartialmergeorconsumednonce. Firsttwostablesamples persistconfidence only,thirdfirsthintbumpsgeneration;stablefurtherreportsnot,badlayoutconflictsuppresshintbumpsgeneration. Onebumpperbatch,checkedoverflow. CachecontentionanderrorlookupNone=>retry/fallback,notfalseacceptance. loadonlyAvailableandunexpiredstate, exposesepoch/expiry/gen/measurements,no noncehistory.
+
+Tests/commands:
+```bash
+cargo test --locked -p ps-html --lib automatic_sizes_store -- --test-threads=1
+cargo test --locked -p ps-html --lib --test srcset_sizes -- --test-threads=1
+cargo check --locked -p ps-nginx
+rustfmt --edition 2021 crates/ps-html/src/automatic_sizes.rs crates/ps-html/src/automatic_sizes_store.rs
+git diff --check
+```
+Focused6testpass beforefinalcapacityrollbackaddition(auto-store-tests.log); final184library+12srcsetpass0.72s/0.01s(auto-store-regressions.log). 7newstoretests:8threadsoneacceptednonce,4Linuxchildprocessessharednonce+distinctnonces(all5consumed/measurementsretained),nonceexpiry/replay/capacity/TTLepoch/corruption,unknownmanifest/no mutation,contention/errorlookup,confidence/conflictgeneration,partialmultiimagecapacityrollbackandvalidretry. LockedNGINXcheck1.48s(auto-store-build.log). Initialcheckalso passes(auto-store-initial-build.log). No releasebuild/browserrerunneededforuncalledAPIs; no requestlatencyclaim.
+
+NextA3bmustwiretrustedidentity/manifestregistrationandcollection; originaldocument/styleepochproducerandstreamingfallbackremainunimplemented. No endpointactivation,nonceentropyprovider,HTTPPOSTencodinglimit,JScollector,cross-workerreload/crashpipelineoractualNGINXcacheadaptervalidation claimed. A4mustrecheckcohortexpiryatearlyHTMLcacheHIT beforeusinglearnedhintbody; TTLreset/epoch/measurementgenerationneedsintegration. Alltemporarymultiprocessfixturescleaned,commandsfinished,nolivechanges.

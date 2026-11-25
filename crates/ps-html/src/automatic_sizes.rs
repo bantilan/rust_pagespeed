@@ -222,6 +222,12 @@ impl MeasuredSizes {
         })
     }
 
+    /// Exact registered identity for strict cache-codec validation.
+    #[must_use]
+    pub fn identity(&self) -> &str {
+        &self.identity
+    }
+
     /// Adds an authenticated observation. Width is positive CSS pixels ×64,
     /// rounded up by the collector. Rejects invalid input before mutation.
     /// Repeated calls are NOT authentication: receiver must reject nonce replay.

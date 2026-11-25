@@ -14,6 +14,7 @@
 pub mod ads_attribute;
 pub mod ads_util;
 pub mod automatic_sizes;
+pub mod automatic_sizes_store;
 pub mod background;
 pub mod base_tracker;
 pub mod beacon_finder;
