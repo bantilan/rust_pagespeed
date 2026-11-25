@@ -62,3 +62,7 @@ ssh -o BatchMode=yes root@157.245.148.68 'python3 -u -' < tools/benchmark_wordpr
 ```
 
 Original712226-bytefixtureSHA is recorded in isolated.json; future image edits may change sizes. Existing cachedHTML variants can retain older originalURLs until expiry/purge, so test a freshrequestvariant when checking asyncprogression. The checked normal browservariant now rewrites without a purge. Rebuild Debian package from current source before reinstalling to retain this fix. Rollback: restore savedmodule through new inode/rename, validate nginx-t and restart; doing so restores the known localHTTPS limitation.
+
+## Installed231832f retest, 2026-11-25 05:16 UTC
+
+Read-only benchmark,3warmups then30confirmedlocalHITs pergroup: freshTLSidentitymedian14.761ms/p9515.250;freshTLSzstd14.8785ms/p9516.351;reusedTLSidentity0.86264ms. All90localmeasuredrequests200/HIT; zstddecoded. Public10requestsall200:8HITs median307.498ms and2MISS346.840/381.699ms; mixedall-requestmedian336.8545ms. Publicnetworksample is not uniformlywarm and is not a causal codecomparison. Rewrittenheader remainsimage/webp80042bytes; bothservicesactive,noresidualFastCGIconnections. Headerreportsnginx1.31.10+231832f. No serverchanges. Raw latest-latency.jsonl/latest-public.json retained. Exactlocalcommand remains ssh stdin benchmark_wordpress_html_cache.py as above.
