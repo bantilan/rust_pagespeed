@@ -114,10 +114,11 @@ pagespeed EnableFilters responsive_images,resize_images;
 
 Images with no `srcset` at all get a generated one with fixed 480w and
 640w resized variants (bytes materialize on first request through the
-standard resize pipeline; downscales only, never upscales). Lazy images
-are paired with `sizes="auto, 100vw"`; eager images with the static
-`(max-width: 640px) 480px, 640px` breakpoint. Existing author srcsets
-are never touched (the automatic sizing above owns those), already
+standard resize pipeline; downscales only, never upscales), and existing
+width-based srcsets gain whichever of the two widths the author lacks
+(author text stays byte-identical; density srcsets are never mixed with
+widths). Lazy images are paired with `sizes="auto, 100vw"`; eager images
+with the static `(max-width: 640px) 480px, 640px` breakpoint. Already
 rewritten URLs, vectors, icons, `<picture>`, no-transform and ambiguous
 markup are skipped, and an existing author `sizes` is preserved. Large
 displays upscale from 640w by design.

@@ -121,13 +121,56 @@ fn lazy_img_gets_auto_sizes() {
 fn existing_srcset_and_sizes_are_preserved() {
     let (server, options) = fixture();
     let driver = driver_for(&server, &options);
-    // Author srcset: untouched (owned by the sizes machinery).
-    let input = "<img src='a.jpg' srcset='a.jpg 300w, b.jpg 800w'>";
-    assert_eq!(render_filter(&driver, input), input);
     // Author sizes without srcset: kept, srcset still generated.
     let out = render_filter(&driver, "<img src='a.jpg' sizes='50vw'>");
     assert!(out.contains("sizes='50vw'"), "{out}");
     assert!(out.contains("480w"), "{out}");
+}
+
+#[test]
+fn width_srcsets_gain_missing_fixed_widths() {
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    // Eager: both widths appended, static sizes added.
+    let out = render_filter(&driver, "<img src='a.jpg' srcset='a.jpg 300w'>");
+    assert!(out.contains("a.jpg 300w, "), "{out}");
+    assert!(out.contains("480w") && out.contains("640w"), "{out}");
+    assert!(out.contains(&format!("sizes=\"{EAGER_SIZES}\"")), "{out}");
+    // Author text stays byte-identical ahead of the join.
+    let srcset = out
+        .split("srcset='")
+        .nth(1)
+        .expect("srcset")
+        .split('\'')
+        .next()
+        .unwrap();
+    assert!(srcset.starts_with("a.jpg 300w, "), "{srcset}");
+    // Partial coverage: only the missing width is added.
+    let out = render_filter(&driver, "<img src='a.jpg' srcset='a.jpg 640w'>");
+    assert!(out.contains("480w"), "{out}");
+    assert_eq!(out.matches("640w").count(), 1, "{out}");
+    // Lazy + author sizes: candidates append, sizes kept.
+    let out = render_filter(
+        &driver,
+        "<img src='a.jpg' srcset='a.jpg 300w' sizes='50vw' loading='lazy'>",
+    );
+    assert!(out.contains("sizes='50vw'"), "{out}");
+    assert!(out.contains("480w") && out.contains("640w"), "{out}");
+}
+
+#[test]
+fn complete_and_density_srcsets_stay_untouched() {
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    for input in [
+        "<img src='a.jpg' srcset='a.jpg 480w, b.jpg 640w'>",
+        "<img src='a.jpg' srcset='a.jpg 300w, b.jpg 480w, c.jpg 640w, d.jpg 1024w'>",
+        "<img src='a.jpg' srcset='a.jpg 1x, b.jpg 2x'>",
+        "<img src='a.jpg' srcset='a.jpg 300w, b.jpg 300w'>",
+        "<img src='a.jpg' srcset='a.jpg 300w' srcset='b.jpg 600w'>",
+    ] {
+        assert_eq!(render_filter(&driver, input), input, "{input}");
+    }
 }
 
 #[test]

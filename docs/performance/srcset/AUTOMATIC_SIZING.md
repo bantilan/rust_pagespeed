@@ -207,8 +207,10 @@ get generated srcsets with fixed 480w + 640w resized variants
 (`responsive_images` + `resize_images` filters, `ResponsiveImageFirst`
 slot; no second pass — final URLs are minted directly, nothing virtual
 to combine). Lazy images pair with `sizes="auto, 100vw"`, eager images
-with `(max-width: 640px) 480px, 640px`. Author srcsets are never
-touched. Large displays upscale from 640w by design.
+with `(max-width: 640px) 480px, 640px`. Follow-up decision: existing
+width srcsets are augmented too — whichever of 480w/640w the author
+lacks is appended (author text byte-identical); complete and density
+srcsets stay untouched. Large displays upscale from 640w by design.
 
 The beacon/measurement pipeline (A3c/A4) is paused, not deleted: the
 collector, store, and codec code stays in-tree and inactive (it never

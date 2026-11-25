@@ -1,21 +1,19 @@
 //! Fixed-width responsive srcsets (`ResponsiveImageFirst`).
 //!
-//! Generates `srcset` candidates at fixed widths for plain `<img>`
-//! elements that have none, instead of predicting per-image sizes:
-//! every eligible image gets 480w + 640w resized variants minted as
-//! unversioned (hash-`0`) image URLs whose bytes materialize on
-//! first request through the standard resize pipeline (width-only
-//! dims preserve aspect; downscales only, never upscales).
+//! Gives every eligible `<img>` 480w + 640w candidates instead of
+//! predicting per-image sizes: missing srcsets are generated fresh,
+//! existing width srcsets are augmented with whichever fixed widths
+//! the author lacks. Variants are minted as unversioned (hash-`0`)
+//! image URLs whose bytes materialize on first request through the
+//! standard resize pipeline (width-only dims preserve aspect;
+//! downscales only, never upscales).
 //!
 //! Paired `sizes`: lazy images get `auto, 100vw` (browser-evaluated
 //! layout width with a viewport fallback); eager images get a static
 //! `(max-width: 640px) 480px, 640px` breakpoint. An existing author
-//! `sizes` is preserved verbatim (it was inert without a srcset, and
-//! guessing wrong is worse than pairing loosely).
-//!
-//! Author srcsets are never touched: any existing `srcset`
-//! attribute skips generation entirely (the `SrcsetSizes` filter
-//! owns those). Large displays upscale from 640w by design.
+//! `sizes` is preserved verbatim. Author srcset text is preserved
+//! byte-identical (candidates append); density srcsets are never
+//! mixed with widths. Large displays upscale from 640w by design.
 
 use std::rc::Rc;
 
@@ -34,6 +32,7 @@ use crate::parser::Dom;
 use crate::resource::Resource;
 use crate::resource_slot::relativize_or_passthrough;
 use crate::server_context::ResourceDriver;
+use crate::srcset::{parse_srcset, supports_width_sizes, MAX_SIZES_SRCSET_BYTES};
 
 /// Fixed srcset candidate widths (CSS px, ascending).
 pub const RESPONSIVE_SRCSET_WIDTHS: [u32; 2] = [480, 640];
@@ -126,14 +125,28 @@ impl ResponsiveImageFirstFilter {
         ))
     }
 
-    fn apply(&self, dom: &mut Dom, id: NodeId) -> Option<()> {
-        // Author srcsets (and ambiguous ones) stay untouched.
-        if SrcsetSizesFilter::unique_attribute(dom, id, b"srcset")
-            .ok()?
-            .is_some()
-        {
+    /// Appends fixed-width candidates, capped like author lists.
+    /// Pure for testing; `None` refuses oversized results.
+    fn append_candidates(existing: &str, urls: &[(u32, String)]) -> Option<String> {
+        let mut out = String::with_capacity(existing.len() + urls.len() * 64);
+        out.push_str(existing);
+        for (width, url) in urls {
+            out.push_str(", ");
+            out.push_str(url);
+            out.push(' ');
+            out.push_str(&width.to_string());
+            out.push('w');
+        }
+        if out.len() > MAX_SIZES_SRCSET_BYTES {
             return None;
         }
+        Some(out)
+    }
+
+    fn apply(&self, dom: &mut Dom, id: NodeId) -> Option<()> {
+        // Ambiguous srcsets stay untouched; width lists get augmented
+        // below, missing ones generated fresh.
+        let srcset_index = SrcsetSizesFilter::unique_attribute(dom, id, b"srcset").ok()?;
         let src = SrcsetSizesFilter::unique_attribute(dom, id, b"src").ok()??;
         let raw = SrcsetSizesFilter::bounded_attribute(dom, id, src, MAX_SRC_BYTES)?;
         if raw.is_empty() {
@@ -155,20 +168,56 @@ impl ResponsiveImageFirstFilter {
         if !compressible_image_kind(content_type.kind()) {
             return None;
         }
-        // All-or-nothing pairs: a lone candidate is pointless.
-        let mut urls = Vec::with_capacity(RESPONSIVE_SRCSET_WIDTHS.len());
-        for width in RESPONSIVE_SRCSET_WIDTHS {
-            urls.push(self.variant_url(src_text, &resolved, content_type, width)?);
-        }
-        let mut srcset = String::new();
-        for (index, (url, width)) in urls.iter().zip(RESPONSIVE_SRCSET_WIDTHS).enumerate() {
-            if index > 0 {
-                srcset.push_str(", ");
+        match srcset_index {
+            Some(index) => {
+                let value =
+                    SrcsetSizesFilter::bounded_attribute(dom, id, index, MAX_SIZES_SRCSET_BYTES)?;
+                if !supports_width_sizes(&value) {
+                    return None;
+                }
+                let present: Vec<u32> = parse_srcset(&value)
+                    .iter()
+                    .map(|candidate| {
+                        candidate
+                            .descriptor
+                            .trim_end_matches('w')
+                            .parse::<u32>()
+                            .unwrap_or(0)
+                    })
+                    .collect();
+                // All-or-nothing: partial pairs confuse selection.
+                let mut fresh = Vec::with_capacity(RESPONSIVE_SRCSET_WIDTHS.len());
+                for width in RESPONSIVE_SRCSET_WIDTHS {
+                    if present.contains(&width) {
+                        continue;
+                    }
+                    let url = self.variant_url(src_text, &resolved, content_type, width)?;
+                    fresh.push((width, url));
+                }
+                if fresh.is_empty() {
+                    return None;
+                }
+                let existing = std::str::from_utf8(&value).ok()?;
+                let merged = Self::append_candidates(existing, &fresh)?;
+                dom.element_attributes_mut(id)[index].set_value(merged.as_bytes());
             }
-            srcset.push_str(url);
-            srcset.push_str(&format!(" {width}w"));
+            None => {
+                // All-or-nothing pairs: a lone candidate is pointless.
+                let mut urls = Vec::with_capacity(RESPONSIVE_SRCSET_WIDTHS.len());
+                for width in RESPONSIVE_SRCSET_WIDTHS {
+                    urls.push(self.variant_url(src_text, &resolved, content_type, width)?);
+                }
+                let mut srcset = String::new();
+                for (index, (url, width)) in urls.iter().zip(RESPONSIVE_SRCSET_WIDTHS).enumerate() {
+                    if index > 0 {
+                        srcset.push_str(", ");
+                    }
+                    srcset.push_str(url);
+                    srcset.push_str(&format!(" {width}w"));
+                }
+                dom.add_attribute(id, b"srcset", srcset.as_bytes());
+            }
         }
-        dom.add_attribute(id, b"srcset", srcset.as_bytes());
         // Pair sizes: keep an existing author value, skip on ambiguity.
         match SrcsetSizesFilter::unique_attribute(dom, id, b"sizes").ok()? {
             Some(_) => {}
