@@ -59,3 +59,17 @@ Remote changes:
 - Site backed up to `/etc/nginx/rustpagespeed.com.before-fastcgi-fix-20261125`; trial bufferingoff removed. No final site-setting changes.
 
 Emergency module rollback (would restore the known bug): copy the backup to a new file, rename it over the active module, validate `nginx -t`, then restart NGINX and reload PHP-FPM. Do not overwrite the inode of a mapped active module in place.
+
+## Installed retest, 2026-11-25 03:15 UTC
+
+User requested benchmark after installation. Tree clean at6de635c. Installed module SHA unchanged13bf793865008b277dfac916a05ff167fb72538741394ebc476d6512764b36c2; services active. No deployment/config changes in this retest. Same fresh-process curl loopback TLS method as above:30identity followed by30zstd, then10publicnetworkzstd requests, sequential not concurrent. All70status200 and curl decode success. Both local groups had one MISS; statistics below separate statuses instead of blending warming into HIT times. MISS values are individual observations, not cold-cache distributions.
+
+| Path | Cache | Samples | Median TTFB | p95 TTFB |
+|---|---|---:|---:|---:|
+| Server-local identity | MISS |1|107.462ms|—|
+| Server-local identity | HIT |29|80.355ms|104.814ms|
+| Server-local Zstd | MISS |1|82.426ms|—|
+| Server-local Zstd | HIT |29|80.205ms|94.145ms|
+| Public-network Zstd | HIT |10|385.539ms|415.917ms|
+
+Public Zstd wire12642bytes. Raw local/public rows retained in installed-retest-local.jsonl and installed-retest-public.json. Post-run noFastCGIconnections via ss, no newerPHPpoolwarning or NGINXupstreamtimeouts (latest oldtimeout03:03:17, beforefix). No additional restart needed. Short sequential test cannot establish sustained concurrency capacity or isolate rewrite/PHP overhead. Local medians~5–7ms above earlier short sample, insufficient to attribute a code regression; module identical. No PageSpeedoff control or profiling performed. Earlier shared-memory Phase10 attribution remains pending.
