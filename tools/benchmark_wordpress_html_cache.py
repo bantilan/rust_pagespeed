@@ -17,8 +17,9 @@ for enc in ['identity','zstd']:
  assert all(x['cache']=='HIT' for x in rows),rows
  v=sorted(x['ms'] for x in rows);print(json.dumps({'mode':enc,'warmup':warmup,'median_hit_ms':statistics.median(v),'p95_hit_ms':v[math.ceil(.95*len(v))-1],'rows':rows}),flush=True)
 c=LocalHTTPS('rustpagespeed.com',timeout=5,context=ssl.create_default_context());rows=[]
-for i in range(31):
+for i in range(33):
  t=time.perf_counter();c.request('GET','/',headers={'Accept-Encoding':'identity'});r=c.getresponse();body=r.read();elapsed=(time.perf_counter()-t)*1000;assert r.status==200
- assert b'PageSpeed Cache: HIT' in body
- if i:rows.append(elapsed)
+ if i >= 3:
+  assert b'PageSpeed Cache: HIT' in body
+  rows.append(elapsed)
 c.close();print(json.dumps({'mode':'keepalive-identity','median_ms':statistics.median(rows),'samples_ms':rows}),flush=True)

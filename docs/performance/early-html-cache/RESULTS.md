@@ -71,3 +71,16 @@ To repeat the production timing probe, run `tools/benchmark_wordpress_html_cache
 Installed NGINX1.31.10 module atomically via new inode/rename after backup. `nginx -t` passed, NGINX restarted to load module. Site enabled HtmlCacheEarlyLookup; all original optimization settings/TTL preserved. Module backup `/usr/lib/nginx/modules/ngx_pagespeed_rust.so.before-early-html-20261125`; site backup `/etc/nginx/rustpagespeed.com.before-early-html-20261125`.
 
 To disable this feature without reverting the earlier FastCGI buffer fix, set HtmlCacheEarlyLookupoff, validate and reload. Full rollback can restore the saved module via a new inode/rename plus saved site configuration, validate, then restart. Existing Debian packages were not rebuilt here; rebuilding from the current source is necessary before future package installation to retain the new feature. No pushes.
+
+## User-installed retest (2026-11-25 04:02 UTC)
+
+Installed diskmoduleSHA unchanged452a423e...; HTTPServer reports1.31.10+a1e2f12 and earlylookup remainson. No server/config changes. Corrected benchmark to warm three requests for the Python keepalive header variant before asserting measuredHITs (initial attempt stopped on firstvariantMISS; its60successfulcurlHIT rows retained in installed-initial-partial.jsonl, excluded from finaltable).
+
+| Confirmed HIT path | Samples | Median | p95 |
+|---|---:|---:|---:|
+| Local freshTLS identity |30|14.841ms|20.488ms|
+| Local freshTLS Zstd |30|14.811ms|21.007ms|
+| Local reusedTLS identity |30|0.863ms|—|
+| Public freshTLS Zstd |10|302.184ms|—|
+
+All100measuredresponses200/HIT; Zstd negotiated/decoded. Threewarmups perlocalgroupexcluded. FakeWPlogincookieBYPASS200at85.655ms. NoresidualFastCGIconnections, servicesactive, no newerpoolwarnings. LatestNGINXerrors inspected were403blockedscannerrequests, notupstreamtimeouts. Networksample timing is observational, not a controlled network performance comparison. Saved installed-retest.jsonl/installed-retest-public.json. No deployment or runtimecode changes.
