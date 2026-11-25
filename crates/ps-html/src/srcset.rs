@@ -18,6 +18,83 @@ use super::resource_slot::{relativize_or_passthrough, SlotBase};
 /// Candidate cap (`SrcSetSlotCollection::kMaxSlots`).
 pub const MAX_SLOTS: usize = 256;
 
+/// Work bounds for the opt-in explicit `sizes` policy, independent of URL slots.
+pub const MAX_SIZES_SRCSET_BYTES: usize = 16 * 1024;
+pub const MAX_SIZES_CANDIDATES: usize = 64;
+
+/// Whether a declaration is a bounded, unambiguous list of positive widths.
+///
+/// This conservative eligibility check allocates nothing and never rewrites
+/// candidate URLs or descriptors. It is not a replacement for WHATWG parsing:
+/// unsupported declarations must retain their original `sizes` and `srcset`.
+/// A width descriptor is an author assertion, not proof of intrinsic size.
+#[must_use]
+pub fn supports_width_sizes(input: &[u8]) -> bool {
+    if input.is_empty() || input.len() > MAX_SIZES_SRCSET_BYTES {
+        return false;
+    }
+    if std::str::from_utf8(input).is_err()
+        || input.iter().any(|&b| {
+            (b.is_ascii_control() && !is_html_space(b)) || matches!(b, b'<' | b'>' | b'"' | b'\'')
+        })
+    {
+        return false;
+    }
+    let mut widths = [0u32; MAX_SIZES_CANDIDATES];
+    let mut count = 0;
+    let mut rest = input;
+    loop {
+        rest = rest.trim_ascii_start();
+        if rest.is_empty() || count == MAX_SIZES_CANDIDATES {
+            return false;
+        }
+        // As in the ordinary parser, commas inside a URL are opaque.
+        let Some(url_end) = rest.iter().position(|&b| is_html_space(b)) else {
+            return false;
+        };
+        if url_end == 0 || rest[0] == b',' || rest[url_end - 1] == b',' {
+            return false;
+        }
+        rest = &rest[url_end..];
+        while rest.first().is_some_and(|&b| is_html_space(b)) {
+            rest = &rest[1..];
+        }
+        let mut width = 0u32;
+        let mut digits = 0;
+        while let Some(&b) = rest.first().filter(|b| b.is_ascii_digit()) {
+            let Some(next) = width
+                .checked_mul(10)
+                .and_then(|w| w.checked_add(u32::from(b - b'0')))
+            else {
+                return false;
+            };
+            width = next;
+            digits += 1;
+            rest = &rest[1..];
+        }
+        if digits == 0
+            || width == 0
+            || rest.first() != Some(&b'w')
+            || widths[..count].contains(&width)
+        {
+            return false;
+        }
+        widths[count] = width;
+        count += 1;
+        rest = &rest[1..];
+        while rest.first().is_some_and(|&b| is_html_space(b)) {
+            rest = &rest[1..];
+        }
+        if rest.is_empty() {
+            return true;
+        }
+        if rest[0] != b',' {
+            return false;
+        }
+        rest = &rest[1..];
+    }
+}
+
 /// One parsed candidate (`ImageCandidate`).
 #[derive(Debug, Clone, Default)]
 pub struct SrcSetCandidate {

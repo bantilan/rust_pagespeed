@@ -1,6 +1,6 @@
 # Srcset-only filter: resumable implementation
 
-Status: Phases0–1 verified; Phase2 pending. Baseline source9b6435b. Phase1 adds configuration groundwork only; no HTML-output changes or live edits/deployment. User explicitly excludes background variant generation. One independently functional/tested phase per session is the intended usage boundary.
+Status: Phases0–2 verified; Phase3 pending. Baseline source9b6435b. Phase1 adds configuration groundwork only; no HTML-output changes or live edits/deployment. User explicitly excludes background variant generation. One independently functional/tested phase per session is the intended usage boundary.
 
 ## Scope and architectural decisions
 
@@ -40,14 +40,17 @@ Status: Phases0–1 verified; Phase2 pending. Baseline source9b6435b. Phase1 add
 - [x] Implement default-off configuration, effective-options signature/key separation, invalid-value tests and config-only milestone commit.
 - [x] Decide whether candidate changes provide a measurable benefit beyond explicit sizes correction; avoid implementing redundant URL rewriting already provided by image_rewrite.
 
-### Phase2 — existing candidate handling: PENDING
+### Phase2 — bounded candidate eligibility: VERIFIED
 
-- [ ] Implement bounded parsing/handling only for safe supported declarations, with no new resources/jobs/variants.
-- [ ] Use only declared or explicitly mapped real candidate URLs/dimensions; do not discard useful larger candidates or alter source order where meaningful.
-- [ ] Validate width vs density lists, data URLs, escaping, malformed/duplicate descriptors, no-transform, `<picture>` and absent srcset cases.
-- [ ] Default-off byte-equivalence and enabled-no-policy no-op tests; independently functional commit.
+- [x] Implement allocation-free safe width-list eligibility:16KiB/64candidate caps, no resources/jobs/variants or candidate allocations.
+- [x] Retain existing URL/descriptor handling; no new mapping/discovery/rewriting machinery or order changes.
+- [x] Test widths, density/mixed rejection, data URLs, escaped URLs, malformed/duplicate/overflow descriptors and exact bounds; existing URL-rewrite integration still passes.
+- [x] Verify helper, HTML library and release diagnostic; persist cost and commit.
 
 ### Phase3 — explicit layout sizes: PENDING
+
+- [ ] Wire a separate real driver filter gated by SrcsetSizesEnabled and complete nonempty policy; call supports_width_sizes only after cheap class/element guards.
+- [ ] Element tests: default-off byte-equivalence, enabled-no-policy no-op, no-transform, picture/art direction, absent srcset, escaped attributes; these were intentionally deferred from helper-only Phase2.
 
 - [ ] Implement narrowly targeted override policy with an appropriate validated CSS sizes value and opt-out semantics.
 - [ ] Preserve unmatched images, density-only lists and art-directed sources. Explicit application to existing sizes must be documented, not silent.
@@ -98,7 +101,7 @@ This existing-build observational sample is not a controlled off/on comparison, 
 
 ## Next Session Resume Point
 
-Read this plan and SHARED_MEMORY_IMPLEMENTATION.md resume section, inspect git status/log. Phases0–1 verified. Next implement Phase2 bounded candidate validation in ps-html before parsing:16KiB/64candidates, reject ambiguous descriptors and malformed lists unchanged. Add default-off/no-policy byte-equivalence tests; preserve existing image URL optimization. Then Phase3 wires the separate driver filter and class-targeted sizes replacement for safe width lists only. No background variants, deployment or byte-saving claims. Config exists but has no HTML effect yet. No commands intentionally running.
+Read this plan and SHARED_MEMORY_IMPLEMENTATION.md resume section, inspect git status/log. Phases0–2 verified. Phase3 next: review driver filter construction/reuse and chain placement, implement separate explicit sizes filter gated by enabled+nonempty class/value. Apply only to exact-class img with supports_width_sizes=true; preserve srcset URLs/descriptors and skip picture/no-transform/unsupported input. Add actual driver default-off/no-policy and element guard tests. Helper currently has no call site; config has no HTML effect yet. No deployment/variants/byte-saving claims. All commands finished.
 
 
 ## Phase1 contract (before implementation)
@@ -112,3 +115,19 @@ Configuration groundwork uses three Directory-scope scalar options: SrcsetSizesE
 - `cargo test -p ps-nginx --lib directive_lines_dispatch -- --test-threads=1`:1passed,0failed; compile4.64s, includes all three new directives. Existing file_fetch/send warnings unchanged.
 - `rustfmt --edition 2021 crates/ps-config/src/options.rs`, `git diff --check`:passed. Tests rebuild downstream HTML/HTTP/NGINX crates; no release build or deployment claimed.
 - Modified options.rs/properties_table.inc.rs/property.rs, module.rs directive regression and both progress documents. Existing baselines retained; no meaningful latency comparison yet because policy does not run on HTML. Full CSS semantic validation is intentionally not claimed; bounded delimiter validation only.
+
+## Phase2 implementation decision (before source changes)
+
+Add allocation-free width-list eligibility validation, rather than another candidate parser or rewriting URLs twice. Fixed16KiB/64candidate limits, fixed stack width table, checked positive u32 dimensions, unique widths, exactly one w descriptor per candidate. Density/mixed/implicit/height descriptors and malformed lists reject the policy without mutating input. URL tokens remain opaque (including commas inside data URLs); reject invalid UTF-8, controls other than HTML whitespace, raw HTML delimiters and trailing URL commas. Existing parser/image rewrite remains untouched for compatibility. Element-level no-transform/picture/absent srcset and default-off byte-equivalence tests belong with the actual Phase3 filter; do not mark those verified by helper tests.
+
+### Phase2 verification and measured cost
+
+Modified srcset.rs adds supports_width_sizes only; existing parse_srcset/slots unchanged. Added tests/srcset_sizes.rs and examples/srcset_validation_latency.rs. No image candidate bytes or dimensions probed; author widths are assertions, not intrinsic verification. Rejecting eligibility does not disable ordinary image optimization. No output behavior changes.
+
+Commands/results:
+- `cargo test -p ps-config --lib --quiet`:90passed (Phase1 baseline).
+- `cargo test -p ps-html --test srcset_sizes --test image_rewrite img_srcset -- --test-threads=1`:2existingimg_srcset tests passed; helper tests filtered out, then explicitly run below.
+- `cargo test -p ps-html --test srcset_sizes -- --test-threads=1`:3passed,0failed.
+- `cargo test -p ps-html --lib --quiet`:171passed,0failed,0.40s; phase2-library-tests.log.
+- `cargo run --release -p ps-html --example srcset_validation_latency`:release build31.03s. Reran sequentially after tests/build completion; saved final validation-phase2.json and build/run logs.9batches×5000iterations/100warmups.3width112bytes227.620ns;24width940bytes2120.226ns;64width2540bytes5691.030ns;65candidate reject5700.835ns; density reject51.647ns;16385byte reject3.192ns. No fair speed comparison to old parser (different work/inputs); this is additional future opt-in eligibility cost, not full request latency. Phase0 full-request baselines unchanged; controlled latency/browser tests pending Phase4.
+- rustfmt for three added/modified Rust files and gitdiffcheck passed. No release NGINX build/deployment needed for an uncalled helper.
