@@ -1,0 +1,138 @@
+{
+  "passed": true,
+  "scope": "real collector JS, synthetic HTTP transport, no module producer/learned output",
+  "source_commit": "5eaf6b50781def2d8e43021a6f29d3579f5307f2",
+  "collector_sha256": "4f0b9a76e10fe4849742395255c9fbf012c2ea423b7c4a52ad4191fecbd5c932",
+  "cases": [
+    {
+      "path": "/page",
+      "viewport": 640,
+      "reports": [
+        {
+          "raw": "url=http%3A%2F%2F127.0.0.1%3A38487%2Fpage&asi=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&asn=AAAAAAAAAAA&asm=automatic-sizes%2F1%20640%0A1111111111111111111111111111111111111111111111111111111111111111%2010240%0A2222222222222222222222222222222222222222222222222222222222222222%2016640%0A",
+          "fields": {
+            "url": [
+              "http://127.0.0.1:38487/page"
+            ],
+            "asi": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ],
+            "asn": [
+              "AAAAAAAAAAA"
+            ],
+            "asm": [
+              "automatic-sizes/1 640\n1111111111111111111111111111111111111111111111111111111111111111 10240\n2222222222222222222222222222222222222222222222222222222222222222 16640\n"
+            ]
+          }
+        }
+      ],
+      "image_requests": 1,
+      "image_attributes_unchanged": true
+    },
+    {
+      "path": "/page-desktop",
+      "viewport": 1024,
+      "reports": [
+        {
+          "raw": "url=http%3A%2F%2F127.0.0.1%3A38487%2Fpage-desktop&asi=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&asn=AAAAAAAAAAA&asm=automatic-sizes%2F1%201024%0A1111111111111111111111111111111111111111111111111111111111111111%2010240%0A2222222222222222222222222222222222222222222222222222222222222222%2016640%0A",
+          "fields": {
+            "url": [
+              "http://127.0.0.1:38487/page-desktop"
+            ],
+            "asi": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ],
+            "asn": [
+              "AAAAAAAAAAA"
+            ],
+            "asm": [
+              "automatic-sizes/1 1024\n1111111111111111111111111111111111111111111111111111111111111111 10240\n2222222222222222222222222222222222222222222222222222222222222222 16640\n"
+            ]
+          }
+        }
+      ],
+      "image_requests": 1,
+      "image_attributes_unchanged": true
+    },
+    {
+      "path": "/fallback",
+      "viewport": 640,
+      "reports": [
+        {
+          "raw": "url=http%3A%2F%2F127.0.0.1%3A38487%2Ffallback&asi=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&asn=AAAAAAAAAAA&asm=automatic-sizes%2F1%20640%0A1111111111111111111111111111111111111111111111111111111111111111%2010240%0A2222222222222222222222222222222222222222222222222222222222222222%2016640%0A",
+          "fields": {
+            "url": [
+              "http://127.0.0.1:38487/fallback"
+            ],
+            "asi": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ],
+            "asn": [
+              "AAAAAAAAAAA"
+            ],
+            "asm": [
+              "automatic-sizes/1 640\n1111111111111111111111111111111111111111111111111111111111111111 10240\n2222222222222222222222222222222222222222222222222222222222222222 16640\n"
+            ]
+          }
+        }
+      ],
+      "image_requests": 1,
+      "image_attributes_unchanged": true
+    },
+    {
+      "path": "/throw-beacon",
+      "viewport": 640,
+      "reports": [
+        {
+          "raw": "url=http%3A%2F%2F127.0.0.1%3A38487%2Fthrow-beacon&asi=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&asn=AAAAAAAAAAA&asm=automatic-sizes%2F1%20640%0A1111111111111111111111111111111111111111111111111111111111111111%2010240%0A2222222222222222222222222222222222222222222222222222222222222222%2016640%0A",
+          "fields": {
+            "url": [
+              "http://127.0.0.1:38487/throw-beacon"
+            ],
+            "asi": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ],
+            "asn": [
+              "AAAAAAAAAAA"
+            ],
+            "asm": [
+              "automatic-sizes/1 640\n1111111111111111111111111111111111111111111111111111111111111111 10240\n2222222222222222222222222222222222222222222222222222222222222222 16640\n"
+            ]
+          }
+        }
+      ],
+      "image_requests": 1,
+      "image_attributes_unchanged": true
+    },
+    {
+      "path": "/cross-origin",
+      "viewport": 640,
+      "reports": [],
+      "image_requests": 1,
+      "image_attributes_unchanged": true
+    },
+    {
+      "path": "/oversize",
+      "viewport": 640,
+      "reports": [],
+      "image_requests": 1,
+      "image_attributes_unchanged": true
+    },
+    {
+      "path": "/too-many-slots",
+      "viewport": 640,
+      "reports": [],
+      "image_requests": 1,
+      "image_attributes_unchanged": true
+    },
+    {
+      "path": "/empty",
+      "viewport": 640,
+      "reports": [],
+      "image_requests": 1,
+      "image_attributes_unchanged": true
+    }
+  ],
+  "prefix": "/tmp/ps-auto-collector-rkus_svn",
+  "browser": "Google Chrome 158.0.8127.88"
+}

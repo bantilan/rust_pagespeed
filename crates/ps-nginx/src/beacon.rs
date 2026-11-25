@@ -107,6 +107,67 @@ pub fn handle_beacon_evidence(
     })
 }
 
+/// Automatic sizing receiver. Only a previously server-registered scope and
+/// nonce can mutate measurements; no registration is exposed over HTTP.
+/// The caller continues returning the ordinary beacon204 response.
+pub fn handle_automatic_sizes(
+    params: &str,
+    server: &ps_html::server_context::ServerContext,
+    now_ms: i64,
+) -> Option<ps_html::automatic_sizes_store::MergeOutcome> {
+    use ps_html::automatic_sizes::{MeasurementBatch, MAX_REPORT_BYTES};
+    use ps_html::automatic_sizes_store::{MeasurementStore, MergeOutcome};
+    // Check before allocating the decoded parameter collection. Other beacon
+    // consumers retain their existing limits; this protects this new path.
+    if params.len() > 65536 || params.split('&').take(17).count() > 16 {
+        return Some(MergeOutcome::InvalidInput);
+    }
+    let mut query = QueryParams::new();
+    query.parse_from_untrusted_string(params);
+    if !query.has("asm") && !query.has("asi") && !query.has("asn") {
+        return None;
+    }
+    let invalid = Some(MergeOutcome::InvalidInput);
+    for required in [BEACON_URL_PARAM, "asi", "asn", "asm"] {
+        if (0..query.len())
+            .filter(|&i| query.name(i) == required)
+            .count()
+            != 1
+        {
+            return invalid;
+        }
+    }
+
+    let Some(page) = query.lookup1_unescaped(BEACON_URL_PARAM) else {
+        return invalid;
+    };
+    if page.len() > 8192 || !GoogleUrl::new(&page).is_web_valid() {
+        return invalid;
+    }
+    let Some(scope) = query.lookup1_unescaped("asi") else {
+        return invalid;
+    };
+    let Some(nonce) = query.lookup1_unescaped("asn") else {
+        return invalid;
+    };
+    if scope.len() != 64 || nonce.len() != 11 {
+        return invalid;
+    }
+    let Some(escaped) = query.lookup1_escaped("asm") else {
+        return invalid;
+    };
+    if escaped.len() > MAX_REPORT_BYTES * 3 {
+        return invalid;
+    }
+    let Some(wire) = query.lookup1_unescaped("asm") else {
+        return invalid;
+    };
+    let Some(batch) = MeasurementBatch::parse(&wire) else {
+        return invalid;
+    };
+    MeasurementStore::new(server.metadata_cache().clone()).accept(&scope, &nonce, &batch, now_ms)
+}
+
 /// Parses the LCP/nonce evidence report: a stamped LCP hash joins
 /// the critical set with img kind; otherwise a valid kind (with
 /// an empty set, so the beacon still counts) plus the loaded URL
@@ -270,5 +331,80 @@ mod tests {
             "http://h/hero.png",
             record
         ));
+    }
+    #[test]
+    fn automatic_receiver_accepts_only_issued_nonce_and_bounded_batch() {
+        use ps_html::automatic_sizes_store::{MeasurementStore, MergeOutcome, RegisterOutcome};
+        use ps_http::query_params::QueryParams;
+        let metadata: std::sync::Arc<dyn ps_cache::cache::Cache> =
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new());
+        let server = crate::rewrite::html_context(
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new()),
+            metadata.clone(),
+            std::sync::Arc::new(ps_stats::core::Statistics::new()),
+            0,
+            std::sync::Arc::new(crate::rewrite::UnavailableFetcher),
+        );
+        let scope = "a".repeat(64);
+        let id = "b".repeat(64);
+        let nonce = ps_html::beacon_finder::format_nonce(11);
+        let store = MeasurementStore::new(metadata);
+        let manifest = [id.clone()].into_iter().collect();
+        assert_eq!(
+            store.register(&scope, &nonce, &manifest, 1000),
+            Some(RegisterOutcome::Registered)
+        );
+        let wire = format!("automatic-sizes/1 412\n{id} 22528\n");
+        // Percent encoding is the browser's application/x-www-form-urlencoded contract.
+        let escaped: String = wire
+            .bytes()
+            .map(|b| match b {
+                b'a'..=b'z' | b'0'..=b'9' | b'-' | b'/' => char::from(b).to_string(),
+                _ => format!("%{b:02X}"),
+            })
+            .collect();
+        let params = format!("url=http%3A%2F%2Fh%2Fp&asi={scope}&asn={nonce}&asm={escaped}");
+        let before = store.load(&scope, 1100).unwrap();
+        for input in [
+            format!("{params}&asm={escaped}"),
+            format!("{params}&asi={scope}"),
+            format!("asi&{params}"),
+            format!("{params}&asn"),
+            params.replace("url=http%3A%2F%2Fh%2Fp", "url=bad"),
+            params.replace("asm=", "other="),
+            format!("{params}&{}", "x=1&".repeat(17)),
+            format!("{params}&x={}", "x".repeat(65536)),
+            params.replace("22528", "0"),
+        ] {
+            assert_eq!(
+                handle_automatic_sizes(&input, &server, 1100),
+                Some(MergeOutcome::InvalidInput)
+            );
+            assert_eq!(store.load(&scope, 1100).unwrap(), before);
+        }
+        assert_eq!(
+            handle_automatic_sizes(&params.replace(&id, &"c".repeat(64)), &server, 1100),
+            Some(MergeOutcome::Unissued)
+        );
+        assert_eq!(
+            handle_automatic_sizes(&params, &server, 1100),
+            Some(MergeOutcome::Accepted {
+                hints_changed: false,
+                generation: 0
+            })
+        );
+        assert_eq!(
+            handle_automatic_sizes(&params, &server, 1100),
+            Some(MergeOutcome::BadNonce)
+        );
+        assert_eq!(
+            handle_automatic_sizes("url=http://h/p&lcp=1&n=x", &server, 1100),
+            None
+        );
+        assert_eq!(store.load(&scope, 1100).unwrap().measurements.len(), 1);
+        // Ensure the decoded browser wire remains compatible with the strict parser.
+        let mut query = QueryParams::new();
+        query.parse_from_untrusted_string(&params);
+        assert_eq!(query.lookup1_unescaped("asm"), Some(wire));
     }
 }

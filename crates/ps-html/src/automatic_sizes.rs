@@ -4,6 +4,10 @@
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Measurement-only browser collector. Producer injection is intentionally
+/// separate so registration/cache gates must succeed before activation.
+pub const COLLECTOR_JS: &str = include_str!("../assets/automatic_sizes_collector.js");
+
 /// Page-wide limits for automatic measurement registration and reports.
 pub const MAX_PLACEMENTS: usize = 64;
 pub const MAX_REPORT_BYTES: usize = 8192;

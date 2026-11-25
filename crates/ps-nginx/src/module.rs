@@ -2280,6 +2280,7 @@ unsafe fn answer_beacon(r: *mut ngx_http_request_t, data: &str) {
                     .map(|age| age.as_millis() as i64)
                     .unwrap_or(0);
                 crate::beacon::handle_beacon_evidence(data, &page_url, &user_agent, html, now_ms);
+                crate::beacon::handle_automatic_sizes(data, html, now_ms);
             }
         }
         // C++ passes a string literal through `const_cast`; the
