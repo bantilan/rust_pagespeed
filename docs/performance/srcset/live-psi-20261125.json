@@ -1,0 +1,515 @@
+{
+  "report_url": "https://pagespeed.web.dev/analysis/https-rustpagespeed-com/0rdq50fd0wns7ma76f1hwd?form_factor=mobile",
+  "records": [
+    {
+      "fetchTime": "2026-11-25T09:09:58.222Z",
+      "formFactor": "mobile",
+      "audits": {
+        "first-contentful-paint": {
+          "id": "first-contentful-paint",
+          "title": "First Contentful Paint",
+          "description": "First Contentful Paint marks the time at which the first text or image is painted. [Learn more about the First Contentful Paint metric](https://developer.chrome.com/docs/lighthouse/performance/first-contentful-paint/).",
+          "score": 1,
+          "scoreDisplayMode": "numeric",
+          "displayValue": "0.9\u00a0s",
+          "numericValue": 917,
+          "numericUnit": "millisecond",
+          "scoringOptions": {
+            "p10": 1800,
+            "median": 3000
+          }
+        },
+        "largest-contentful-paint": {
+          "id": "largest-contentful-paint",
+          "title": "Largest Contentful Paint",
+          "description": "Largest Contentful Paint marks the time at which the largest text or image is painted. [Learn more about the Largest Contentful Paint metric](https://developer.chrome.com/docs/lighthouse/performance/lighthouse-largest-contentful-paint/)",
+          "score": 1,
+          "scoreDisplayMode": "numeric",
+          "displayValue": "1.2\u00a0s",
+          "numericValue": 1201,
+          "numericUnit": "millisecond",
+          "scoringOptions": {
+            "p10": 2500,
+            "median": 4000
+          }
+        },
+        "speed-index": {
+          "id": "speed-index",
+          "title": "Speed Index",
+          "description": "Speed Index shows how quickly the contents of a page are visibly populated. [Learn more about the Speed Index metric](https://developer.chrome.com/docs/lighthouse/performance/speed-index/).",
+          "score": 0.94,
+          "scoreDisplayMode": "numeric",
+          "displayValue": "3.0\u00a0s",
+          "numericValue": 2979.506260055542,
+          "numericUnit": "millisecond",
+          "scoringOptions": {
+            "p10": 3387,
+            "median": 5800
+          }
+        },
+        "total-blocking-time": {
+          "id": "total-blocking-time",
+          "title": "Total Blocking Time",
+          "description": "Sum of all time periods between FCP and Time to Interactive, when task length exceeded 50ms, expressed in milliseconds. [Learn more about the Total Blocking Time metric](https://developer.chrome.com/docs/lighthouse/performance/lighthouse-total-blocking-time/).",
+          "score": 1,
+          "scoreDisplayMode": "numeric",
+          "displayValue": "0\u00a0ms",
+          "numericValue": 0,
+          "numericUnit": "millisecond",
+          "scoringOptions": {
+            "p10": 200,
+            "median": 600
+          }
+        },
+        "cumulative-layout-shift": {
+          "id": "cumulative-layout-shift",
+          "title": "Cumulative Layout Shift",
+          "description": "Cumulative Layout Shift measures the movement of visible elements within the viewport. [Learn more about the Cumulative Layout Shift metric](https://web.dev/articles/cls).",
+          "score": 1,
+          "scoreDisplayMode": "numeric",
+          "displayValue": "0",
+          "details": {
+            "items": [
+              {
+                "cumulativeLayoutShiftMainFrame": 0,
+                "newEngineResult": {
+                  "cumulativeLayoutShift": 0,
+                  "cumulativeLayoutShiftMainFrame": 0
+                },
+                "newEngineResultDiffered": false
+              }
+            ],
+            "type": "debugdata"
+          },
+          "numericValue": 0,
+          "numericUnit": "unitless",
+          "scoringOptions": {
+            "p10": 0.1,
+            "median": 0.25
+          }
+        },
+        "image-delivery-insight": {
+          "id": "image-delivery-insight",
+          "title": "Improve image delivery",
+          "description": "Reducing the download time of images can improve the perceived load time of the page and LCP. [Learn more about optimizing image size](https://developer.chrome.com/docs/performance/insights/image-delivery).",
+          "score": 0,
+          "scoreDisplayMode": "metricSavings",
+          "displayValue": "Est savings of 45\u00a0KiB",
+          "details": {
+            "debugData": {
+              "type": "debugdata",
+              "wastedBytes": 46234
+            },
+            "headings": [
+              {
+                "key": "node",
+                "valueType": "node"
+              },
+              {
+                "key": "url",
+                "label": "URL",
+                "subItemsHeading": {
+                  "key": "reason",
+                  "valueType": "text"
+                },
+                "valueType": "url"
+              },
+              {
+                "key": "totalBytes",
+                "label": "Resource Size",
+                "valueType": "bytes"
+              },
+              {
+                "key": "wastedBytes",
+                "label": "Est Savings",
+                "subItemsHeading": {
+                  "key": "wastedBytes",
+                  "valueType": "bytes"
+                },
+                "valueType": "bytes"
+              }
+            ],
+            "items": [
+              {
+                "node": {
+                  "boundingRect": {
+                    "bottom": 1056,
+                    "height": 247,
+                    "left": 30,
+                    "right": 382,
+                    "top": 810,
+                    "width": 352
+                  },
+                  "lhId": "page-0-IMG",
+                  "nodeLabel": "div.wp-block-group > div.entry-content > figure.wp-block-image > img.wp-image-7",
+                  "path": "1,HTML,1,BODY,1,DIV,1,MAIN,1,DIV,0,UL,1,LI,0,DIV,1,DIV,0,FIGURE,0,IMG",
+                  "selector": "div.wp-block-group > div.entry-content > figure.wp-block-image > img.wp-image-7",
+                  "snippet": "<img decoding=\"async\" width=\"800\" height=\"560\" src=\"https://rustpagespeed.com/wp-content/uploads/2026/11/xheader-768x538.jpg.p\u2026\" alt=\"\" class=\"wp-image-7\" srcset=\"https://rustpagespeed.com/wp-content/uploads/2026/11/xheader.jpg.pagespeed\u2026\" sizes=\"(max-width: 800px) 100vw, 800px\" data-pagespeed-url-hash=\"534431690\">",
+                  "type": "node"
+                },
+                "subItems": {
+                  "items": [
+                    {
+                      "reason": "This image file is larger than it needs to be (768x538) for its displayed dimensions (616x432). Use responsive images to reduce the image download size.",
+                      "wastedBytes": 23592
+                    }
+                  ],
+                  "type": "subitems"
+                },
+                "totalBytes": 66144,
+                "url": "https://rustpagespeed.com/wp-content/uploads/2026/11/xheader-768x538.jpg.pagespeed.ic.0.jpg",
+                "wastedBytes": 23592
+              },
+              {
+                "node": {
+                  "boundingRect": {
+                    "bottom": 630,
+                    "height": 352,
+                    "left": 30,
+                    "right": 382,
+                    "top": 278,
+                    "width": 352
+                  },
+                  "lhId": "page-1-IMG",
+                  "nodeLabel": "div.wp-block-group > div.entry-content > figure.wp-block-image > img.wp-image-10",
+                  "path": "1,HTML,1,BODY,1,DIV,1,MAIN,1,DIV,0,UL,0,LI,0,DIV,1,DIV,1,FIGURE,0,IMG",
+                  "selector": "div.wp-block-group > div.entry-content > figure.wp-block-image > img.wp-image-10",
+                  "snippet": "<img fetchpriority=\"high\" decoding=\"async\" width=\"1024\" height=\"1024\" src=\"https://rustpagespeed.com/wp-content/uploads/2026/11/x887328173_1663263468\u2026\" alt=\"\" class=\"wp-image-10\" srcset=\"https://rustpagespeed.com/wp-content/uploads/2026/11/x887328173_1663263468\u2026\" sizes=\"(max-width: 1024px) 100vw, 1024px\" data-pagespeed-url-hash=\"2459658944\">",
+                  "type": "node"
+                },
+                "subItems": {
+                  "items": [
+                    {
+                      "reason": "This image file is larger than it needs to be (768x768) for its displayed dimensions (616x616). Use responsive images to reduce the image download size.",
+                      "wastedBytes": 22642
+                    }
+                  ],
+                  "type": "subitems"
+                },
+                "totalBytes": 63482,
+                "url": "https://rustpagespeed.com/wp-content/uploads/2026/11/x887328173_1663263468785830_6948282537634016603_n-768x768.jpeg.pagespeed.ic.0.jpg",
+                "wastedBytes": 22642
+              }
+            ],
+            "type": "table"
+          },
+          "numericValue": 46234,
+          "numericUnit": "byte",
+          "metricSavings": {
+            "LCP": 150,
+            "FCP": 0
+          },
+          "guidanceLevel": 3
+        },
+        "lcp-discovery-insight": {
+          "id": "lcp-discovery-insight",
+          "title": "LCP request discovery",
+          "description": "[Optimize LCP](https://developer.chrome.com/docs/performance/insights/lcp-discovery) by making the LCP image discoverable from the HTML immediately, and avoiding lazy-loading",
+          "score": 1,
+          "scoreDisplayMode": "numeric",
+          "details": {
+            "items": [
+              {
+                "items": {
+                  "eagerlyLoaded": {
+                    "label": "LCP resources shouldn\u2019t use loading=lazy",
+                    "value": true
+                  },
+                  "priorityHinted": {
+                    "label": "fetchpriority=high applied",
+                    "value": true
+                  },
+                  "requestDiscoverable": {
+                    "label": "Request is discoverable in initial document",
+                    "value": true
+                  }
+                },
+                "type": "checklist"
+              },
+              {
+                "boundingRect": {
+                  "bottom": 630,
+                  "height": 352,
+                  "left": 30,
+                  "right": 382,
+                  "top": 278,
+                  "width": 352
+                },
+                "lhId": "page-1-IMG",
+                "nodeLabel": "div.wp-block-group > div.entry-content > figure.wp-block-image > img.wp-image-10",
+                "path": "1,HTML,1,BODY,1,DIV,1,MAIN,1,DIV,0,UL,0,LI,0,DIV,1,DIV,1,FIGURE,0,IMG",
+                "selector": "div.wp-block-group > div.entry-content > figure.wp-block-image > img.wp-image-10",
+                "snippet": "<img fetchpriority=\"high\" decoding=\"async\" width=\"1024\" height=\"1024\" src=\"https://rustpagespeed.com/wp-content/uploads/2026/11/x887328173_1663263468\u2026\" alt=\"\" class=\"wp-image-10\" srcset=\"https://rustpagespeed.com/wp-content/uploads/2026/11/x887328173_1663263468\u2026\" sizes=\"(max-width: 1024px) 100vw, 1024px\" data-pagespeed-url-hash=\"2459658944\">",
+                "type": "node"
+              }
+            ],
+            "type": "list"
+          },
+          "numericValue": 0,
+          "numericUnit": "millisecond",
+          "metricSavings": {
+            "LCP": 0
+          },
+          "guidanceLevel": 3
+        }
+      }
+    },
+    {
+      "fetchTime": "2026-11-25T09:09:57.860Z",
+      "formFactor": "desktop",
+      "audits": {
+        "first-contentful-paint": {
+          "id": "first-contentful-paint",
+          "title": "First Contentful Paint",
+          "description": "First Contentful Paint marks the time at which the first text or image is painted. [Learn more about the First Contentful Paint metric](https://developer.chrome.com/docs/lighthouse/performance/first-contentful-paint/).",
+          "score": 1,
+          "scoreDisplayMode": "numeric",
+          "displayValue": "0.2\u00a0s",
+          "numericValue": 242,
+          "numericUnit": "millisecond",
+          "scoringOptions": {
+            "p10": 934,
+            "median": 1600
+          }
+        },
+        "largest-contentful-paint": {
+          "id": "largest-contentful-paint",
+          "title": "Largest Contentful Paint",
+          "description": "Largest Contentful Paint marks the time at which the largest text or image is painted. [Learn more about the Largest Contentful Paint metric](https://developer.chrome.com/docs/lighthouse/performance/lighthouse-largest-contentful-paint/)",
+          "score": 1,
+          "scoreDisplayMode": "numeric",
+          "displayValue": "0.5\u00a0s",
+          "numericValue": 522,
+          "numericUnit": "millisecond",
+          "scoringOptions": {
+            "p10": 1200,
+            "median": 2400
+          }
+        },
+        "speed-index": {
+          "id": "speed-index",
+          "title": "Speed Index",
+          "description": "Speed Index shows how quickly the contents of a page are visibly populated. [Learn more about the Speed Index metric](https://developer.chrome.com/docs/lighthouse/performance/speed-index/).",
+          "score": 0.96,
+          "scoreDisplayMode": "numeric",
+          "displayValue": "1.1\u00a0s",
+          "numericValue": 1081.3784801711042,
+          "numericUnit": "millisecond",
+          "scoringOptions": {
+            "p10": 1311,
+            "median": 2300
+          }
+        },
+        "total-blocking-time": {
+          "id": "total-blocking-time",
+          "title": "Total Blocking Time",
+          "description": "Sum of all time periods between FCP and Time to Interactive, when task length exceeded 50ms, expressed in milliseconds. [Learn more about the Total Blocking Time metric](https://developer.chrome.com/docs/lighthouse/performance/lighthouse-total-blocking-time/).",
+          "score": 1,
+          "scoreDisplayMode": "numeric",
+          "displayValue": "0\u00a0ms",
+          "numericValue": 0,
+          "numericUnit": "millisecond",
+          "scoringOptions": {
+            "p10": 150,
+            "median": 350
+          }
+        },
+        "cumulative-layout-shift": {
+          "id": "cumulative-layout-shift",
+          "title": "Cumulative Layout Shift",
+          "description": "Cumulative Layout Shift measures the movement of visible elements within the viewport. [Learn more about the Cumulative Layout Shift metric](https://web.dev/articles/cls).",
+          "score": 1,
+          "scoreDisplayMode": "numeric",
+          "displayValue": "0",
+          "details": {
+            "items": [
+              {
+                "cumulativeLayoutShiftMainFrame": 0,
+                "newEngineResult": {
+                  "cumulativeLayoutShift": 0,
+                  "cumulativeLayoutShiftMainFrame": 0
+                },
+                "newEngineResultDiffered": false
+              }
+            ],
+            "type": "debugdata"
+          },
+          "numericValue": 0,
+          "numericUnit": "unitless",
+          "scoringOptions": {
+            "p10": 0.1,
+            "median": 0.25
+          }
+        },
+        "image-delivery-insight": {
+          "id": "image-delivery-insight",
+          "title": "Improve image delivery",
+          "description": "Reducing the download time of images can improve the perceived load time of the page and LCP. [Learn more about optimizing image size](https://developer.chrome.com/docs/performance/insights/image-delivery).",
+          "score": 0,
+          "scoreDisplayMode": "metricSavings",
+          "displayValue": "Est savings of 194\u00a0KiB",
+          "details": {
+            "debugData": {
+              "type": "debugdata",
+              "wastedBytes": 199067
+            },
+            "headings": [
+              {
+                "key": "node",
+                "valueType": "node"
+              },
+              {
+                "key": "url",
+                "label": "URL",
+                "subItemsHeading": {
+                  "key": "reason",
+                  "valueType": "text"
+                },
+                "valueType": "url"
+              },
+              {
+                "key": "totalBytes",
+                "label": "Resource Size",
+                "valueType": "bytes"
+              },
+              {
+                "key": "wastedBytes",
+                "label": "Est Savings",
+                "subItemsHeading": {
+                  "key": "wastedBytes",
+                  "valueType": "bytes"
+                },
+                "valueType": "bytes"
+              }
+            ],
+            "items": [
+              {
+                "node": {
+                  "boundingRect": {
+                    "bottom": 1744,
+                    "height": 452,
+                    "left": 345,
+                    "right": 990,
+                    "top": 1293,
+                    "width": 645
+                  },
+                  "lhId": "page-0-IMG",
+                  "nodeLabel": "div.wp-block-group > div.entry-content > figure.wp-block-image > img.wp-image-7",
+                  "path": "1,HTML,1,BODY,1,DIV,1,MAIN,1,DIV,0,UL,1,LI,0,DIV,1,DIV,0,FIGURE,0,IMG",
+                  "selector": "div.wp-block-group > div.entry-content > figure.wp-block-image > img.wp-image-7",
+                  "snippet": "<img decoding=\"async\" width=\"800\" height=\"560\" src=\"https://rustpagespeed.com/wp-content/uploads/2026/11/xheader.jpg.pagespeed\u2026\" alt=\"\" class=\"wp-image-7\" srcset=\"https://rustpagespeed.com/wp-content/uploads/2026/11/xheader.jpg.pagespeed\u2026\" sizes=\"(max-width: 800px) 100vw, 800px\" data-pagespeed-url-hash=\"534431690\">",
+                  "type": "node"
+                },
+                "subItems": {
+                  "items": [
+                    {
+                      "reason": "Increasing the image compression factor could improve this image\u2019s download size",
+                      "wastedBytes": 106532
+                    },
+                    {
+                      "reason": "This image file is larger than it needs to be (800x560) for its displayed dimensions (645x452). Use responsive images to reduce the image download size.",
+                      "wastedBytes": 63413
+                    }
+                  ],
+                  "type": "subitems"
+                },
+                "totalBytes": 181199,
+                "url": "https://rustpagespeed.com/wp-content/uploads/2026/11/xheader.jpg.pagespeed.ic.0.jpg",
+                "wastedBytes": 132663
+              },
+              {
+                "node": {
+                  "boundingRect": {
+                    "bottom": 1029,
+                    "height": 645,
+                    "left": 345,
+                    "right": 990,
+                    "top": 384,
+                    "width": 645
+                  },
+                  "lhId": "page-1-IMG",
+                  "nodeLabel": "div.wp-block-group > div.entry-content > figure.wp-block-image > img.wp-image-10",
+                  "path": "1,HTML,1,BODY,1,DIV,1,MAIN,1,DIV,0,UL,0,LI,0,DIV,1,DIV,1,FIGURE,0,IMG",
+                  "selector": "div.wp-block-group > div.entry-content > figure.wp-block-image > img.wp-image-10",
+                  "snippet": "<img fetchpriority=\"high\" decoding=\"async\" width=\"1024\" height=\"1024\" src=\"https://rustpagespeed.com/wp-content/uploads/2026/11/x887328173_1663263468\u2026\" alt=\"\" class=\"wp-image-10\" srcset=\"https://rustpagespeed.com/wp-content/uploads/2026/11/x887328173_1663263468\u2026\" sizes=\"(max-width: 1024px) 100vw, 1024px\" data-pagespeed-url-hash=\"2459658944\">",
+                  "type": "node"
+                },
+                "subItems": {
+                  "items": [
+                    {
+                      "reason": "This image file is larger than it needs to be (1024x1024) for its displayed dimensions (645x645). Use responsive images to reduce the image download size.",
+                      "wastedBytes": 66404
+                    }
+                  ],
+                  "type": "subitems"
+                },
+                "totalBytes": 110077,
+                "url": "https://rustpagespeed.com/wp-content/uploads/2026/11/x887328173_1663263468785830_6948282537634016603_n-1024x1024.jpeg.pagespeed.ic.0.jpg",
+                "wastedBytes": 66404
+              }
+            ],
+            "type": "table"
+          },
+          "numericValue": 199067,
+          "numericUnit": "byte",
+          "metricSavings": {
+            "LCP": 200,
+            "FCP": 0
+          },
+          "guidanceLevel": 3
+        },
+        "lcp-discovery-insight": {
+          "id": "lcp-discovery-insight",
+          "title": "LCP request discovery",
+          "description": "[Optimize LCP](https://developer.chrome.com/docs/performance/insights/lcp-discovery) by making the LCP image discoverable from the HTML immediately, and avoiding lazy-loading",
+          "score": 1,
+          "scoreDisplayMode": "numeric",
+          "details": {
+            "items": [
+              {
+                "items": {
+                  "eagerlyLoaded": {
+                    "label": "LCP resources shouldn\u2019t use loading=lazy",
+                    "value": true
+                  },
+                  "priorityHinted": {
+                    "label": "fetchpriority=high applied",
+                    "value": true
+                  },
+                  "requestDiscoverable": {
+                    "label": "Request is discoverable in initial document",
+                    "value": true
+                  }
+                },
+                "type": "checklist"
+              },
+              {
+                "boundingRect": {
+                  "bottom": 1029,
+                  "height": 645,
+                  "left": 345,
+                  "right": 990,
+                  "top": 384,
+                  "width": 645
+                },
+                "lhId": "page-1-IMG",
+                "nodeLabel": "div.wp-block-group > div.entry-content > figure.wp-block-image > img.wp-image-10",
+                "path": "1,HTML,1,BODY,1,DIV,1,MAIN,1,DIV,0,UL,0,LI,0,DIV,1,DIV,1,FIGURE,0,IMG",
+                "selector": "div.wp-block-group > div.entry-content > figure.wp-block-image > img.wp-image-10",
+                "snippet": "<img fetchpriority=\"high\" decoding=\"async\" width=\"1024\" height=\"1024\" src=\"https://rustpagespeed.com/wp-content/uploads/2026/11/x887328173_1663263468\u2026\" alt=\"\" class=\"wp-image-10\" srcset=\"https://rustpagespeed.com/wp-content/uploads/2026/11/x887328173_1663263468\u2026\" sizes=\"(max-width: 1024px) 100vw, 1024px\" data-pagespeed-url-hash=\"2459658944\">",
+                "type": "node"
+              }
+            ],
+            "type": "list"
+          },
+          "numericValue": 0,
+          "numericUnit": "millisecond",
+          "metricSavings": {
+            "LCP": 0
+          },
+          "guidanceLevel": 3
+        }
+      }
+    }
+  ]
+}

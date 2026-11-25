@@ -85,3 +85,7 @@ Costdiagnostic sequentialafterbuilds/tests/browser:9alternatingbatches×100itera
 Zero resourcefetches asserted. Enabledmode measured lower in thisrun; this is noise-sensitive observation, NOT proven speedup or NGINX/requestlatency. Cold samples are single firstdrivercalls, not useful distributions. A6stillneeds controlledcold/warmresourceMISS/HTMLHIT andlargeinputlatency. No deployment or productionbenchmark.
 
 READMEactualswitch/eligibility/conflicts/limitsupdated; rustfmtnewRust/test/example and gitdiffcheck pass. Modifiedfilterpolicy/apply,srcsettests,browsertool,diagnosticexample,README,plan/ledger,rawlogs. Immutableconfigurationreused; no newstatsregistration/fetch/encode/jobs. NextA1bmodel thenA3collection, not eagerauto injection.
+
+## Live report and explicit LCP requirement
+
+User installed A2 and requests LCP inclusion. Read LIVE_FINDINGS.md and live-psi-20261125.json before A1b. Currentmobilebothimagesareeager;LCPfetchpriorityhigh;A2correctlyskipsboth. MobileLCP1.201s/CLS0,TBT0;45KiBestimatedimagesavings,768selectedvs616target. Need learned eager/LCP path, not enablelazy onhero. No actual616/640candidatebetween300/768; correctsizesmaynotremovemobilewarning. Desktop645slotcouldchooseexisting768ratherthan1024. Do not claim userconfigurationwrong. ExplicitA4acceptanceincludesimgsizes/generatedpreloadimagesizesmatched, no duplicaterequests,firstvisit/unknownviewportfallback and no cache/RUMregression.
