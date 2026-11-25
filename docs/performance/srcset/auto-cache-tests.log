@@ -1,0 +1,28 @@
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.92s
+     Running unittests src/lib.rs (target/debug/build/ps-html/312fd3749c0f773f/out/ps_html-312fd3749c0f773f)
+
+running 20 tests
+test html_cache::tests::allowlisted_cookies_miss_store_and_hit ... ok
+test html_cache::tests::auth_and_generic_bypasses_stay_quiet ... ok
+test html_cache::tests::automatic_collector_cannot_publish_body_or_early_policy ... ok
+test html_cache::tests::beacon_learning_gates_lookup_store_and_identity ... ok
+test html_cache::tests::bypass_reasons_sanitize_and_truncate ... ok
+test html_cache::tests::cookie_configuration_overrides ... ok
+test html_cache::tests::each_gate_bypasses_alone ... ok
+test html_cache::tests::early_lookup_rejects_corrupt_hint_and_private_origin ... ok
+test html_cache::tests::early_lookup_requires_publication_and_preserves_variants ... ok
+test html_cache::tests::experiment_bypasses ... ok
+test html_cache::tests::file_mtime_stands_in_for_invisible_freshness ... ok
+test html_cache::tests::identity_splits_user_agents_and_purges ... ok
+test html_cache::tests::malformed_and_cookie2_bypass_with_lines ... ok
+test html_cache::tests::miss_stores_and_hit_serves ... ok
+test html_cache::tests::oversize_and_sampled_bodies_do_not_store ... ok
+test html_cache::tests::publication_rechecks_request_cookies ... ok
+test html_cache::tests::rum_only_body_still_publishes_and_replays ... ok
+test html_cache::tests::sampling_due_and_unsettled_renders_bypass ... ok
+test html_cache::tests::show_comment_shapes ... ok
+test html_cache::tests::unknown_and_mixed_cookies_bypass_with_named_reason ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.03s
+

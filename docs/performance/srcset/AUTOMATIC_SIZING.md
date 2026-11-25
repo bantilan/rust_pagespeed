@@ -36,7 +36,7 @@ crates/ps-html/assets/critical_images_beacon_dbg.js:getImageRenderedMap emits rw
 
 ## Next Session Resume Point
 
-A3b collector+receiver checkpoint verified. New3056byte automatic_sizes_collector.js exportedviaCOLLECTOR_JS, actualNGINXanswer_beacon callsboundedhandle_automatic_sizes(asm/asi/asn/url)->singlecohortaccept. Serverregistrationonly; noHTTPregister. 294NGINX+184HTMLlibrary+12srcsettests pass;8actualChromeHTTPsinkcases pass,oneoriginalimagefetch,attrsunchanged,duplicate/hidden/picture/no-transform/cap skips,sendBeaconfalse/throwfetchfallback,crossoriginrefusal. Lockedcheck1.15s. Producer/injection STILLUNWIRED,automaticLCPinactive. Next A3c: trustedcompleteoriginaldocument/styleidentityproducer/streamflushfallback,requestcohortisolation,nonceentropy+manifestregistration/stamping/injection gatedonmetadata success andcache sampling eligibility. Mustincludeepoch/generation/expiryinlearnedHTMLkeys/earlyHIT validation andensure nonce-bearingcollectorHTMLnotcachedorreused,whileexistingRUMretained. Existingcriticalbeaconprotocol unchanged. Then A4consumelearnedsizesbeforeLCPpreloads. No manualbreakpoints/no variants/deployment;allcommandsfinished.
+A3c1 cache-publication safeguard verified: automatic collector definition/invocation blocks HTML publication, including split writes; normal and early lookups cannot replay sampled bodies. Ordinary RUM-only body still caches/replays. Producer/injection remains UNWIRED; automatic eager/LCP sizing remains inactive. Next: implement trusted runtime original-document fingerprint/completeness and streaming-flush fallback, then stylesheet freshness/cohort isolation, secure nonce sampling/registration/stamping/injection. Do not activate before early-HIT sampling and epoch/generation/expiry validation are integrated. A4 learned consumer/preload alignment follows. No deployment or background commands.
 
 ## A1a contract before source edits
 
@@ -183,3 +183,19 @@ git diff --check
 5focusedbeacon/routingtests passed(auto-receiver-tests.log); full294NGINX0fail2.49s(auto-receiver-regressions.log),184HTML0fail0.70s+12srcset0fail0.01s(auto-collector-html-tests.log),finalcheck1.15s(auto-receiver-build.log). ActualChrome158 syntheticHTTPsink8cases:640/1024viewporttwodifferentimageplacements(sameURL160/260CSSpx),DOM>512,nslots>64,emptyhidden,beaconfalse,beaconthrow,crossoriginrefusal. PositivecasesoneimageGETandonePOST;allsource/sizesattributesunchanged. Script/JSONhashes/browser/rawpayloads inauto-collector-browser.json;imagesfixtureonly,noproductiontraffic. ChromeharnessstopsHTTPserver/processes;prefixartifactsretainedforreproduction. FullRusttests precededlastJStrycatchrefinement; final8Chromechecksandlockedcheckverifyfinalasset. Noactualproducer->NGINXHTTPendtoendbeaconclaimed: receiver seededRustunit andcollectorsyntheticHTTPsink separatelytested; realwire/NGINXpipeline/reloadoracleremainsA3c.
 
 Filesassets/automatic_sizes_collector.js,automatic_sizes.rs assetexport,ps-nginx/beacon.rs+module.rs receiverwiring,tools/verify_automatic_sizes_collector.py,plan/ledger/testartifacts. NoREADMEfunctionalLCPclaim,noreleasebuild/deploy,norequestlatencybenchmarksinceproducerstilloff. A3cmustresolvecompleteoriginaldoc+stylesheetepochandcohortlayoutisolation,secureentropy/sampling,HTTPcache nonceexclusion/currentRUMandearlyHITexpiry/generationchecks beforeactivation. CollectorHTTPoverhead/JSbytesCPU andcold/warmMISS/HITwillbemeasuredA6.
+
+## A3c1 contract before source edits
+
+Add automatic collector publication exclusion before producer activation. Reject HTML containing the reserved `pagespeed.collectAutomaticSizes` marker, including an inlined collector definition, using the existing final-body sampled-beacon guard. Verify split writes cannot evade detection and neither ordinary nor early HTML lookup can replay sampled HTML. Verify ordinary RUM-only HTML remains cacheable. No sampling activation, identity shortcut, or performance claim in this checkpoint. Baseline command: `cargo test --locked -p ps-html --lib html_cache::tests -- --test-threads=1`, output `auto-cache-baseline.log`.
+
+## A3c1 verified cache safeguard (2026-11-25)
+
+Completed only the cache-publication prerequisite; A3c overall remains pending. Modified `crates/ps-html/src/html_cache.rs`: reserved `pagespeed.collectAutomaticSizes` marker recognized alongside existing sampled beacons. Added tests for actual collector asset and initialization split byte-by-byte, no ordinary/early HIT or early-policy publication, and RUM-only body preservation through both HIT paths. No producer activation, stylesheet identity shortcut, or live changes. Existing final-body scan reused; no request fetch/work queue changes.
+
+Commands/results (artifacts in docs/performance/srcset):
+- `cargo test --locked -p ps-html --lib html_cache::tests -- --test-threads=1`: before 18 passed/0.02s (`auto-cache-baseline.log`); after 20 passed/0.03s (`auto-cache-tests.log`). Test timings are not latency benchmarks.
+- `cargo test --locked -p ps-html --lib --test srcset_sizes -- --test-threads=1`: 186 library +12 srcset passed (`auto-cache-regressions.log`).
+- `cargo check --locked -p ps-nginx`: pass,1.00s (`auto-cache-build.log`).
+- `rustfmt --edition 2021 crates/ps-html/src/html_cache.rs`; `git diff --check`: pass.
+
+No runtime performance comparison claimed: collector still inactive; cold/MISS/HIT and script overhead benchmarks remain A6. RUM test proves cache body preservation, not new browser end-to-end RUM execution. Next action is recorded above.

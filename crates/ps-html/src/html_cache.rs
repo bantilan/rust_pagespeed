@@ -806,7 +806,13 @@ fn has_cache_prohibition(origin: &ResponseHeaders) -> bool {
 /// Sampled beacon initialization markers (never freeze these
 /// into a cached document, including the boundary case where
 /// sampling becomes due during the rewrite).
-const SAMPLED_BEACON_MARKERS: &[&[u8]] = &[b"pagespeed.CriticalImages.Run(", b"CriticalCssBeacon"];
+const SAMPLED_BEACON_MARKERS: &[&[u8]] = &[
+    b"pagespeed.CriticalImages.Run(",
+    b"CriticalCssBeacon",
+    // Match both the collector definition and invocation. Issued nonces
+    // belong to one response and must never be replayed from HTML cache.
+    b"pagespeed.collectAutomaticSizes",
+];
 
 /// Whether a body carries sampled beacon initialization.
 fn contains_sampled_beacon_init(body: &[u8]) -> bool {
@@ -1260,6 +1266,80 @@ mod tests {
             assert!(finish.detail_line.is_none(), "{marker}");
         }
         assert_eq!(0, harness.counter("html_cache_inserts"));
+    }
+
+    #[test]
+    fn automatic_collector_cannot_publish_body_or_early_policy() {
+        for body in [
+            b"<script>pagespeed.collectAutomaticSizes('/beacon','scope','nonce');</script>"
+                .as_slice(),
+            crate::automatic_sizes::COLLECTOR_JS.as_bytes(),
+        ] {
+            let h = Harness::new();
+            h.options
+                .borrow_mut()
+                .set_option(
+                    "HtmlCacheEarlyLookup",
+                    "on",
+                    ps_config::scope::Scope::Server,
+                )
+                .unwrap();
+            let request = h.get_request();
+            let origin = h.ok_origin();
+            let mtime = Some((12, 34));
+            let mut render = h.session();
+            assert!(render
+                .lookup(&origin, &request, &h.purge, mtime, START_MS)
+                .is_none());
+            // Exercise every byte boundary, including within the marker.
+            for byte in body {
+                render.write(std::slice::from_ref(byte));
+            }
+            render.finish(&request, START_MS + 1);
+            assert_eq!(0, h.counter("html_cache_inserts"));
+            assert!(h
+                .session()
+                .lookup(&origin, &request, &h.purge, mtime, START_MS + 2)
+                .is_none());
+            assert!(h
+                .session()
+                .lookup_early(&request, &h.purge, mtime, START_MS + 2)
+                .is_none());
+        }
+    }
+
+    #[test]
+    fn rum_only_body_still_publishes_and_replays() {
+        let h = Harness::new();
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheEarlyLookup",
+                "on",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        let request = h.get_request();
+        let origin = h.ok_origin();
+        let mtime = Some((12, 34));
+        let body = b"<html><script>pagespeed.addInstrumentationInit('/beacon');</script></html>";
+        let mut render = h.session();
+        assert!(render
+            .lookup(&origin, &request, &h.purge, mtime, START_MS)
+            .is_none());
+        render.write(body);
+        render.finish(&request, START_MS + 1);
+        assert_eq!(1, h.counter("html_cache_inserts"));
+        let hit = h
+            .session()
+            .lookup(&origin, &request, &h.purge, mtime, START_MS + 2)
+            .unwrap();
+        assert_eq!(hit.body, body);
+        let (early, _) = h
+            .session()
+            .lookup_early(&request, &h.purge, mtime, START_MS + 2)
+            .unwrap();
+        assert_eq!(early.body, body);
     }
 
     #[test]
