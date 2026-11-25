@@ -1,0 +1,3443 @@
+{
+  "original_config_sha256": "08a7aa02c0a74c8c7764180d57af0fa2eca5bb50e2ef70c72e093f28755ebd01",
+  "method": "server loopback TLS persistent connection, identity, desktop UA; 5warmup+30measured per phase/page/round; OFF ON ON OFF; no cache purge; HtmlCache and HtmlCacheEarlyLookup disabled in config; resource-warm uncached rewrites, not true cold misses",
+  "rounds": [
+    {
+      "mode": "off",
+      "round": 0,
+      "config_sha256": "6ab8ce85848004a55ed1d8eaa1033e92c062feb4191faa4d6f2f654a6aa26261",
+      "pages": {
+        "/": {
+          "rewrite_config_cache_off": [
+            {
+              "warmup": true,
+              "total_ms": 80.08099899961962,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 61079,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 80.54406700102845,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58083,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 78.23244199971668,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 63.45200299983844,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 64.12999700114597,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.20468199980678,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.72062400280265,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.47227099872543,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.695431999803986,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.58859700069297,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.62212000062573,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.55846599824145,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 101.15039499942213,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.2097110018658,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 83.66179800214013,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 68.93651800055522,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.4957409974013,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.36928399914177,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.53043500005151,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.5163400004094,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.98214800012647,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.90559899975779,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.31270900045638,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.49896500312025,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.83385100061423,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.492005003558,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.53025899868226,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.25913600146305,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.58251200153609,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.56286199722672,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.47735000256216,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 70.17459100097767,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 93.49469500011764,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 68.59009199979482,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.22210999880917,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            }
+          ]
+        },
+        "/hello-world/": {
+          "rewrite_config_cache_off": [
+            {
+              "warmup": true,
+              "total_ms": 86.21284800028661,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 82015,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 74.64002499909839,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 77.20096300181467,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 74.33441800094442,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 76.22603200070444,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.02313899749424,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 71.95780699839815,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.33597900308087,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.87319400004344,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.88550600080634,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.40798300053575,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.33669199963333,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 72.08657600131119,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 83.22435800073436,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.14132700109622,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 82.96211900233175,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 82.85165399865946,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.74041999780457,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.41628000035416,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.08980799725396,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 72.80756800173549,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 78.93252199937706,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.05385800302611,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 71.07666899901233,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 71.96440800180426,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.3707879994181,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.53029600219452,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.05815699935192,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.38708000033512,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 94.1800289983803,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.42697700005374,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.83885300077964,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 72.56369199967594,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 72.86270500117098,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.33029599997099,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            }
+          ]
+        },
+        "/sample-page/": {
+          "rewrite_config_cache_off": [
+            {
+              "warmup": true,
+              "total_ms": 75.66841299922089,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 59.04555300003267,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 60.84067300253082,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 59.00278300032369,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 58.16465400130255,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.85270900014439,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.66513499838766,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.018300998810446,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 62.66284400044242,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 61.613387002580566,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.36029000036069,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.08877099986421,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.055752000858774,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.76708699727897,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 70.18211200193036,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 61.65121000231011,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.04575299771386,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.7283399986045,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 61.39206700026989,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.64777299959678,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.63130699840258,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.06331000025966,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.75518099896726,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.52544200065313,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 69.27282199831097,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.17710100120166,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.26201599827618,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.27824500011047,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 56.89672500011511,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.75754400040023,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 62.50599600025453,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.77287800103659,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.58499799939455,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.04268199810758,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.13080500229262,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "mode": "on",
+      "round": 1,
+      "config_sha256": "3d9fd41acb39e9c817aa71ec47b8660c25023ddec4caabc6eb9ca7950bad0c90",
+      "pages": {
+        "/": {
+          "rewrite_config_cache_off": [
+            {
+              "warmup": true,
+              "total_ms": 90.56987400254002,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 61079,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 80.83080899814377,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58083,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 82.77630199881969,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 67.90600599924801,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 67.06270599897834,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 70.21015399732278,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 69.27281900061644,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.16400200073258,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.25785699888365,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.43376699887449,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.22020700140274,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.79910199777805,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.77597000068636,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.9176799999841,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.35013200098183,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.50778000059654,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.63796100069885,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.20592000035685,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 61.19567499990808,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.52698499924736,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.99393400069675,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.29790800070623,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.46854299813276,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.00803299807012,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 68.1005529986578,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 69.5937780001259,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.99852499837289,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.65039899921976,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.93200600036653,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.176285999361426,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.68015800055582,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.73156099693733,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 69.39627600149834,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 97.89563400045154,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 81.60291799867991,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            }
+          ]
+        },
+        "/hello-world/": {
+          "rewrite_config_cache_off": [
+            {
+              "warmup": true,
+              "total_ms": 88.72737500132644,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 82015,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 75.98004100145772,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 72.74944500022684,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 72.70760200117365,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 73.33354599904851,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.71862300028442,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.40637199761113,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.25312500042492,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.97022700024536,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.08214100037003,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.85954699930153,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.36651999867172,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.69933500033221,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.31789700119407,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.21452800251427,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.6386430002749,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.8785260002478,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.94774600147502,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 72.07159600147861,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.81524199829437,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 80.2068960001634,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 112.94644900044659,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.86913399831974,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 80.01279200107092,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 79.41535799909616,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 81.24653999766451,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.12314699831768,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.16501500140294,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 78.08938200105331,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.59690700145438,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.14963599937619,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.52646899805404,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 100.48634100166964,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 89.12766299908981,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.16967999981716,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            }
+          ]
+        },
+        "/sample-page/": {
+          "rewrite_config_cache_off": [
+            {
+              "warmup": true,
+              "total_ms": 75.04026499736938,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 60.02727499799221,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 61.13131000165595,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 59.38601900197682,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 59.489976996701444,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.71466899791267,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 56.841018002160126,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.64510500032338,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.60968899994623,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.464434001914924,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.30741200022749,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.42209399997955,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 62.30890400183853,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.840180001425324,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.95552700187545,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 68.68647699957364,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.35914899763884,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.415723000711296,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.355641998990905,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.40575800175429,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.69184299808694,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.33248200139496,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.7007510017138,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.26255200029118,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.27786999766249,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.26512700191233,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.47638000018196,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.25809800060233,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.551376998162596,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.290921999083366,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.26724999860744,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.81552700136672,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 56.4209350013698,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.94946800233447,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.66006900012144,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "mode": "on",
+      "round": 2,
+      "config_sha256": "3d9fd41acb39e9c817aa71ec47b8660c25023ddec4caabc6eb9ca7950bad0c90",
+      "pages": {
+        "/": {
+          "rewrite_config_cache_off": [
+            {
+              "warmup": true,
+              "total_ms": 77.38342599986936,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 61356,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 68.80847200227436,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 65.42864100265433,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 64.61939500150038,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 69.05211699995562,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.95867099936004,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.01947199992719,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 68.45419499950367,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 62.40539099962916,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 62.92829900121433,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.74671499765827,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.09934900168446,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.24128400249174,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.34607899791445,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.44719999894733,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.72097999925609,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 69.13279099899228,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.2697980007797,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.85553300142055,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.39001999812899,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.04533399877255,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.13212700156146,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.00750599682215,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.66633500147145,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.96387200220488,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.16336500339094,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.24867299958714,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.21803299942985,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.76406699989457,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.09669199981727,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.1330030009849,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 62.4447730006068,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.76309599747765,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.95779900049092,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 64.09120000171242,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            }
+          ]
+        },
+        "/hello-world/": {
+          "rewrite_config_cache_off": [
+            {
+              "warmup": true,
+              "total_ms": 78.39820300068823,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 82043,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 70.98844700158224,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 71.5585239995562,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 71.04294199962169,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 73.14847100133193,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.68507299968041,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 72.7079460011737,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 71.4225970004918,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 72.14476499939337,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 72.19040999916615,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 71.01192199843354,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 71.37357499959762,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 72.3871539994434,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 72.9195849999087,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.47656500153244,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 71.019986000465,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 71.5559080017556,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.49976300247363,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.08727700042073,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.62985599704552,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 106.07966799943824,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.96575400343863,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 83.43301599961706,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 80.58302599965828,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 85.25688800000353,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.08033699882799,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 91.06514099767082,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 78.82240999970236,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 105.82349700052873,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.48853500015684,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.48142200175789,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.24210699880496,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.06078800038085,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 79.21904599788832,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 98.17137599748094,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            }
+          ]
+        },
+        "/sample-page/": {
+          "rewrite_config_cache_off": [
+            {
+              "warmup": true,
+              "total_ms": 68.63853100003325,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 63.043276000826154,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 60.75025500103948,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 55.54159599705599,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 61.93291599993245,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 62.972136001917534,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 62.912279998272425,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.5441800004628,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 68.85085099929711,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 62.435843003186164,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.79849499979173,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.551038000383414,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.341971998946974,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.89949199970579,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.205932997429045,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.99772599877906,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.42827000055695,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.20493599801557,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.68647900185897,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.41957400116371,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.9233890020987,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 56.058738999126945,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.03172899829224,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 56.90489699918544,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.655616001284216,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 62.341954002476996,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.46549099785625,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.45906400261447,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.59391299964045,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.413833997998154,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.468232000246644,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.35594400175614,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.94762300138245,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.93461699815816,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.34546700154897,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "mode": "off",
+      "round": 3,
+      "config_sha256": "6ab8ce85848004a55ed1d8eaa1033e92c062feb4191faa4d6f2f654a6aa26261",
+      "pages": {
+        "/": {
+          "rewrite_config_cache_off": [
+            {
+              "warmup": true,
+              "total_ms": 76.43063499926939,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 61356,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 70.64653600173187,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 71.81872699948144,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 74.44736199977342,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 75.75640999857569,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.22500000090804,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 68.01144500059308,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 70.21757999973488,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.54770500023733,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 71.21419699979015,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 72.96229200073867,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 68.36366099742008,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 69.66942000144627,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 69.23790499786264,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.77261300137616,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 69.69454399950337,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 78.60419699863996,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.8228519987606,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.92174599974533,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 78.7716820013884,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 79.23626000047079,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.15030999982264,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 92.5031000006129,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.4547260007239,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 79.6665559973917,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 80.32482100315974,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 79.92161999936798,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 78.3574220004084,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 101.183303999278,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 66.46118700155057,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.34289000087301,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.79124800150748,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.91266200080281,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.11383100022795,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.36631600101828,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 58240,
+              "font_preloads": 0
+            }
+          ]
+        },
+        "/hello-world/": {
+          "rewrite_config_cache_off": [
+            {
+              "warmup": true,
+              "total_ms": 81.05460599836078,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 82043,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 81.40247399933287,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 77.3544919975393,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 79.75905000057537,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 79.83744900047895,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 82.90668200061191,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 83.48697100154823,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 80.37687799878768,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 81.23931299996912,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.65293899844983,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 80.55927299938048,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.84542900096858,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.82573000015691,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.91300300211878,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.28227500006324,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.87310099956812,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.67001999996137,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.71715700012282,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 95.27857899956871,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 84.09121600197977,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 78.0578650010284,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 79.3355440000596,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 79.9787899995863,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 90.98478800297016,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 80.69401800094056,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 80.1501459973224,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.40578000064124,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.9040129998757,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 77.19537899902207,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 81.76239199747215,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.42949399814825,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.54028999907314,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.65360599962878,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 72.09575900196796,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 76.42069899884518,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 78915,
+              "font_preloads": 0
+            }
+          ]
+        },
+        "/sample-page/": {
+          "rewrite_config_cache_off": [
+            {
+              "warmup": true,
+              "total_ms": 66.34338100047898,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 59.746081999037415,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 58.71818200103007,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 57.85082699730992,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": true,
+              "total_ms": 60.58910000137985,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 73.50689799932297,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 75.1083449977159,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.2153820010426,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 61.28546499894583,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 67.18592199831619,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.780562998435926,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.326571998302825,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 61.66504999782774,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 74.87433999995119,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.86676300037652,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.556939999514725,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 65.20411100063939,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.72442399797728,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.521930001006695,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 59.66633599746274,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.102293998672394,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.70532099995762,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.703177001007134,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.73332899904926,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.24045400044997,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 69.9336299985589,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 70.09595099953003,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.83925200134399,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 61.75043799885316,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 63.15259899929515,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.719611999957124,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.708372002409305,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 57.79550400256994,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 58.423187998414505,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            },
+            {
+              "warmup": false,
+              "total_ms": 60.89766100194538,
+              "status": 200,
+              "cache": "BYPASS",
+              "bytes": 67184,
+              "font_preloads": 0
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "restored": true
+}
