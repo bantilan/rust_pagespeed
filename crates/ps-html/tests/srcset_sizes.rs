@@ -294,3 +294,86 @@ fn cached_plan_reuses_policy_and_lcp_preload_sees_corrected_sizes() {
     assert!(!output.contains("data-pagespeed-no-transform"), "{output}");
     assert_eq!(fetcher.fetch_count(), 0);
 }
+
+fn automatic() -> RewriteOptions {
+    let mut options = RewriteOptions::new();
+    options
+        .set_option("SrcsetAutoSizes", "on", Scope::Server)
+        .unwrap();
+    options
+}
+
+#[test]
+fn automatic_native_lazy_sizing_preserves_fallback_and_needs_no_class() {
+    let base = "<img loading='lazy' width='800' height='600' src='fallback.jpg' srcset='a.jpg 300w, b.jpg 800w' sizes='(max-width: 800px) 100vw, 800px'>";
+    let expected = base.replace("sizes='", "sizes='auto, ");
+    assert_eq!(render(&automatic(), base), expected);
+    assert_eq!(render(&RewriteOptions::new(), base), base);
+    // Reprocessing already-automatic markup must not duplicate its prefix.
+    assert_eq!(render(&automatic(), &expected), expected);
+    let absent = base.replace(" sizes='(max-width: 800px) 100vw, 800px'", "");
+    assert_eq!(
+        render(&automatic(), &absent),
+        absent.replace('>', " sizes=\"auto, 100vw\">")
+    );
+    let encoded = base
+        .replace("loading='lazy'", "LOADING='la&#122;y'")
+        .replace("sizes='(max-width: 800px) 100vw, 800px'", "SIZES='100vw'");
+    assert_eq!(
+        render(&automatic(), &encoded),
+        encoded.replace("SIZES='100vw'", "SIZES='auto, 100vw'")
+    );
+}
+
+#[test]
+fn automatic_skips_eager_priority_ambiguous_and_missing_layout() {
+    let base = "<img loading='lazy' width='800' height='600' srcset='a.jpg 300w, b.jpg 800w' sizes='100vw'>";
+    let cases = [
+        base.replace("loading='lazy'", "loading='eager'"),
+        base.replace(" loading='lazy'", ""),
+        base.replace(" width='800'", ""),
+        base.replace("height='600'", "height='0'"),
+        base.replace("width='800'", "width='100%'"),
+        base.replace("width='800'", "width='4294967296'"),
+        base.replace("height='600'", "height='600' HEIGHT='300'"),
+        base.replace("loading='lazy'", "loading='lazy' loading='eager'"),
+        base.replace("sizes='100vw'", "sizes='100vw' SIZES='50vw'"),
+        base.replace("<img ", "<img fetchpriority='HIGH' "),
+        base.replace("<img ", "<img onload='custom()' "),
+        base.replace("<img ", "<img data-pagespeed-lazy-src='original.jpg' "),
+        base.replace("<img ", "<img data-src='original.jpg' "),
+        base.replace("<img ", "<img data-pagespeed-no-transform "),
+        base.replace("<img ", "<img pagespeed_no_transform "),
+        base.replace("a.jpg 300w, b.jpg 800w", "a.jpg 1x, b.jpg 2x"),
+        format!("<picture>{base}</picture>"),
+        format!("<noscript>{base}</noscript>"),
+        format!("<template>{base}</template>"),
+    ];
+    for input in cases {
+        assert_eq!(render(&automatic(), &input), input, "{input}");
+    }
+    let oversized = base.replace("100vw", &"x".repeat(1025));
+    assert_eq!(render(&automatic(), &oversized), oversized);
+}
+
+#[test]
+fn automatic_manual_precedence_and_js_lazy_fallback() {
+    use ps_config::filter::Filter;
+    let base = "<img class='hero' loading='lazy' width='800' height='600' srcset='a.jpg 300w' sizes='100vw'>";
+    let mut options = policy();
+    options
+        .set_option("SrcsetAutoSizes", "on", Scope::Server)
+        .unwrap();
+    assert_eq!(
+        render(&options, base),
+        base.replace("sizes='100vw'", &format!("sizes='{SIZES}'"))
+    );
+    let mut native = automatic();
+    native.filters_mut().enable(Filter::LazyloadImages);
+    let plan = build_chain(&native, &ChainContext::new(true, true));
+    assert!(!plan.early_pre.contains(&ChainFilter::SrcsetSizes));
+    // Existing JS lazy filter stays enabled; the native mode stands down.
+    assert!(plan.post.contains(&ChainFilter::LazyloadImages));
+    let output = render(&native, base);
+    assert!(!output.contains("auto,"), "{output}");
+}

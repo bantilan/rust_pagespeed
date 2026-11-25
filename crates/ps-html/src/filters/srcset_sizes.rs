@@ -15,21 +15,28 @@ use crate::srcset::{supports_width_sizes, MAX_SIZES_SRCSET_BYTES};
 pub struct SrcsetSizesPolicy {
     class: Vec<u8>,
     sizes: Vec<u8>,
+    automatic: bool,
 }
 
 impl SrcsetSizesPolicy {
     pub(crate) fn from_options(options: &RewriteOptions) -> Option<Self> {
-        if !options.srcset_sizes_enabled() {
-            return None;
+        let automatic = options.srcset_auto_sizes()
+            && !options
+                .filters()
+                .enabled(ps_config::filter::Filter::LazyloadImages);
+        let mut class = options.srcset_sizes_class();
+        let mut sizes = options.srcset_sizes();
+        if !options.srcset_sizes_enabled() || class.is_empty() || sizes.trim().is_empty() {
+            class.clear();
+            sizes.clear();
         }
-        let class = options.srcset_sizes_class();
-        let sizes = options.srcset_sizes();
-        if class.is_empty() || sizes.trim().is_empty() {
+        if !automatic && class.is_empty() {
             return None;
         }
         Some(Self {
             class: class.into_bytes(),
             sizes: sizes.into_bytes(),
+            automatic,
         })
     }
 }
@@ -92,14 +99,65 @@ impl SrcsetSizesFilter {
         }
     }
 
-    fn apply(&self, dom: &mut Dom, id: NodeId) -> Option<()> {
-        let class = Self::unique_attribute(dom, id, b"class").ok()??;
-        let classes = Self::bounded_attribute(dom, id, class, 1024)?;
-        if !classes
+    fn manual_match(&self, dom: &mut Dom, id: NodeId) -> bool {
+        if self.policy.class.is_empty() {
+            return false;
+        }
+        let Some(class) = Self::unique_attribute(dom, id, b"class").ok().flatten() else {
+            return false;
+        };
+        let Some(classes) = Self::bounded_attribute(dom, id, class, 1024) else {
+            return false;
+        };
+        classes
             .split(|b| matches!(b, b' ' | b'\t' | b'\r' | b'\n' | 12))
             .any(|token| token == self.policy.class)
-        {
+    }
+
+    fn native_eligible(dom: &mut Dom, id: NodeId) -> Option<()> {
+        let loading = Self::unique_attribute(dom, id, b"loading").ok()??;
+        if !Self::bounded_attribute(dom, id, loading, 16)?.eq_ignore_ascii_case(b"lazy") {
             return None;
+        }
+        for name in [b"width".as_slice(), b"height"] {
+            let index = Self::unique_attribute(dom, id, name).ok()??;
+            let value = Self::bounded_attribute(dom, id, index, 32)?;
+            let text = std::str::from_utf8(&value).ok()?;
+            if text.is_empty()
+                || !text.bytes().all(|b| b.is_ascii_digit())
+                || text.parse::<u32>().ok()? == 0
+            {
+                return None;
+            }
+        }
+        if let Some(index) = Self::unique_attribute(dom, id, b"fetchpriority").ok()? {
+            if Self::bounded_attribute(dom, id, index, 16)?.eq_ignore_ascii_case(b"high") {
+                return None;
+            }
+        }
+        for name in [
+            b"onload".as_slice(),
+            b"data-pagespeed-lazy-src",
+            b"data-pagespeed-lazy-srcset",
+            b"data-src",
+            b"data-srcset",
+        ] {
+            if Self::unique_attribute(dom, id, name).ok()?.is_some() {
+                return None;
+            }
+        }
+        Some(())
+    }
+
+    fn apply(&self, dom: &mut Dom, id: NodeId) -> Option<()> {
+        // Reject ambiguous class attributes even for the automatic path.
+        Self::unique_attribute(dom, id, b"class").ok()?;
+        let manual = self.manual_match(dom, id);
+        if !manual {
+            if !self.policy.automatic {
+                return None;
+            }
+            Self::native_eligible(dom, id)?;
         }
         let srcset = Self::unique_attribute(dom, id, b"srcset").ok()??;
         let sizes = Self::unique_attribute(dom, id, b"sizes").ok()?;
@@ -107,10 +165,33 @@ impl SrcsetSizesFilter {
         if !supports_width_sizes(&value) {
             return None;
         }
-        if let Some(index) = sizes {
-            dom.element_attributes_mut(id)[index].set_value(&self.policy.sizes);
+        let output = if manual {
+            self.policy.sizes.clone()
         } else {
-            dom.add_attribute(id, b"sizes", &self.policy.sizes);
+            let fallback = if let Some(index) = sizes {
+                Self::bounded_attribute(dom, id, index, 1024)?
+            } else {
+                Vec::new()
+            };
+            if fallback.eq_ignore_ascii_case(b"auto")
+                || fallback
+                    .get(..5)
+                    .is_some_and(|p| p.eq_ignore_ascii_case(b"auto,"))
+            {
+                return Some(());
+            }
+            let mut output = b"auto, ".to_vec();
+            if fallback.iter().all(|b| b.is_ascii_whitespace()) {
+                output.extend_from_slice(b"100vw");
+            } else {
+                output.extend_from_slice(&fallback);
+            }
+            output
+        };
+        if let Some(index) = sizes {
+            dom.element_attributes_mut(id)[index].set_value(&output);
+        } else {
+            dom.add_attribute(id, b"sizes", &output);
         }
         Some(())
     }

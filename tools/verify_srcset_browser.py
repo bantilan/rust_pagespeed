@@ -22,7 +22,9 @@ p.add_argument('--module', required=True)
 p.add_argument('--chrome', default='/usr/bin/google-chrome')
 p.add_argument('--output', required=True)
 p.add_argument('--native-auto-probe', action='store_true', help='Probe browser-native lazy sizes=auto with static markup; does not test an automatic module filter')
+p.add_argument('--automatic-filter', action='store_true', help='Exercise actual SrcsetAutoSizes switch on native lazy images')
 a = p.parse_args()
+assert not (a.native_auto_probe and a.automatic_filter)
 root = Path(tempfile.mkdtemp(prefix='ps-srcset-browser-'))
 (root / 'logs').mkdir()
 for width in [300, 768, 800]:
@@ -35,9 +37,9 @@ page = '''<html><head><style>body{margin:0}.slot{width:calc(100vw - 60px);max-wi
 for mode in ['off', 'on']:
     (root / mode).mkdir()
     fixture = page
-    if a.native_auto_probe:
+    if a.native_auto_probe or a.automatic_filter:
         fixture = fixture.replace('<img class=', '<img loading="lazy" class=')
-        if mode == 'on':
+        if mode == 'on' and a.native_auto_probe:
             fixture = fixture.replace('sizes="', 'sizes="auto, ', 1)
     (root / mode / 'index.html').write_text(fixture)
 s = socket.socket(); s.bind(('127.0.0.1', 0)); port = s.getsockname()[1]; s.close()
@@ -67,6 +69,11 @@ if a.native_auto_probe:
     # Static fixture probe is independent of the future automatic filter.
     conf = conf.replace('location /on/ { pagespeed SrcsetSizesEnabled on; }',
                         'location /on/ { pagespeed SrcsetSizesEnabled off; }')
+if a.automatic_filter:
+    conf = conf.replace('location /off/ { pagespeed SrcsetSizesEnabled off; }',
+                        'location /off/ { pagespeed SrcsetSizesEnabled off; pagespeed SrcsetAutoSizes off; }')
+    conf = conf.replace('location /on/ { pagespeed SrcsetSizesEnabled on; }',
+                        'location /on/ { pagespeed SrcsetSizesEnabled off; pagespeed SrcsetAutoSizes on; }')
 (root / 'nginx.conf').write_text(conf)
 
 class Chrome:
@@ -119,8 +126,8 @@ proc = browser = None
 result = {'passed': False, 'prefix': str(root), 'cases': [],
           'module_sha256': hashlib.sha256(Path(a.module).read_bytes()).hexdigest(),
           'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
-          'fixture': 'Static native lazy-auto browser probe; automatic module filter NOT implemented' if a.native_auto_probe else 'Only supplied300/768/800JPEGs; PassThrough+sizes policy, no image conversion or variants',
-          'native_auto_probe': a.native_auto_probe,
+          'fixture': 'Actual SrcsetAutoSizes filter; author-lazy dimensions and unchanged existing srcset' if a.automatic_filter else 'Static native lazy-auto browser probe; automatic module filter NOT implemented' if a.native_auto_probe else 'Only supplied300/768/800JPEGs; PassThrough+sizes policy, no image conversion or variants',
+          'native_auto_probe': a.native_auto_probe, 'automatic_filter': a.automatic_filter,
           'jpeg_bytes': {str(w): (root / f'{w}.jpg').stat().st_size for w in [300, 768, 800]}}
 try:
     subprocess.run([a.nginx, '-t', '-p', str(root), '-c', str(root / 'nginx.conf')], check=True, capture_output=True)
@@ -155,10 +162,10 @@ try:
                 sample.update(mode=mode, fileWidth=selected, fileHeight=selected * 3 // 4)
                 assert sample['encodedBodySize'] == result['jpeg_bytes'][str(selected)], sample
                 if mode == 'on':
-                    assert sample['sizes'] == ('auto, (max-width: 800px) 100vw, 800px' if a.native_auto_probe else '(max-width: 800px) calc(100vw - 60px), 645px'), sample
+                    assert sample['sizes'] == ('auto, (max-width: 800px) 100vw, 800px' if (a.native_auto_probe or a.automatic_filter) else '(max-width: 800px) calc(100vw - 60px), 645px'), sample
                 else:
                     assert sample['sizes'] == '(max-width: 800px) 100vw, 800px', sample
-                if a.native_auto_probe:
+                if a.native_auto_probe or a.automatic_filter:
                     assert sample['loading'] == 'lazy', sample
                     assert len(sample['imageRequests']) == 1, sample
                 result['cases'].append(sample)

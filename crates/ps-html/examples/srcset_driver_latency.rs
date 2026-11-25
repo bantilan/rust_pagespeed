@@ -49,7 +49,7 @@ fn request(
 }
 
 fn main() {
-    // Optional mode/iteration arguments allow separate-process peak-RSS samples.
+    // Args: off/on/both, iterations (default500), optional auto policy.
     let args: Vec<_> = std::env::args().collect();
     let selected = args.get(1).map(String::as_str).unwrap_or("both");
     assert!(["both", "off", "on"].contains(&selected));
@@ -57,7 +57,11 @@ fn main() {
     assert!(iterations > 0);
     let active = [selected != "on", selected != "off"];
 
-    let html = format!("<html><head></head><body>{}<img class='hero' src='800.jpg' srcset='300.jpg 300w, 768.jpg 768w, 800.jpg 800w' sizes='100vw'></body></html>", "<p>Some realistic text content.</p>".repeat(1000));
+    let automatic = args.get(3).is_some_and(|value| value == "auto");
+    let mut html = format!("<html><head></head><body>{}<img class='hero' src='800.jpg' srcset='300.jpg 300w, 768.jpg 768w, 800.jpg 800w' sizes='100vw'></body></html>", "<p>Some realistic text content.</p>".repeat(1000));
+    if automatic {
+        html = html.replace("class='hero'", "loading='lazy' width='800' height='600'");
+    }
     println!("{{\"scope\":\"in-process driver only; timers include overhead; no HTML cache or network\",\"batches\":9,\"iterations_per_batch\":{},\"html_bytes\":{},\"cases\":[",iterations,html.len());
     // Alternate order across batches; distinct cold plans for initial samples.
     let fetcher = Arc::new(ps_http::mock::MockUrlFetcher::new());
@@ -67,6 +71,7 @@ fn main() {
         fetcher.clone(),
         1_700_000_000_000,
     ));
+    eprintln!("policy={}", if automatic { "automatic" } else { "manual" });
     let options: Vec<_> = ["off", "on"]
         .iter()
         .map(|mode| {
@@ -80,6 +85,12 @@ fn main() {
                 ),
             ] {
                 o.set_option(key, value, Scope::Server).unwrap();
+            }
+            if automatic {
+                o.set_option("SrcsetSizesEnabled", "off", Scope::Server)
+                    .unwrap();
+                o.set_option("SrcsetAutoSizes", mode, Scope::Server)
+                    .unwrap();
             }
             Rc::new(RefCell::new(o))
         })

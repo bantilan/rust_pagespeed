@@ -84,6 +84,28 @@ HTML frames are never cached, preserving per-request RUM/beacon behavior.
 [Zstd benchmarks and memory tradeoffs](docs/performance/zstd/RESULTS.md) cover
 HTML HIT/MISS, cached resources, unique bodies, and disabled-filter controls.
 
+### Automatic sizing for native lazy images
+
+```nginx
+pagespeed SrcsetAutoSizes on;
+```
+
+No image class or manual sizes expression is required. For existing
+`loading="lazy"` images with positive integer `width`/`height` attributes and
+valid width-based `srcset`, this adds `sizes="auto, …"`, preserving the author's
+fallback list (or `100vw` when absent). Supporting browsers choose an existing
+candidate using the actual layout width on desktop and mobile. Older browsers
+can use the fallback. This does not generate additional image sizes.
+
+This first automatic-sizing stage leaves eager/LCP images unchanged; learned
+sizing for them is still pending. It skips `<picture>`, no-transform, high
+fetch priority, ambiguous markup and custom lazy placeholders/onload handlers.
+An explicit matching `SrcsetSizes` manual policy takes precedence. Automatic
+sizing stands down when PageSpeed's JavaScript `lazyload_images` filter is
+enabled; that existing filter continues operating. Supply accurate dimensions
+and test your CSS layout, as native `auto` affects intrinsic-size containment.
+The feature defaults off. Disable with `pagespeed SrcsetAutoSizes off;`.
+
 ### Explicit layout sizes for existing srcsets
 
 The opt-in `SrcsetSizes` policy adjusts the browser's layout-size hint for an
