@@ -19,7 +19,8 @@ Status: A0/A1a/A2 verified; native automatic sizing implemented for eligible aut
 
 - [x] A0 audit existing rd collection/receiver and record protocol gaps/design constraints.
 - [x] A1a automatic switch/native-lazy published compatibility, defaultoff/scope/merge/signature tests and actual Chrome fixture probe.
-- [ ] A1b bounded measurement data model/codec tests, precise image placement identity and observed-range confidence rules (required before A3, independent of A2 native path).
+- [x] A1b model/codec: bounded observations, exact-viewport rules, confidence/conflict/fallback and corruption tests.
+- [ ] A1b integration identity: server-derived page/options/layout/candidate/placement digest, invalidation policy and token validation (required before A3/A4 output).
 - [x] A2 implement native automatic sizing for eligible existing lazy images with browser fallback tests, no loading/LCP changes. Separate benchmark/commit.
 - [ ] A3 extend beacon JS/receiver with viewport+element identity/rendered widths, strict payload/count/numeric bounds, nonce validation, generation and TTL. Shared metadata transaction/crash/reload tests; preserve old beacon decoding. No markup inference yet.
 - [ ] A4 conservative validated evidence consumer for eager images with explicit observed-range fallbacks; duplicate-image placement isolation, LCP preload alignment and HTML-cache tests.
@@ -32,7 +33,7 @@ crates/ps-html/assets/critical_images_beacon_dbg.js:getImageRenderedMap emits rw
 
 ## Next Session Resume Point
 
-A2 native automatic mode verified. SrcsetAutoSizes on now emits auto+originalfallback for eligible existing native-lazy dimensioned widthsrcset img, without manual class/rule. Manualmatchingwins; picture/no-transform/highpriority/unknownlayout/customlazy skips; activeJS LazyloadImages disables only nativeauto path, preservesexistingJSfilter. Fullrequestlatency/RUM/cache/nativeunsupportedbrowser checks remain A5/A6. Next A1b before A3: bounded viewport+per-element measurement model/codec, placement identity and conservative observed-range rules for eager/LCP learning. Existing rd URLhashmerges duplicateplacements; cannot consumeas-is. Nativeauto does NOT solve eagerhero. Read A2verification commands/artifacts below; inspectgitstatus/log and rerun12srcsettests before edits. No deployment/livechanges; no commands running. Do not repeat native24caseprobe unless sourcechanges.
+Automatic breakpoints are required; NO manual SrcsetBreakpointSizes option added. A1b pure model/codec verified in src/automatic_sizes.rs:16viewports,3stableobservations,1/64CSSpx,ceilwidth,exactobservedviewportclauses+originalfallback,conflictsuppress,strict2048byteversionedcodec.174HTMLlibrary+12srcsettests pass. No runtimecallsite yet; learned eager/LCP HTML output NOT implemented. Next remaining A1b identity producer/A3collection: derive server-validated page/options/layout/candidate+placement digest, stamp elementtoken, collect viewport/renderedwidth via existing beacon with nonce replay protection, perpagecaps/TTL/sharedtransaction and effectivehint-onlygeneration. Resolve layout invalidation before output; don'ttrust URL-onlyrd or browserprovidedidentity. Then A4applyinitialHTML/preload (keep eager/highpriority), no post-download mutation. Unknown/unobservedviewport fallback, no manualbreakpointvalues, no extrapolation, no missingvariantgeneration. NativeA2 remainsworking unchanged. No deployment/backgroundcommands.
 
 ## A1a contract before source edits
 
@@ -89,3 +90,21 @@ READMEactualswitch/eligibility/conflicts/limitsupdated; rustfmtnewRust/test/exam
 ## Live report and explicit LCP requirement
 
 User installed A2 and requests LCP inclusion. Read LIVE_FINDINGS.md and live-psi-20261125.json before A1b. Currentmobilebothimagesareeager;LCPfetchpriorityhigh;A2correctlyskipsboth. MobileLCP1.201s/CLS0,TBT0;45KiBestimatedimagesavings,768selectedvs616target. Need learned eager/LCP path, not enablelazy onhero. No actual616/640candidatebetween300/768; correctsizesmaynotremovemobilewarning. Desktop645slotcouldchooseexisting768ratherthan1024. Do not claim userconfigurationwrong. ExplicitA4acceptanceincludesimgsizes/generatedpreloadimagesizesmatched, no duplicaterequests,firstvisit/unknownviewportfallback and no cache/RUMregression.
+
+## A1b automatic breakpoint model — before edits
+
+User explicitly rejects manualbreakpointconfiguration. No SrcsetBreakpointSizesoptionwillbeadded. Learn measuredCSSwidth at viewportwidth; never infer arbitraryCSSbreakpointintervals from sparse samples. Firstconsumer emits exact observedviewport clauses, e.g.(width:412px)352px, followed by originalauthorfallback. Require3acceptedindependentlynoncevalidatedreports; confidence is stability check, not proof allpersonalizedlayouts equal. Persist min/maxwidth at1/64CSSpxprecision; conflictingobservations>1CSSpx disable thatviewport until newlayoutidentity/expiry. Ceilmaxwidth to integerCSSpx so hints neverroundbelowmeasurement. Cap16viewports/record,2048encodedbytes,viewport1..16384,width1..16384CSSpx,1024fallbackbytes. One record scoped to hashed page/options/layout/candidate identity AND elementplacement; URLs alone are insufficient. Epoch/versioncodec rejects invalid/duplicate/oversizedinput; namespace distinct from existingbeaconevidence. A1b implements puremodel/codec only, no fakeautomaticLCPconsumer; A3mustderive/checkidentityserver-side, validate nonce and per-pagecaps/TTL/sharedcachetransactions, then A4 applies in initialHTML beforepreloads. Generation mustchangeonlywhen effectivelearnedhintschange, not count-onlysampling, toavoidHTMLcachechurn. NativeA2remainsunchanged.
+
+## A1b model/codec verified checkpoint
+
+Newautomatic_sizes.rs exportsMeasuredSizes; uncalledpuremodel with noI/O/filtercallbacks/queues/stats. Identitymustbeverifiedserverdigest; producer/hashderivationandlayoutinvalidationNOTimplemented. Collector/receiver mustauthenticateindependentnonces; observe aloneisNOTreplayprotection. Eachrecord16viewports, positiveviewport≤16384/CSSwidth≤16384, fixed64ths,min/max,countcap3. Conflicts>1CSSpxpermanentlydisableviewportunderthatidentityuntilTTL/epochreset; no extrapolation. Outputceilmaxwidth,exact(width:Npx) mediaqueries only,authorfallback verbatim (max1024bytes). Three samples are a conservative heuristic, notproofagainstpersonalizedlayouts; producerisolationmusthandlethat. Codecmeasured-sizes/1,strictdecode≤2048bytes,duplicate/invalidfield/count/versionreject. Cachetransaction/TTL/generation still A3. No nonce-bearingexistingcodecmodified.
+
+Tests: cold/missingconfidence returnsNone, stablemobile+desktop widthclauses, fractionalwidthroundsup, wrongidentity/oversizefallbackreject, conflict+latersamples remainssuppressed, capacity/rangerejectbeforemutation,cache roundtrip/corruptversion/duplicate/singleinconsistentobservation rejected.
+
+```bash
+cargo test -p ps-html --lib --quiet
+cargo test -p ps-html --test srcset_sizes --quiet
+rustfmt --edition 2021 crates/ps-html/src/automatic_sizes.rs
+git diff --check
+```
+174librarypass0.29s(previous171+3newtests),12srcsetpass0.01s; auto-a1b-tests.log/auto-a1b-srcset-tests.log. No releasebuild/browserbenchmark needed for uncalledmodel; nativeautomaticfilter behavior unchanged. No totalrequestimprovementclaimed. Modifiedautomatic_sizes.rs/libmodule,ledger/plan/testlogs. No livechanges; exactnextaction above.
