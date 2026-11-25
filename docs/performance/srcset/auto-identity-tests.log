@@ -1,0 +1,13 @@
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.21s
+     Running unittests src/lib.rs (target/debug/build/ps-html/312fd3749c0f773f/out/ps_html-312fd3749c0f773f)
+
+running 5 tests
+test automatic_sizes::tests::bounds_reject_before_mutation_and_codec_round_trips ... ok
+test automatic_sizes::tests::codec_rejects_malformed_and_duplicate_observations ... ok
+test automatic_sizes::tests::measurement_wire_is_bounded_and_rejects_unissued_or_duplicate_slots ... ok
+test automatic_sizes::tests::placement_scope_separates_page_layout_candidates_and_duplicate_images ... ok
+test automatic_sizes::tests::stable_viewports_require_evidence_and_preserve_unknown_fallback ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 171 filtered out; finished in 0.00s
+

@@ -20,7 +20,8 @@ Status: A0/A1a/A2 verified; native automatic sizing implemented for eligible aut
 - [x] A0 audit existing rd collection/receiver and record protocol gaps/design constraints.
 - [x] A1a automatic switch/native-lazy published compatibility, defaultoff/scope/merge/signature tests and actual Chrome fixture probe.
 - [x] A1b model/codec: bounded observations, exact-viewport rules, confidence/conflict/fallback and corruption tests.
-- [ ] A1b integration identity: server-derived page/options/layout/candidate/placement digest, invalidation policy and token validation (required before A3/A4 output).
+- [x] A1b identity primitives: bounded server-scope placement digest, streaming original-document hash and bounded wire/manifest checks.
+- [ ] A3 integration prerequisites: runtime identity producer, original-document completeness/streaming fallback, stylesheet epoch/TTL invalidation, nonce-bound issued manifest (identity helpers alone do not implement these).
 - [x] A2 implement native automatic sizing for eligible existing lazy images with browser fallback tests, no loading/LCP changes. Separate benchmark/commit.
 - [ ] A3 extend beacon JS/receiver with viewport+element identity/rendered widths, strict payload/count/numeric bounds, nonce validation, generation and TTL. Shared metadata transaction/crash/reload tests; preserve old beacon decoding. No markup inference yet.
 - [ ] A4 conservative validated evidence consumer for eager images with explicit observed-range fallbacks; duplicate-image placement isolation, LCP preload alignment and HTML-cache tests.
@@ -33,7 +34,7 @@ crates/ps-html/assets/critical_images_beacon_dbg.js:getImageRenderedMap emits rw
 
 ## Next Session Resume Point
 
-Automatic breakpoints are required; NO manual SrcsetBreakpointSizes option added. A1b pure model/codec verified in src/automatic_sizes.rs:16viewports,3stableobservations,1/64CSSpx,ceilwidth,exactobservedviewportclauses+originalfallback,conflictsuppress,strict2048byteversionedcodec.174HTMLlibrary+12srcsettests pass. No runtimecallsite yet; learned eager/LCP HTML output NOT implemented. Next remaining A1b identity producer/A3collection: derive server-validated page/options/layout/candidate+placement digest, stamp elementtoken, collect viewport/renderedwidth via existing beacon with nonce replay protection, perpagecaps/TTL/sharedtransaction and effectivehint-onlygeneration. Resolve layout invalidation before output; don'ttrust URL-onlyrd or browserprovidedidentity. Then A4applyinitialHTML/preload (keep eager/highpriority), no post-download mutation. Unknown/unobservedviewport fallback, no manualbreakpointvalues, no extrapolation, no missingvariantgeneration. NativeA2 remainsworking unchanged. No deployment/backgroundcommands.
+Placementidentity/wire milestoneverified: automatic_sizes.rs now has incremental originalHTML SHA256fingerprint (8MiBcap,noHTMLbuffer), bounded domain/length-framedSHA256 placementidentity(page/options/document/styleepoch/ordinal/src/srcset/sizes), bounded measurementwireparser(8192bytes,64slots,positiveviewport/width64ths), issuedmanifestmembershipcheck. SHA2 0.10.9locked.177HTMLlibrary+12srcsettests pass; lockedNGINXcheck passes4.06s. All helpers currently UNCALLED byruntime. Next A3: wire trusted layout/document/styleidentityproducer, nonce-bound issuedmanifest and JScollection, mergevalidatedbatch+noncereplaystate atomically into sharedmetadata. Needoriginaldocumentcompletebeforeidentity; streamed/unknownlayoutfallthrough muststayoriginal, stylesheetepoch+TTL/invalidation cannotbe assumed solved. Existingbeacon URLhashnoncecodec unchanged; do not accept arbitrarybrowserID. Then A4learnedinitialHTML/preloadconsumer. No manualbreakpoints,newvariants,deploymentorrequestlatencyspeedupclaims. NativeA2unchanged; allcommandsfinished.
 
 ## A1a contract before source edits
 
@@ -108,3 +109,25 @@ rustfmt --edition 2021 crates/ps-html/src/automatic_sizes.rs
 git diff --check
 ```
 174librarypass0.29s(previous171+3newtests),12srcsetpass0.01s; auto-a1b-tests.log/auto-a1b-srcset-tests.log. No releasebuild/browserbenchmark needed for uncalledmodel; nativeautomaticfilter behavior unchanged. No totalrequestimprovementclaimed. Modifiedautomatic_sizes.rs/libmodule,ledger/plan/testlogs. No livechanges; exactnextaction above.
+
+## Placement identity + wire validation milestone — before edits
+
+A1b integration groundwork: SHA256 domain-separated length-framed digest includes fullpageURL/effectiveoptionssignature, originaldocumentdigest, stylesheet/layout epoch, document-ordereligible-imageordinal, originalsrc/srcset/fallbacksizes. Inputsboundedbeforehash;64placements/page. Hash is identity, NOTauthorization; only server-issued manifest tied to authenticatednonce may permitreports. Originalpreoptimizationbytes avoidformatURLdrift. Changesinlayout/candidates/position/optionscannotsharemeasurements. A3mustcomputeoriginaldocumentdigest incrementally (no buffering/fullHTMLcopy), resolve stylesheet epoch/invalidation and streamingfallback beforeapplyingmeasurements. Purehelperrequiresservertrustedcontext; no arbitrarybrowsercontextaccepted. Newboundedversionedwirebatch≤8192bytes/64uniqueidentities,viewport1..16384,width64ths1..1048576;strictnumeric/noextras/duplicates. Unknownissuedidentityrejectwholebatch. Parserdoesnotconsumenonceorwritecache; actualsharedtransactionintegrationnext, existingbeaconcodecunchanged. SHA256dependencyadded explicitly, no collision-prone truncation or URL-onlyhashreuse.
+
+## Placement identity/wire validation — verified checkpoint
+
+Newhelpers are pureanduncalled; no collector/receiver/driver/HTMLcache changes. placement_identity rejects oversizedfields/invalidordinal/unsupportedwidthlist beforehashing. SHA256domain+64bitlength framing separates inputs; options/page/document/styleepoch/elementposition/originalsrc/srcset/sizes allcovered. URLhashcannotidentifyduplicateplacements; tests confirmdistinctordinal givesdistinctdigest. A digest is NOTauthentication: receiver MUSTverifyissuedmanifest+nonceexpiry/replaytransaction. matches_manifestalsorevalidatespublicbatchfields.
+
+LayoutFingerprint streams originalbytes independentofchunkboundaries with no retainedHTMLcopy;8MiBcap disableslearningonly, ordinaryrewriteunaffected. Onlyfinish exposesdigest; caller mustnotstamp/apply beforeoriginaldocumentiscomplete. Parserflushstreaming behavior andtrusted stylesheetepoch producer stillunimplemented. ExternalCSSchangehandling mustbespecified/tested beforeA4; no silentfreshnessassumption.
+
+MeasurementBatchwire:automatic-sizes/1 viewport followedbyuniquehexidentity/width64thslines;≤8192bytes,1..64slots,viewport≤16384,width≤1048576(1/64CSSpx),noempty/duplicate/extra/float/signedfields. Unknownissuedidentityrejectswholebatch; no partialmutation. RawHTTP/queryencodinglimit and noncevalidationremainreceiverobligations. Existingbeaconcodec/measurementcache remainuntouched.
+
+Dependencysha2=0.10addedtops-html,Cargo.lockpins0.10.9;cfg-if/cpufeatures/digestalreadyexisting. No network service calls fromnewcode. Testcommands:
+```bash
+cargo test -p ps-html --lib automatic_sizes -- --test-threads=1
+cargo test --locked -p ps-html --lib --test srcset_sizes -- --test-threads=1
+cargo check --locked -p ps-nginx
+rustfmt --edition 2021 crates/ps-html/src/automatic_sizes.rs
+git diff --check
+```
+Focusedbaseline3tests passed;firstexpanded5tests passed(auto-identity-tests.log);finalfullsuite177library+12srcsetpassed0.69s/0.01s(auto-identity-regressions.log). NGINXlockeddevcheck4.06s(auto-identity-build.log),notreleasebuild/deployment. Added3tests totalsince174:placementisolation/inputbounds,wireparse/manifest/caps,andstreamhash/chunk/overflow. Nativebrowsertestsnotrerunbecause runtimecallsitesunchanged. No requestbenchmarkaddedforuncalledhelpers; SHA256cost mustbemeasuredwhenintegrated. Allcommandsended,nolivechanges/no push.
