@@ -113,6 +113,11 @@ impl Driver {
                         Box::new(filters::srcset_sizes::SrcsetSizesFilter::new(policy))
                             as Box<dyn crate::filter::HtmlFilter>
                     }),
+                    ChainFilter::ResponsiveImageFirst => resource_driver.clone().map(|driver| {
+                        Box::new(filters::responsive_images::ResponsiveImageFirstFilter::new(
+                            driver,
+                        )) as Box<dyn crate::filter::HtmlFilter>
+                    }),
                     ChainFilter::CssFilter => resource_driver.clone().map(|driver| {
                         Box::new(filters::css::CssFilter::new(driver))
                             as Box<dyn crate::filter::HtmlFilter>

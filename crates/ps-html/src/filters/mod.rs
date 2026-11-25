@@ -59,6 +59,7 @@ pub mod pedantic;
 pub mod quote_removal;
 pub mod redirect_on_size_limit;
 pub mod remove_comments;
+pub mod responsive_images;
 pub mod rewritten_content_scanning;
 pub mod strip_legacy_polyfills;
 pub mod strip_scripts;
@@ -125,6 +126,7 @@ pub use pedantic::PedanticFilter;
 pub use quote_removal::QuoteRemovalFilter;
 pub use redirect_on_size_limit::RedirectOnSizeLimitFilter;
 pub use remove_comments::RemoveCommentsFilter;
+pub use responsive_images::ResponsiveImageFirstFilter;
 pub use rewritten_content_scanning::{
     RewrittenContentScanningFilter, NUM_PROXIED_REWRITTEN_RESOURCES_PROPERTY,
 };

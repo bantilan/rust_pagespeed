@@ -199,3 +199,19 @@ Commands/results (artifacts in docs/performance/srcset):
 - `rustfmt --edition 2021 crates/ps-html/src/html_cache.rs`; `git diff --check`: pass.
 
 No runtime performance comparison claimed: collector still inactive; cold/MISS/HIT and script overhead benchmarks remain A6. RUM test proves cache body preservation, not new browser end-to-end RUM execution. Next action is recorded above.
+
+## Pivot (2026-11-25): fixed 480w/640w candidates replace prediction
+
+User decision: instead of measurement-driven size prediction, plain images
+get generated srcsets with fixed 480w + 640w resized variants
+(`responsive_images` + `resize_images` filters, `ResponsiveImageFirst`
+slot; no second pass — final URLs are minted directly, nothing virtual
+to combine). Lazy images pair with `sizes="auto, 100vw"`, eager images
+with `(max-width: 640px) 480px, 640px`. Author srcsets are never
+touched. Large displays upscale from 640w by design.
+
+The beacon/measurement pipeline (A3c/A4) is paused, not deleted: the
+collector, store, and codec code stays in-tree and inactive (it never
+emitted markup). Delete it explicitly if the fixed-candidate approach
+holds. The `responsive_images_needs_both` chain test and level goldens
+now assert the single-pass plan.

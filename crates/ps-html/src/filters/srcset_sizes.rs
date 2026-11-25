@@ -57,7 +57,7 @@ impl SrcsetSizesFilter {
         }
     }
 
-    fn blocks(dom: &Dom, id: NodeId, keyword: Keyword) -> bool {
+    pub(crate) fn blocks(dom: &Dom, id: NodeId, keyword: Keyword) -> bool {
         match keyword {
             Keyword::Noscript => true,
             // These HTML5 names have no entry in the C++ keyword table.
@@ -71,7 +71,11 @@ impl SrcsetSizesFilter {
     }
 
     // Duplicate attributes are ambiguous; do not choose one to overwrite.
-    fn unique_attribute(dom: &Dom, id: NodeId, name: &[u8]) -> Result<Option<usize>, ()> {
+    pub(crate) fn unique_attribute(
+        dom: &Dom,
+        id: NodeId,
+        name: &[u8],
+    ) -> Result<Option<usize>, ()> {
         let mut indices = dom
             .element_attributes(id)
             .iter()
@@ -86,7 +90,12 @@ impl SrcsetSizesFilter {
         }
     }
 
-    fn bounded_attribute(dom: &mut Dom, id: NodeId, index: usize, cap: usize) -> Option<Vec<u8>> {
+    pub(crate) fn bounded_attribute(
+        dom: &mut Dom,
+        id: NodeId,
+        index: usize,
+        cap: usize,
+    ) -> Option<Vec<u8>> {
         // Bound the escaped representation before decoded_attribute allocates.
         if dom.element_attributes(id)[index].escaped_value()?.len() > cap {
             return None;

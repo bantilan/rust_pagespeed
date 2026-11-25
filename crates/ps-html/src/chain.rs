@@ -376,10 +376,11 @@ pub fn build_chain(options: &RewriteOptions, ctx: &ChainContext) -> ChainPlan {
     if enabled(options, Filter::DecodeRewrittenUrls) {
         plan.early_pre.push(ChainFilter::DecodeRewrittenUrls);
     }
+    // Fixed-width srcsets mint final URLs in one pass (no virtual
+    // elements to combine), so only the first phase is planned; the
+    // second slot stays unimplemented.
     if enabled(options, Filter::ResponsiveImages) && enabled(options, Filter::ResizeImages) {
         plan.early_pre.push(ChainFilter::ResponsiveImageFirst);
-        // Second phase runs post-render, but registers here, so first.
-        plan.post.push(ChainFilter::ResponsiveImageSecond);
     }
     if options.filters().requires_add_head() {
         plan.early_pre.push(ChainFilter::AddHead);

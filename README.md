@@ -106,6 +106,22 @@ enabled; that existing filter continues operating. Supply accurate dimensions
 and test your CSS layout, as native `auto` affects intrinsic-size containment.
 The feature defaults off. Disable with `pagespeed SrcsetAutoSizes off;`.
 
+### Fixed-width srcsets for plain images
+
+```nginx
+pagespeed EnableFilters responsive_images,resize_images;
+```
+
+Images with no `srcset` at all get a generated one with fixed 480w and
+640w resized variants (bytes materialize on first request through the
+standard resize pipeline; downscales only, never upscales). Lazy images
+are paired with `sizes="auto, 100vw"`; eager images with the static
+`(max-width: 640px) 480px, 640px` breakpoint. Existing author srcsets
+are never touched (the automatic sizing above owns those), already
+rewritten URLs, vectors, icons, `<picture>`, no-transform and ambiguous
+markup are skipped, and an existing author `sizes` is preserved. Large
+displays upscale from 640w by design.
+
 ### Explicit layout sizes for existing srcsets
 
 The opt-in `SrcsetSizes` policy adjusts the browser's layout-size hint for an

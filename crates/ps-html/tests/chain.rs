@@ -241,8 +241,12 @@ fn responsive_images_needs_both() {
         Phase::EarlyPreRender,
         ChainFilter::ResponsiveImageFirst
     ));
-    // Second phase registers first in the post list.
-    assert_eq!(plan.post[0], ChainFilter::ResponsiveImageSecond);
+    // No second phase: fixed-width srcsets need no combining pass.
+    assert!(!has(
+        &plan,
+        Phase::PostRender,
+        ChainFilter::ResponsiveImageSecond
+    ));
 }
 
 #[test]
@@ -1027,7 +1031,6 @@ fn level_golden_testing() {
             "ImageCombineFilter",
         ],
         &[
-            "ResponsiveImageSecondFilter",
             "InsertAmpLinkFilter",
             "DeferIframeFilter",
             "JsDisableFilter",
@@ -1083,7 +1086,6 @@ fn level_golden_all() {
             "PushPreloadFilter",
         ],
         &[
-            "ResponsiveImageSecondFilter",
             "InsertDnsPrefetchFilter",
             "PrioritizeLcpImagesFilter",
             "InsertAmpLinkFilter",
