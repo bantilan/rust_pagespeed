@@ -53,6 +53,7 @@ pub struct HtmlCacheSession {
     formats: String,
     device_suffix: String,
     state: SessionState,
+    early_policy: Option<(String, Vec<u8>)>,
 }
 
 /// Why a lookup bypassed (cookie names only; cookie values never
@@ -157,6 +158,7 @@ impl HtmlCacheSession {
             formats,
             device_suffix,
             state: SessionState::Pending,
+            early_policy: None,
         }
     }
 
@@ -200,6 +202,10 @@ impl HtmlCacheSession {
             beacon_identity,
             ..
         } = eligibility;
+        self.early_policy = self.early_key(request, file_mtime).and_then(|hint_key| {
+            let bytes = origin.clone().write_as_binary();
+            (bytes.len() <= 65000).then_some((hint_key, bytes))
+        });
         let lookup = self.driver.server_context().metadata_cache().get(&key);
         let blob = match lookup {
             ps_cache::cache::Lookup {
@@ -238,6 +244,94 @@ impl HtmlCacheSession {
                 None
             }
         }
+    }
+
+    /// Origin-independent candidate key. File-backed routes use the current
+    /// regular-file mtime; all request headers except rejected cookies remain
+    /// variant inputs. This is a hint, never an authorization to serve alone.
+    fn early_key(
+        &self,
+        request: &RequestHeaders,
+        file_mtime: Option<(u64, u32)>,
+    ) -> Option<String> {
+        if !self.driver.options().html_cache_early_lookup()
+            || !self.driver.options().html_cache()
+            || request.method() != ps_http::request::Method::Get
+            || request.headers().iter().any(|(name, _)| {
+                [
+                    "Cookie",
+                    "Cookie2",
+                    "Authorization",
+                    "Range",
+                    "If-Range",
+                    "If-None-Match",
+                    "If-Modified-Since",
+                    "If-Match",
+                    "If-Unmodified-Since",
+                    "Cache-Control",
+                    "Pragma",
+                    "Vary",
+                ]
+                .iter()
+                .any(|n| name.eq_ignore_ascii_case(n))
+            })
+        {
+            return None;
+        }
+        Some(format!(
+            "early-html-v1:{}",
+            html_codec::html_cache_key(&format!(
+                "{}\n{}\n{}\n{}\n{:?}",
+                self.url,
+                self.driver.cache_fragment(),
+                self.driver.options_signature(),
+                request.to_http_string_without_cookies(),
+                file_mtime
+            ))
+        ))
+    }
+
+    /// Attempts a fully validated HIT using previously published origin policy.
+    /// Missing/corrupt hints never arm a rewrite or count as ordinary misses.
+    pub fn lookup_early(
+        &mut self,
+        request: &RequestHeaders,
+        purge: &PurgeSet,
+        file_mtime: Option<(u64, u32)>,
+        now_ms: i64,
+    ) -> Option<(html_codec::HtmlCacheEntry, ResponseHeaders)> {
+        let hint_key = self.early_key(request, file_mtime)?;
+        let cache = self.driver.server_context().metadata_cache();
+        let blob = cache.get(&hint_key).value?;
+        if blob.len() > 65536 {
+            return None;
+        }
+        let policy = html_codec::validate_value(
+            &blob,
+            &self.url,
+            now_ms,
+            self.driver.options().html_cache_ttl_sec() * 1000,
+            i64::MAX,
+            purge,
+        )?;
+        let mut origin = ResponseHeaders::new(ps_http::response::HttpOptions::default());
+        origin.read_from_binary(&policy.body).ok()?;
+        let eligible = self
+            .eligibility_key(&origin, request, &self.driver.options(), file_mtime, now_ms)
+            .ok()?;
+        let body = cache.get(&eligible.key).value?;
+        let entry = html_codec::validate_value(
+            &body,
+            &self.url,
+            now_ms,
+            eligible.ttl_ms,
+            eligible.origin_expiry_ms,
+            purge,
+        )?;
+        self.count("html_cache_hits", 1);
+        self.count("html_cache_bytes_served", entry.body.len() as i64);
+        self.state = SessionState::Hit;
+        Some((entry, origin))
     }
 
     /// Formats the HIT comment for an entry served now (`None`
@@ -323,6 +417,16 @@ impl HtmlCacheSession {
                                 .server_context()
                                 .metadata_cache()
                                 .put(&key, &value);
+                            if let Some((hint_key, bytes)) = self.early_policy.take() {
+                                if let Some(hint) =
+                                    html_codec::encode_value(now_ms, expires_ms, &bytes)
+                                {
+                                    self.driver
+                                        .server_context()
+                                        .metadata_cache()
+                                        .put(&hint_key, &hint);
+                                }
+                            }
                             self.count("html_cache_inserts", 1);
                             created_ms = now_ms;
                             if self.url.len() <= 4096 {
@@ -808,6 +912,129 @@ mod tests {
         fn counter(&self, name: &str) -> i64 {
             self.driver.server_context().variable(name).get()
         }
+    }
+
+    #[test]
+    fn early_lookup_requires_publication_and_preserves_variants() {
+        let h = Harness::new();
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheEarlyLookup",
+                "on",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        let request = h.get_request();
+        let origin = h.ok_origin();
+        let mtime = Some((12, 34));
+        assert!(h
+            .session()
+            .lookup_early(&request, &h.purge, mtime, START_MS)
+            .is_none());
+        let mut first = h.session();
+        assert!(first
+            .lookup(&origin, &request, &h.purge, mtime, START_MS)
+            .is_none());
+        first.write(b"<html>cached</html>");
+        assert!(h
+            .session()
+            .lookup_early(&request, &h.purge, mtime, START_MS)
+            .is_none());
+        first.finish(&request, START_MS);
+        let (entry, replay) = h
+            .session()
+            .lookup_early(&request, &h.purge, mtime, START_MS + 1)
+            .unwrap();
+        assert_eq!(entry.body, b"<html>cached</html>");
+        assert_eq!(
+            replay.headers().lookup1("Content-Type").as_deref(),
+            Some("text/html")
+        );
+        assert!(h
+            .session()
+            .lookup_early(&request, &h.purge, Some((13, 34)), START_MS + 1)
+            .is_none());
+        assert!(h
+            .session()
+            .lookup_early(&request, &h.purge, mtime, START_MS + 60001)
+            .is_none());
+        for header in [
+            "Cookie",
+            "Authorization",
+            "Range",
+            "If-None-Match",
+            "Cache-Control",
+            "Pragma",
+        ] {
+            let mut variant = request.clone();
+            variant.headers_mut().add(header, "x");
+            assert!(
+                h.session()
+                    .lookup_early(&variant, &h.purge, mtime, START_MS + 1)
+                    .is_none(),
+                "{header}"
+            );
+        }
+        let mut variant = request.clone();
+        variant.headers_mut().add("Accept-Language", "fr");
+        assert!(h
+            .session()
+            .lookup_early(&variant, &h.purge, mtime, START_MS + 1)
+            .is_none());
+        let mut post = request.clone();
+        post.set_method(Method::Post);
+        assert!(h
+            .session()
+            .lookup_early(&post, &h.purge, mtime, START_MS + 1)
+            .is_none());
+        let mut purge = PurgeSet::new(25_000);
+        purge.put(PAGE_URL, START_MS + 1);
+        assert!(h
+            .session()
+            .lookup_early(&request, &purge, mtime, START_MS + 2)
+            .is_none());
+        h.options
+            .borrow_mut()
+            .set_option("HtmlCacheTtlSec", "30", ps_config::scope::Scope::Server)
+            .unwrap();
+        assert!(h
+            .session()
+            .lookup_early(&request, &h.purge, mtime, START_MS + 1)
+            .is_none());
+    }
+
+    #[test]
+    fn early_lookup_rejects_corrupt_hint_and_private_origin() {
+        let h = Harness::new();
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheEarlyLookup",
+                "on",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        let request = h.get_request();
+        let key = h.session().early_key(&request, None).unwrap();
+        h.driver
+            .server_context()
+            .metadata_cache()
+            .put(&key, b"garbage");
+        assert!(h
+            .session()
+            .lookup_early(&request, &h.purge, None, START_MS)
+            .is_none());
+        let mut origin = h.ok_origin();
+        origin.headers_mut().add("Set-Cookie", "login=secret");
+        let mut session = h.session();
+        session.lookup(&origin, &request, &h.purge, None, START_MS);
+        session.write(b"private");
+        session.finish(&request, START_MS);
+        assert!(h
+            .session()
+            .lookup_early(&request, &h.purge, None, START_MS)
+            .is_none());
     }
 
     #[test]

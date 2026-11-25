@@ -1202,7 +1202,7 @@ pub mod html_rewrite {
     /// # Safety
     ///
     /// `r` must point at a live request.
-    unsafe fn origin_file_mtime(r: *mut ngx_http_request_t) -> Option<(u64, u32)> {
+    pub(crate) unsafe fn origin_file_mtime(r: *mut ngx_http_request_t) -> Option<(u64, u32)> {
         // SAFETY: caller guarantees a live request.
         unsafe {
             // The postconfiguration snapshot (never live nginx
@@ -1227,6 +1227,7 @@ pub mod html_rewrite {
                 if let Some(path) = fetcher.resolve_routed(&url) {
                     if let Some(age) = std::fs::metadata(&path)
                         .ok()
+                        .filter(|meta| meta.is_file())
                         .and_then(|meta| meta.modified().ok())
                         .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
                     {

@@ -213,3 +213,36 @@ The existing checkouts are untouched and remain the source of truth:
 
 Nothing in this repository modifies those directories. Port work here must
 be verified against them.
+
+### Serve HTML cache hits before PHP
+
+`HtmlCacheEarlyLookup` is an opt-in extension for routes whose anonymous output
+may be reused for the configured HTML-cache lifetime:
+
+```nginx
+pagespeed HtmlCache on;
+pagespeed HtmlCacheTtlSec 300;
+pagespeed HtmlCacheEarlyLookup on;
+pagespeed ShowCacheTimestamp on;  # Optional HIT/MISS/BYPASS comment
+```
+
+After an eligible rewrite publishes its body and origin-policy metadata, warm
+GET requests can return before PHP or another origin handler runs. Missing,
+expired, purged, corrupt, or differently keyed entries fall through to the
+existing origin/rewrite path. Options, request variants, file modification time,
+and beacon evidence remain validated; sampling-due beacon requests fall through.
+HTML bodies containing sampled beacon nonces are not published. Existing RUM
+JavaScript remains in the cached HTML and runs on each browser navigation.
+
+The default is **off**. Enabling this trusts the cached origin policy until expiry:
+changes to application content, response headers, or access rules that are not
+represented in the cache identity require a purge or expiry. Use it only on
+public routes with suitable invalidation. The early path bypasses all requests
+with cookies (including analytics cookies), Authorization, conditional/range
+headers, or explicit Cache-Control/Pragma. Origin Set-Cookie/private/no-store
+prohibitions still prevent publication. Dynamic applications that require PHP to
+run on every request should leave this option off. NGINX access phases still run
+before the early handler; the setting does not replace application authorization.
+Returned HTML uses private/no-store downstream policy and negotiates compression
+for the current request. Resource optimization, ordinary HTML cache lookup, and
+all enabled rewrite filters remain active on misses.

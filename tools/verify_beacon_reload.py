@@ -22,6 +22,7 @@ parser.add_argument('--output', required=True)
 parser.add_argument('--port', type=int, default=18091)
 parser.add_argument('--zstd', action='store_true', help='Enable/accept zstd and decode HTML before checking nonce behavior')
 parser.add_argument('--accept-before-reload', action='store_true', help='Accept before reload, then ensure new workers preserve evidence and reject replay')
+parser.add_argument('--early-html-cache', action='store_true', help='Exercise opt-in pre-origin HTML cache lookup')
 args = parser.parse_args()
 repo = Path(__file__).resolve().parent.parent
 prefix = Path(tempfile.mkdtemp(prefix='ps-beacon-reload-'))
@@ -35,6 +36,8 @@ config = config.replace('master_process off;', 'master_process on;').replace('wo
 config = config.replace('http {', 'http {\nadd_header X-Worker $pid always;')
 config = config.replace(f'pagespeed FileCachePath {prefix}/cache;', f'pagespeed FileCachePath {prefix}/cache;\npagespeed CreateSharedMemoryMetadataCache {prefix}/cache 1024;')
 config = config.replace('    location / {', f'    location = /beacon-reload.html {{ alias {prefix}/page.html; }}\n    location = /hold.bin {{ alias {prefix}/hold.bin; limit_rate 8k; }}\n    location / {{')
+if args.early_html_cache:
+    config = config.replace('pagespeed RewriteLevel CoreFilters;', 'pagespeed RewriteLevel CoreFilters;\npagespeed HtmlCacheEarlyLookup on;')
 if args.zstd:
     config = config.replace('pagespeed RewriteLevel CoreFilters;', 'pagespeed RewriteLevel CoreFilters;\npagespeed EnableFilters compress_zstd;')
 (prefix / 'conf/nginx.conf').write_text(config)

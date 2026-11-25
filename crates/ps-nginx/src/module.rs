@@ -2658,6 +2658,75 @@ unsafe fn resource_response(
         {
             return NGX_DECLINED as ngx_int_t;
         }
+        // Opt-in complete-response HIT before invoking the origin content
+        // handler. Normal header-stage lookup remains the fallback.
+        if !html_rewrite
+            && !pagespeed_resource
+            && !admin_handler
+            && r == (*r).main
+            && determined.experiment_cookie.is_none()
+            && resolved.core.html_cache_early_lookup()
+        {
+            if let Some(html) = server.html_context.clone() {
+                let driver = Rc::new(ps_html::server_context::ResourceDriver::new(
+                    html,
+                    Rc::new(std::cell::RefCell::new(resolved.core.clone())),
+                    &url_string,
+                ));
+                crate::terminal::install_request_context(&driver, &request_headers);
+                let mut session = ps_html::html_cache::HtmlCacheSession::new(driver, &url_string);
+                let mtime = crate::filters::html_rewrite::origin_file_mtime(r);
+                if let Some((entry, origin)) = session.lookup_early(
+                    &request_headers,
+                    &main_conf.driver_factory.purge_set,
+                    mtime,
+                    now_ms,
+                ) {
+                    let mut body = entry.body.clone();
+                    if let Some(comment) = session.hit_comment(&entry, now_ms) {
+                        body.extend_from_slice(&comment);
+                    }
+                    let mut headers: Vec<(String, String)> = origin
+                        .headers()
+                        .iter()
+                        .filter(|(name, _)| {
+                            ![
+                                "Content-Length",
+                                "Content-Encoding",
+                                "ETag",
+                                "Last-Modified",
+                                "Date",
+                                "Age",
+                                "Expires",
+                                "Cache-Control",
+                                "Connection",
+                                "Keep-Alive",
+                                "Transfer-Encoding",
+                                "Accept-Ranges",
+                                "X-Page-Speed",
+                            ]
+                            .iter()
+                            .any(|n| name.eq_ignore_ascii_case(n))
+                        })
+                        .map(|(n, v)| (n.to_string(), v.to_string()))
+                        .collect();
+                    headers.push((
+                        "Cache-Control".into(),
+                        "max-age=0, private, no-store".into(),
+                    ));
+                    headers.push((X_PAGE_SPEED.to_string(), resolved.core.x_header_value()));
+                    headers.push(("Vary".into(), "User-Agent, Accept, Accept-Encoding".into()));
+                    let encoded = crate::zstd_encode::encode_response_body(
+                        &mut headers,
+                        &body,
+                        200,
+                        &request_headers,
+                        resolved.core.filters().enabled(Filter::CompressZstd),
+                    );
+                    return serve_response(r, 200, &headers, encoded.as_deref().unwrap_or(&body));
+                }
+            }
+        }
         let ctx_ptr = if html_rewrite {
             ctx_ptr
         } else {

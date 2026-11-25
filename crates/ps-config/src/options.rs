@@ -2030,6 +2030,15 @@ impl RewriteOptions {
         }
     }
 
+    /// Opt-in serving before origin execution, using stored origin policy.
+    #[must_use]
+    pub fn html_cache_early_lookup(&self) -> bool {
+        matches!(
+            self.get_by_name("HtmlCacheEarlyLookup"),
+            Some(Value::Bool(true))
+        )
+    }
+
     /// Sets HTML caching.
     pub fn set_html_cache(&mut self, value: bool) {
         self.invalidate_signature();
