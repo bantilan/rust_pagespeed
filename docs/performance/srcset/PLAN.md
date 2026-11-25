@@ -1,6 +1,6 @@
 # Srcset-only filter: resumable implementation
 
-Status: Phases0–2 verified; Phase3 pending. Baseline source9b6435b. Phase1 adds configuration groundwork only; no HTML-output changes or live edits/deployment. User explicitly excludes background variant generation. One independently functional/tested phase per session is the intended usage boundary.
+Status: Phases0–3 verified; Phase4 pending. Baseline source9b6435b. Phase3 implements opt-in output behavior; default-off remains unchanged, no live edits/deployment. User explicitly excludes background variant generation. One independently functional/tested phase per session is the intended usage boundary.
 
 ## Scope and architectural decisions
 
@@ -9,7 +9,7 @@ Status: Phases0–2 verified; Phase3 pending. Baseline source9b6435b. Phase1 add
 - Do not prune candidate widths based on user-agent/mobile classification: viewport and pixel density are browser decisions.
 - Preserve `<picture>` source ordering/media/type/art direction, density lists, fallback src, layout dimensions, LCP priority, lazy-loading behavior and RUM/beacons.
 - `sizes` depends on CSS layout. An override must be explicitly configured and narrowly matched to an image; no automatic assumption of full viewport width or WordPress margins.
-- New filter defaults off, must work as a real driver filter, and participates in effective-option signatures/cache keys. Proposed filter/option names are not yet implemented; confirm in Phase1 rather than documenting nonexistent directives as available.
+- New SrcsetSizes driver filter defaults off and participates in effective-option signatures/cache keys via SrcsetSizesEnabled/Class/Sizes; it does not repurpose responsive_images.
 - Candidate discovery is limited to existing author-provided declarations or explicit configuration with trustworthy dimensions/already available metadata. No URL guessing or descriptor relabeling. A 768px file must not be labeled640w.
 - Preserve malformed/ambiguous author input unchanged rather than changing browser fallback behavior. Bound work by bytes and candidate/rule counts before expensive parsing, not just after allocating the entire list.
 
@@ -47,14 +47,14 @@ Status: Phases0–2 verified; Phase3 pending. Baseline source9b6435b. Phase1 add
 - [x] Test widths, density/mixed rejection, data URLs, escaped URLs, malformed/duplicate/overflow descriptors and exact bounds; existing URL-rewrite integration still passes.
 - [x] Verify helper, HTML library and release diagnostic; persist cost and commit.
 
-### Phase3 — explicit layout sizes: PENDING
+### Phase3 — explicit layout sizes: VERIFIED
 
-- [ ] Wire a separate real driver filter gated by SrcsetSizesEnabled and complete nonempty policy; call supports_width_sizes only after cheap class/element guards.
-- [ ] Element tests: default-off byte-equivalence, enabled-no-policy no-op, no-transform, picture/art direction, absent srcset, escaped attributes; these were intentionally deferred from helper-only Phase2.
+- [x] Wire a separate real driver filter gated by SrcsetSizesEnabled and complete nonempty policy; call supports_width_sizes only after cheap class/element guards.
+- [x] Element tests: default-off byte-equivalence, enabled-no-policy no-op, no-transform, picture/art direction, absent srcset, escaped attributes; these were intentionally deferred from helper-only Phase2.
 
-- [ ] Implement narrowly targeted override policy with an appropriate validated CSS sizes value and opt-out semantics.
-- [ ] Preserve unmatched images, density-only lists and art-directed sources. Explicit application to existing sizes must be documented, not silent.
-- [ ] Test per-image rule matching and options/cache-key separation; commit.
+- [x] Implement narrowly targeted override policy with an appropriate validated CSS sizes value and opt-out semantics.
+- [x] Preserve unmatched images, density-only lists and art-directed sources. Explicit application to existing sizes must be documented, not silent.
+- [x] Test per-image rule matching and options/cache-key separation; commit.
 
 ### Phase4 — correctness and performance: PENDING
 
@@ -101,7 +101,7 @@ This existing-build observational sample is not a controlled off/on comparison, 
 
 ## Next Session Resume Point
 
-Read this plan and SHARED_MEMORY_IMPLEMENTATION.md resume section, inspect git status/log. Phases0–2 verified. Phase3 next: review driver filter construction/reuse and chain placement, implement separate explicit sizes filter gated by enabled+nonempty class/value. Apply only to exact-class img with supports_width_sizes=true; preserve srcset URLs/descriptors and skip picture/no-transform/unsupported input. Add actual driver default-off/no-policy and element guard tests. Helper currently has no call site; config has no HTML effect yet. No deployment/variants/byte-saving claims. All commands finished.
+Read this plan and SHARED_MEMORY_IMPLEMENTATION.md resume section; inspect git status/log. Phases0–3 verified. Start Phase4: verify last tests/build; create isolated same-build off/on benchmark fixture, separately cold, warm metadata/HTML MISS and HTML HIT. Preserve prior baseline source9b6435b if comparison needed. Test cache-key isolation and RUM per-request handling with actual policy; browser viewport/DPR currentSrc/transfer bytes and preload alignment. No live cache clearing/deployment or image variants. Stage tests before measurements; no extrapolation from helper ns to total request savings. SrcsetSizes driver filter now works opt-in; README example exists, release/deployment and browser benchmarks remain pending. No commands running.
 
 
 ## Phase1 contract (before implementation)
@@ -131,3 +131,19 @@ Commands/results:
 - `cargo test -p ps-html --lib --quiet`:171passed,0failed,0.40s; phase2-library-tests.log.
 - `cargo run --release -p ps-html --example srcset_validation_latency`:release build31.03s. Reran sequentially after tests/build completion; saved final validation-phase2.json and build/run logs.9batches×5000iterations/100warmups.3width112bytes227.620ns;24width940bytes2120.226ns;64width2540bytes5691.030ns;65candidate reject5700.835ns; density reject51.647ns;16385byte reject3.192ns. No fair speed comparison to old parser (different work/inputs); this is additional future opt-in eligibility cost, not full request latency. Phase0 full-request baselines unchanged; controlled latency/browser tests pending Phase4.
 - rustfmt for three added/modified Rust files and gitdiffcheck passed. No release NGINX build/deployment needed for an uncalled helper.
+
+## Phase3 design before edits
+
+Add SrcsetSizes chain slot in early-pre, ahead of image rewriting (which removes no-transform markers) and LCP preload generation (which copies sizes). Policy bytes owned once in cached ChainPlan via Rc; each filter has only request-local blocked-context depth. Gate slot on enabled plus both nonempty config strings; disabled/incomplete config constructs no filter. Exact HTML class-token matching, bounded raw class/srcset bytes before entity decoding, reject duplicate relevant attributes/decoding failures. Only safe width srcsets on img; preserve all other attributes and srcset verbatim. Skip picture/noscript/template/svg subtrees and both existing no-transform spellings. Replace existing sizes explicitly or add if absent. No statistics/resource driver/fetch/encoder required. Add driver-output, streaming/reset and LCP preload regressions. Cold/MISS comparison remains Phase4 using preserved baseline commit9b6435b in isolated instance; no live cache clearing.
+
+### Phase3 verification and implementation
+
+- ChainFilter::SrcsetSizes runs first in early-pre, before ImageRewrite strips no-transform and before LCP captures sizes. No image driver/resources/statistics registered by this filter. Immutable Rc policy retained in existing cached ChainPlan; per-document blocked depth isolated/reset. No policy -> no filter construction.
+- Only exact class-token img with unique class/srcset/sizes attributes and supported width list can change sizes. Existing sizes explicitly overwritten; missing sizes appended. Raw escaped class/srcset bounds checked BEFORE decoding allocations; at most64attributes,1KiBclass,16KiBsrcset/64candidates. Other attrs/srcset unchanged. Picture/noscript/template/svg subtree guards retained across flush; density/unsupported/malformed/no-transform skips.
+- New test module initially failed compilation because Keyword::Picture does not exist; changed to case-insensitive element-name check. First expanded suite then found a test expectation involving trailing tag whitespace normalized by the existing writer; fixture now has no trailing whitespace. No runtime workaround. Initial suite output retained as phase3-initial-tests.log, final helper/driver test rerun passed.
+- `cargo test -p ps-html --lib --test driver --test srcset_sizes --test prioritize_lcp_images -- --test-threads=1`:171library,29driver,26LCP passed; initialsrcset8passed/1fixture failure corrected as above.
+- Final `cargo test -p ps-html --test srcset_sizes -- --test-threads=1`:9passed0failed after additional no-transform+ImageRewrite check; phase3-tests.log. Tests verify zero fetches, generated LCP imagesizes/unchangedimagesrcset, cached policy Rc reuse/options separation, streaming/reuse, duplicate/oversizeattrs, encoded/case variants, defaultoff/incomplete byte-equivalence.
+- `cargo test -p ps-html --test image_rewrite img_srcset -- --test-threads=1`:2passed; phase3-image-tests.log.
+- `cargo test -p ps-nginx --lib -- --test-threads=1`:293passed0failed2.54s; phase3-nginx-tests.log. Existing warning output retained, no release build/deployment claimed.
+- rustfmt for newfilter/test and gitdiffcheck passed. README documents actual syntax, execution order, explicit CSS responsibility, caps/skips, author preload alignment and no generated variants/byte-savings guarantee. Referenced install/common template/config-filter docs in chain header do not exist in this checkout; README is the actual config documentation updated.
+- Modified chain.rs,driver.rs,filters/mod.rs,newfilters/srcset_sizes.rs,tests/srcset_sizes.rs,README,plan/ledger and test artifacts. No full-request performance claim: helper measurements from Phase2 unchanged; Phase4 isolates new enabled-filter overhead and checks browser/cache/RUM behavior.

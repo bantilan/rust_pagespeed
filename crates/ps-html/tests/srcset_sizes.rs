@@ -75,3 +75,222 @@ fn limits_bytes_and_candidates_before_allocation() {
         MAX_SIZES_SRCSET_BYTES + 1
     ]));
 }
+
+#[allow(dead_code)]
+#[path = "harness.rs"]
+mod harness;
+
+use ps_config::options::RewriteOptions;
+use ps_config::scope::Scope;
+use ps_html::chain::{build_chain, ChainContext, ChainFilter};
+use ps_html::driver::Driver;
+use std::rc::Rc;
+
+const SIZES: &str = "(max-width: 800px) calc(100vw - 60px), 645px";
+
+fn policy() -> RewriteOptions {
+    let mut options = RewriteOptions::new();
+    for (name, value) in [
+        ("SrcsetSizesEnabled", "on"),
+        ("SrcsetSizesClass", "hero"),
+        ("SrcsetSizes", SIZES),
+    ] {
+        options.set_option(name, value, Scope::Server).unwrap();
+    }
+    options
+}
+
+fn render(options: &RewriteOptions, html: &str) -> String {
+    let sink = harness::SharedSink::default();
+    let mut driver = Driver::new(options, &ChainContext::new(true, true), sink.clone(), None);
+    assert!(!driver
+        .skipped_slots()
+        .iter()
+        .any(|(_, slot)| *slot == ChainFilter::SrcsetSizes));
+    driver.start_parse(b"https://test.com/page", false);
+    driver.write(html.as_bytes());
+    driver.finish();
+    String::from_utf8(sink.bytes()).unwrap()
+}
+
+#[test]
+fn driver_defaults_and_incomplete_policy_are_byte_equivalent() {
+    let input = "<picture><source srcset='a.jpg 300w'><img class='hero' src='a.jpg' srcset='a.jpg 300w, b.jpg 800w' sizes='100vw'></picture><img class='hero' srcset='a.jpg 300w'>";
+    for name in ["SrcsetSizesEnabled", "SrcsetSizesClass", "SrcsetSizes"] {
+        let mut options = policy();
+        options
+            .set_option(
+                name,
+                if name == "SrcsetSizesEnabled" {
+                    "off"
+                } else {
+                    ""
+                },
+                Scope::Server,
+            )
+            .unwrap();
+        assert!(!build_chain(&options, &ChainContext::new(true, true))
+            .early_pre
+            .contains(&ChainFilter::SrcsetSizes));
+        assert_eq!(render(&options, input), input);
+    }
+    assert_eq!(render(&RewriteOptions::new(), input), input);
+}
+
+#[test]
+fn driver_changes_only_explicitly_targeted_sizes() {
+    let input = "<img class='extra hero other' src='fallback.jpg' srcset='small.jpg 300w, large.jpg 800w' sizes='100vw' width='800' height='600' loading='eager' fetchpriority='high'><img class='hero' srcset='a.jpg 300w'><img class='heroine' srcset='a.jpg 300w' sizes='100vw'><img class='Hero' srcset='a.jpg 300w' sizes='100vw'>";
+    let expected = input
+        .replacen("sizes='100vw'", &format!("sizes='{SIZES}'"), 1)
+        .replacen(
+            "<img class='hero' srcset='a.jpg 300w'>",
+            &format!("<img class='hero' srcset='a.jpg 300w' sizes=\"{SIZES}\">"),
+            1,
+        );
+    assert_eq!(render(&policy(), input), expected);
+}
+
+#[test]
+fn driver_preserves_unsupported_elements_and_ambiguous_attributes() {
+    let cases = [
+        "<picture><source media='(min-width:800px)' type='image/avif' srcset='a.avif 800w'><img class='hero' srcset='a.jpg 300w' sizes='100vw'></picture>",
+        "<noscript><img class='hero' srcset='a.jpg 300w'></noscript>",
+        "<template><img class='hero' srcset='a.jpg 300w'></template>",
+        "<svg><img class='hero' srcset='a.jpg 300w'></svg>",
+        "<img data-pagespeed-no-transform class='hero' srcset='a.jpg 300w'>",
+        "<img pagespeed_no_transform class='hero' srcset='a.jpg 300w'>",
+        "<img class='hero' src='a.jpg'>",
+        "<img class='hero' srcset='a.jpg 1x, b.jpg 2x'>",
+        "<img class='hero' srcset='a.jpg 300w, b.jpg 300w'>",
+        "<img class='hero' srcset='a.jpg 300w,'>",
+        "<img class='hero' class='other' srcset='a.jpg 300w'>",
+        "<img class='hero' srcset='a.jpg 300w' srcset='b.jpg 600w'>",
+        "<img class='hero' srcset='a.jpg 300w' sizes='1px' sizes='2px'>",
+        "<source class='hero' srcset='a.jpg 300w'>",
+    ];
+    for input in cases {
+        assert_eq!(render(&policy(), input), input, "{input}");
+    }
+    let long = format!(
+        "<img class='hero' srcset='{} 300w'>",
+        "x".repeat(MAX_SIZES_SRCSET_BYTES)
+    );
+    assert_eq!(render(&policy(), &long), long);
+    let long_class = format!(
+        "<img class='hero {}' srcset='a.jpg 300w'>",
+        "x".repeat(1024)
+    );
+    assert_eq!(render(&policy(), &long_class), long_class);
+    let many_attributes = format!(
+        "<img class='hero' srcset='a.jpg 300w' {}>",
+        (0..64)
+            .map(|i| format!("data-x{i}='a'"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+    assert_eq!(render(&policy(), &many_attributes), many_attributes);
+}
+
+#[test]
+fn driver_decodes_target_attributes_without_rewriting_srcset_bytes() {
+    let input = "<img CLASS='he&#114;o' SRCSET='a.jpg?a=1&amp;b=2 300w, b.jpg 800w' SIZES='100vw'>";
+    assert_eq!(
+        render(&policy(), input),
+        input.replace("SIZES='100vw'", &format!("SIZES='{SIZES}'"))
+    );
+}
+
+#[test]
+fn driver_streaming_and_reuse_reset_context_state() {
+    let options = policy();
+    let sink = harness::SharedSink::default();
+    let mut driver = Driver::new(&options, &ChainContext::new(true, true), sink.clone(), None);
+    driver.start_parse(b"https://test.com/page", false);
+    driver.write(b"<picture>");
+    driver.flush();
+    driver.write(b"<img class='hero' srcset='a.jpg 300w'></picture>");
+    driver.flush();
+    driver.write(b"<img class='hero' srcset='a.jpg 300w'>");
+    driver.finish();
+    let output = String::from_utf8(sink.bytes()).unwrap();
+    assert_eq!(output.matches("sizes=").count(), 1);
+    // Reusing the same driver must not inherit a prior blocked context.
+    driver.start_parse(b"https://test.com/other", false);
+    driver.write(b"<img class='hero' srcset='a.jpg 300w'>");
+    driver.finish();
+    assert_eq!(
+        String::from_utf8(sink.bytes())
+            .unwrap()
+            .matches("sizes=")
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn cached_plan_reuses_policy_and_lcp_preload_sees_corrected_sizes() {
+    use ps_config::filter::Filter;
+    use ps_html::server_context::{ResourceDriver, ServerContext};
+    use std::cell::RefCell;
+    use std::sync::Arc;
+    let fetcher = Arc::new(ps_http::mock::MockUrlFetcher::new());
+    let server = Rc::new(ServerContext::new_with_metadata(
+        Arc::new(ps_cache::cache::MemoryCache::new()),
+        Arc::new(ps_cache::cache::MemoryCache::new()),
+        fetcher.clone(),
+        1_700_000_000_000,
+    ));
+    let mut options = policy();
+    options.filters_mut().enable(Filter::PrioritizeLcpImages);
+    let ctx = ChainContext::new(true, true);
+    let first = server.chain_plan(&options, &ctx);
+    let second = server.chain_plan(&options, &ctx);
+    assert!(Rc::ptr_eq(
+        first.srcset_sizes_policy.as_ref().unwrap(),
+        second.srcset_sizes_policy.as_ref().unwrap()
+    ));
+    let mut other = options.clone();
+    other
+        .set_option("SrcsetSizes", "100px", Scope::Server)
+        .unwrap();
+    assert_ne!(first, server.chain_plan(&other, &ctx));
+    let resource_driver = Rc::new(ResourceDriver::new(
+        server.clone(),
+        Rc::new(RefCell::new(options.clone())),
+        "https://test.com/page",
+    ));
+    let sink = harness::SharedSink::default();
+    let mut driver = Driver::new(&options, &ctx, sink.clone(), Some(resource_driver));
+    driver.start_parse(b"https://test.com/page", false);
+    driver.write(b"<html><head></head><body><img class='hero' src='a.jpg' srcset='a.jpg 300w, b.jpg 800w' sizes='100vw'></body></html>");
+    driver.finish();
+    let output = String::from_utf8(sink.bytes()).unwrap();
+    assert!(
+        output.contains(&format!("imagesizes=\"{SIZES}\"")),
+        "{output}"
+    );
+    assert!(
+        output.contains("imagesrcset=\"a.jpg 300w, b.jpg 800w\""),
+        "{output}"
+    );
+    assert_eq!(fetcher.fetch_count(), 0);
+    // ImageRewrite removes its no-transform marker. Early placement must
+    // have honored that marker before removal, rather than modifying sizes.
+    options.filters_mut().enable(Filter::RecompressJpeg);
+    let resources = Rc::new(ResourceDriver::new(
+        server,
+        Rc::new(RefCell::new(options.clone())),
+        "https://test.com/page",
+    ));
+    let sink = harness::SharedSink::default();
+    let mut driver = Driver::new(&options, &ctx, sink.clone(), Some(resources));
+    assert!(driver.plan().pre.contains(&ChainFilter::ImageRewrite));
+    driver.start_parse(b"https://test.com/page", false);
+    driver.write(b"<img class='hero' data-pagespeed-no-transform src='a.jpg' srcset='a.jpg 300w' sizes='100vw'>");
+    driver.finish();
+    let output = String::from_utf8(sink.bytes()).unwrap();
+    assert!(output.contains("sizes='100vw'"), "{output}");
+    assert!(!output.contains(SIZES), "{output}");
+    assert!(!output.contains("data-pagespeed-no-transform"), "{output}");
+    assert_eq!(fetcher.fetch_count(), 0);
+}

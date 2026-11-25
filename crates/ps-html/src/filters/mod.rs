@@ -1,6 +1,6 @@
 //! Built-in HTML filters.
 //!
-//! Each module ports one C++ filter class; [`instantiate`] maps implemented
+//! Each module implements one filter; [`instantiate`] maps implemented
 //! [`ChainFilter`](crate::chain::ChainFilter) slots to constructors so the
 //! driver can build live chains from a [`ChainPlan`](crate::chain::ChainPlan).
 //! Slots without an implementation return `None` until their filter lands.
@@ -62,6 +62,7 @@ pub mod remove_comments;
 pub mod rewritten_content_scanning;
 pub mod strip_legacy_polyfills;
 pub mod strip_scripts;
+pub mod srcset_sizes;
 pub mod strip_subresource_hints;
 pub mod support_noscript;
 pub mod url_left_trim;

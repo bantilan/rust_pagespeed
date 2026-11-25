@@ -27,6 +27,7 @@ pub enum ChainFilter {
     DomStats,
     StripSubresourceHints,
     DecodeRewrittenUrls,
+    SrcsetSizes,
     ResponsiveImageFirst,
     AddHead,
     BaseTag,
@@ -97,6 +98,7 @@ impl ChainFilter {
             ChainFilter::DomStats => "DomStatsFilter",
             ChainFilter::StripSubresourceHints => "StripSubresourceHintsFilter",
             ChainFilter::DecodeRewrittenUrls => "DecodeRewrittenUrlsFilter",
+            ChainFilter::SrcsetSizes => "SrcsetSizesFilter",
             ChainFilter::ResponsiveImageFirst => "ResponsiveImageFirstFilter",
             ChainFilter::AddHead => "AddHeadFilter",
             ChainFilter::BaseTag => "BaseTagFilter",
@@ -196,6 +198,8 @@ pub struct ChainPlan {
     pub post: Vec<ChainFilter>,
     /// Parser byte cap (`set_size_limit(MaxHtmlParseBytes)`), when capped.
     pub size_limit: Option<i64>,
+    /// Immutable layout policy shared by drivers using this cached plan.
+    pub srcset_sizes_policy: Option<std::rc::Rc<crate::filters::srcset_sizes::SrcsetSizesPolicy>>,
 }
 
 impl ChainPlan {
@@ -349,6 +353,8 @@ pub fn build_chain(options: &RewriteOptions, ctx: &ChainContext) -> ChainPlan {
         pre: Vec::new(),
         post: Vec::new(),
         size_limit: None,
+        srcset_sizes_policy: crate::filters::srcset_sizes::SrcsetSizesPolicy::from_options(options)
+            .map(std::rc::Rc::new),
     };
 
     // Event listeners.
@@ -357,7 +363,10 @@ pub fn build_chain(options: &RewriteOptions, ctx: &ChainContext) -> ChainPlan {
     }
     plan.listeners.push(ChainFilter::AmpDocument);
 
-    // Early pre-render.
+    // Early pre-render. Run before no-transform removal and preload generation.
+    if plan.srcset_sizes_policy.is_some() {
+        plan.early_pre.push(ChainFilter::SrcsetSizes);
+    }
     if enabled(options, Filter::ComputeStatistics) {
         plan.early_pre.push(ChainFilter::DomStats);
     }

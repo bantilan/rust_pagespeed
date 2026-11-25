@@ -84,6 +84,38 @@ HTML frames are never cached, preserving per-request RUM/beacon behavior.
 [Zstd benchmarks and memory tradeoffs](docs/performance/zstd/RESULTS.md) cover
 HTML HIT/MISS, cached resources, unique bodies, and disabled-filter controls.
 
+### Explicit layout sizes for existing srcsets
+
+The opt-in `SrcsetSizes` policy adjusts the browser's layout-size hint for an
+exact image class. It runs before
+image rewriting and generated LCP preloads, sharing immutable configuration
+through the cached filter plan.
+
+```nginx
+# http/server/location; use a class and sizes matching YOUR site's CSS.
+pagespeed SrcsetSizesEnabled on;
+pagespeed SrcsetSizesClass hero;
+pagespeed SrcsetSizes "(max-width: 800px) calc(100vw - 60px), 645px";
+```
+
+Defaults are off/empty. An empty class/value leaves HTML unchanged. This is a
+separate boolean policy, not an `EnableFilters responsive_images` alias.
+Only matching `<img>` elements with valid, unique positive `w` descriptors
+are eligible; existing `sizes` is explicitly replaced, or added if absent.
+Candidate URLs, widths, order, fallback `src`, loading and priority attributes
+are preserved. No variants are generated, discovered, fetched or encoded.
+`<picture>`, `<noscript>`, `<template>`, `<svg>`, no-transform images, density
+lists and ambiguous markup are skipped. Work is capped at 64 attributes,
+1 KiB escaped class text, 16 KiB escaped srcset text and 64 candidates.
+
+The site owner must supply a CSS-accurate `sizes` value; validation checks
+bounds/delimiters, not CSS semantics. Configure author-written image preloads
+consistently too. Smaller byte transfers depend on which real candidates
+exist: correcting `sizes` cannot create a missing intermediate image.
+Turn off with `pagespeed SrcsetSizesEnabled off;`; purge cached HTML or wait
+for expiry after configuration/deployment changes. Browser/cache benchmarks
+are still pending; no end-to-end latency or byte-saving improvement is claimed.
+
 ## Features vs C++ PageSpeed
 
 Legend: ✅ supported · 🔶 partial · 📋 planned · ❌ not supported (out of scope)

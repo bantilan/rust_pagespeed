@@ -1,0 +1,412 @@
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+warning: function `wrap_body` is never used
+  --> crates/ps-html/tests/harness.rs:34:8
+   |
+34 | pub fn wrap_body(fragment: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `round_trip` is never used
+  --> crates/ps-html/tests/harness.rs:56:8
+   |
+56 | pub fn round_trip(input: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^^
+
+warning: function `validate_expected` is never used
+  --> crates/ps-html/tests/harness.rs:62:8
+   |
+62 | pub fn validate_expected(id: &str, input: &[u8], expected: &[u8]) {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: struct `SharedFilter` is never constructed
+  --> crates/ps-html/tests/harness.rs:72:12
+   |
+72 | pub struct SharedFilter<F> {
+   |            ^^^^^^^^^^^^
+
+warning: associated items `new` and `with` are never used
+  --> crates/ps-html/tests/harness.rs:86:12
+   |
+84 | impl<F> SharedFilter<F> {
+   | ----------------------- associated items in this implementation
+85 |     /// Wraps a filter for shared ownership.
+86 |     pub fn new(filter: F) -> Self {
+   |            ^^^
+...
+93 |     pub fn with<R>(&self, read: impl FnOnce(&F) -> R) -> R {
+   |            ^^^^
+
+warning: struct `ExplicitCloseTag` is never constructed
+   --> crates/ps-html/tests/harness.rs:181:12
+    |
+181 | pub struct ExplicitCloseTag;
+    |            ^^^^^^^^^^^^^^^^
+
+warning: struct `InsertCommentOnFirstDiv` is never constructed
+   --> crates/ps-html/tests/harness.rs:200:12
+    |
+200 | pub struct InsertCommentOnFirstDiv {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `new` and `insert` are never used
+   --> crates/ps-html/tests/harness.rs:207:12
+    |
+205 | impl InsertCommentOnFirstDiv {
+    | ---------------------------- associated items in this implementation
+206 |     #[must_use]
+207 |     pub fn new(at_start: bool) -> Self {
+    |            ^^^
+...
+214 |     fn insert(&mut self, at_start: bool, dom: &mut Dom, lexer: &Lexer, id: NodeId) {
+    |        ^^^^^^
+
+warning: struct `InsertScripts` is never constructed
+   --> crates/ps-html/tests/harness.rs:238:12
+    |
+238 | pub struct InsertScripts {
+    |            ^^^^^^^^^^^^^
+
+warning: associated items `new` and `insert` are never used
+   --> crates/ps-html/tests/harness.rs:246:12
+    |
+244 | impl InsertScripts {
+    | ------------------ associated items in this implementation
+245 |     #[must_use]
+246 |     pub fn new(before: bool, at_start: bool, external: bool) -> Self {
+    |            ^^^
+...
+254 |     fn insert(&mut self, at_start: bool, dom: &mut Dom, id: NodeId) {
+    |        ^^^^^^
+
+warning: struct `DeleteCounts` is never constructed
+   --> crates/ps-html/tests/harness.rs:285:12
+    |
+285 | pub struct DeleteCounts {
+    |            ^^^^^^^^^^^^
+
+warning: struct `DeleteCountValues` is never constructed
+   --> crates/ps-html/tests/harness.rs:291:12
+    |
+291 | pub struct DeleteCountValues {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: method `values` is never used
+   --> crates/ps-html/tests/harness.rs:300:12
+    |
+298 | impl DeleteCounts {
+    | ----------------- method in this implementation
+299 |     #[must_use]
+300 |     pub fn values(&self) -> DeleteCountValues {
+    |            ^^^^^^
+
+warning: struct `DeleteNodes` is never constructed
+   --> crates/ps-html/tests/harness.rs:306:12
+    |
+306 | pub struct DeleteNodes {
+    |            ^^^^^^^^^^^
+
+warning: associated items `new`, `set_delete_node_type`, `set_delete_from_type`, `set_delete_on_open_tag`, and `delete_elements` are never used
+   --> crates/ps-html/tests/harness.rs:318:12
+    |
+316 | impl DeleteNodes {
+    | ---------------- associated items in this implementation
+317 |     #[must_use]
+318 |     pub fn new(counts: &DeleteCounts) -> Self {
+    |            ^^^
+...
+330 |     pub fn set_delete_node_type(&mut self, keyword: Keyword) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+334 |     pub fn set_delete_from_type(&mut self, keyword: Keyword) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+338 |     pub fn set_delete_on_open_tag(&mut self, on_open: bool) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+342 |     fn delete_elements(&mut self, dom: &mut Dom) {
+    |        ^^^^^^^^^^^^^^^
+
+warning: function `run_with_filters` is never used
+  --> crates/ps-html/tests/harness.rs:44:8
+   |
+44 | pub fn run_with_filters(input: &[u8], build: impl FnOnce(&mut Parser)) -> Vec<u8> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: `ps-html` (test "prioritize_lcp_images") generated 15 warnings
+warning: `ps-html` (test "driver") generated 16 warnings (15 duplicates)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.33s
+     Running unittests src/lib.rs (target/debug/build/ps-html/3190878eb5345cc4/out/ps_html-3190878eb5345cc4)
+
+running 171 tests
+test ads_attribute::tests::lookup_basic ... ok
+test ads_attribute::tests::lookup_not_matched ... ok
+test ads_util::tests::ads_by_google_src_match ... ok
+test ads_util::tests::publisher_id_match ... ok
+test ads_util::tests::publisher_id_no_match ... ok
+test ads_util::tests::show_ads_src_match ... ok
+test ads_util::tests::valid_ads_by_google_matrix ... ok
+test background::tests::duplicates_share_one_execution ... ok
+test background::tests::executes_and_returns ... ok
+test background::tests::panicking_job_releases_waiters_and_worker_survives ... ok
+test background::tests::queue_overflow_rejects_fast ... ok
+test background::tests::shutdown_releases_and_joins ... ok
+test background::tests::timeout_releases_waiter_but_job_completes ... ok
+test base_tracker::tests::lawyer_suffixes_adopted_bases ... ok
+test base_tracker::tests::max_url_size_boundary ... ok
+test base_tracker::tests::observe_first_wins_and_problems_poison ... ok
+test base_tracker::tests::resolve_matrix ... ok
+test beacon_finder::tests::accept_stamped_beacon_end_to_end ... ok
+test beacon_finder::tests::accept_unstamped_and_text_lcp ... ok
+test beacon_finder::tests::availability_needs_a_valid_beacon ... ok
+test beacon_finder::tests::candidates_gate_and_reset ... ok
+test beacon_finder::tests::codec_round_trip_and_rejects ... ok
+test beacon_finder::tests::criticality_needs_max_support ... ok
+test beacon_finder::tests::finder_round_trips_through_cache ... ok
+test beacon_finder::tests::multiprocess_evidence_updates_preserve_nonces_and_reports ... ok
+test beacon_finder::tests::nonces_validate_once_and_expire ... ok
+test beacon_finder::tests::sampling_cadence_and_low_frequency ... ok
+test beacon_finder::tests::url_hash_matches_reference ... ok
+test css_tag_scanner::tests::alternate_rel_fail ... ok
+test css_tag_scanner::tests::alternate_stylesheet_matrix ... ok
+test css_tag_scanner::tests::bad_type_fail ... ok
+test css_tag_scanner::tests::doubled_href_fail ... ok
+test css_tag_scanner::tests::doubled_rel_ok ... ok
+test css_tag_scanner::tests::has_import_matrix ... ok
+test css_tag_scanner::tests::minimal_ok ... ok
+test css_tag_scanner::tests::missing_href_doubled_rel_fail ... ok
+test css_tag_scanner::tests::missing_rel_doubled_href_fail ... ok
+test css_tag_scanner::tests::missing_rel_fail ... ok
+test css_tag_scanner::tests::nonstandard_attribute_ok ... ok
+test css_tag_scanner::tests::rel_case_insensitive_ok ... ok
+test css_tag_scanner::tests::stylesheet_or_alternate_matrix ... ok
+test css_tag_scanner::tests::with_media_ok ... ok
+test css_tag_scanner::tests::with_type_ok ... ok
+test css_util::tests::media_screen_matrix ... ok
+test decode_url::tests::combined_url_yields_many ... ok
+test decode_url::tests::image_id_decodes_through_image_encoder ... ok
+test decode_url::tests::oblivious_and_forbidden_gates ... ok
+test decode_url::tests::outline_decodes_empty ... ok
+test decode_url::tests::proxy_modes ... ok
+test decode_url::tests::rejects_cleanly ... ok
+test decode_url::tests::single_url_round_trip ... ok
+test doctype::tests::html5_doctype ... ok
+test doctype::tests::legacy_doctypes ... ok
+test doctype::tests::non_doctype_untouched ... ok
+test element::tests::attribute_value_triad ... ok
+test element::tests::quote_need_predicate ... ok
+test element::tests::set_escaped_value_invalidates_cache ... ok
+test element::tests::set_value_reescapes_and_repairs_quotes ... ok
+test event::tests::insert_erase_splice ... ok
+test file_input_resource::tests::empty_file_loads ... ok
+test file_input_resource::tests::explicit_ttl_wins ... ok
+test file_input_resource::tests::failures_are_graceful_and_retryable ... ok
+test file_input_resource::tests::loads_valid_file_with_headers ... ok
+test file_input_resource::tests::negative_cap_is_unlimited ... ok
+test file_input_resource::tests::typeless_url_loads_without_content_type ... ok
+test filters::critical_images_beacon::tests::prepare_inserts_on_first_visit ... ok
+test filters::image_combine::tests::div_dimensions_need_both ... ok
+test filters::image_combine::tests::position_keywords ... ok
+test filters::image_combine::tests::position_lengths ... ok
+test filters::image_combine::tests::position_rejections ... ok
+test filters::logo_detection::tests::css_background_logo_pipeline ... ok
+test filters::logo_detection::tests::css_url_extraction ... ok
+test filters::logo_detection::tests::org_scopes_are_ascii ... ok
+test filters::logo_detection::tests::url_scoring_prefers_filenames ... ok
+test filters::prioritize_lcp_images::tests::format_matrix ... ok
+test flush_early::tests::keys_isolate_pages_and_variants ... ok
+test flush_early::tests::round_trip_and_rejections ... ok
+test html_async::tests::coordinated_css_and_js_combinations_warm_later_html ... ok
+test html_async::tests::coordinated_worker_subprocess ... ok
+test html_async::tests::inline_miss_defers_and_warm_view_inlines ... ok
+test html_async::tests::miss_schedules_async_and_serves_original_then_optimized ... ok
+test html_async::tests::no_pool_keeps_sync_rewrite ... ok
+test html_async::tests::remote_claim_defers_fetch_and_release_allows_metadata_publication ... ok
+test html_async::tests::separate_worker_processes_fetch_once_and_recover_killed_optimizer ... ok
+test html_async::tests::shutdown_pool_keeps_original_url ... ok
+test html_async::tests::worker_image_rewrite_reports_record_to_sink ... ok
+test html_cache::tests::allowlisted_cookies_miss_store_and_hit ... ok
+test html_cache::tests::auth_and_generic_bypasses_stay_quiet ... ok
+test html_cache::tests::beacon_learning_gates_lookup_store_and_identity ... ok
+test html_cache::tests::bypass_reasons_sanitize_and_truncate ... ok
+test html_cache::tests::cookie_configuration_overrides ... ok
+test html_cache::tests::each_gate_bypasses_alone ... ok
+test html_cache::tests::early_lookup_rejects_corrupt_hint_and_private_origin ... ok
+test html_cache::tests::early_lookup_requires_publication_and_preserves_variants ... ok
+test html_cache::tests::experiment_bypasses ... ok
+test html_cache::tests::file_mtime_stands_in_for_invisible_freshness ... ok
+test html_cache::tests::identity_splits_user_agents_and_purges ... ok
+test html_cache::tests::malformed_and_cookie2_bypass_with_lines ... ok
+test html_cache::tests::miss_stores_and_hit_serves ... ok
+test html_cache::tests::oversize_and_sampled_bodies_do_not_store ... ok
+test html_cache::tests::publication_rechecks_request_cookies ... ok
+test html_cache::tests::sampling_due_and_unsettled_renders_bypass ... ok
+test html_cache::tests::show_comment_shapes ... ok
+test html_cache::tests::unknown_and_mixed_cookies_bypass_with_named_reason ... ok
+test js_escape::tests::js_avoid_close_script ... ok
+test js_escape::tests::js_avoid_weird_parsing_sequence ... ok
+test js_escape::tests::js_dont_escape_way_too_much ... ok
+test js_escape::tests::js_escape_basic ... ok
+test js_escape::tests::js_single_quotes ... ok
+test keywords::tests::escape_basics ... ok
+test keywords::tests::tag_sets_match_cpp ... ok
+test keywords::tests::unescape_basics ... ok
+test keywords::tests::unescape_failure_modes ... ok
+test keywords::tests::unescape_numeric ... ok
+test name::tests::discriminant_order_matches_cpp ... ok
+test name::tests::lookup_handles_long_names ... ok
+test name::tests::lookup_is_case_insensitive ... ok
+test name::tests::names_keep_original_spelling ... ok
+test rewrite_filter::tests::filter_defaults ... ok
+test rewrite_filter::tests::script_charset_priority ... ok
+test rewrite_filter::tests::stylesheet_charset_priority ... ok
+test rewrite_stats::tests::roster_lists_console_names ... ok
+test script_scanner::tests::mimetypes_sorted ... ok
+test server_context::tests::capabilities_refresh_after_request_changes ... ok
+test server_context::tests::chain_plan_reuses_config_but_separates_debug_and_context ... ok
+test server_context::tests::custom_servant_overrides_lazy_builtin ... ok
+test server_context::tests::deadline_counts_elapsed_work_and_rearms_on_flush ... ok
+test server_context::tests::options_signature_memo_matches_direct ... ok
+test server_context::tests::options_signature_separates_cache_keys ... ok
+test server_context::tests::partition_hash_refreshes_with_live_options ... ok
+test server_context::tests::serving_filters_are_lazy_and_do_not_retain_the_driver ... ok
+test show_ads_snippet_parser::tests::parse_color_array ... ok
+test show_ads_snippet_parser::tests::parse_short_attribute ... ok
+test show_ads_snippet_parser::tests::parse_strict_empty ... ok
+test show_ads_snippet_parser::tests::parse_strict_google_ad_format ... ok
+test show_ads_snippet_parser::tests::parse_strict_google_ad_format_with_unexpected_ends ... ok
+test show_ads_snippet_parser::tests::parse_strict_google_ad_format_with_unexpected_prefix ... ok
+test show_ads_snippet_parser::tests::parse_strict_google_ad_format_with_whitespaces ... ok
+test show_ads_snippet_parser::tests::parse_strict_invalid_assignment ... ok
+test show_ads_snippet_parser::tests::parse_strict_invalid_attribute_name_illegal_char ... ok
+test show_ads_snippet_parser::tests::parse_strict_invalid_attribute_name_not_started_with_google ... ok
+test show_ads_snippet_parser::tests::parse_strict_invalid_duplicate ... ok
+test show_ads_snippet_parser::tests::parse_strict_invalid_missing_semicolon ... ok
+test show_ads_snippet_parser::tests::parse_strict_invalid_modified ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid_empty_lines ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid_empty_statement ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid_single_quote ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid_with_enclosing_comment_tag ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid_with_enclosing_comment_tag_and_whitespaces ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid_without_semicolon ... ok
+test show_ads_snippet_parser::tests::parse_weird_google_ad_format ... ok
+test static_assets::tests::beacon_and_defer_markers ... ok
+test static_assets::tests::client_domain_rewriter_markers ... ok
+test static_assets::tests::critical_css_loader_markers ... ok
+test static_assets::tests::dedup_inlined_images_markers ... ok
+test static_assets::tests::defer_iframe_markers ... ok
+test static_assets::tests::delay_images_markers ... ok
+test static_assets::tests::deterministic_js_markers ... ok
+test static_assets::tests::instrumentation_markers ... ok
+test static_assets::tests::lazyload_images_markers ... ok
+test static_assets::tests::local_storage_cache_markers ... ok
+test url_namer::tests::decode_reconstruction ... ok
+test url_namer::tests::encode_url_assembly ... ok
+test url_namer::tests::path_encoding_matrix ... ok
+test url_namer::tests::proxy_encoding_matrix ... ok
+test url_segment_encoder::tests::css_encode_decode_round_trip ... ok
+test url_segment_encoder::tests::css_legacy_letters_decode ... ok
+test url_segment_encoder::tests::default_single_url ... ok
+test url_segment_encoder::tests::multipart_edge_cases ... ok
+test url_segment_encoder::tests::multipart_escape_round_trip ... ok
+
+test result: ok. 171 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+
+     Running tests/driver.rs (target/debug/build/ps-html/d3cb7e632d5d932f/out/driver-d3cb7e632d5d932f)
+
+running 29 tests
+test amp_verdict_through_driver ... ok
+test core_plan_leaves_unplanned_content_alone ... ok
+test dns_prefetch_corrupt_state_fails_safe ... ok
+test dns_prefetch_disabled_writes_nothing ... ok
+test dns_prefetch_persists_across_drivers ... ok
+test dns_prefetch_state_is_page_isolated ... ok
+test domain_rewrite_runs_through_driver ... ok
+test driver_binds_meta_tag_to_shared_headers ... ok
+test driver_binds_support_noscript_with_driver_url ... ok
+test driver_bound_css_inlines_small_link ... ok
+test executes_implemented_slots_across_phases ... ok
+test flush_html_induces_flushes ... ok
+test flush_html_no_extra_flushes ... ok
+test flush_html_not_enough ... ok
+test google_analytics_runs_through_driver ... ok
+test insert_dns_prefetch_runs_through_driver ... ok
+test lazyload_images_runs_through_driver ... ok
+test lazyload_images_stands_down_without_beacon_data ... ok
+test max_url_size_blocks_base_adoption_through_driver ... ok
+test passthrough_round_trip ... ok
+test phases_run_early_pre_render_post ... ok
+test proxy_suffix_threads_lawyer_through_driver ... ok
+test show_ads_async_runs_through_driver ... ok
+test show_ads_async_runs_without_resource_driver ... ok
+test size_limit_propagates ... ok
+test slow_fetch_falls_back_then_warms_html_rewrites ... ok
+test sync_css_inline_baseline_inlines_first_request ... ok
+test url_left_trim_runs_through_driver ... ok
+test writer_disabled_means_no_output ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/prioritize_lcp_images.rs (target/debug/build/ps-html/cd773c6dd65bedc4/out/prioritize_lcp_images-cd773c6dd65bedc4)
+
+running 26 tests
+test article_logo_image_not_confused ... ok
+test author_preload_suppresses_duplicate_hint ... ok
+test background_lcp_author_preload_wins ... ok
+test background_lcp_format_mismatch_skips ... ok
+test background_lcp_preloads_head_hint ... ok
+test background_lcp_yields_to_image_hero ... ok
+test bare_itemprop_without_context_stays_candidate ... ok
+test custom_header_svg_logo_skipped ... ok
+test element_hero_class_still_vetoes_despite_header ... ok
+test explicit_high_priority_is_never_lazy ... ok
+test fallback_does_not_double_spend_learned_budget ... ok
+test fallback_hero_skips_logo_candidate ... ok
+test filename_only_logo_stays_candidate ... ok
+test hero_mentioning_logo_still_prioritized ... ok
+test heuristic_hero_preloads_and_rest_lazy ... ok
+test hidden_trackers_and_data_urls_skip ... ok
+test learned_evidence_overrides_position ... ok
+test logo_inside_banner_region_still_skipped ... ok
+test logo_inside_picture_skipped ... ok
+test logo_with_author_priority_left_byte_identical ... ok
+test measured_lcp_logo_still_prioritized ... ok
+test schema_org_itemprop_logo_skipped ... ok
+test stale_evidence_naming_absent_image_falls_back ... ok
+test text_lcp_evidence_falls_back_to_visual_hero ... ok
+test wordpress_block_logo_skipped ... ok
+test wordpress_custom_logo_skipped_hero_passes_to_content ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/srcset_sizes.rs (target/debug/build/ps-html/6d0276cb9a70a9ec/out/srcset_sizes-6d0276cb9a70a9ec)
+
+running 9 tests
+test accepts_width_lists_without_changing_author_text ... ok
+test cached_plan_reuses_policy_and_lcp_preload_sees_corrected_sizes ... ok
+test driver_changes_only_explicitly_targeted_sizes ... ok
+test driver_decodes_target_attributes_without_rewriting_srcset_bytes ... ok
+test driver_defaults_and_incomplete_policy_are_byte_equivalent ... ok
+test driver_preserves_unsupported_elements_and_ambiguous_attributes ... FAILED
+test driver_streaming_and_reuse_reset_context_state ... ok
+test limits_bytes_and_candidates_before_allocation ... ok
+test rejects_unsupported_or_ambiguous_lists ... ok
+
+failures:
+
+---- driver_preserves_unsupported_elements_and_ambiguous_attributes stdout ----
+
+thread 'driver_preserves_unsupported_elements_and_ambiguous_attributes' (725581) panicked at crates/ps-html/tests/srcset_sizes.rs:190:5:
+assertion `left == right` failed
+  left: "<img class='hero' srcset='a.jpg 300w' data-x0='a' data-x1='a' data-x2='a' data-x3='a' data-x4='a' data-x5='a' data-x6='a' data-x7='a' data-x8='a' data-x9='a' data-x10='a' data-x11='a' data-x12='a' data-x13='a' data-x14='a' data-x15='a' data-x16='a' data-x17='a' data-x18='a' data-x19='a' data-x20='a' data-x21='a' data-x22='a' data-x23='a' data-x24='a' data-x25='a' data-x26='a' data-x27='a' data-x28='a' data-x29='a' data-x30='a' data-x31='a' data-x32='a' data-x33='a' data-x34='a' data-x35='a' data-x36='a' data-x37='a' data-x38='a' data-x39='a' data-x40='a' data-x41='a' data-x42='a' data-x43='a' data-x44='a' data-x45='a' data-x46='a' data-x47='a' data-x48='a' data-x49='a' data-x50='a' data-x51='a' data-x52='a' data-x53='a' data-x54='a' data-x55='a' data-x56='a' data-x57='a' data-x58='a' data-x59='a' data-x60='a' data-x61='a' data-x62='a' data-x63='a'>"
+ right: "<img class='hero' srcset='a.jpg 300w' data-x0='a' data-x1='a' data-x2='a' data-x3='a' data-x4='a' data-x5='a' data-x6='a' data-x7='a' data-x8='a' data-x9='a' data-x10='a' data-x11='a' data-x12='a' data-x13='a' data-x14='a' data-x15='a' data-x16='a' data-x17='a' data-x18='a' data-x19='a' data-x20='a' data-x21='a' data-x22='a' data-x23='a' data-x24='a' data-x25='a' data-x26='a' data-x27='a' data-x28='a' data-x29='a' data-x30='a' data-x31='a' data-x32='a' data-x33='a' data-x34='a' data-x35='a' data-x36='a' data-x37='a' data-x38='a' data-x39='a' data-x40='a' data-x41='a' data-x42='a' data-x43='a' data-x44='a' data-x45='a' data-x46='a' data-x47='a' data-x48='a' data-x49='a' data-x50='a' data-x51='a' data-x52='a' data-x53='a' data-x54='a' data-x55='a' data-x56='a' data-x57='a' data-x58='a' data-x59='a' data-x60='a' data-x61='a' data-x62='a' data-x63='a' >"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    driver_preserves_unsupported_elements_and_ambiguous_attributes
+
+test result: FAILED. 8 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p ps-html --test srcset_sizes`
