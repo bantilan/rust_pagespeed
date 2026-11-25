@@ -1373,6 +1373,7 @@ pub mod html_rewrite {
             }
             // Cache hits swallow the origin body (already served).
             if (*ctx).html_cache_served {
+                consume_cached_origin_chain(chain);
                 return pass_to_next(std::ptr::null_mut());
             }
             let sink = (*ctx)
@@ -1399,6 +1400,24 @@ pub mod html_rewrite {
                 }
             }
             pass_to_next(std::ptr::null_mut())
+        }
+    }
+
+    /// Releases origin buffers after cached output has already been sent.
+    /// Merely dropping the chain leaves upstream buffers busy and can stall
+    /// FastCGI responses once the upstream buffer pool fills.
+    ///
+    /// # Safety
+    /// Every link and buffer in `chain` must be live and writable.
+    unsafe fn consume_cached_origin_chain(mut chain: *mut ngx_chain_t) {
+        unsafe {
+            while !chain.is_null() {
+                let buf = (*chain).buf;
+                (*buf).pos = (*buf).last;
+                (*buf).file_pos = (*buf).file_last;
+                (*buf).set_last_buf(0);
+                chain = (*chain).next;
+            }
         }
     }
 
@@ -1687,6 +1706,38 @@ pub mod html_rewrite {
 
             fn done(&mut self) {
                 self.dones += 1;
+            }
+        }
+
+        #[test]
+        fn cached_origin_consumes_memory_and_file_buffers() {
+            use ngx::ffi::{ngx_buf_t, ngx_chain_t};
+            // SAFETY: links, buffers and bytes are owned by this test.
+            unsafe {
+                let mut bytes = [0u8; 65536];
+                let mut memory: ngx_buf_t = std::mem::zeroed();
+                memory.pos = bytes.as_mut_ptr();
+                memory.last = memory.pos.add(bytes.len());
+                memory.set_temporary(1);
+                let mut file: ngx_buf_t = std::mem::zeroed();
+                file.set_in_file(1);
+                file.file_pos = 10;
+                file.file_last = 100000;
+                file.set_last_buf(1);
+                let mut tail = ngx_chain_t {
+                    buf: &mut file,
+                    next: std::ptr::null_mut(),
+                };
+                let mut head = ngx_chain_t {
+                    buf: &mut memory,
+                    next: &mut tail,
+                };
+                consume_cached_origin_chain(&mut head);
+                assert_eq!(memory.pos, memory.last);
+                assert_eq!(file.file_pos, file.file_last);
+                assert_eq!(file.last_buf(), 0);
+                consume_cached_origin_chain(&mut head);
+                consume_cached_origin_chain(std::ptr::null_mut());
             }
         }
 
