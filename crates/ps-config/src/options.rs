@@ -4689,6 +4689,20 @@ mod tests {
     use crate::filter::Filter;
 
     #[test]
+    fn early_html_lookup_is_explicit_and_not_query_configurable() {
+        let mut options = RewriteOptions::new();
+        assert!(!options.html_cache_early_lookup());
+        assert!(options
+            .set_option("HtmlCacheEarlyLookup", "on", Scope::Query)
+            .is_err());
+        assert!(!options.html_cache_early_lookup());
+        options
+            .set_option("HtmlCacheEarlyLookup", "on", Scope::Server)
+            .unwrap();
+        assert!(options.html_cache_early_lookup());
+    }
+
+    #[test]
     fn defaults_and_html_writer() {
         let mut options = RewriteOptions::new();
         assert!(!options.modified());

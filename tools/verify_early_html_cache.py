@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Isolated FastCGI counter oracle for pre-origin HTML-cache lookup."""
 import argparse
+import hashlib
 import http.client
 import json
 import os
+import re
 from pathlib import Path
 import signal
 import socket
@@ -19,6 +21,7 @@ p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--nginx', required=True)
 p.add_argument('--module', required=True)
 p.add_argument('--output', required=True)
+p.add_argument('--rum-only', action='store_true', help='Isolate RUM clock retention with add_instrumentation; core beacon sampling tested separately')
 a = p.parse_args()
 root = Path(tempfile.mkdtemp(prefix='ps-early-html-'))
 (root / 'logs').mkdir()
@@ -102,6 +105,8 @@ http {{
  }}
 }}
 '''
+if a.rum_only:
+    conf = conf.replace('  pagespeed on;', '  pagespeed on;\n  pagespeed RewriteLevel PassThrough;\n  pagespeed EnableFilters add_instrumentation;')
 (root / 'nginx.conf').write_text(conf)
 proc = None
 
@@ -109,11 +114,14 @@ def get(path='/', headers=None):
     c = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
     start = time.perf_counter()
     try:
-        c.request('GET', path, headers=headers or {})
+        browser = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36'} if a.rum_only else {}
+        c.request('GET', path, headers={**browser, **(headers or {})})
         r = c.getresponse(); body = r.read()
         assert r.status == 200, (r.status, body[:100])
         marker = body.rsplit(b'PageSpeed Cache:', 1)[-1].split(b'|', 1)[0].strip().decode()
-        return {'ms': (time.perf_counter() - start) * 1000, 'marker': marker, 'bytes': len(body)}
+        return {'ms': (time.perf_counter() - start) * 1000, 'marker': marker, 'bytes': len(body),
+                'rum_browser_clock': b'window.mod_pagespeed_start = Number(new Date())' in body,
+                'body_hash': hashlib.sha256(re.sub(rb'<!-- PageSpeed Cache:.*?-->', b'', body)).hexdigest()}
     finally:
         c.close()
 
@@ -131,6 +139,9 @@ try:
     before = counts.get('/', 0)
     warm = [get() for _ in range(20)]
     assert all(x['marker'] == 'HIT' for x in warm), warm
+    assert all(x['body_hash'] == cold['body_hash'] for x in warm), warm
+    if a.rum_only:
+        assert cold['rum_browser_clock'] and all(x['rum_browser_clock'] for x in warm), warm
     assert counts.get('/', 0) == before, counts
     for headers in [{'Cookie': 'wordpress_logged_in_x=secret'}, {'Authorization': 'Basic test'}, {'Cache-Control': 'no-cache'}, {'Range': 'bytes=0-10'}]:
         before = counts.get('/', 0)

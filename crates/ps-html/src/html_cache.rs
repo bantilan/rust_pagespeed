@@ -302,7 +302,11 @@ impl HtmlCacheSession {
     ) -> Option<(html_codec::HtmlCacheEntry, ResponseHeaders)> {
         let hint_key = self.early_key(request, file_mtime)?;
         let cache = self.driver.server_context().metadata_cache();
-        let blob = cache.get(&hint_key).value?;
+        let hint = cache.get(&hint_key);
+        if hint.state != ps_cache::cache::KeyState::Available {
+            return None;
+        }
+        let blob = hint.value?;
         if blob.len() > 65536 {
             return None;
         }
@@ -319,7 +323,11 @@ impl HtmlCacheSession {
         let eligible = self
             .eligibility_key(&origin, request, &self.driver.options(), file_mtime, now_ms)
             .ok()?;
-        let body = cache.get(&eligible.key).value?;
+        let cached = cache.get(&eligible.key);
+        if cached.state != ps_cache::cache::KeyState::Available {
+            return None;
+        }
+        let body = cached.value?;
         let entry = html_codec::validate_value(
             &body,
             &self.url,
