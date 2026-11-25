@@ -1,0 +1,32 @@
+{
+  "passed": true,
+  "zstd": true,
+  "prefix": "/tmp/ps-beacon-reload-5b_j6hkh",
+  "commit": "4f21fded3835d914f0e88751b0e984e6ccbece4e",
+  "module_sha256": "5777c16827917839fd60b05814906a1dbefe4c0e224e2d695b4942aba406c93f",
+  "config_sha256": "48badb225fee5570eed0317746b3a09be0fdab65a9634a136764192578ae82ca",
+  "decoded_zstd_responses": 1,
+  "srcset_policy_applied": true,
+  "accept_before_reload": false,
+  "old_worker": 735658,
+  "accepted_worker": 735664,
+  "replay_worker": 735663,
+  "initial": {
+    "valid": 0,
+    "generation": 0,
+    "nonces": [
+      "BjGbK9DdIKQ"
+    ]
+  },
+  "accepted": {
+    "valid": 1,
+    "generation": 1,
+    "nonces": []
+  },
+  "after_replay": {
+    "valid": 1,
+    "generation": 1,
+    "nonces": []
+  },
+  "old_worker_alive_during_accept": true
+}
