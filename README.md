@@ -202,40 +202,51 @@ latest local fixes are not evidence that a production server has been updated.
 
 ## Features vs C++ PageSpeed
 
-Legend: ✅ supported · 🔶 partial · 📋 planned · ❌ not supported (out of scope)
+Legend: ✅ implemented · 🔶 partial · ❌ unavailable · — Rust extension without
+an equivalent comparison here. Status describes this source tree, not the
+version installed on a particular server. Individual feature support does not
+imply complete C++ filter-chain parity.
 
 | Area | C++ 1.15 | Rust | Notes |
 |---|---|---|---|
-| HTML rewrite engine | ✅ | ✅ | Streaming parser, plan-driven filter chain |
-| Rewrite filters | ~100 classes | ✅ 60+ modules live | Full chain plan; unbuilt slots pass through (see `skipped_slots`) |
-| Rewrite options & directives | ✅ | ✅ | `RewriteOptions`, scopes, nginx directive parsing |
-| CSS minify / rewrite / combine / inline | ✅ | ✅ | Hand-written parser, no regex |
-| JS minify / combine / inline / source maps | ✅ | ✅ | Lossless tokenizer, shared pattern table |
-| Images: JPEG/PNG/GIF resize & recompress | ✅ | ✅ | |
-| Images: WebP / AVIF conversion + negotiation | ✅ | ✅ | Format checks per request variant |
-| Lazy-loaded images, deferred iframes | ✅ | ✅ | |
-| Responsive images (`srcset`, `<picture>`) | ✅ | ✅ | |
-| CSS/JS/HTML cache extension | ✅ | ✅ | |
-| Domain rewriting, sharding, mapping | ✅ | ✅ | |
-| Resource file cache + HTTP cache + purge | ✅ | ✅ | Byte-compatible entries, purge endpoint |
-| HTML (whole-page) cache | ✅ | ✅ | Variant-aware identity, cookie allowlists |
-| In-memory LRU tier | ✅ opt-in | ✅ **on by default** | 8 MiB/process, 16 KiB cap; explicit zeros restore C++ shape |
-| IPRO (in-place resource optimization) | ✅ | ✅ | Recording, waiting, deadlines |
-| Memcached / Redis backends | ✅ | 🔶 falls back | Warns once per path, uses file cache |
-| Shared-memory metadata cache | ✅ | ✅ opt-in | Bounded Linux shared tier; persistent disk fallback and tested reload/recovery |
-| Critical-image beaconing + LCP learning | ✅ | ✅ | Beacon finder, evidence store, LCP prioritization |
-| Full RUM instrumentation filter | ✅ | ✅ | `add_instrumentation`; cached HTML retains browser-side navigation timing |
-| **Automatic critical font preloads** | — | ✅ **CoreFilters default** | Up to two hints; CSS usage analysis, variable fonts, cached decisions and beacon learning |
-| **Automatic logo detection for LCP** | ❌ | ✅ **Rust-only** | Confidence-based (WP/custom/SVG/CSS-bg); keeps logos out of auto-preload |
-| **LCP fallback hero** | ❌ | ✅ **Rust-only** | Empty/stale evidence never leaves the visual hero bare |
-| Async HTML (deadline-detach) | ✅ threads | ✅ adapted | Fire-and-forget rewrite jobs; first view serves originals, next view hits |
-| **Async CSS/JS combination** | ✅ threads | ✅ adapted | Background combiners with failure memory; uncombinable members never block HTML caching |
-| **Background admin reporting** | ✅ | ✅ | Worker completions land on the admin images page |
-| Admin / console / statistics / graphs | ✅ | ✅ | `ps-admin` + cross-process shared counters |
-| **Zstd output compression** | — | ✅ | `compress_zstd`; negotiated, streaming, bounded payload cache |
-| Gzip handling, Vary, downstream caching | ✅ | ✅ | |
-| Apache module | ✅ | ❌ | NGINX only |
-| Envoy integration | ✅ | ❌ | |
+| HTML rewrite engine | ✅ | ✅ | Streaming parser; immutable chain plans reused with request-local mutable state |
+| Rewrite filter coverage | ~100 classes | 🔶 partial chain coverage | Implemented filters run normally; inspect `Driver::skipped_slots()` for unbuilt chain slots |
+| Rewrite options & directives | ✅ | ✅ | Scoped options, NGINX directives, mutation-aware cached signatures |
+| CSS minify / rewrite / combine / inline | ✅ | ✅ | Parser-based transforms and background resource optimization |
+| JS minify / combine / inline / source maps | ✅ | ✅ | Tokenizer, shared pattern table and cached optimization metadata |
+| Images: JPEG/PNG/GIF resize & recompress | ✅ | ✅ | Original URLs remain valid while background work is incomplete |
+| Images: WebP / AVIF negotiation | ✅ | ✅ | Per-request format capabilities; AVIF requires the documented runtime encoder |
+| Lazy-loaded images / deferred iframes | ✅ | ✅ | Existing loading and optimization filters remain available |
+| Responsive images / `srcset` | ✅ | 🔶 | Existing candidate rewriting supported; dedicated responsive chain slots are not fully wired |
+| CSS/JS/HTML cache extension | ✅ | ✅ | Optimized resource URLs and cache lifetime handling |
+| Domain rewriting / sharding / mapping | ✅ | ✅ | URL resolution and rewrite policy |
+| Resource file cache / HTTP cache / purge | ✅ | ✅ | Persistent cache entries, expiration and purge support |
+| Whole-page HTML cache | ✅ | ✅ | Options, request variants, origin policy and beacon evidence participate in validation |
+| **Pre-origin HTML cache HIT** | — | ✅ **opt-in** | `HtmlCacheEarlyLookup on`; eligible warm responses skip PHP/origin and rewrite parsing |
+| **Analytics-cookie HTML cache HIT** | — | ✅ | Existing cookie allowlist applies to ordinary and early lookup; private/unknown cookies still bypass |
+| In-memory LRU tier | ✅ opt-in | ✅ **default on** | 8 MiB/process, 16 KiB entry cap; explicitly configurable |
+| Shared-memory metadata tier | ✅ | ✅ **opt-in, Linux** | Bounded cross-worker reuse, coherence, disk fallback and tested recovery/reload |
+| IPRO (in-place resource optimization) | ✅ | ✅ | Recording, configurable waiting and deadlines |
+| Memcached / Redis backends | ✅ | ❌ native clients | Configured external backends warn and fall back to file cache; fallback is not external-cache support |
+| Critical-image beaconing / LCP learning | ✅ | ✅ | Evidence store, prioritization and nonce validation; sampled responses may intentionally BYPASS HTML cache |
+| RUM navigation instrumentation | ✅ | ✅ | `add_instrumentation`; cached HTML retains browser-side timing code |
+| **Automatic font lookup / preloads** | — | ✅ **CoreFilters default** | `preload_critical_fonts`; bounded CSS usage discovery, variable fonts, custom properties and at most two hints |
+| **Font learning / diagnostics** | — | ✅ | Cached decisions, nonce-validated font beacons, empty query-only POST support and Debug selection explanations |
+| **Automatic logo detection for LCP** | ❌ | ✅ **Rust-only** | Confidence-based detection keeps identified logos out of automatic hero preload selection |
+| **LCP fallback hero** | ❌ | ✅ **Rust-only** | Fallback selection when learned hero evidence is missing or stale |
+| Asynchronous resource rewriting | ✅ threads | ✅ adapted | Cached metadata on HTML path; bounded background work, deduplication and deadline fallback |
+| Asynchronous CSS/JS combination | ✅ threads | ✅ adapted | Background combiners and failure memory; incomplete work does not block HTML delivery |
+| **Background admin reporting** | ✅ | ✅ | Worker completions populate admin resource reporting |
+| Admin / console / statistics / graphs | ✅ | ✅ | Admin views and cross-process shared counters |
+| **Zstd output compression** | — | ✅ | `compress_zstd`; negotiated encoding, streaming flushes, reused workspaces and bounded complete-body cache |
+| Gzip handling / Vary / downstream caching | ✅ | ✅ | Existing encoding negotiation and cache-policy handling |
+| Apache module | ✅ | ❌ | Rust module targets NGINX |
+| Envoy integration | ✅ | ❌ | Outside the current implementation |
+
+Configuration and limits: [Zstd](#zstd-output-compression),
+[font lookup/preloading](#automatic-critical-font-preloads),
+[early HTML HITs and analytics cookies](#serve-html-cache-hits-before-php),
+[shared caching](#shared-caching), and [AVIF](#avif-runtime-dependency).
 
 ### Deliberate differences from C++
 

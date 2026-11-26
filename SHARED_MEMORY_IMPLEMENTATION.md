@@ -858,3 +858,7 @@ Documentation-only user request completed: CoreFilters automatic fontpreloads/op
 ## README discoverability follow-up — 2026-11-26
 
 User asked where Zstd/fontlookup/etc appear. Added prominent feature quickreference beforePerformance with exactdirectives/defaults and internal links forZstd,fontpreload,earlyHTML/analytics,AVIF,LCP,sharedcache,RUM; added Zstd comparisontable entry. Existing detailedsections retained. Documentation-only; checkedheadinganchors/directive names/diff. No runtime/deploy changes; implementation resume unchanged.
+
+## Feature comparison refresh — 2026-11-26
+
+User requested FeaturesvsC++table update. Documented current earlyHTML/analyticsHITs,fontlookup/preload/learning/emptyPOST/debug,Zstdworkspace/cache,optionssignature/planreuse,asyncboundedwork/sharedcoherence/recovery. Corrected broad filtercoverage and responsivechain wiring to partial; externalbackendfallback is explicitlynotnativeclient support. Existing production-vs-source caveat and configurationlinks added. Checked currentdriver/chain/fontfilter/caches and localC++options declarations. README/ledgeronly; relativeanchors andgitdiff verified; no runtime/deploy/test rerun. Next implementation/deployment resume unchanged.
