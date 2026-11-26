@@ -189,11 +189,11 @@ Commands run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Next Session Resume Point
 
-**Previous completed task (2026-11-26):** font/preload latency optimization committed732d534;1765HTMLtests pass. Source change: borrow DOM tag spelling/decoded selector attrs and own only first-seen tokens. Baseline/after release profiles saved in docs/performance/font-lookup-optimization; repeated warm walk300→192µs,7987→1987allocations. No live deployment/config changes. Existing unrelated source at entry HEAD0bd1770 preserved.
+**Current milestone (2026-11-26):** public browser grouping implemented; user requested default ON whenever HTML caching is used. `HtmlCachePublicBrowserGrouping off` restores exact UA/Accept variants. Configuration is signature-bearing and cannot be changed via query. Compatible Firefox/Chrome reuse early and normal entries; device and incompatible rewrite capabilities remain separate. README documents public-site content contract and remaining privacy/language variants.
 
-**Exact next action:** image-free sampling repair implemented locally; see docs/performance/image-free-beacon/RESULTS.md. Collector fallback at documentend and unknownLCP acknowledgement preserve knownhero evidence, consumevalidnonce and advancecadence.206HTML+6filter+294NGINXtests, Chromebothassets noobserver, realNGINXimagefreeaccept/replay/reload and font/zstd+publiccacheoracles pass. Static-alias combinedwarmHITassertion stillBYPASS; unresolvedfixturepublication limitation explicitlyrecorded, no endtoendliveHITclaim. Next install/retest actualSamplePage(browserreport+consecutiveHIT) and investigate ifstillbypasses; no deployment thisturn. All commandscomplete.
+**Next action:** review `docs/performance/public-browser-grouping/RESULTS.md` and test logs, then install the locally built module using the deployment's matching NGINX version and verify consecutive Firefox/Chrome requests with equivalent privacy/language headers. No live installation or live latency claim in this milestone. Earlier image-free static-alias sampling fixture limitation remains unresolved; see `docs/performance/image-free-beacon/RESULTS.md`.
 
-**Deployment:** this patch is local only. Live config restored by prior OFF/ON benchmark; do not install mismatched NGINX module. No push. Maintain existing RUM, CSS/image optimization and cache validity.
+**Deployment:** local only, no push. Preserve existing RUM, image/CSS/JS optimization, cookie/authorization bypass, and cache validity. Default change alters option signatures, so entries warm in a new namespace.
 
 ## Phase 0 audit findings (persisted before implementation)
 
@@ -882,3 +882,9 @@ Contract: preserve issued sampling and text/background LCP evidence; insert pend
 ## Image-free sampling milestone — 2026-11-26
 
 Implemented enddocumentfallbackcollector plus noncevalidated unknownack inbothassets/receiver; preservepriorLCP/support.206library+6filterpass,294NGINXpass,Chromeassetsbothpass,actualimagefreeNGINXnonceaccept/replay/reloadpass,font/zstdregressionpass,FastCGIpubliccache/RUM/analyticsoraclepass. Combinedstatic-aliasHITassertionfailed(cachepublicationnotresolved), removedfromgenericreloadtestanddocumentedaslimitation ratherthanclaimsuccess. ExactnexttestactualdeployedSamplePage; no livechanges. docs/performance/image-free-beacon/RESULTS.md containscommands/limits. All processescomplete.
+
+## Public browser grouping — 2026-11-26
+
+Implemented `HtmlCachePublicBrowserGrouping` at Directory scope. Initially opt-in, superseded by the user's explicit request to default ON with HTML caching. Effective capability/device identity replaces raw User-Agent/Accept/browser identity hints, including origin Vary UA/Accept. Header casing/order canonicalized; other explicit Vary, language and privacy inputs remain. Animated WebP capability matters only when that conversion is enabled. Existing cookie/private-response gates and sampling remain intact. Equivalent public content within each capability group is required; exact mode remains available via `off`.
+
+Validation commands/results and deployment limits are in `docs/performance/public-browser-grouping/RESULTS.md`. No live deployment. Remaining work: live cross-browser validation after installation; privacy, encoding and other content headers can intentionally retain separate variants.

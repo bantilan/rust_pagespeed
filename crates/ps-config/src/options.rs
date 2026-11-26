@@ -2030,6 +2030,15 @@ impl RewriteOptions {
         }
     }
 
+    /// Public-site authorization to share HTML across equivalent browsers.
+    #[must_use]
+    pub fn html_cache_public_browser_grouping(&self) -> bool {
+        matches!(
+            self.get_by_name("HtmlCachePublicBrowserGrouping"),
+            Some(Value::Bool(true))
+        )
+    }
+
     /// Opt-in serving before origin execution, using stored origin policy.
     #[must_use]
     pub fn html_cache_early_lookup(&self) -> bool {
@@ -6325,6 +6334,22 @@ mod tests {
             .set_option("ObliviousPagespeedUrls", "on", Scope::ProcessStrict)
             .unwrap();
         assert!(options.oblivious_pagespeed_urls());
+    }
+
+    #[test]
+    fn public_browser_grouping_configuration_contract() {
+        let mut options = RewriteOptions::new();
+        let before = options.signature();
+        assert!(options.html_cache_public_browser_grouping());
+        assert!(options
+            .set_option("HtmlCachePublicBrowserGrouping", "on", Scope::Query)
+            .is_err());
+        options
+            .set_option("HtmlCachePublicBrowserGrouping", "off", Scope::Server)
+            .unwrap();
+        assert!(!options.html_cache_public_browser_grouping());
+        assert_ne!(before, options.signature());
+        assert!(!options.clone().html_cache_public_browser_grouping());
     }
 
     #[test]

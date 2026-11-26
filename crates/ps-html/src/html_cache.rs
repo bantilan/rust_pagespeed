@@ -288,7 +288,7 @@ impl HtmlCacheSession {
                 self.url,
                 self.driver.cache_fragment(),
                 self.driver.options_signature(),
-                public_request_identity(request, None),
+                self.request_identity(request, None),
                 file_mtime
             ))
         ))
@@ -576,7 +576,7 @@ impl HtmlCacheSession {
             self.url,
             self.driver.cache_fragment(),
             self.driver.options_signature(),
-            public_request_identity(request, Some(origin)),
+            self.request_identity(request, Some(origin)),
         );
         identity.push_str(&format!(
             "debug:{}\norigin-ttl:{}\n",
@@ -705,6 +705,79 @@ impl HtmlCacheSession {
             beacon_identity,
             allowlisted_cookies,
         })
+    }
+
+    fn request_identity(
+        &self,
+        request: &RequestHeaders,
+        origin: Option<&ResponseHeaders>,
+    ) -> String {
+        if !self.driver.options().html_cache_public_browser_grouping() {
+            return public_request_identity(request, origin);
+        }
+        let mut normalized = request.clone();
+        // Explicit public-site contract overrides these origin UA/Accept
+        // dimensions only. Language, privacy, cookies and all other Vary
+        // fields remain unchanged.
+        for name in [
+            "User-Agent",
+            "Accept",
+            "Sec-CH-UA",
+            "Sec-CH-UA-Full-Version",
+            "Sec-CH-UA-Full-Version-List",
+            "Sec-CH-UA-Mobile",
+            "Sec-CH-UA-Platform",
+        ] {
+            normalized.headers_mut().remove_all(name);
+        }
+        let mut p = self.driver.request_properties();
+        let caps = [
+            p.supports_avif_rewritten_urls(),
+            p.supports_webp_rewritten_urls(),
+            p.supports_webp_lossless_alpha(),
+            self.driver
+                .options()
+                .enabled(ps_config::filter::Filter::ConvertToWebpAnimated)
+                && p.supports_webp_animated(),
+            p.supports_image_inlining(),
+            p.supports_lazyload_images(),
+            p.supports_js_defer(false),
+            p.supports_js_defer(true),
+            p.supports_dns_prefetch(),
+            p.supports_dns_prefetch_using_rel_prefetch(),
+            p.supports_critical_css(),
+            p.supports_critical_css_beacon(),
+            p.supports_critical_images_beacon(),
+            p.forbid_webp_inlining(),
+            p.requests_save_data(),
+            p.has_via_header(),
+            p.is_bot(),
+            p.accepts_gzip(),
+            p.supports_webp_in_place(),
+        ];
+        // Header names/order are transport representation, not content.
+        // Preserve duplicate-field value order while canonicalizing names.
+        let raw = public_request_identity(&normalized, origin);
+        let mut lines = raw.split("\r\n");
+        let first = lines.next().unwrap_or_default();
+        let mut fields: Vec<(String, &str)> = lines
+            .filter_map(|line| line.split_once(':'))
+            .map(|(name, value)| (name.to_ascii_lowercase(), value))
+            .collect();
+        fields.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut canonical = format!("{first}\r\n");
+        for (name, value) in fields {
+            canonical.push_str(&name);
+            canonical.push(':');
+            canonical.push_str(value);
+            canonical.push_str("\r\n");
+        }
+        format!(
+            "public-browser-v1:{:?}:{:?}\n{}",
+            p.device_type(),
+            caps,
+            canonical
+        )
     }
 
     /// Bumps a counter, creating it when absent.
@@ -1028,6 +1101,90 @@ mod tests {
             .expect("eligible")
             .key;
         assert_eq!(unkeyed, unkeyed_after);
+    }
+
+    #[test]
+    fn public_browser_grouping_defaults_on_and_preserves_variants() {
+        let h = Harness::new();
+        let firefox = "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0";
+        let chrome = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+        let make = |ua: &str, accept: &str| {
+            let mut r = h.get_request();
+            r.headers_mut().add("User-Agent", ua);
+            r.headers_mut().replace("Accept", accept);
+            r
+        };
+        let f = make(firefox, "text/html,image/avif,image/webp");
+        let c = make(chrome, "text/html,image/webp,image/avif,*/*;q=0.8");
+        let identity = |r: &RequestHeaders| {
+            h.driver
+                .set_user_agent(&r.headers().lookup1("User-Agent").unwrap());
+            h.driver.set_request_headers(r.clone());
+            h.session().request_identity(r, Some(&h.ok_origin()))
+        };
+        assert!(h.options.borrow().html_cache_public_browser_grouping());
+        assert_eq!(identity(&f), identity(&c));
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCachePublicBrowserGrouping",
+                "off",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        assert_ne!(identity(&f), identity(&c));
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCachePublicBrowserGrouping",
+                "on",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        assert_eq!(identity(&f), identity(&c));
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheEarlyLookup",
+                "on",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        let mut origin = h.ok_origin();
+        origin.headers_mut().add("Vary", "User-Agent, Accept");
+        identity(&f);
+        let mut first = h.session();
+        assert!(first
+            .lookup(&origin, &f, &h.purge, None, START_MS)
+            .is_none());
+        first.write(b"<html>public browser group</html>");
+        first.finish(&f, START_MS);
+        identity(&c);
+        assert!(h
+            .session()
+            .lookup_early(&c, &h.purge, None, START_MS + 1)
+            .is_some());
+        assert!(h
+            .session()
+            .lookup(&origin, &c, &h.purge, None, START_MS + 1)
+            .is_some());
+
+        // Identical browser generations share even when raw UA/Accept differ.
+        let c2 = make(
+            &chrome.replace("131.0.0.0", "132.0.0.0"),
+            "text/html,image/webp,image/avif",
+        );
+        assert_eq!(identity(&c), identity(&c2));
+        let mut language = c.clone();
+        language.headers_mut().add("Accept-Language", "fr");
+        assert_ne!(identity(&c), identity(&language));
+        let mut no_avif = c.clone();
+        no_avif
+            .headers_mut()
+            .replace("Accept", "text/html,image/webp,image/avif;q=0");
+        assert_ne!(identity(&c), identity(&no_avif));
+        let mobile = make("Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36", "text/html,image/avif,image/webp");
+        assert_ne!(identity(&c), identity(&mobile));
     }
 
     #[test]
@@ -1531,6 +1688,15 @@ mod tests {
     #[test]
     fn identity_splits_user_agents_and_purges() {
         let harness = Harness::new();
+        harness
+            .options
+            .borrow_mut()
+            .set_option(
+                "HtmlCachePublicBrowserGrouping",
+                "off",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
         let request = harness.get_request();
         let origin = harness.ok_origin();
         let mut first = harness.session();

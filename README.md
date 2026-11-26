@@ -255,6 +255,37 @@ Configuration and limits: [Zstd](#zstd-output-compression),
 [early HTML HITs and analytics cookies](#serve-html-cache-hits-before-php),
 [shared caching](#shared-caching), and [AVIF](#avif-runtime-dependency).
 
+### Public-site browser cache grouping
+
+For a public site that serves equivalent HTML to browsers with the same rewrite
+capabilities, browser grouping is **on by default when HTML caching is used**:
+
+```nginx
+pagespeed HtmlCache on;
+pagespeed HtmlCacheEarlyLookup on;
+pagespeed HtmlCachePublicBrowserGrouping on;  # Default; optional to state explicitly
+```
+
+The setting defaults **on** and cannot be changed through a request query.
+Use `pagespeed HtmlCachePublicBrowserGrouping off;` to retain exact browser variants.
+It authorizes grouping raw `User-Agent`, `Accept`, and browser identity client
+hints, including origin `Vary: User-Agent, Accept`, by effective capabilities.
+Desktop, mobile, and tablet remain separate, as do incompatible AVIF/WebP,
+script, beacon, and image capabilities that can change output. Compatible
+Firefox/Chrome clients can reuse a public entry instead of warming one per
+browser version. Header-name casing and header order are canonicalized in this
+mode; language, privacy signals, other content headers and their `Vary` rules
+remain separate. Analytics allowlists and private/authorization bypass rules
+still apply. A Firefox privacy signal absent in Chrome can therefore still
+select a different entry.
+
+HTML caching with default grouping assumes your application does not serve browser-specific HTML
+within these capability groups or negotiate other document representations via
+`Accept`. Sites needing exact UA/Accept variation must explicitly turn grouping off. It does not
+remove intentional beacon sampling or stale-entry misses. Changed options use a
+separate cache namespace/signature, so existing entries need warming; no purge
+is needed solely to enable the setting.
+
 ### Deliberate differences from C++
 
 - **LRU on by default** (C++: off). Same knobs, safer out-of-box latency.
