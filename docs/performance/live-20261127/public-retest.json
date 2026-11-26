@@ -1,0 +1,714 @@
+{
+  "scope": "public",
+  "method": "HTTP/1.1 persistent TLS connection per page, 3 warmups +20 requests, identity encoding; headers timing includes header parsing",
+  "pages": {
+    "/": {
+      "median_total_ms": 73.18891449540388,
+      "p95_total_ms": 73.75427399529144,
+      "rows": [
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 343.4184009965975,
+          "total_ms": 413.2047849998344,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.78741800109856,
+          "total_ms": 73.19021699368022,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.99951300572138,
+          "total_ms": 72.30099500156939,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.80218400410376,
+          "total_ms": 73.27646399789955,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.26427800196689,
+          "total_ms": 72.87065000855364,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.64697100617923,
+          "total_ms": 72.79810799809638,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.78610600042157,
+          "total_ms": 73.1013649929082,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.49828899512067,
+          "total_ms": 72.72084700525738,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 73.43240099726245,
+          "total_ms": 73.78053000138607,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.75723399652634,
+          "total_ms": 72.92875798884779,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.10465701064095,
+          "total_ms": 72.25982101226691,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.30547499784734,
+          "total_ms": 73.53352800419088,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.80907500151079,
+          "total_ms": 72.43288900644984,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.35395499446895,
+          "total_ms": 73.72830499662086,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.58256399654783,
+          "total_ms": 72.81139299448114,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.29238099534996,
+          "total_ms": 73.71772499755025,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.82853400101885,
+          "total_ms": 73.0203159910161,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.17060899711214,
+          "total_ms": 73.36139200197067,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.4543079995783,
+          "total_ms": 72.68016299349256,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.41305299976375,
+          "total_ms": 73.53089300158899,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.02689599944279,
+          "total_ms": 73.68306300486438,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.13764899643138,
+          "total_ms": 73.75427399529144,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.67045500339009,
+          "total_ms": 73.65167399984784,
+          "bytes": 61292,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        }
+      ]
+    },
+    "/hello-world/": {
+      "median_total_ms": 72.41017100022873,
+      "p95_total_ms": 73.25841800775379,
+      "rows": [
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 519.6849210042274,
+          "total_ms": 588.9102290093433,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.26407100097276,
+          "total_ms": 72.98542399075814,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.80034100019839,
+          "total_ms": 72.17299500189256,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.46120999823324,
+          "total_ms": 71.68660299794283,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.14912799443118,
+          "total_ms": 71.8098689976614,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.58178099780343,
+          "total_ms": 72.20541501010302,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.15506900299806,
+          "total_ms": 71.50618299783673,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.4642249949975,
+          "total_ms": 72.05633100238629,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.72318999073468,
+          "total_ms": 71.94489699031692,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.15409200580325,
+          "total_ms": 72.4262709991308,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.78543500776868,
+          "total_ms": 73.46949299972039,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.4773429974448,
+          "total_ms": 72.70799599064048,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.68165799905546,
+          "total_ms": 72.90784300130326,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.24060899170581,
+          "total_ms": 72.46481999754906,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.99142200988717,
+          "total_ms": 72.39407100132667,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.42880499688908,
+          "total_ms": 72.68391299294308,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.81538100121543,
+          "total_ms": 72.08648799860384,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.57784499577247,
+          "total_ms": 72.18560999899637,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.69905100110918,
+          "total_ms": 72.94651500706095,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.65359800658189,
+          "total_ms": 72.89419899461791,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 73.06548400083557,
+          "total_ms": 73.25841800775379,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.8416790041374,
+          "total_ms": 72.09707700530998,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.34687599702738,
+          "total_ms": 72.58941099280491,
+          "bytes": 79637,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        }
+      ]
+    },
+    "/sample-page/": {
+      "median_total_ms": 71.49747500079684,
+      "p95_total_ms": 72.57688899699133,
+      "rows": [
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 350.72410700377077,
+          "total_ms": 420.6384010030888,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 70.64877200173214,
+          "total_ms": 71.96779100922868,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": true,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.19658699957654,
+          "total_ms": 72.38295300339814,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 70.06469198677223,
+          "total_ms": 70.65739898825996,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 70.99654099147301,
+          "total_ms": 72.57688899699133,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 72.7708439953858,
+          "total_ms": 72.94244899821933,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.21892800205387,
+          "total_ms": 71.41409600444604,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.48893299745396,
+          "total_ms": 71.7433899990283,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 70.45277299766894,
+          "total_ms": 70.66611399932299,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 70.65703900298104,
+          "total_ms": 72.30418900144286,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.68152900703717,
+          "total_ms": 71.95700399461202,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 70.77727701107506,
+          "total_ms": 70.98602000041865,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 70.39260299643502,
+          "total_ms": 70.57060999795794,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.90975500270724,
+          "total_ms": 72.05480099946726,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.60793099319562,
+          "total_ms": 71.80940099351574,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.46265599294566,
+          "total_ms": 71.79297099355608,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.79184099368285,
+          "total_ms": 72.02138198772445,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 70.98634399881121,
+          "total_ms": 71.24042000214104,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.2485830008518,
+          "total_ms": 71.41578999289777,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 70.85384101083037,
+          "total_ms": 70.9943890105933,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 70.6625089951558,
+          "total_ms": 70.97006299591158,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 71.3819280063035,
+          "total_ms": 71.57916000869591,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        },
+        {
+          "warmup": false,
+          "status": 200,
+          "cache": "HIT",
+          "ttfb_headers_ms": 70.8038090087939,
+          "total_ms": 70.96799000282772,
+          "bytes": 68828,
+          "server": "nginx/1.31.10+1eec8fb",
+          "detail": null
+        }
+      ]
+    }
+  }
+}
