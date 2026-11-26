@@ -259,8 +259,6 @@ impl HtmlCacheSession {
             || request.method() != ps_http::request::Method::Get
             || request.headers().iter().any(|(name, _)| {
                 [
-                    "Cookie",
-                    "Cookie2",
                     "Authorization",
                     "Range",
                     "If-Range",
@@ -278,6 +276,11 @@ impl HtmlCacheSession {
         {
             return None;
         }
+        // Match the ordinary lookup's configured cookie policy before
+        // omitting cookie values from the hint identity. A late HIT must
+        // not require origin work solely for approved analytics cookies.
+        let headers: Vec<(&str, &str)> = request.headers().iter().collect();
+        cookie_verdict(&self.driver.options(), &headers).ok()?;
         Some(format!(
             "early-html-v1:{}",
             html_codec::html_cache_key(&format!(
@@ -336,6 +339,9 @@ impl HtmlCacheSession {
             eligible.origin_expiry_ms,
             purge,
         )?;
+        if eligible.allowlisted_cookies > 0 {
+            self.count("html_cache_cookie_allowlisted", 1);
+        }
         self.count("html_cache_hits", 1);
         self.count("html_cache_bytes_served", entry.body.len() as i64);
         self.state = SessionState::Hit;
@@ -1001,6 +1007,101 @@ mod tests {
             .expect("eligible")
             .key;
         assert_eq!(unkeyed, unkeyed_after);
+    }
+
+    #[test]
+    fn early_lookup_uses_configured_cookie_policy() {
+        let h = Harness::new();
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheEarlyLookup",
+                "on",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        let request = h.get_request();
+        let origin = h.ok_origin();
+        let approved = cookie_request(&h, "_ga=first; _gid=second");
+        assert!(h
+            .session()
+            .lookup_early(&approved, &h.purge, None, START_MS)
+            .is_none());
+        // A render with approved cookies publishes the same public variant.
+        let mut render = h.session();
+        assert!(render
+            .lookup(&origin, &approved, &h.purge, None, START_MS)
+            .is_none());
+        render.write(b"<html>public</html>");
+        render.finish(&approved, START_MS);
+        for r in [
+            request.clone(),
+            approved,
+            cookie_request(&h, "_ga=different; _ga=another"),
+        ] {
+            assert_eq!(
+                h.session()
+                    .lookup_early(&r, &h.purge, None, START_MS + 1)
+                    .unwrap()
+                    .0
+                    .body,
+                b"<html>public</html>"
+            );
+        }
+        assert_eq!(h.counter("html_cache_cookie_allowlisted"), 3);
+        for value in [
+            "wordpress_logged_in_x=secret",
+            "_ga=x; session=secret",
+            "unknown=x",
+            "_ga",
+            "_GA=x",
+        ] {
+            let r = cookie_request(&h, value);
+            assert!(h.session().early_key(&r, None).is_none(), "{value}");
+            assert!(h
+                .session()
+                .lookup_early(&r, &h.purge, None, START_MS + 1)
+                .is_none());
+        }
+        let mut cookie2 = request.clone();
+        cookie2.headers_mut().add("Cookie2", "_ga=x");
+        assert!(h.session().early_key(&cookie2, None).is_none());
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheIgnoreCommonCookies",
+                "off",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        assert!(h
+            .session()
+            .early_key(&cookie_request(&h, "_ga=x"), None)
+            .is_none());
+        h.options
+            .borrow_mut()
+            .parse_and_set_1(
+                "HtmlCacheIgnoreCookie",
+                "tracker",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        assert!(h
+            .session()
+            .early_key(&cookie_request(&h, "tracker=x"), None)
+            .is_some());
+        h.options
+            .borrow_mut()
+            .parse_and_set_1(
+                "HtmlCacheBypassCookie",
+                "tracker",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        assert!(h
+            .session()
+            .early_key(&cookie_request(&h, "tracker=x"), None)
+            .is_none());
     }
 
     #[test]

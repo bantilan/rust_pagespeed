@@ -22,6 +22,7 @@ p.add_argument('--nginx', required=True)
 p.add_argument('--module', required=True)
 p.add_argument('--output', required=True)
 p.add_argument('--rum-only', action='store_true', help='Isolate RUM clock retention with add_instrumentation; core beacon sampling tested separately')
+p.add_argument('--analytics-early', choices=['baseline', 'fixed'], help='Verify analytics origin counter before/after allowlist parity fix')
 a = p.parse_args()
 root = Path(tempfile.mkdtemp(prefix='ps-early-html-'))
 (root / 'logs').mkdir()
@@ -143,14 +144,27 @@ try:
     if a.rum_only:
         assert cold['rum_browser_clock'] and all(x['rum_browser_clock'] for x in warm), warm
     assert counts.get('/', 0) == before, counts
-    for headers in [{'Cookie': 'wordpress_logged_in_x=secret'}, {'Authorization': 'Basic test'}, {'Cache-Control': 'no-cache'}, {'Range': 'bytes=0-10'}]:
+    analytics = []
+    if a.analytics_early:
+        before = counts.get('/', 0)
+        for i in range(20):
+            sample = get(headers={'Cookie': f'_ga=GA1.1.{i}; _gid=test'})
+            assert sample['marker'] == 'HIT', sample
+            assert sample['body_hash'] == cold['body_hash'], sample
+            if a.rum_only:
+                assert sample['rum_browser_clock'], sample
+            analytics.append(sample)
+        expected = 0 if a.analytics_early == 'fixed' else 20
+        assert counts.get('/', 0) == before + expected, (counts, before, expected)
+    for headers in [{'Cookie': '_ga=123; session=secret'}, {'Cookie': 'unknown=secret'}, {'Cookie': '_ga'}, {'Cookie2': '_ga=123'}, {'Cookie': 'wordpress_logged_in_x=secret'}, {'Authorization': 'Basic test'}, {'Cache-Control': 'no-cache'}, {'Range': 'bytes=0-10'}]:
         before = counts.get('/', 0)
         get(headers=headers)
         assert counts.get('/', 0) == before + 1, (headers, counts)
     private = [get('/private') for _ in range(2)]
-    assert counts['/private'] == 2, counts
+    private.extend(get('/private', headers={'Cookie': '_ga=123'}) for _ in range(2))
+    assert counts['/private'] == 4, counts
     assert all(x['marker'] == 'BYPASS' for x in private), private
-    result = {'synthetic_origin_delay_ms': 25, 'cold': cold, 'warm': warm,
+    result = {'analytics': analytics, 'analytics_median_ms': statistics.median(x['ms'] for x in analytics) if analytics else None, 'analytics_expected': a.analytics_early, 'synthetic_origin_delay_ms': 25, 'cold': cold, 'warm': warm,
               'warm_median_ms': statistics.median(x['ms'] for x in warm),
               'origin_counts': counts, 'warm_hits_skipped_origin': True,
               'cookie_auth_cachecontrol_range_bypass_verified': True,

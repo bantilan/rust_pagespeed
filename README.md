@@ -265,9 +265,12 @@ JavaScript remains in the cached HTML and runs on each browser navigation.
 The default is **off**. Enabling this trusts the cached origin policy until expiry:
 changes to application content, response headers, or access rules that are not
 represented in the cache identity require a purge or expiry. Use it only on
-public routes with suitable invalidation. The early path bypasses all requests
-with cookies (including analytics cookies), Authorization, conditional/range
-headers, or explicit Cache-Control/Pragma. Origin Set-Cookie/private/no-store
+public routes with suitable invalidation. The early path uses the same configured cookie allowlist as ordinary HTML caching:
+requests containing only approved analytics cookies can HIT before PHP runs.
+Private, login, session, unknown, malformed, or forced-bypass cookies still bypass,
+as do Authorization, conditional/range headers, or explicit Cache-Control/Pragma.
+`HtmlCacheIgnoreCommonCookies off` also disables the built-in analytics allowance
+for early lookup; custom ignore/bypass cookie rules remain respected. Origin Set-Cookie/private/no-store
 prohibitions still prevent publication. Dynamic applications that require PHP to
 run on every request should leave this option off. NGINX access phases still run
 before the early handler; the setting does not replace application authorization.
