@@ -24,6 +24,7 @@ p.add_argument('--output', required=True)
 p.add_argument('--rum-only', action='store_true', help='Isolate RUM clock retention with add_instrumentation; core beacon sampling tested separately')
 p.add_argument('--analytics-early', choices=['baseline', 'fixed'], help='Verify analytics origin counter before/after allowlist parity fix')
 p.add_argument('--sampled-image-free', action='store_true', help='Real Chrome image-free lazyload sampling through stable cache HITs')
+p.add_argument('--browser-groups', action='store_true', help='Replay Chrome/Firefox navigation header differences against one public entry')
 a = p.parse_args()
 root = Path(tempfile.mkdtemp(prefix='ps-early-html-'))
 (root / 'logs').mkdir()
@@ -198,6 +199,28 @@ try:
     navigation = get(headers={'Referer': 'http://localhost/sample-page/', 'Sec-Fetch-Site': 'same-origin', 'Priority': 'u=1'})
     assert navigation['marker'] == 'HIT' and navigation['body_hash'] == cold['body_hash'], navigation
     assert counts.get('/', 0) == before_navigation, counts
+    browser_groups = []
+    if a.browser_groups:
+        common = {'Accept-Language': 'en-US,en;q=0.9', 'Accept-Encoding': 'identity',
+            'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1', 'Referer': 'http://localhost/another-page/',
+            'Priority': 'u=0, i'}
+        chrome = {**common, 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Cache-Control': 'max-age=0', 'Sec-CH-UA': '"Chromium";v="158", "Not.A/Brand";v="24", "Google Chrome";v="158"',
+            'Sec-CH-UA-Mobile': '?0', 'Sec-CH-UA-Platform': '"Linux"'}
+        firefox = {**common, 'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Sec-GPC': '1', 'Connection': 'keep-alive', 'TE': 'trailers'}
+        prime = get('/browser-groups', chrome)
+        assert prime['marker'] == 'MISS', prime
+        before = counts['/browser-groups']
+        for headers in [firefox, chrome] * 5:
+            hit = get('/browser-groups', headers)
+            assert hit['marker'] == 'HIT' and hit['body_hash'] == prime['body_hash'], hit
+            browser_groups.append(hit)
+        assert counts['/browser-groups'] == before, counts
     analytics = []
     if a.analytics_early:
         before = counts.get('/', 0)
@@ -218,7 +241,7 @@ try:
     private.extend(get('/private', headers={'Cookie': '_ga=123'}) for _ in range(2))
     assert counts['/private'] == 4, counts
     assert all(x['marker'] == 'BYPASS' for x in private), private
-    result = {'navigation_hit_skipped_origin': True, 'navigation': navigation, 'analytics': analytics, 'analytics_median_ms': statistics.median(x['ms'] for x in analytics) if analytics else None, 'analytics_expected': a.analytics_early, 'synthetic_origin_delay_ms': 25, 'cold': cold, 'warm': warm,
+    result = {'cross_browser_hits': browser_groups, 'navigation_hit_skipped_origin': True, 'navigation': navigation, 'analytics': analytics, 'analytics_median_ms': statistics.median(x['ms'] for x in analytics) if analytics else None, 'analytics_expected': a.analytics_early, 'synthetic_origin_delay_ms': 25, 'cold': cold, 'warm': warm,
               'warm_median_ms': statistics.median(x['ms'] for x in warm),
               'origin_counts': counts, 'warm_hits_skipped_origin': True,
               'cookie_auth_cachecontrol_range_bypass_verified': True,

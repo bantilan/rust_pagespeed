@@ -257,7 +257,7 @@ impl HtmlCacheSession {
         if !self.driver.options().html_cache_early_lookup()
             || !self.driver.options().html_cache()
             || request.method() != ps_http::request::Method::Get
-            || request.headers().iter().any(|(name, _)| {
+            || request.headers().iter().any(|(name, value)| {
                 [
                     "Authorization",
                     "Range",
@@ -266,12 +266,14 @@ impl HtmlCacheSession {
                     "If-Modified-Since",
                     "If-Match",
                     "If-Unmodified-Since",
-                    "Cache-Control",
                     "Pragma",
                     "Vary",
                 ]
                 .iter()
                 .any(|n| name.eq_ignore_ascii_case(n))
+                    || (name.eq_ignore_ascii_case("Cache-Control")
+                        && !(self.driver.options().html_cache_public_browser_grouping()
+                            && public_refresh_directive(value)))
             })
         {
             return None;
@@ -717,8 +719,8 @@ impl HtmlCacheSession {
         }
         let mut normalized = request.clone();
         // Explicit public-site contract overrides these origin UA/Accept
-        // dimensions only. Language, privacy, cookies and all other Vary
-        // fields remain unchanged.
+        // dimensions only. Other explicit Vary fields remain unchanged;
+        // public transport/refresh/privacy normalization below honors them.
         for name in [
             "User-Agent",
             "Accept",
@@ -730,14 +732,37 @@ impl HtmlCacheSession {
         ] {
             normalized.headers_mut().remove_all(name);
         }
+        // These do not select public content unless the origin declares
+        // Vary. Only normalize the cache-key copy: privacy signals and
+        // transport/request directives are still forwarded to the origin.
+        for name in ["Connection", "Keep-Alive", "TE", "Sec-GPC", "DNT"] {
+            if !origin_varies_on(origin, name) {
+                normalized.headers_mut().remove_all(name);
+            }
+        }
+        if !origin_varies_on(origin, "Cache-Control")
+            && normalized
+                .headers()
+                .lookup("Cache-Control")
+                .is_some_and(|values| values.iter().all(|value| public_refresh_directive(value)))
+        {
+            normalized.headers_mut().remove_all("Cache-Control");
+        }
         let mut p = self.driver.request_properties();
+        // In-place resource negotiation is not an HTML output capability.
+        // Rewritten-image support above includes UA inference and q=0 vetoes.
         let caps = [
             p.supports_avif_rewritten_urls(),
             p.supports_webp_rewritten_urls(),
             p.supports_webp_lossless_alpha(),
-            self.driver
+            (self
+                .driver
                 .options()
                 .enabled(ps_config::filter::Filter::ConvertToWebpAnimated)
+                || self
+                    .driver
+                    .options()
+                    .enabled(ps_config::filter::Filter::RecompressWebp))
                 && p.supports_webp_animated(),
             p.supports_image_inlining(),
             p.supports_lazyload_images(),
@@ -753,7 +778,6 @@ impl HtmlCacheSession {
             p.has_via_header(),
             p.is_bot(),
             p.accepts_gzip(),
-            p.supports_webp_in_place(),
         ];
         // Header names/order are transport representation, not content.
         // Preserve duplicate-field value order while canonicalizing names.
@@ -773,7 +797,7 @@ impl HtmlCacheSession {
             canonical.push_str("\r\n");
         }
         format!(
-            "public-browser-v1:{:?}:{:?}\n{}",
+            "public-browser-v2:{:?}:{:?}\n{}",
             p.device_type(),
             caps,
             canonical
@@ -786,20 +810,34 @@ impl HtmlCacheSession {
     }
 }
 
+/// Public cache mode treats a plain browser refresh as public navigation.
+/// Any additional directive (especially no-cache/no-store) keeps origin work.
+fn public_refresh_directive(value: &str) -> bool {
+    value.split(',').all(|directive| {
+        directive.split_once('=').is_some_and(|(name, value)| {
+            name.trim().eq_ignore_ascii_case("max-age") && value.trim() == "0"
+        })
+    })
+}
+
+fn origin_varies_on(origin: Option<&ResponseHeaders>, name: &str) -> bool {
+    origin.is_some_and(|origin| {
+        origin.headers().lookup("Vary").is_some_and(|values| {
+            values.iter().any(|value| {
+                value
+                    .split(',')
+                    .any(|field| field.trim().eq_ignore_ascii_case(name))
+            })
+        })
+    })
+}
+
 /// Navigation provenance and scheduling do not define public content unless
 /// the origin explicitly declares otherwise. All other variant inputs remain.
 fn public_request_identity(request: &RequestHeaders, origin: Option<&ResponseHeaders>) -> String {
     let mut normalized = request.clone();
     for name in ["Referer", "Sec-Fetch-Site", "Priority"] {
-        let varies = origin.is_some_and(|origin| {
-            origin.headers().lookup("Vary").is_some_and(|values| {
-                values.iter().any(|value| {
-                    value
-                        .split(',')
-                        .any(|field| field.trim().eq_ignore_ascii_case(name))
-                })
-            })
-        });
+        let varies = origin_varies_on(origin, name);
         if !varies {
             normalized.headers_mut().remove_all(name);
         }
@@ -1106,16 +1144,24 @@ mod tests {
     #[test]
     fn public_browser_grouping_defaults_on_and_preserves_variants() {
         let h = Harness::new();
-        let firefox = "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0";
-        let chrome = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+        let firefox = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0";
+        let chrome = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36";
         let make = |ua: &str, accept: &str| {
             let mut r = h.get_request();
             r.headers_mut().add("User-Agent", ua);
             r.headers_mut().replace("Accept", accept);
             r
         };
-        let f = make(firefox, "text/html,image/avif,image/webp");
-        let c = make(chrome, "text/html,image/webp,image/avif,*/*;q=0.8");
+        let mut f = make(
+            firefox,
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        );
+        f.headers_mut().add("Sec-GPC", "1");
+        f.headers_mut().add("Connection", "keep-alive");
+        f.headers_mut().add("TE", "trailers");
+        let mut c = make(chrome, "text/html,image/webp,image/avif,*/*;q=0.8");
+        c.headers_mut().add("Cache-Control", "max-age=0");
+        c.headers_mut().add("Sec-CH-UA", "Chromium");
         let identity = |r: &RequestHeaders| {
             h.driver
                 .set_user_agent(&r.headers().lookup1("User-Agent").unwrap());
@@ -1171,7 +1217,7 @@ mod tests {
 
         // Identical browser generations share even when raw UA/Accept differ.
         let c2 = make(
-            &chrome.replace("131.0.0.0", "132.0.0.0"),
+            &chrome.replace("158.0.0.0", "159.0.0.0"),
             "text/html,image/webp,image/avif",
         );
         assert_eq!(identity(&c), identity(&c2));
@@ -1183,8 +1229,117 @@ mod tests {
             .headers_mut()
             .replace("Accept", "text/html,image/webp,image/avif;q=0");
         assert_ne!(identity(&c), identity(&no_avif));
-        let mobile = make("Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36", "text/html,image/avif,image/webp");
+        let mobile = make("Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 Chrome/158.0.0.0 Mobile Safari/537.36", "text/html,image/avif,image/webp");
         assert_ne!(identity(&c), identity(&mobile));
+    }
+
+    #[test]
+    fn public_browser_headers_share_unless_origin_varies() {
+        for (name, value) in [
+            ("Sec-GPC", "1"),
+            ("DNT", "1"),
+            ("Connection", "keep-alive"),
+            ("Keep-Alive", "timeout=5"),
+            ("TE", "trailers"),
+            ("Cache-Control", "max-age=0"),
+        ] {
+            for varies in [false, true] {
+                let h = Harness::new();
+                h.options
+                    .borrow_mut()
+                    .set_option(
+                        "HtmlCacheEarlyLookup",
+                        "on",
+                        ps_config::scope::Scope::Server,
+                    )
+                    .unwrap();
+                let base = h.get_request();
+                let mut other = base.clone();
+                other.headers_mut().add(name, value);
+                let mut origin = h.ok_origin();
+                if varies {
+                    origin.headers_mut().add("Vary", name);
+                }
+                let mut first = h.session();
+                assert!(first
+                    .lookup(&origin, &base, &h.purge, None, START_MS)
+                    .is_none());
+                first.write(b"<html>public</html>");
+                first.finish(&base, START_MS);
+                assert_eq!(
+                    h.session()
+                        .lookup_early(&other, &h.purge, None, START_MS + 1)
+                        .is_some(),
+                    !varies,
+                    "early {name} Vary={varies}"
+                );
+                assert_eq!(
+                    h.session()
+                        .lookup(&origin, &other, &h.purge, None, START_MS + 1)
+                        .is_some(),
+                    !varies,
+                    "normal {name} Vary={varies}"
+                );
+                assert_eq!(
+                    other.headers().lookup1(name).as_deref(),
+                    Some(value),
+                    "original headers preserved"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn public_refresh_keeps_revalidation_controls_and_exact_mode() {
+        let h = Harness::new();
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheEarlyLookup",
+                "on",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        let base = h.get_request();
+        for value in ["max-age=0", "MAX-AGE = 0", "max-age=0, max-age=0"] {
+            let mut refresh = base.clone();
+            refresh.headers_mut().add("Cache-Control", value);
+            assert_eq!(
+                h.session().early_key(&base, None),
+                h.session().early_key(&refresh, None)
+            );
+        }
+        for value in [
+            "no-cache",
+            "no-store",
+            "max-age=0, no-cache",
+            "max-age=0, no-store",
+            "max-age=1",
+            "",
+            "max-age=0,",
+        ] {
+            let mut refresh = base.clone();
+            refresh.headers_mut().add("Cache-Control", value);
+            assert!(h.session().early_key(&refresh, None).is_none(), "{value}");
+        }
+        let mut refresh = base.clone();
+        refresh.headers_mut().add("Pragma", "no-cache");
+        assert!(h.session().early_key(&refresh, None).is_none());
+        refresh.headers_mut().remove_all("Pragma");
+        refresh.headers_mut().add("Cache-Control", "max-age=0");
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCachePublicBrowserGrouping",
+                "off",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        assert!(h.session().early_key(&refresh, None).is_none());
+        assert_ne!(
+            h.session().request_identity(&base, None),
+            h.session().request_identity(&refresh, None)
+        );
     }
 
     #[test]

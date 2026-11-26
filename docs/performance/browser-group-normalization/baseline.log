@@ -1,0 +1,24 @@
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.56s
+     Running unittests src/lib.rs (target/debug/build/ps-html/3190878eb5345cc4/out/ps_html-3190878eb5345cc4)
+
+running 1 test
+test html_cache::tests::public_browser_grouping_defaults_on_and_preserves_variants ... FAILED
+
+failures:
+
+---- html_cache::tests::public_browser_grouping_defaults_on_and_preserves_variants stdout ----
+
+thread 'html_cache::tests::public_browser_grouping_defaults_on_and_preserves_variants' (1171618) panicked at crates/ps-html/src/html_cache.rs:1131:9:
+assertion `left == right` failed
+  left: "public-browser-v1:Desktop:[true, true, true, false, true, true, true, true, true, false, true, true, true, false, false, false, false, false, true]\nGET  HTTP/1.1\r\nconnection: keep-alive\r\nhost: cache.test\r\nsec-gpc: 1\r\nte: trailers\r\n"
+ right: "public-browser-v1:Desktop:[true, true, true, false, true, true, true, true, true, false, true, true, true, false, false, false, false, false, true]\nGET  HTTP/1.1\r\ncache-control: max-age=0\r\nhost: cache.test\r\n"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    html_cache::tests::public_browser_grouping_defaults_on_and_preserves_variants
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 206 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p ps-html --lib`

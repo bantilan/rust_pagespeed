@@ -274,14 +274,19 @@ Desktop, mobile, and tablet remain separate, as do incompatible AVIF/WebP,
 script, beacon, and image capabilities that can change output. Compatible
 Firefox/Chrome clients can reuse a public entry instead of warming one per
 browser version. Header-name casing and header order are canonicalized in this
-mode; language, privacy signals, other content headers and their `Vary` rules
-remain separate. Analytics allowlists and private/authorization bypass rules
-still apply. A Firefox privacy signal absent in Chrome can therefore still
-select a different entry.
+mode. Transport headers (`Connection`, `Keep-Alive`, `TE`), GPC/DNT signals,
+and a standalone request `Cache-Control: max-age=0` do not split public groups
+unless the origin explicitly names that header in `Vary`. Original request
+headers, including privacy signals, are still forwarded to the origin. Language,
+other content headers and their `Vary` rules remain separate. Analytics allowlists
+and private/authorization bypass rules still apply. Explicit `no-cache`, `no-store`,
+and `Pragma` controls still take the origin path before any cache reuse.
 
 HTML caching with default grouping assumes your application does not serve browser-specific HTML
 within these capability groups or negotiate other document representations via
-`Accept`. Sites needing exact UA/Accept variation must explicitly turn grouping off. It does not
+`Accept`. Applications that change HTML for GPC/DNT must declare the corresponding
+`Vary` header or turn grouping off. Sites needing exact UA/Accept variation must
+explicitly turn grouping off. It does not
 remove intentional beacon sampling or stale-entry misses. Changed options use a
 separate cache namespace/signature, so existing entries need warming; no purge
 is needed solely to enable the setting.

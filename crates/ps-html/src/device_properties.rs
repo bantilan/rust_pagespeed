@@ -166,7 +166,8 @@ impl DeviceProperties {
     /// Whether lossless-alpha webp is supported.
     #[must_use]
     pub fn supports_webp_lossless_alpha(&self) -> bool {
-        self.accepts_webp && self.matcher.supports_webp_lossless_alpha(&self.user_agent)
+        self.supports_webp_rewritten_urls()
+            && self.matcher.supports_webp_lossless_alpha(&self.user_agent)
     }
 
     /// Whether animated webp is supported.
@@ -297,4 +298,36 @@ fn parse_quality_parameter(parameter: &str, quality: &mut f64) -> bool {
         *quality = parsed;
     }
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn firefox_navigation_infers_alpha_but_respects_explicit_rejection() {
+        let mut device = DeviceProperties::new();
+        device.set_user_agent(
+            "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0",
+        );
+        let mut headers = RequestHeaders::new();
+        headers
+            .headers_mut()
+            .add("Accept", "text/html,application/xhtml+xml,*/*;q=0.8");
+        device.parse_request_headers(&headers);
+        assert!(device.supports_webp_rewritten_urls());
+        assert!(device.supports_webp_lossless_alpha());
+        // In-place resource negotiation still requires its own explicit Accept.
+        assert!(!device.supports_webp_in_place());
+        headers
+            .headers_mut()
+            .replace("Accept", "text/html,image/webp;q=0");
+        device.parse_request_headers(&headers);
+        assert!(!device.supports_webp_rewritten_urls());
+        assert!(!device.supports_webp_lossless_alpha());
+        device.set_user_agent("Mozilla/5.0 Firefox/60.0");
+        headers.headers_mut().replace("Accept", "text/html,*/*");
+        device.parse_request_headers(&headers);
+        assert!(!device.supports_webp_lossless_alpha());
+    }
 }
