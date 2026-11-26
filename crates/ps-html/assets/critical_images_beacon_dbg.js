@@ -4231,6 +4231,14 @@ goog.dom.DomHelper.prototype.getAncestorByClass = goog.dom.getAncestorByClass;
 goog.dom.DomHelper.prototype.getAncestor = goog.dom.getAncestor;
 goog.dom.DomHelper.prototype.getCanvasContext2D = goog.dom.getCanvasContext2D;
 var pagespeedutils = {MAX_POST_SIZE:131072, sendBeacon:function(a, b, c) {
+  // Queue the nonce-bound report across navigation; retain legacy fallback
+  // when the browser cannot admit a beacon (for example a full queue).
+  var target = a + (-1 == a.indexOf("?") ? "?" : "&") + "url=" + encodeURIComponent(b);
+  try {
+    if (navigator.sendBeacon && navigator.sendBeacon(target, new Blob([c], {type:"application/x-www-form-urlencoded"}))) {
+      return !0;
+    }
+  } catch (ignored) {}
   if (window.XMLHttpRequest) {
     var d = new XMLHttpRequest;
   } else {
@@ -4324,6 +4332,7 @@ pagespeed.CriticalImages.Beacon_.prototype.setupLcpObserver_ = function() {
         for (var c = 0; c < b.length; ++c) {
           a.trackLcpEntry_(b[c]);
         }
+        a.imageFreeLoaded_ && a.checkCriticalImages_();
       }), a.lcpObserver_.observe({type:"largest-contentful-paint", buffered:!0}), pagespeedutils.addHandler(document, "visibilitychange", function() {
         "hidden" == document.visibilityState && b();
       }), pagespeedutils.addHandler(window, "pagehide", b);
@@ -4387,7 +4396,10 @@ goog.exportSymbol("pagespeed.CriticalImages.getBeaconData", pagespeed.CriticalIm
 pagespeed.CriticalImages.Run = function(a, b, c, d, e, f) {
   var g = new pagespeed.CriticalImages.Beacon_(a, b, c, e, f);
   pagespeed.CriticalImages.beaconObj_ = g;
-  d && pagespeedutils.addHandler(window, "load", function() {
+  // With no images there is no lazyload callback to trigger collection.
+  // Keep observing until usable LCP evidence exists or the page is hidden.
+  (d || !document.getElementsByTagName("IMG").length) && pagespeedutils.addHandler(window, "load", function() {
+    g.imageFreeLoaded_ = !document.getElementsByTagName("IMG").length;
     window.setTimeout(function() {
       g.checkCriticalImages_();
     }, 0);

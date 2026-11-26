@@ -189,9 +189,11 @@ Commands run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Next Session Resume Point
 
-**Current milestone (2026-11-26):** public browser grouping implemented; user requested default ON whenever HTML caching is used. `HtmlCachePublicBrowserGrouping off` restores exact UA/Accept variants. Configuration is signature-bearing and cannot be changed via query. Compatible Firefox/Chrome reuse early and normal entries; device and incompatible rewrite capabilities remain separate. README documents public-site content contract and remaining privacy/language variants.
+**Previous milestone (2026-11-26):** public browser grouping implemented; user requested default ON whenever HTML caching is used. `HtmlCachePublicBrowserGrouping off` restores exact UA/Accept variants. Configuration is signature-bearing and cannot be changed via query. Compatible Firefox/Chrome reuse early and normal entries; device and incompatible rewrite capabilities remain separate. README documents public-site content contract and remaining privacy/language variants.
 
-**Next action:** review `docs/performance/public-browser-grouping/RESULTS.md` and test logs, then install the locally built module using the deployment's matching NGINX version and verify consecutive Firefox/Chrome requests with equivalent privacy/language headers. No live installation or live latency claim in this milestone. Earlier image-free static-alias sampling fixture limitation remains unresolved; see `docs/performance/image-free-beacon/RESULTS.md`.
+**Current task:** repair recurring image-free lazyload beacon sampling. Both collector assets now use navigation-safe sendBeacon with URL-encoded Blob and false/throw XHR fallback. Image-free pages collect on load and late LCP callback without waiting for lazy-image callbacks. Known LCP and nonce/replay policy preserved. Browser regression baseline fails missing report/native transport; repaired cases pass. Real Chrome + FastCGI/NGINX accepts four samples and independent HTML probe remains HIT across five-second boundary without origin calls. Full details/limits in docs/performance/beacon-cache-settling/RESULTS.md (being finalized).
+
+**Exact next action:** verification and release build complete; install matching module and retest actual /sample-page/ browser navigation. No live deployment performed. Preserve periodic sampling; do not promise every legitimate request is HIT. Chrome dump-DOM omits status comments in this fixture; cache HIT assertions use HTTP probe with shared page/device evidence and origin counter, not browser DOM status.
 
 **Deployment:** local only, no push. Preserve existing RUM, image/CSS/JS optimization, cookie/authorization bypass, and cache validity. Default change alters option signatures, so entries warm in a new namespace.
 
@@ -892,3 +894,9 @@ Validation commands/results and deployment limits are in `docs/performance/publi
 ## Live bypass follow-up — 2026-11-26
 
 Read-only check of WebInspector HAR and deployment8e4df99. HAR singlehomepage/noresponsebody cannotattribute reportedBYPASS. Exactcompressedheader replay fiveHITs; identityencoding MISS→HIT→HIT. Criticalbeacon499s inserverlogs are a lead requiring investigation, notprovenrootcause. No fix/deploy. See docs/performance/browser-bypass-20261126/RESULTS.md. Next capturebrowserresponsebodies+criticalPOSTcompletion or addexplicitstoreskipdiagnostics.
+
+## Beacon cache settling repair — 2026-11-26 VERIFIED LOCALLY
+
+Six new HARs target /sample-page/, not homepage; response bodies absent but repeated font 204s and prior critical 499s. Identified image-free lazyload collector waits for pagehide (Run send_at_onload=false) and sends cancellable XHR. Plan: preserve LCP observer and nonce policy; use navigation-safe sendBeacon with fallback, trigger image-free sampling on load/observer evidence without depending on lazy-image callbacks. Browser asset regression baseline first, then both debug/optimized assets, actual NGINX nonce acceptance and HTML cache tests/build. Do not shorten LCP observation with arbitrary timeout or disable beacon gates. Completed: baseline reproduced, repair implemented, browser/library/NGINX/build/receiver/cache regression checks passed; logs persisted. Live install/retest remains pending.
+
+Completed repair tasks: baseline Chrome asset regression persisted; both assets fixed; ten lifecycle transport cases and legacy collector test pass;207HTML+6criticalfilter+4cookie tests,294NGINXtests,matched1.31.10releasebuild pass. Real browser sampling→evidence→four stable HTTPHITs including five-secondboundary passes. RUM/analytics/privacycounteroracle passes. Reload acceptance/replay oracle passed. See final RESULTS.md and adjacent logs.

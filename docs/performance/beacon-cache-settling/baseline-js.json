@@ -1,0 +1,58 @@
+[
+  {
+    "asset": "critical_images_beacon_opt.js",
+    "mode": "lazy-empty",
+    "reports": [],
+    "passed": false
+  },
+  {
+    "asset": "critical_images_beacon_opt.js",
+    "mode": "hidden-native",
+    "reports": [
+      {
+        "transport": "xhr",
+        "body": "oh=options&n=testnonce&lcpk=unknown"
+      }
+    ],
+    "passed": false
+  },
+  {
+    "asset": "critical_images_beacon_opt.js",
+    "mode": "hidden-fallback",
+    "reports": [
+      {
+        "transport": "xhr",
+        "body": "oh=options&n=testnonce&lcpk=unknown"
+      }
+    ],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_dbg.js",
+    "mode": "lazy-empty",
+    "reports": [],
+    "passed": false
+  },
+  {
+    "asset": "critical_images_beacon_dbg.js",
+    "mode": "hidden-native",
+    "reports": [
+      {
+        "transport": "xhr",
+        "body": "oh=options&n=testnonce&lcpk=unknown"
+      }
+    ],
+    "passed": false
+  },
+  {
+    "asset": "critical_images_beacon_dbg.js",
+    "mode": "hidden-fallback",
+    "reports": [
+      {
+        "transport": "xhr",
+        "body": "oh=options&n=testnonce&lcpk=unknown"
+      }
+    ],
+    "passed": true
+  }
+]

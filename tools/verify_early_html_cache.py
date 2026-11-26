@@ -23,6 +23,7 @@ p.add_argument('--module', required=True)
 p.add_argument('--output', required=True)
 p.add_argument('--rum-only', action='store_true', help='Isolate RUM clock retention with add_instrumentation; core beacon sampling tested separately')
 p.add_argument('--analytics-early', choices=['baseline', 'fixed'], help='Verify analytics origin counter before/after allowlist parity fix')
+p.add_argument('--sampled-image-free', action='store_true', help='Real Chrome image-free lazyload sampling through stable cache HITs')
 a = p.parse_args()
 root = Path(tempfile.mkdtemp(prefix='ps-early-html-'))
 (root / 'logs').mkdir()
@@ -106,6 +107,8 @@ http {{
  }}
 }}
 '''
+if a.sampled_image_free:
+    conf = conf.replace('  pagespeed on;', '  pagespeed on;\n  pagespeed EnableFilters lazyload_images;')
 if a.rum_only:
     conf = conf.replace('  pagespeed on;', '  pagespeed on;\n  pagespeed RewriteLevel PassThrough;\n  pagespeed EnableFilters add_instrumentation;')
 (root / 'nginx.conf').write_text(conf)
@@ -135,6 +138,52 @@ try:
                 break
         except OSError:
             time.sleep(.05)
+    if a.sampled_image_free:
+        # Real browser + actual POST receiver, no forged sampling completion.
+        # The fourth issuance observes three accepted samples and selects low frequency.
+        import zlib
+        def sample_record():
+            records = []
+            for path in (root / 'cache').rglob('*'):
+                if not path.is_file() or '.pagespeed-lru' in path.parts:
+                    continue
+                try:
+                    blob = zlib.decompress(path.read_bytes(), -15)
+                except (OSError, zlib.error):
+                    continue
+                if blob.startswith(b'beacon-evidence/1\n'):
+                    records.append(blob.decode().splitlines())
+            assert len(records) <= 1, records
+            return records[0] if records else None
+        def chrome_visit():
+            run = subprocess.run(['google-chrome', '--headless', '--no-sandbox', '--disable-gpu',
+                '--no-proxy-server', '--virtual-time-budget=2000', '--dump-dom',
+                f'http://127.0.0.1:{port}/'], capture_output=True, text=True, timeout=25, check=True)
+            markers = re.findall(r'<!-- PageSpeed Cache: (HIT|MISS|BYPASS)', run.stdout)
+            return markers[-1] if markers else 'DOM_NO_MARKER'
+        visits = []
+        for count in range(1, 5):
+            visits.append(chrome_visit())
+            record = sample_record()
+            assert record and int(record[2]) >= count, (visits, record)
+            if count < 4:
+                time.sleep(5.1)
+        visits.append(chrome_visit())
+        # Fresh probe identity, same learned page/device evidence.
+        headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36'}
+        publication = get(headers=headers)
+        before = counts.get('/', 0)
+        stable = [get(headers=headers)['marker'] for _ in range(3)]
+        time.sleep(5.1)  # Cross the former high-frequency boundary.
+        stable.append(get(headers=headers)['marker'])
+        assert all(marker == 'HIT' for marker in stable), (visits, stable)
+        assert counts.get('/', 0) == before, counts
+        result = {'sampling_visits': visits, 'publication': publication, 'stable_visits': stable,
+                  'valid_beacons': int(sample_record()[2]), 'origin_counts': counts,
+                  'warm_hits_skipped_origin': True, 'prefix': str(root)}
+        Path(a.output).write_text(json.dumps(result, indent=2) + '\n')
+        print(json.dumps(result))
+        raise SystemExit(0)
     cold = get()
     assert cold['marker'] == 'MISS', cold
     before = counts.get('/', 0)
