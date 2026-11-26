@@ -102,7 +102,10 @@ fn caps_two_preloads_and_prunes() {
          @font-face { font-family: B; src: url(https://x.test/b.woff2); }\n\
          @font-face { font-family: C; src: url(https://x.test/c.woff2); }\n\
          body { font-family: A; } h1 { font-family: B; } p { font-family: C; }";
-    let html = format!("<html><head><style>{css}</style></head><body></body></html>");
+    // h1/p elements exist so all three usages verify; the cap then
+    // admits a+b and skips c.
+    let html =
+        format!("<html><head><style>{css}</style></head><body><h1>t</h1><p>x</p></body></html>");
     let out = render_filter(&driver, &html);
     assert_eq!(out.matches("rel=\"preload\"").count(), 2, "{out}");
     assert!(out.contains("https://x.test/a.woff2"), "{out}");
@@ -114,7 +117,8 @@ fn caps_two_preloads_and_prunes() {
         out.find("https://x.test/a.woff2").unwrap() < out.find("https://x.test/b.woff2").unwrap(),
         "{out}"
     );
-    assert_eq!(stat(&server, FONT_PRELOAD_SKIPPED), 0);
+    // Cap overflow counts as skipped.
+    assert_eq!(stat(&server, FONT_PRELOAD_SKIPPED), 1);
     // Icon-only and subset faces never emit.
     let css = "@font-face { font-family: Icons; src: url(https://x.test/i.woff2); \
          unicode-range: U+E000-F8FF; }\n\
@@ -388,6 +392,88 @@ fn decision_hit_stays_quiet_once_learned() {
     assert_eq!(stat(&server, FONT_PRELOAD_CACHE_HIT), 1);
     assert!(second.contains("rel=\"preload\""), "{second}");
     assert!(!second.contains("FontPreloads.Run"), "{second}");
+}
+
+/// Real `wp-fonts-local` block from rustpagespeed.com (Twenty
+/// Twenty-Five): variable Manrope + Fira Code, weight ranges.
+const TT5_FONTS_LOCAL: &str = "@font-face{font-family:Manrope;font-style:normal;font-weight:200 800;font-display:fallback;src:url(https://rustpagespeed.com/wp-content/themes/twentytwentyfive/assets/fonts/manrope/Manrope-VariableFont_wght.woff2) format('woff2')}@font-face{font-family:\"Fira Code\";font-style:normal;font-weight:300 700;font-display:fallback;src:url(https://rustpagespeed.com/wp-content/themes/twentytwentyfive/assets/fonts/fira-code/FiraCode-VariableFont_wght.woff2) format('woff2')}";
+
+/// Trimmed `global-styles-inline-css` from the same page: preset
+/// families, `var()`-wired body, per-family utility classes.
+const TT5_GLOBAL: &str = ":root{--wp--preset--font-family--manrope:Manrope , sans-serif;--wp--preset--font-family--fira-code:\"Fira Code\" , monospace;}body{font-family: var(--wp--preset--font-family--manrope);font-weight:300;}.has-manrope-font-family{font-family: var(--wp--preset--font-family--manrope) !important;}.has-fira-code-font-family{font-family: var(--wp--preset--font-family--fira-code) !important;}";
+
+const TT5_DOM: &str = "<header><nav><a>Home</a></nav><p class=\"site-title\">Rust PageSpeed</p></header><main><h1>Hello</h1><p>Body copy.</p></main>";
+
+#[test]
+fn twentytwentyfive_preloads_manrope_excludes_fira_code() {
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    let html = format!(
+        "<html><head><style class=\"wp-fonts-local\">{TT5_FONTS_LOCAL}</style>\
+         <style id=\"global-styles-inline-css\">{TT5_GLOBAL}</style></head>\
+         <body>{TT5_DOM}</body></html>"
+    );
+    let out = render_filter(&driver, &html);
+    assert_eq!(out.matches("rel=\"preload\"").count(), 1, "{out}");
+    assert!(out.contains("as=\"font\""), "{out}");
+    assert!(out.contains("Manrope-VariableFont_wght.woff2"), "{out}");
+    assert!(out.contains("type=\"font/woff2\""), "{out}");
+    assert!(out.contains("crossorigin=\"anonymous\""), "{out}");
+    // Fira Code stays declared-only: its utility class matches no
+    // element, so no second preload is emitted for it.
+    assert!(
+        !out.contains("as=\"font\" type=\"font/woff2\" href=\"https://rustpagespeed.com/wp-content/themes/twentytwentyfive/assets/fonts/fira-code"),
+        "{out}"
+    );
+}
+
+#[test]
+fn twentytwentyfive_code_block_lifts_fira_code() {
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    // A code block carries the Fira utility class: both families are
+    // used, so both preload (the cap).
+    let html = format!(
+        "<html><head><style class=\"wp-fonts-local\">{TT5_FONTS_LOCAL}</style>\
+         <style id=\"global-styles-inline-css\">{TT5_GLOBAL}</style></head>\
+         <body>{TT5_DOM}<pre class=\"has-fira-code-font-family\">code</pre></body></html>"
+    );
+    let out = render_filter(&driver, &html);
+    assert_eq!(out.matches("rel=\"preload\"").count(), 2, "{out}");
+    assert!(out.contains("Manrope-VariableFont_wght.woff2"), "{out}");
+    assert!(
+        out.contains("as=\"font\" type=\"font/woff2\" href=\"https://rustpagespeed.com/wp-content/themes/twentytwentyfive/assets/fonts/fira-code/FiraCode-VariableFont_wght.woff2\""),
+        "{out}"
+    );
+    assert_eq!(stat(&server, FONT_PRELOAD_PRELOADED), 2);
+}
+
+#[test]
+fn debug_comment_explains_selection_and_rejection() {
+    let (server, options) = fixture();
+    options
+        .borrow_mut()
+        .filters_mut()
+        .enable(ps_config::filter::Filter::Debug);
+    let driver = driver_for(&server, &options);
+    let html = format!(
+        "<html><head><style class=\"wp-fonts-local\">{TT5_FONTS_LOCAL}</style>\
+         <style id=\"global-styles-inline-css\">{TT5_GLOBAL}</style></head>\
+         <body>{TT5_DOM}</body></html>"
+    );
+    let out = render_filter(&driver, &html);
+    assert!(out.contains("<!--font-preloads:"), "{out}");
+    assert!(out.contains("manrope=selected(page-wide rule"), "{out}");
+    assert!(out.contains("overlaps face 200-800"), "{out}");
+    assert!(
+        out.contains("fira code=rejected(no matching usage)"),
+        "{out}"
+    );
+    // No Debug filter: no comment.
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    let out = render_filter(&driver, &html);
+    assert!(!out.contains("font-preloads:"), "{out}");
 }
 
 #[test]

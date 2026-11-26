@@ -20,15 +20,23 @@
 //! faces are never emitted. Decisions cache per page+options+inputs
 //! so warm renders skip re-parsing; beacon merges bump the HTML
 //! generation so learned changes refresh cached pages.
+//!
+//! Detection: `var()` refs resolve against custom properties merged
+//! from every sheet (order-independent); selectors verify against
+//! document tags/classes/ids so unused utility classes never
+//! preload; page-wide (`body`), structural (headings/nav/titles),
+//! and verified usages rank above unverifiable ones; variable
+//! weight ranges overlap-match. With `Debug`, a head comment
+//! explains every selected/skipped/rejected family.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::cacheable_resource::{MockLoadCallback, NotCacheablePolicy};
 use crate::css_tag_scanner::{is_alternate_stylesheet, is_stylesheet_or_alternate};
-use crate::element::NodeId;
+use crate::element::{LeafKind, NodeId};
 use crate::filter::HtmlFilter;
-use crate::font_discovery::{self, FontUsage};
+use crate::font_discovery::{self, RawFontUsage};
 use crate::font_store;
 use crate::js_escape::escape_to_js_string_literal;
 use crate::lexer::Lexer;
@@ -66,6 +74,16 @@ const MAX_IMPORT_DEPTH: u32 = 2;
 const MAX_ATTR_USAGES: usize = 128;
 /// Max bytes fetched per external sheet.
 const MAX_SHEET_BYTES: usize = 256 * 1024;
+/// Max document tags/classes/ids kept for selector verification.
+const MAX_DOM_TAGS: usize = 512;
+/// Max document classes kept for selector verification.
+const MAX_DOM_CLASSES: usize = 2048;
+/// Max document ids kept for selector verification.
+const MAX_DOM_IDS: usize = 2048;
+/// Max token bytes kept per tag/class/id.
+const MAX_DOM_TOKEN_BYTES: usize = 64;
+/// Max diagnostic comment bytes (Debug filter only).
+const MAX_DEBUG_COMMENT_BYTES: usize = 1536;
 
 /// What one external stylesheet load produced.
 enum SheetLoad {
@@ -96,9 +114,12 @@ pub struct PreloadCriticalFontsFilter {
     style_blocks: Vec<Vec<u8>>,
     style_bytes: usize,
     external_sheets: Vec<String>,
-    attr_usages: Vec<FontUsage>,
+    attr_usages: Vec<RawFontUsage>,
     author_preloads: HashSet<String>,
     link_headers_scanned: bool,
+    dom_tags: HashSet<String>,
+    dom_classes: HashSet<String>,
+    dom_ids: HashSet<String>,
 }
 
 impl PreloadCriticalFontsFilter {
@@ -116,6 +137,9 @@ impl PreloadCriticalFontsFilter {
             attr_usages: Vec::new(),
             author_preloads: HashSet::new(),
             link_headers_scanned: false,
+            dom_tags: HashSet::new(),
+            dom_classes: HashSet::new(),
+            dom_ids: HashSet::new(),
         }
     }
 
@@ -288,11 +312,13 @@ impl PreloadCriticalFontsFilter {
             SheetLoad::Ready(bytes) => {
                 let scanned = font_discovery::scan_stylesheet(&bytes);
                 let usages = font_discovery::scan_stylesheet_usages(&bytes);
+                let custom_props = font_discovery::collect_custom_properties(&bytes);
                 let cached = font_store::CachedCssFaces {
                     fetched_ms: now_ms,
                     faces: scanned.faces,
                     imports: scanned.imports,
                     usages,
+                    custom_props,
                 };
                 cache.put(&key, font_store::encode_css_faces(&cached).as_bytes());
                 SheetOutcome::Ready(cached)
@@ -367,6 +393,95 @@ impl PreloadCriticalFontsFilter {
         // for same-origin fonts (CORS-mode cache partitioning).
         dom.add_attribute(link, b"crossorigin", b"anonymous");
         dom.prepend_child(head, link);
+    }
+
+    /// Appends a diagnostic head comment (Debug filter only).
+    fn emit_debug_comment(&self, dom: &mut Dom, text: &str) {
+        let debug = self
+            .driver
+            .options()
+            .filters()
+            .enabled(ps_config::filter::Filter::Debug);
+        if !debug {
+            return;
+        }
+        let Some(head) = self.head_element else {
+            return;
+        };
+        if !dom.can_append_child(head) {
+            return;
+        }
+        let mut clean = text.replace("--", "- -");
+        clean.truncate(MAX_DEBUG_COMMENT_BYTES);
+        let mut escaped = Vec::new();
+        crate::keywords::escape(clean.as_bytes(), &mut escaped);
+        let node = dom.new_leaf(None, LeafKind::Comment, escaped);
+        dom.append_child(Some(head), node);
+    }
+
+    /// Explains every considered family (Debug filter only).
+    fn emit_debug_notes(&self, dom: &mut Dom, notes: &[font_discovery::FontNote]) {
+        if notes.is_empty() {
+            return;
+        }
+        let mut text = String::from("font-preloads:");
+        for note in notes {
+            let outcome = match note.outcome {
+                font_discovery::FontOutcome::Selected => "selected",
+                font_discovery::FontOutcome::Skipped => "skipped",
+                font_discovery::FontOutcome::Rejected => "rejected",
+            };
+            let piece = format!(" {}={outcome}({})", note.family, note.reason);
+            if text.len() + piece.len() > MAX_DEBUG_COMMENT_BYTES {
+                break;
+            }
+            text.push_str(&piece);
+        }
+        self.emit_debug_comment(dom, &text);
+    }
+
+    /// Records one element's tag/classes/id for selector
+    /// verification (bounded; tags lowercased, classes/ids exact).
+    fn note_dom_token(&mut self, dom: &mut Dom, id: NodeId) {
+        if self.dom_tags.len() < MAX_DOM_TAGS {
+            let tag = dom.element_name(id).to_ascii_lowercase();
+            if !tag.is_empty() && tag.len() <= MAX_DOM_TOKEN_BYTES {
+                if let Ok(tag) = String::from_utf8(tag) {
+                    self.dom_tags.insert(tag);
+                }
+            }
+        }
+        if self.dom_classes.len() < MAX_DOM_CLASSES {
+            if let Some(index) = dom.find_attribute(id, Keyword::Class) {
+                if let (Some(value), _) = dom.decoded_attribute(id, index) {
+                    for class in value.split(|byte| byte.is_ascii_whitespace()) {
+                        if class.is_empty() || class.len() > MAX_DOM_TOKEN_BYTES {
+                            continue;
+                        }
+                        if self.dom_classes.len() >= MAX_DOM_CLASSES {
+                            break;
+                        }
+                        if let Ok(class) = String::from_utf8(class.to_vec()) {
+                            self.dom_classes.insert(class);
+                        }
+                    }
+                }
+            }
+        }
+        if self.dom_ids.len() < MAX_DOM_IDS {
+            if let Some(index) = dom.find_attribute(id, Keyword::Id) {
+                if let (Some(value), _) = dom.decoded_attribute(id, index) {
+                    let clean = !value.is_empty()
+                        && value.len() <= MAX_DOM_TOKEN_BYTES
+                        && !value.iter().any(|byte| byte.is_ascii_whitespace());
+                    if clean {
+                        if let Ok(id) = String::from_utf8(value.to_vec()) {
+                            self.dom_ids.insert(id);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Scans Link response headers for author font preloads.
@@ -513,7 +628,9 @@ impl PreloadCriticalFontsFilter {
         let confirmed = self.load_confirmed();
         self.bump(FONT_PRELOAD_BEACON_CONFIRMED, confirmed.len() as i64);
         // Fingerprint over inline CSS plus external sheet URLs; the
-        // confirmed digest scopes reuse to learned state.
+        // confirmed digest scopes reuse to learned state. Selector
+        // verification also reads the document, so fold in a digest
+        // of the element sets (cheap sorted hash, no parsing).
         let mut fingerprinted = Vec::new();
         for block in &self.style_blocks {
             fingerprinted.extend_from_slice(block);
@@ -523,6 +640,18 @@ impl PreloadCriticalFontsFilter {
             fingerprinted.extend_from_slice(href.as_bytes());
             fingerprinted.push(b'\n');
         }
+        let mut dom_digest_input = Vec::new();
+        for set in [&self.dom_tags, &self.dom_classes, &self.dom_ids] {
+            let mut items: Vec<&str> = set.iter().map(String::as_str).collect();
+            items.sort_unstable();
+            dom_digest_input.extend_from_slice(&(items.len() as u64).to_be_bytes());
+            for item in items {
+                dom_digest_input.extend_from_slice(item.as_bytes());
+                dom_digest_input.push(0);
+            }
+        }
+        fingerprinted
+            .extend_from_slice(&font_store::fingerprint_bytes(&dom_digest_input).to_be_bytes());
         let css_fingerprint = font_store::fingerprint_bytes(&fingerprinted);
         let mut confirmed_digest_input = Vec::new();
         let mut confirmed_list: Vec<(&str, u32)> = confirmed
@@ -569,6 +698,13 @@ impl PreloadCriticalFontsFilter {
                         if decision.needs_beacon {
                             self.inject_beacon(dom, lexer, &page_url, &options_hash, &suffix);
                         }
+                        self.emit_debug_comment(
+                            dom,
+                            &format!(
+                                "font-preloads: cached decision replayed ({} preloads)",
+                                decision.preloads.len()
+                            ),
+                        );
                         return;
                     }
                 }
@@ -577,21 +713,19 @@ impl PreloadCriticalFontsFilter {
         self.bump(FONT_PRELOAD_CACHE_MISS, 1);
         let doc_base = self.driver.decoded_base_url();
         let mut faces = Vec::new();
-        // Element-ordered inline usages first, stylesheet order after.
-        let mut usages = self.attr_usages.clone();
-        let mut seen_usages: HashSet<(String, u32, u8)> = usages
-            .iter()
-            .map(|usage| (usage.family.clone(), usage.weight, usage.style as u8))
-            .collect();
+        // Phase one: raw usages plus custom properties from every
+        // sheet; props merge before anything resolves, so discovery
+        // never depends on declaration order.
+        let mut sheet_raw: Vec<RawFontUsage> = Vec::new();
+        let mut props: HashMap<String, Vec<u8>> = HashMap::new();
         // Inline blocks (author plus inlined external) resolve against
         // the document base; their imports seed the external queue.
         let mut queue: Vec<(String, u32)> = Vec::new();
         for block in &self.style_blocks {
             let scanned = font_discovery::scan_stylesheet(block);
-            for usage in font_discovery::scan_stylesheet_usages(block) {
-                if seen_usages.insert((usage.family.clone(), usage.weight, usage.style as u8)) {
-                    usages.push(usage);
-                }
+            sheet_raw.extend(font_discovery::scan_stylesheet_usages(block));
+            for (name, value) in font_discovery::collect_custom_properties(block) {
+                props.insert(name, value.into_bytes());
             }
             faces.extend(Self::resolve_faces(scanned.faces, &doc_base));
             for import in scanned.imports {
@@ -631,10 +765,9 @@ impl PreloadCriticalFontsFilter {
                 }
             };
             faces.extend(Self::resolve_faces(cached.faces, &css_url));
-            for usage in cached.usages {
-                if seen_usages.insert((usage.family.clone(), usage.weight, usage.style as u8)) {
-                    usages.push(usage);
-                }
+            sheet_raw.extend(cached.usages);
+            for (name, value) in cached.custom_props {
+                props.insert(name, value.into_bytes());
             }
             if depth < MAX_IMPORT_DEPTH {
                 for import in cached.imports {
@@ -645,24 +778,61 @@ impl PreloadCriticalFontsFilter {
                 }
             }
         }
+        // Phase two: resolve `var()` refs against the merged map
+        // and verify selectors; element-ordered inline usages first,
+        // stylesheet order after.
+        let dom_sets = font_discovery::DomSets {
+            tags: self.dom_tags.clone(),
+            classes: self.dom_classes.clone(),
+            ids: self.dom_ids.clone(),
+        };
+        let mut usages =
+            font_discovery::resolve_raw_usages(&self.attr_usages, &props, &dom_sets, true);
+        let mut seen_usages: HashSet<(String, u32, u32, u8, u8, String)> = usages
+            .iter()
+            .map(|usage| {
+                (
+                    usage.family.clone(),
+                    usage.weight,
+                    usage.weight_max,
+                    usage.style as u8,
+                    usage.confidence as u8,
+                    usage.selector.clone(),
+                )
+            })
+            .collect();
+        for usage in font_discovery::resolve_raw_usages(&sheet_raw, &props, &dom_sets, false) {
+            if seen_usages.insert((
+                usage.family.clone(),
+                usage.weight,
+                usage.weight_max,
+                usage.style as u8,
+                usage.confidence as u8,
+                usage.selector.clone(),
+            )) {
+                usages.push(usage);
+            }
+        }
         self.bump(FONT_PRELOAD_DISCOVERED, faces.len() as i64);
-        let preloads = font_discovery::select_preloads(&faces, &usages, &confirmed);
+        let (preloads, notes) = font_discovery::select_preloads_explained(
+            &faces,
+            &usages,
+            &confirmed,
+            &self.author_preloads,
+        );
         let mut emitted = 0i64;
-        let mut skipped = 0i64;
         // Reversed: each prepend lands ahead of the last.
         for preload in preloads.iter().rev() {
-            if self.author_preloads.contains(&preload.url) {
-                skipped += 1;
-                continue;
-            }
             self.emit_preload(dom, preload);
             emitted += 1;
         }
         self.bump(FONT_PRELOAD_PRELOADED, emitted);
-        // Skipped counts matched-but-unemitted faces (dedup here;
-        // pruning happens inside selection).
-        skipped += (preloads.len() as i64) - emitted;
-        self.bump(FONT_PRELOAD_SKIPPED, skipped.max(0));
+        let skipped = notes
+            .iter()
+            .filter(|note| note.outcome == font_discovery::FontOutcome::Skipped)
+            .count() as i64;
+        self.bump(FONT_PRELOAD_SKIPPED, skipped);
+        self.emit_debug_notes(dom, &notes);
         let needs_beacon = Self::learnable(&faces, &usages, &confirmed);
         if !sheets_pending {
             let revalidate_after_ms = if sheets_failed {
@@ -703,6 +873,9 @@ impl HtmlFilter for PreloadCriticalFontsFilter {
         self.attr_usages.clear();
         self.author_preloads.clear();
         self.link_headers_scanned = false;
+        self.dom_tags.clear();
+        self.dom_classes.clear();
+        self.dom_ids.clear();
     }
 
     fn start_element(&mut self, dom: &mut Dom, _lexer: &Lexer, id: NodeId) {
@@ -750,12 +923,13 @@ impl HtmlFilter for PreloadCriticalFontsFilter {
             }
             _ => {}
         }
+        self.note_dom_token(dom, id);
         // Inline `style=` font usage in element order (bounded).
         if self.attr_usages.len() < MAX_ATTR_USAGES {
             if let Some(index) = dom.find_attribute_by_name(id, b"style") {
                 if let (Some(value), _) = dom.decoded_attribute(id, index) {
                     self.attr_usages
-                        .extend(font_discovery::usages_from_declarations(&value));
+                        .extend(font_discovery::raw_usage_from_declarations(&value, ""));
                     self.attr_usages.truncate(MAX_ATTR_USAGES);
                 }
             }

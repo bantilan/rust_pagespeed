@@ -12,7 +12,7 @@
 
 use std::collections::HashSet;
 
-use crate::font_discovery::{FontFace, FontPreload, FontSource, FontStyle, FontUsage};
+use crate::font_discovery::{FontFace, FontPreload, FontSource, FontStyle, RawFontUsage};
 
 /// Decision blob version tag.
 const DECISION_CODEC: &str = "font-preloads/3";
@@ -322,16 +322,23 @@ pub struct CachedCssFaces {
     pub faces: Vec<FontFace>,
     /// Raw `@import` URLs for nested resolution.
     pub imports: Vec<String>,
-    /// Font usages in document order (deduplicated per sheet).
-    pub usages: Vec<FontUsage>,
+    /// Raw font usages in document order (deduplicated per sheet;
+    /// resolved per page once every sheet's props are merged).
+    pub usages: Vec<RawFontUsage>,
+    /// Custom property definitions for cross-block `var()` merging.
+    pub custom_props: Vec<(String, String)>,
 }
 
 /// Stylesheet faces blob version tag.
-const CSS_FACES_CODEC: &str = "font-css-faces/1";
+const CSS_FACES_CODEC: &str = "font-css-faces/2";
 /// Max faces per cached stylesheet.
 const MAX_CACHED_FACES: usize = 64;
 /// Max usages per cached stylesheet.
 const MAX_CACHED_USAGES: usize = 128;
+/// Max custom properties per cached stylesheet.
+const MAX_CACHED_PROPS: usize = 128;
+/// Max raw usage/property line bytes in a blob.
+const MAX_RAW_LINE_BYTES: usize = 1024;
 
 /// Encodes cached stylesheet faces.
 #[must_use]
@@ -378,16 +385,28 @@ pub fn encode_css_faces(cached: &CachedCssFaces) -> String {
     }
     out.push_str(&format!("{}\n", cached.usages.len().min(MAX_CACHED_USAGES)));
     for usage in cached.usages.iter().take(MAX_CACHED_USAGES) {
-        let style_byte = match usage.style {
-            FontStyle::Normal => "n",
-            FontStyle::Italic => "i",
-            FontStyle::Oblique => "o",
-        };
-        out.push_str(&usage.family.replace(['\n', '\r', '\t'], ""));
+        let parts = [
+            &usage.families,
+            &usage.weight,
+            &usage.style,
+            &usage.selector,
+        ];
+        for (index, part) in parts.iter().enumerate() {
+            if index > 0 {
+                out.push('\t');
+            }
+            out.push_str(&part.replace(['\n', '\r', '\t'], ""));
+        }
+        out.push('\n');
+    }
+    out.push_str(&format!(
+        "{}\n",
+        cached.custom_props.len().min(MAX_CACHED_PROPS)
+    ));
+    for (name, value) in cached.custom_props.iter().take(MAX_CACHED_PROPS) {
+        out.push_str(&name.replace(['\n', '\r', '\t'], ""));
         out.push('\t');
-        out.push_str(&usage.weight.to_string());
-        out.push('\t');
-        out.push_str(style_byte);
+        out.push_str(&value.replace(['\n', '\r', '\t'], ""));
         out.push('\n');
     }
     out
@@ -496,29 +515,40 @@ pub fn decode_css_faces(input: &str) -> Option<CachedCssFaces> {
     for _ in 0..nusages {
         let line = lines.next()?;
         let mut parts = line.split('\t');
-        let (Some(family), Some(weight), Some(style), None) =
-            (parts.next(), parts.next(), parts.next(), parts.next())
-        else {
+        let (Some(families), Some(weight), Some(style), Some(selector), None) = (
+            parts.next(),
+            parts.next(),
+            parts.next(),
+            parts.next(),
+            parts.next(),
+        ) else {
             return None;
         };
-        if family.is_empty() || family.len() > 256 {
+        if families.is_empty() || line.len() > MAX_RAW_LINE_BYTES * 4 {
             return None;
         }
-        let weight: u32 = match weight.parse() {
-            Ok(weight) if (1..=1000).contains(&weight) => weight,
-            _ => return None,
-        };
-        let style = match style {
-            "n" => FontStyle::Normal,
-            "i" => FontStyle::Italic,
-            "o" => FontStyle::Oblique,
-            _ => return None,
-        };
-        usages.push(FontUsage {
-            family: family.to_string(),
-            weight,
-            style,
+        usages.push(RawFontUsage {
+            families: families.to_string(),
+            weight: weight.to_string(),
+            style: style.to_string(),
+            selector: selector.to_string(),
         });
+    }
+    let nprops: usize = lines.next()?.parse().ok()?;
+    if nprops > MAX_CACHED_PROPS {
+        return None;
+    }
+    let mut custom_props = Vec::with_capacity(nprops);
+    for _ in 0..nprops {
+        let line = lines.next()?;
+        let mut parts = line.split('\t');
+        let (Some(name), Some(value), None) = (parts.next(), parts.next(), parts.next()) else {
+            return None;
+        };
+        if !name.starts_with("--") || name.len() > 128 || value.len() > MAX_RAW_LINE_BYTES {
+            return None;
+        }
+        custom_props.push((name.to_string(), value.to_string()));
     }
     if lines.next().is_some() {
         return None;
@@ -528,6 +558,7 @@ pub fn decode_css_faces(input: &str) -> Option<CachedCssFaces> {
         faces,
         imports,
         usages,
+        custom_props,
     })
 }
 
@@ -605,11 +636,16 @@ mod tests {
         CachedCssFaces {
             fetched_ms: 1_700_000_000_000,
             imports: vec!["https://x.test/nested.css".to_string()],
-            usages: vec![FontUsage {
-                family: "manrope".to_string(),
-                weight: 700,
-                style: FontStyle::Normal,
+            usages: vec![RawFontUsage {
+                families: "var(--preset-manrope)".to_string(),
+                weight: "700".to_string(),
+                style: String::new(),
+                selector: "h1".to_string(),
             }],
+            custom_props: vec![(
+                "--preset-manrope".to_string(),
+                "Manrope, sans-serif".to_string(),
+            )],
             faces: vec![
                 crate::font_discovery::FontFace {
                     family: "manrope".to_string(),
