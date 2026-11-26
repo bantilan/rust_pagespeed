@@ -612,8 +612,13 @@ impl PreloadCriticalFontsFilter {
             }
             _ => crate::filters::common::XhtmlStatus::IsNotXhtml,
         };
-        crate::filters::common::add_js_to_element(dom, lexer, script, &js, false, xhtml);
+        // Insert before adding the payload: the child's events queue
+        // relative to the script's end slot, which only exists once
+        // the element itself is in the document. Adding JS first
+        // strands it at the queue tail, after </html>, where it
+        // renders as visible page text.
         dom.append_child(Some(body), script);
+        crate::filters::common::add_js_to_element(dom, lexer, script, &js, false, xhtml);
     }
 
     /// Decides and emits: cached decision on input match, else full

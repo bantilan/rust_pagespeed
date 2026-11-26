@@ -324,6 +324,35 @@ fn beacon_js_injected_while_unconfirmed() {
 }
 
 #[test]
+fn beacon_js_wrapped_inside_script_element() {
+    let (server, options) = fixture();
+    let driver = driver_for(&server, &options);
+    let html = format!(
+        "<html><head><style>{MANROPE_CSS}</style></head>\
+         <body><p style=\"font-family: Manrope\">hi</p></body></html>"
+    );
+    let out = render_filter(&driver, &html);
+    // The beacon payload must sit inside its script element: raw JS
+    // after </html> renders as visible page text at the bottom.
+    let open = out
+        .find("<script data-pagespeed-no-defer")
+        .expect("beacon script tag");
+    let after_open = &out[open..];
+    let run = after_open
+        .find("pagespeed.FontPreloads.Run(")
+        .expect("beacon run call");
+    let close = after_open.find("</script>").expect("script close");
+    assert!(run < close, "{out}");
+    // The whole script closes before </body>; nothing beacon-shaped
+    // leaks past </html>.
+    let body_end = out.find("</body>").expect("body close");
+    let html_end = out.find("</html>").expect("html close");
+    assert!(open + close < body_end && body_end < html_end, "{out}");
+    assert!(!out[html_end..].contains("FontPreloads"), "{out}");
+    let _ = server;
+}
+
+#[test]
 fn beacon_js_withheld_once_confirmed() {
     use ps_html::font_discovery::FontStyle;
     let (server, options) = fixture();
