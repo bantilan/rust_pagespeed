@@ -2175,7 +2175,20 @@ unsafe fn request_body_bytes(r: *mut ngx_http_request_t) -> Option<Vec<u8>> {
     unsafe {
         let log = (*(*r).connection).log;
         let body = (*r).request_body;
+        // NGINX can represent an empty POST with no buffers or with a
+        // sentinel buffer whose pos/last are null. Neither is a read error.
+        if (*r).headers_in.content_length_n == 0 {
+            return Some(Vec::new());
+        }
+
         if body.is_null() || (*body).bufs.is_null() {
+            // sendBeacon(url) legitimately posts no data: its report may
+            // live entirely in the query string. The read callback has
+            // completed, so absent buffers are valid for an empty body.
+            // An announced nonempty body with missing buffers still fails.
+            if (*r).headers_in.content_length_n <= 0 {
+                return Some(Vec::new());
+            }
             ngx::ngx_log_error!(
                 NGX_LOG_WARN,
                 log,

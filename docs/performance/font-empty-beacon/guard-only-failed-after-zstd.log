@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/gamingph/Projects/Rust/pagespeed-rust/tools/verify_beacon_reload.py", line 143, in <module>
+    request(fe, font_params, query_post=True)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gamingph/Projects/Rust/pagespeed-rust/tools/verify_beacon_reload.py", line 78, in request
+    assert status in (200, 204), (status, body[:200])
+           ^^^^^^^^^^^^^^^^^^^^
+AssertionError: (500, b'<!DOCTYPE html>\n<html>\n<head>\n<title>Error</title>\n<style>\nhtml { color-scheme: light dark; }\nbody { width: 35em; margin: 0 auto;\nfont-family: Tahoma, Verdana, Arial, sans-serif; }\n</style>\n</head>\n<b')

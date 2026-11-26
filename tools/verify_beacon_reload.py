@@ -23,6 +23,7 @@ parser.add_argument('--port', type=int, default=18091)
 parser.add_argument('--zstd', action='store_true', help='Enable/accept zstd and decode HTML before checking nonce behavior')
 parser.add_argument('--accept-before-reload', action='store_true', help='Accept before reload, then ensure new workers preserve evidence and reject replay')
 parser.add_argument('--early-html-cache', action='store_true', help='Exercise opt-in pre-origin HTML cache lookup')
+parser.add_argument('--font-query-post', action='store_true', help='Exercise real font collector empty POST/query transport with evidence/replay checks')
 args = parser.parse_args()
 repo = Path(__file__).resolve().parent.parent
 prefix = Path(tempfile.mkdtemp(prefix='ps-beacon-reload-'))
@@ -30,6 +31,8 @@ prefix = Path(tempfile.mkdtemp(prefix='ps-beacon-reload-'))
 (prefix / 'logs').mkdir()
 (prefix / 'hold.bin').write_bytes(b'x' * 65536)
 (prefix / 'page.html').write_text('<html><head><title>Beacon reload</title></head><body><img src="/hero.jpg"></body></html>')
+if args.font_query_post:
+    (prefix / 'page.html').write_text('<html><head><style>@font-face{font-family:Manrope;src:url(/manrope.woff2)}body{font-family:Manrope}</style></head><body><img src="/hero.jpg">text</body></html>')
 config = (repo / 'docs/performance/shared-memory/nginx-template.conf').read_text()
 config = config.replace('@MODULE@', str(Path(args.module).resolve())).replace('@PREFIX@', str(prefix)).replace('@PORT@', str(args.port))
 config = config.replace('master_process off;', 'master_process on;').replace('worker_processes 1;', 'worker_processes 2;')
@@ -50,9 +53,11 @@ def connection():
     return http.client.HTTPConnection('127.0.0.1', args.port, timeout=5)
 
 
-def request(path, params=None):
+def request(path, params=None, query_post=False):
     conn = connection()
-    conn.request('POST' if params else 'GET', path, body=urlencode(params) if params else None,
+    if query_post:
+        path += '?' + urlencode(params)
+    conn.request('POST' if params else 'GET', path, body=b'' if query_post else (urlencode(params) if params else None),
                  headers={'Host': 'localhost', 'Content-Type': 'application/x-www-form-urlencoded', 'Accept-Encoding': 'zstd' if args.zstd else 'identity', 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
     response = conn.getresponse()
     body = response.read()
@@ -71,6 +76,8 @@ def request(path, params=None):
     status, pid = response.status, int(response.getheader('X-Worker', '0'))
     conn.close()
     assert status in (200, 204), (status, body[:200])
+    if query_post:
+        assert status == 204, (status, body[:200])
     assert pid, 'missing worker identity'
     return pid, body
 
@@ -95,6 +102,21 @@ def evidence():
     return records[0]
 
 
+def font_evidence():
+    records = []
+    for path in (prefix / 'cache').rglob('*'):
+        if not path.is_file() or '.pagespeed-lru' in path.parts:
+            continue
+        try:
+            blob = zlib.decompress(path.read_bytes(), -15)
+        except (OSError, zlib.error):
+            continue
+        if blob.startswith(b'font-confirmed/1\n'):
+            records.append(blob.decode())
+    assert len(records) <= 1, records
+    return records[0] if records else None
+
+
 process = hold = log = None
 try:
     log = (prefix / 'runner.log').open('ab')
@@ -112,6 +134,22 @@ try:
     endpoint, page_url, options_hash, nonce = [v.decode() for v in match.groups()]
     if args.zstd:
         assert result.get('decoded_zstd_responses', 0) > 0, 'HTML was not zstd encoded'
+    if args.font_query_post:
+        font_match = re.search(rb"pagespeed\.FontPreloads\.Run\('([^']*)','([^']*)','([^']*)','([^']*)'\)", body)
+        assert font_match, body[-2000:]
+        fe, fp, fo, fn = [value.decode() for value in font_match.groups()]
+        assert font_evidence() is None
+        font_params = {'url': fp, 'oh': fo, 'n': 'not-issued', 'ff': 'manrope|400|n'}
+        request(fe, font_params, query_post=True)
+        assert font_evidence() is None, 'unissued nonce accepted'
+        font_params['n'] = fn
+        request(fe, font_params, query_post=True)
+        learned = font_evidence()
+        assert learned == 'font-confirmed/1\n1\nmanrope\t400\tn\n', learned
+        font_params['ff'] = 'unexpected|700|n'
+        request(fe, font_params, query_post=True)
+        assert font_evidence() == learned, 'replay mutated evidence'
+        result['font_empty_post'] = {'accepted': True, 'unissued_rejected': True, 'replay_rejected': True, 'evidence': learned}
     initial = evidence()
     assert nonce in initial['nonces'] and initial['valid'] == 0, initial
     params = {'url': page_url, 'oh': options_hash, 'n': nonce, 'lcpk': 'text'}
@@ -147,6 +185,10 @@ try:
     replay = evidence()
     assert replay == accepted, (accepted, replay)
     assert Path(f'/proc/{old_pid}/stat').exists(), 'old worker exited before beacon checks'
+    if args.font_query_post:
+        request(fe, font_params, query_post=True)
+        assert font_evidence() == learned, 'font evidence/replay changed across reload'
+        result['font_empty_post']['reload_preserved'] = True
     result.update(passed=True, accept_before_reload=args.accept_before_reload, old_worker=old_pid, accepted_worker=accepted_pid, replay_worker=replay_pid,
                   initial=initial, accepted=accepted, after_replay=replay, old_worker_alive_during_accept=Path(f'/proc/{old_pid}/stat').exists())
 finally:
