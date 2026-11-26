@@ -888,3 +888,7 @@ Implemented enddocumentfallbackcollector plus noncevalidated unknownack inbothas
 Implemented `HtmlCachePublicBrowserGrouping` at Directory scope. Initially opt-in, superseded by the user's explicit request to default ON with HTML caching. Effective capability/device identity replaces raw User-Agent/Accept/browser identity hints, including origin Vary UA/Accept. Header casing/order canonicalized; other explicit Vary, language and privacy inputs remain. Animated WebP capability matters only when that conversion is enabled. Existing cookie/private-response gates and sampling remain intact. Equivalent public content within each capability group is required; exact mode remains available via `off`.
 
 Validation commands/results and deployment limits are in `docs/performance/public-browser-grouping/RESULTS.md`. No live deployment. Remaining work: live cross-browser validation after installation; privacy, encoding and other content headers can intentionally retain separate variants.
+
+## Live bypass follow-up — 2026-11-26
+
+Read-only check of WebInspector HAR and deployment8e4df99. HAR singlehomepage/noresponsebody cannotattribute reportedBYPASS. Exactcompressedheader replay fiveHITs; identityencoding MISS→HIT→HIT. Criticalbeacon499s inserverlogs are a lead requiring investigation, notprovenrootcause. No fix/deploy. See docs/performance/browser-bypass-20261126/RESULTS.md. Next capturebrowserresponsebodies+criticalPOSTcompletion or addexplicitstoreskipdiagnostics.
