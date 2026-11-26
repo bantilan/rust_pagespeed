@@ -460,8 +460,26 @@ impl HtmlCacheSession {
                 }
                 // A store means this response missed (created==0
                 // renders BYPASS for skipped stores).
-                let show_comment =
-                    show.then(|| show_comment(false, created_ms, now_ms).into_bytes());
+                let show_comment = show.then(|| {
+                    let mut comment = show_comment(false, created_ms, now_ms);
+                    if created_ms == 0 {
+                        let reason = if body.is_empty() {
+                            "empty-body"
+                        } else if !publication_ok {
+                            "request-policy"
+                        } else if !evidence_settled {
+                            "beacon-evidence-changed"
+                        } else if self.driver.detached_rewrites() != 0 {
+                            "resource-optimization-pending"
+                        } else if contains_sampled_beacon_init(&body) {
+                            "beacon-sampling"
+                        } else {
+                            "expired-or-unencodable"
+                        };
+                        comment.push_str(&format!("\n<!-- PageSpeed Cache Detail: {reason} -->"));
+                    }
+                    comment.into_bytes()
+                });
                 HtmlCacheFinish {
                     detail_line,
                     bypass_line: None,
@@ -1144,7 +1162,8 @@ mod tests {
     #[test]
     fn public_browser_grouping_defaults_on_and_preserves_variants() {
         let h = Harness::new();
-        let firefox = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0";
+        let firefox =
+            "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0";
         let chrome = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36";
         let make = |ua: &str, accept: &str| {
             let mut r = h.get_request();
@@ -1838,6 +1857,27 @@ mod tests {
             assert!(finish.detail_line.is_none(), "{marker}");
         }
         assert_eq!(0, harness.counter("html_cache_inserts"));
+    }
+
+    #[test]
+    fn pending_optimization_bypass_reports_reason_without_changing_gate() {
+        let h = Harness::new();
+        h.options
+            .borrow_mut()
+            .set_option("ShowCacheTimestamp", "on", ps_config::scope::Scope::Server)
+            .unwrap();
+        let request = h.get_request();
+        let mut render = h.session();
+        assert!(render
+            .lookup(&h.ok_origin(), &request, &h.purge, None, START_MS)
+            .is_none());
+        render.write(b"<html>original URLs</html>");
+        h.driver.note_detached_rewrite();
+        let result = render.finish(&request, START_MS + 1);
+        let comment = String::from_utf8(result.show_comment.unwrap()).unwrap();
+        assert!(comment.contains("PageSpeed Cache: BYPASS"));
+        assert!(comment.contains("PageSpeed Cache Detail: resource-optimization-pending"));
+        assert_eq!(0, h.counter("html_cache_inserts"));
     }
 
     #[test]
