@@ -191,7 +191,7 @@ Commands run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 **Previous completed task (2026-11-26):** font/preload latency optimization committed732d534;1765HTMLtests pass. Source change: borrow DOM tag spelling/decoded selector attrs and own only first-seen tokens. Baseline/after release profiles saved in docs/performance/font-lookup-optimization; repeated warm walk300→192µs,7987→1987allocations. No live deployment/config changes. Existing unrelated source at entry HEAD0bd1770 preserved.
 
-**Exact next action:** public navigation cache sharing is implemented and verified locally; see docs/performance/public-navigation/RESULTS.md. Referer/Sec-Fetch-Site/Priority normalized unless origin Vary names them; versionedkeys, all other variant/private/beacon gates retained.205HTML+4cookie+294NGINXtests and matched1.31.10release+delayedorigin/RUM/analyticsoracle passed. Returningfromanotherpage nowearlyHIT with0additionalorigin calls infixture. No live deployment; next install/retest normalnavigation, expectinitialnew-keywarming. Prior emptyfontPOSTfix and analytics fixes included. No backgroundcommands.
+**Exact next action:** image-free sampling repair implemented locally; see docs/performance/image-free-beacon/RESULTS.md. Collector fallback at documentend and unknownLCP acknowledgement preserve knownhero evidence, consumevalidnonce and advancecadence.206HTML+6filter+294NGINXtests, Chromebothassets noobserver, realNGINXimagefreeaccept/replay/reload and font/zstd+publiccacheoracles pass. Static-alias combinedwarmHITassertion stillBYPASS; unresolvedfixturepublication limitation explicitlyrecorded, no endtoendliveHITclaim. Next install/retest actualSamplePage(browserreport+consecutiveHIT) and investigate ifstillbypasses; no deployment thisturn. All commandscomplete.
 
 **Deployment:** this patch is local only. Live config restored by prior OFF/ON benchmark; do not install mismatched NGINX module. No push. Maintain existing RUM, CSS/image optimization and cache validity.
 
@@ -874,3 +874,11 @@ User requests public cache sharing across direct/internal navigation. Contract b
 ## Public navigation cache sharing verified — 2026-11-26
 
 Implemented limitednavigationheader normalization with explicitVaryrestoration and versionedHTML/earlykeys. README updated.205HTML+4cookie+294NGINXtests pass;matchedrelease24.87s; delayedoriginoracle returnnavigationHIT/noorigin/identicalbody,RUM+analytics+privatecontrols pass. Exactcommands/logs at docs/performance/public-navigation/RESULTS.md. No productiondeploy/push;no allvariantcollapse. All processes complete.
+
+## Image-free beacon sampling fix — in progress 2026-11-26
+
+Contract: preserve issued sampling and text/background LCP evidence; insert pending critical beacon once at document end if no eligible image inserted it. Use existing BodyEndTracker for full/fragment/streamed markup. Never cache sampled nonce response; normal settled sampling cadence still applies. Test noimage markup/browser/bot/reuse and real imagefree nonce acceptance/reload oracle. No live deploy.
+
+## Image-free sampling milestone — 2026-11-26
+
+Implemented enddocumentfallbackcollector plus noncevalidated unknownack inbothassets/receiver; preservepriorLCP/support.206library+6filterpass,294NGINXpass,Chromeassetsbothpass,actualimagefreeNGINXnonceaccept/replay/reloadpass,font/zstdregressionpass,FastCGIpubliccache/RUM/analyticsoraclepass. Combinedstatic-aliasHITassertionfailed(cachepublicationnotresolved), removedfromgenericreloadtestanddocumentedaslimitation ratherthanclaimsuccess. ExactnexttestactualdeployedSamplePage; no livechanges. docs/performance/image-free-beacon/RESULTS.md containscommands/limits. All processescomplete.

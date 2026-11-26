@@ -57,7 +57,10 @@ pub const LCP_KIND_TEXT: &str = "text";
 /// Whether a reported LCP kind is one of the three known values.
 #[must_use]
 pub fn valid_lcp_kind(kind: &str) -> bool {
-    kind == LCP_KIND_IMG || kind == LCP_KIND_BACKGROUND || kind == LCP_KIND_TEXT
+    kind == LCP_KIND_IMG
+        || kind == LCP_KIND_BACKGROUND
+        || kind == LCP_KIND_TEXT
+        || kind == "unknown"
 }
 
 /// Parses reported font triples (`family|weight|style`, comma
@@ -594,6 +597,13 @@ pub fn accept_beacon(
     if !validate_nonce(now_ms, &report.nonce, evidence) {
         return AcceptOutcome::BadNonce;
     }
+    if report.lcp_kind == "unknown" {
+        // Acknowledge sampling without treating unavailable browser LCP
+        // support as negative evidence about previously learned images.
+        evidence.valid_beacons = evidence.valid_beacons.saturating_add(1);
+        evidence.generation = evidence.generation.saturating_add(1);
+        return AcceptOutcome::Accepted;
+    }
     if !report.lcp_kind.is_empty() {
         evidence.lcp_kind = report.lcp_kind.clone();
         if !report.lcp_image_url.is_empty() {
@@ -716,6 +726,36 @@ impl BeaconFinder {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unknown_lcp_acknowledges_without_erasing_evidence() {
+        let mut evidence = BeaconEvidence::default();
+        evidence.lcp_kind = LCP_KIND_BACKGROUND.to_string();
+        evidence.lcp_image_url = "https://h/hero.jpg".to_string();
+        evidence.support.insert("known".to_string(), 8);
+        evidence.max_support = 10;
+        let nonce = prepare_beacon(&mut evidence, 1000, 5, 42).unwrap();
+        let support = evidence.support.clone();
+        let report = report_with(Some(HashSet::new()), "unknown", "", &nonce);
+        assert_eq!(
+            accept_beacon(&mut evidence, &report, 1001),
+            AcceptOutcome::Accepted
+        );
+        assert_eq!(evidence.support, support);
+        assert_eq!(evidence.max_support, 10);
+        assert_eq!(evidence.lcp_kind, LCP_KIND_BACKGROUND);
+        assert_eq!(evidence.lcp_image_url, "https://h/hero.jpg");
+        assert_eq!(evidence.valid_beacons, 1);
+        assert!(!should_beacon(
+            1002,
+            Some(&evidence),
+            DownstreamBeacon::Inactive
+        ));
+        assert_eq!(
+            accept_beacon(&mut evidence, &report, 1002),
+            AcceptOutcome::BadNonce
+        );
+    }
 
     #[test]
     fn font_triples_parse_validate_and_cap() {

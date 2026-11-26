@@ -38,6 +38,7 @@ pub struct CriticalImagesBeaconFilter {
     added_beacon_js: bool,
     noscript_depth: u32,
     prepared: bool,
+    body_end: crate::filters::common::BodyEndTracker,
 }
 
 impl CriticalImagesBeaconFilter {
@@ -54,6 +55,7 @@ impl CriticalImagesBeaconFilter {
             added_beacon_js: false,
             noscript_depth: 0,
             prepared: false,
+            body_end: Default::default(),
         }
     }
 
@@ -160,7 +162,7 @@ impl CriticalImagesBeaconFilter {
     }
 
     /// Inserts the beacon script before the current node, once.
-    fn maybe_add_beacon_javascript(&mut self, dom: &mut Dom, lexer: &Lexer) {
+    fn maybe_add_beacon_javascript(&mut self, dom: &mut Dom, lexer: &Lexer, at_end: bool) {
         if !self.insert_beacon_js || self.added_beacon_js {
             return;
         }
@@ -173,7 +175,11 @@ impl CriticalImagesBeaconFilter {
             None,
             crate::element::QuoteStyle::DoubleQuote,
         );
-        dom.insert_node_before_current(script);
+        if at_end {
+            self.body_end.insert(dom, script);
+        } else {
+            dom.insert_node_before_current(script);
+        }
         let xhtml = match self.driver.mime_type_xhtml_status() {
             crate::server_context::XhtmlStatus::IsXhtml => {
                 crate::filters::common::XhtmlStatus::IsXhtml
@@ -216,7 +222,7 @@ impl CriticalImagesBeaconFilter {
                 crate::element::QuoteStyle::DoubleQuote,
             );
             if self.insert_beacon_js {
-                self.maybe_add_beacon_javascript(dom, lexer);
+                self.maybe_add_beacon_javascript(dom, lexer, false);
             }
         }
     }
@@ -236,17 +242,24 @@ impl HtmlFilter for CriticalImagesBeaconFilter {
         // Per-render transient state only: prepared insertion
         // state survives (determine runs before this).
         self.image_url_hashes.clear();
+        self.body_end.clear();
         self.added_beacon_js = false;
         self.noscript_depth = 0;
     }
 
     fn start_element(&mut self, dom: &mut Dom, _lexer: &Lexer, id: NodeId) {
+        self.body_end.clear();
         if dom.element_keyword(id) == Keyword::Noscript {
             self.noscript_depth += 1;
         }
     }
 
+    fn characters(&mut self, dom: &mut Dom, _lexer: &Lexer, id: NodeId) {
+        self.body_end.observe_characters(dom, id);
+    }
+
     fn end_element(&mut self, dom: &mut Dom, lexer: &Lexer, id: NodeId) {
+        self.body_end.observe_end(dom, id);
         let keyword = dom.element_keyword(id);
         if keyword == Keyword::Noscript {
             self.noscript_depth = self.noscript_depth.saturating_sub(1);
@@ -260,7 +273,10 @@ impl HtmlFilter for CriticalImagesBeaconFilter {
         }
     }
 
-    fn end_document(&mut self, _dom: &mut Dom, _lexer: &Lexer) {
+    fn end_document(&mut self, dom: &mut Dom, lexer: &Lexer) {
+        // Image-free pages still need to report text/background LCP and
+        // consume the nonce we issued; otherwise sampling never settles.
+        self.maybe_add_beacon_javascript(dom, lexer, true);
         self.finish_document();
         // Reset for filter reuse (`Clear`).
         self.image_url_hashes.clear();

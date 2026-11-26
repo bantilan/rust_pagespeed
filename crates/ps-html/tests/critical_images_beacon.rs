@@ -21,8 +21,7 @@ struct Harness {
 
 impl Harness {
     fn new() -> Self {
-        let http: Arc<dyn ps_cache::cache::Cache> =
-            Arc::new(ps_cache::cache::MemoryCache::new());
+        let http: Arc<dyn ps_cache::cache::Cache> = Arc::new(ps_cache::cache::MemoryCache::new());
         let metadata: Arc<dyn ps_cache::cache::Cache> =
             Arc::new(ps_cache::cache::MemoryCache::new());
         let server = Rc::new(ServerContext::new_with_metadata(
@@ -66,10 +65,7 @@ fn count(haystack: &[u8], needle: &[u8]) -> usize {
 fn first_visit_instruments_stamps_and_registers() {
     let harness = Harness::new();
     let driver = harness.driver_for(CHROME_UA);
-    let out = harness.render(
-        &driver,
-        b"<html><body><img src=\"hero.png\"></body></html>",
-    );
+    let out = harness.render(&driver, b"<html><body><img src=\"hero.png\"></body></html>");
     // Beacon JS inserted once before the first image.
     assert_eq!(1, count(&out, b"pagespeed.CriticalImages.Run('"));
     // The image carries its stamped original-URL hash.
@@ -100,9 +96,12 @@ fn pre_phase_visit_instruments_and_stamps() {
     let harness = Harness::new();
     let driver = harness.driver_for(CHROME_UA);
     let filter = CriticalImagesBeaconFilter::new(Rc::clone(&driver));
-    let out = run_with_filters(b"<html><body><img src=\"hero.png\"></body></html>", |parser| {
-        parser.add_pre_render_filter(Box::new(filter));
-    });
+    let out = run_with_filters(
+        b"<html><body><img src=\"hero.png\"></body></html>",
+        |parser| {
+            parser.add_pre_render_filter(Box::new(filter));
+        },
+    );
     assert_eq!(1, count(&out, b"pagespeed.CriticalImages.Run('"));
     assert_eq!(1, count(&out, b"data-pagespeed-url-hash="));
 }
@@ -115,10 +114,7 @@ fn immediate_revisit_stands_down_without_evidence() {
     // Sampling just happened: the revisit inserts nothing and
     // stamps nothing (no evidence yet).
     let second = harness.driver_for(CHROME_UA);
-    let out = harness.render(
-        &second,
-        b"<html><body><img src=\"hero.png\"></body></html>",
-    );
+    let out = harness.render(&second, b"<html><body><img src=\"hero.png\"></body></html>");
     assert_eq!(0, count(&out, b"pagespeed.CriticalImages.Run('"));
     assert_eq!(0, count(&out, b"data-pagespeed-url-hash="));
 }
@@ -133,8 +129,7 @@ fn learned_evidence_stamps_without_reinstrumenting() {
         .hasher()
         .hash(harness.options.borrow().signature().as_bytes());
     let mut evidence = ps_html::beacon_finder::BeaconEvidence::default();
-    let nonce = ps_html::beacon_finder::prepare_beacon(&mut evidence, 1000, 5, 9)
-        .expect("due");
+    let nonce = ps_html::beacon_finder::prepare_beacon(&mut evidence, 1000, 5, 9).expect("due");
     let hash = ps_html::beacon_finder::url_hash("http://beacon.test/hero.png");
     ps_html::beacon_finder::update_candidates(
         &mut evidence,
@@ -156,10 +151,7 @@ fn learned_evidence_stamps_without_reinstrumenting() {
     evidence.next_beacon_ms = i64::MAX / 2;
     finder.store(PAGE_URL, &oh, "@Desktop", &evidence);
     let driver = harness.driver_for(CHROME_UA);
-    let out = harness.render(
-        &driver,
-        b"<html><body><img src=\"hero.png\"></body></html>",
-    );
+    let out = harness.render(&driver, b"<html><body><img src=\"hero.png\"></body></html>");
     assert_eq!(0, count(&out, b"pagespeed.CriticalImages.Run('"));
     assert_eq!(1, count(&out, b"data-pagespeed-url-hash="));
 }
@@ -168,10 +160,35 @@ fn learned_evidence_stamps_without_reinstrumenting() {
 fn bots_never_instrument() {
     let harness = Harness::new();
     let driver = harness.driver_for(BOT_UA);
-    let out = harness.render(
-        &driver,
-        b"<html><body><img src=\"hero.png\"></body></html>",
-    );
+    let out = harness.render(&driver, b"<html><body><img src=\"hero.png\"></body></html>");
     assert_eq!(0, count(&out, b"pagespeed.CriticalImages.Run('"));
     assert_eq!(0, count(&out, b"data-pagespeed-url-hash="));
+}
+#[test]
+fn image_free_documents_receive_one_live_beacon() {
+    for html in [
+        "<html><body><h1>Text LCP</h1></body></html>",
+        "<h1>Fragment</h1>",
+        "<html><body style='background-image:url(hero.jpg)'>Background</body></html>",
+    ] {
+        let h = Harness::new();
+        let driver = h.driver_for(CHROME_UA);
+        let out = h.render(&driver, html.as_bytes());
+        assert_eq!(
+            count(&out, b"pagespeed.CriticalImages.Run('"),
+            1,
+            "{}",
+            String::from_utf8_lossy(&out)
+        );
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("</script>"));
+        if html.contains("</body>") {
+            assert!(
+                text.find("pagespeed.CriticalImages.Run('").unwrap()
+                    < text.find("</body>").unwrap()
+            );
+        }
+        let bot = h.render(&h.driver_for(BOT_UA), html.as_bytes());
+        assert_eq!(count(&bot, b"pagespeed.CriticalImages.Run('"), 0);
+    }
 }

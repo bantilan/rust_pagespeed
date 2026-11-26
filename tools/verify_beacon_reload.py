@@ -24,6 +24,7 @@ parser.add_argument('--zstd', action='store_true', help='Enable/accept zstd and 
 parser.add_argument('--accept-before-reload', action='store_true', help='Accept before reload, then ensure new workers preserve evidence and reject replay')
 parser.add_argument('--early-html-cache', action='store_true', help='Exercise opt-in pre-origin HTML cache lookup')
 parser.add_argument('--font-query-post', action='store_true', help='Exercise real font collector empty POST/query transport with evidence/replay checks')
+parser.add_argument('--image-free', action='store_true', help='Verify critical beacon nonce acceptance on a text-only page')
 args = parser.parse_args()
 repo = Path(__file__).resolve().parent.parent
 prefix = Path(tempfile.mkdtemp(prefix='ps-beacon-reload-'))
@@ -33,12 +34,16 @@ prefix = Path(tempfile.mkdtemp(prefix='ps-beacon-reload-'))
 (prefix / 'page.html').write_text('<html><head><title>Beacon reload</title></head><body><img src="/hero.jpg"></body></html>')
 if args.font_query_post:
     (prefix / 'page.html').write_text('<html><head><style>@font-face{font-family:Manrope;src:url(/manrope.woff2)}body{font-family:Manrope}</style></head><body><img src="/hero.jpg">text</body></html>')
+if args.image_free:
+    (prefix / 'page.html').write_text('<html><head><title>Text page</title></head><body><h1>Text LCP</h1></body></html>')
 config = (repo / 'docs/performance/shared-memory/nginx-template.conf').read_text()
 config = config.replace('@MODULE@', str(Path(args.module).resolve())).replace('@PREFIX@', str(prefix)).replace('@PORT@', str(args.port))
 config = config.replace('master_process off;', 'master_process on;').replace('worker_processes 1;', 'worker_processes 2;')
 config = config.replace('http {', 'http {\nadd_header X-Worker $pid always;')
 config = config.replace(f'pagespeed FileCachePath {prefix}/cache;', f'pagespeed FileCachePath {prefix}/cache;\npagespeed CreateSharedMemoryMetadataCache {prefix}/cache 1024;')
 config = config.replace('    location / {', f'    location = /beacon-reload.html {{ alias {prefix}/page.html; }}\n    location = /hold.bin {{ alias {prefix}/hold.bin; limit_rate 8k; }}\n    location / {{')
+if args.image_free:
+    config = config.replace(f'alias {prefix}/page.html;', f'alias {prefix}/page.html; expires 300s;')
 if args.early_html_cache:
     config = config.replace('pagespeed RewriteLevel CoreFilters;', 'pagespeed RewriteLevel CoreFilters;\npagespeed HtmlCacheEarlyLookup on;')
 if args.zstd:
@@ -152,7 +157,7 @@ try:
         result['font_empty_post'] = {'accepted': True, 'unissued_rejected': True, 'replay_rejected': True, 'evidence': learned}
     initial = evidence()
     assert nonce in initial['nonces'] and initial['valid'] == 0, initial
-    params = {'url': page_url, 'oh': options_hash, 'n': nonce, 'lcpk': 'text'}
+    params = {'url': page_url, 'oh': options_hash, 'n': nonce, 'lcpk': 'unknown' if args.image_free else 'text'}
     accepted_before = None
     if args.accept_before_reload:
         request(endpoint, params)

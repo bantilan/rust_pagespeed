@@ -4349,6 +4349,12 @@ pagespeed.CriticalImages.Beacon_.prototype.checkCriticalImages_ = function() {
       this.lcpKind_ && (c = "&lcpk=" + encodeURIComponent(this.lcpKind_), a.length + c.length <= pagespeedutils.MAX_POST_SIZE && (a += c, b = !0), this.lcpUrl_ && (c = "&lcpu=" + encodeURIComponent(this.lcpUrl_), a.length + c.length <= pagespeedutils.MAX_POST_SIZE && (a += c)));
     }
     this.checkRenderedImageSizes_ && (c = "&rd=" + encodeURIComponent(JSON.stringify(this.getImageRenderedMap())), a.length + c.length <= pagespeedutils.MAX_POST_SIZE && (a += c, b = !0));
+    // A browser without usable LCP evidence must still acknowledge the
+    // issued sample; unknown never claims a text or image LCP.
+    if (!b && !this.lcpObserver_) {
+      a += "&lcpk=unknown";
+      b = !0;
+    }
     if (b || !this.lcpObserver_) {
       this.lcpObserver_ && (this.lcpObserver_.disconnect(), this.lcpObserver_ = null), this.beaconSent_ = !0, pagespeed.CriticalImages.beaconData_ = a, b && pagespeedutils.sendBeacon(this.beaconUrl_, this.htmlUrl_, a);
     }
