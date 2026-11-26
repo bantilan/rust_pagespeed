@@ -16,7 +16,7 @@ your C++ configuration when switching over.
 
 ## Performance
 
-Latest measured build: **`ef9aeb5`**, tested on 2026-11-24 with the default
+The following controlled static-page baseline uses **`ef9aeb5`**, tested on 2026-11-24 with the default
 cache configuration and an ordinary release module against NGINX 1.31.8.
 
 | Page | First HTML delivery | Warm HTML cache HIT | Warm metadata, HTML cache MISS |
@@ -84,6 +84,95 @@ HTML frames are never cached, preserving per-request RUM/beacon behavior.
 [Zstd benchmarks and memory tradeoffs](docs/performance/zstd/RESULTS.md) cover
 HTML HIT/MISS, cached resources, unique bodies, and disabled-filter controls.
 
+### Automatic critical font preloads
+
+`preload_critical_fonts` is included in **CoreFilters**, so it is enabled by
+default at that rewrite level. It adds at most two font preload hints near the
+start of `<head>`, with the font MIME type and `crossorigin="anonymous"`.
+
+Discovery uses inline and external CSS, CSS custom properties (`var()`), variable
+font weight ranges, and font usages verified against document tags/classes/IDs.
+Unused utility classes do not trigger preloads. Existing author font preloads
+are respected; unsafe sources and unconfirmed icon/subset-only fonts are pruned.
+This is bounded CSS analysis, not a browser layout engine.
+
+```nginx
+# Optional: explicitly enable when using a different rewrite level.
+pagespeed EnableFilters preload_critical_fonts;
+
+# Alternatively, disable font preloading:
+# pagespeed DisableFilters preload_critical_fonts;
+
+# Optional diagnostics explaining font selection/rejection:
+# pagespeed EnableFilters debug;
+```
+
+Parsed stylesheet discoveries and page decisions are cached. Pending remote CSS
+loads are left for a later render instead of waiting for network completion.
+Browser font beacons learn loaded families and version dependent HTML entries.
+The beacon endpoint supports empty POSTs with report fields in the query string
+(the `navigator.sendBeacon(url)` transport); issued-nonce and replay validation
+still apply. Existing POST-body beacons remain supported.
+
+Recent selector collection work reduced allocations from 7,987 to 1,987 in the
+repeated-class local fixture. This is an instrumented component result, not a
+production request-latency claim. See the [font lookup benchmark](docs/performance/font-lookup-optimization/RESULTS.md)
+and [font beacon verification](docs/performance/font-empty-beacon/RESULTS.md).
+
+### Serve HTML cache hits before PHP
+
+`HtmlCacheEarlyLookup` is an opt-in extension for routes whose anonymous output
+may be reused for the configured HTML-cache lifetime:
+
+```nginx
+pagespeed HtmlCache on;
+pagespeed HtmlCacheTtlSec 300;
+pagespeed HtmlCacheEarlyLookup on;
+pagespeed ShowCacheTimestamp on;  # Optional HIT/MISS/BYPASS comment
+```
+
+After an eligible rewrite publishes its body and origin-policy metadata, warm
+GET requests can return before PHP or another origin handler runs. Missing,
+expired, purged, corrupt, or differently keyed entries fall through to the
+existing origin/rewrite path. Options, request variants, file modification time,
+and beacon evidence remain validated; sampling-due beacon requests fall through.
+HTML bodies containing sampled beacon nonces are not published. Existing RUM
+JavaScript remains in the cached HTML and runs on each browser navigation.
+
+The default is **off**. Enabling this trusts the cached origin policy until expiry:
+changes to application content, response headers, or access rules that are not
+represented in the cache identity require a purge or expiry. Use it only on
+public routes with suitable invalidation. The early path uses the same configured cookie allowlist as ordinary HTML caching:
+requests containing only approved analytics cookies can HIT before PHP runs.
+Private, login, session, unknown, malformed, or forced-bypass cookies still bypass,
+as do Authorization, conditional/range headers, or explicit Cache-Control/Pragma.
+`HtmlCacheIgnoreCommonCookies off` also disables the built-in analytics allowance
+for early lookup; custom ignore/bypass cookie rules remain respected. Ignored
+cookies must not affect server-generated HTML. Origin Set-Cookie/private/no-store
+prohibitions still prevent publication. Dynamic applications that require PHP to
+run on every request should leave this option off. NGINX access phases still run
+before the early handler; the setting does not replace application authorization.
+Returned HTML uses private/no-store downstream policy and negotiates compression
+for the current request. Resource optimization, ordinary HTML cache lookup, and
+all enabled rewrite filters remain active on misses.
+
+Approved analytics cookies such as `_ga` and `_gid` need no new directive when
+`HtmlCacheEarlyLookup on` is enabled. They can share the public cookie-free
+variant without invoking PHP on a warm HIT. Private/login/session cookies are
+not covered by that allowance. The [analytics early-HIT regression](docs/performance/analytics-early-hit/RESULTS.md)
+verified zero origin calls across 20 analytics HITs; median latency changed from
+26.77 ms to 0.69 ms with a synthetic 25 ms origin delay. These are isolated local
+measurements, not a live-site speedup claim.
+
+A HIT does not guarantee every later navigation will HIT. Beacon sampling,
+newly accepted learning evidence, request variants, expiration, and invalidation
+can cause a later BYPASS or MISS. Sampled responses stay uncached so their
+per-request nonces are not reused. A successful beacon transport normally
+returns HTTP 204; that status alone does not prove its nonce/evidence was
+accepted. Font learning and replay checks are covered by the linked verification
+record. Deployment availability depends on the installed module version; the
+latest local fixes are not evidence that a production server has been updated.
+
 ## Features vs C++ PageSpeed
 
 Legend: ✅ supported · 🔶 partial · 📋 planned · ❌ not supported (out of scope)
@@ -106,9 +195,10 @@ Legend: ✅ supported · 🔶 partial · 📋 planned · ❌ not supported (out 
 | In-memory LRU tier | ✅ opt-in | ✅ **on by default** | 8 MiB/process, 16 KiB cap; explicit zeros restore C++ shape |
 | IPRO (in-place resource optimization) | ✅ | ✅ | Recording, waiting, deadlines |
 | Memcached / Redis backends | ✅ | 🔶 falls back | Warns once per path, uses file cache |
-| Shared-memory metadata cache | ✅ | ❌ fails closed | Per-process LRU covers the hot path instead |
+| Shared-memory metadata cache | ✅ | ✅ opt-in | Bounded Linux shared tier; persistent disk fallback and tested reload/recovery |
 | Critical-image beaconing + LCP learning | ✅ | ✅ | Beacon finder, evidence store, LCP prioritization |
-| Full RUM instrumentation filter | ✅ | 📋 code present | Filter implemented, chain wiring pending |
+| Full RUM instrumentation filter | ✅ | ✅ | `add_instrumentation`; cached HTML retains browser-side navigation timing |
+| **Automatic critical font preloads** | — | ✅ **CoreFilters default** | Up to two hints; CSS usage analysis, variable fonts, cached decisions and beacon learning |
 | **Automatic logo detection for LCP** | ❌ | ✅ **Rust-only** | Confidence-based (WP/custom/SVG/CSS-bg); keeps logos out of auto-preload |
 | **LCP fallback hero** | ❌ | ✅ **Rust-only** | Empty/stale evidence never leaves the visual hero bare |
 | Async HTML (deadline-detach) | ✅ threads | ✅ adapted | Fire-and-forget rewrite jobs; first view serves originals, next view hits |
@@ -138,8 +228,9 @@ Measured live (12 nginx workers): ~213 MB total RSS, 11–25 MB per worker
 depending on cache warmth, against 15 GB system RAM. Per-worker memory is
 dominated by the bounded 8 MiB LRU tier plus message buffers and the
 rewrite thread pool; the file cache lives on disk. Regex tables compile
-once at worker startup and serving filters construct lazily, so steady
-requests carry no initialization overhead.
+once at worker startup. Immutable filter plans are reused; mutable parser/filter
+state remains request-local. Early HTML-cache HITs bypass parsing and rewrite
+filter construction entirely.
 
 ## Layout
 
@@ -241,39 +332,3 @@ The existing checkouts are untouched and remain the source of truth:
 
 Nothing in this repository modifies those directories. Port work here must
 be verified against them.
-
-### Serve HTML cache hits before PHP
-
-`HtmlCacheEarlyLookup` is an opt-in extension for routes whose anonymous output
-may be reused for the configured HTML-cache lifetime:
-
-```nginx
-pagespeed HtmlCache on;
-pagespeed HtmlCacheTtlSec 300;
-pagespeed HtmlCacheEarlyLookup on;
-pagespeed ShowCacheTimestamp on;  # Optional HIT/MISS/BYPASS comment
-```
-
-After an eligible rewrite publishes its body and origin-policy metadata, warm
-GET requests can return before PHP or another origin handler runs. Missing,
-expired, purged, corrupt, or differently keyed entries fall through to the
-existing origin/rewrite path. Options, request variants, file modification time,
-and beacon evidence remain validated; sampling-due beacon requests fall through.
-HTML bodies containing sampled beacon nonces are not published. Existing RUM
-JavaScript remains in the cached HTML and runs on each browser navigation.
-
-The default is **off**. Enabling this trusts the cached origin policy until expiry:
-changes to application content, response headers, or access rules that are not
-represented in the cache identity require a purge or expiry. Use it only on
-public routes with suitable invalidation. The early path uses the same configured cookie allowlist as ordinary HTML caching:
-requests containing only approved analytics cookies can HIT before PHP runs.
-Private, login, session, unknown, malformed, or forced-bypass cookies still bypass,
-as do Authorization, conditional/range headers, or explicit Cache-Control/Pragma.
-`HtmlCacheIgnoreCommonCookies off` also disables the built-in analytics allowance
-for early lookup; custom ignore/bypass cookie rules remain respected. Origin Set-Cookie/private/no-store
-prohibitions still prevent publication. Dynamic applications that require PHP to
-run on every request should leave this option off. NGINX access phases still run
-before the early handler; the setting does not replace application authorization.
-Returned HTML uses private/no-store downstream policy and negotiates compression
-for the current request. Resource optimization, ordinary HTML cache lookup, and
-all enabled rewrite filters remain active on misses.
