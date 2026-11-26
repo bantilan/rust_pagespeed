@@ -183,6 +183,13 @@ Returned HTML uses private/no-store downstream policy and negotiates compression
 for the current request. Resource optimization, ordinary HTML cache lookup, and
 all enabled rewrite filters remain active on misses.
 
+Public cache entries are shared across direct visits and internal navigation:
+`Referer`, `Sec-Fetch-Site`, and request `Priority` do not split entries unless
+the origin explicitly names them in `Vary`. Other request variants and all
+private-request checks remain in force. If your application personalizes public
+HTML using these navigation headers, it must declare the corresponding `Vary`
+or exclude that response from public caching.
+
 Approved analytics cookies such as `_ga` and `_gid` need no new directive when
 `HtmlCacheEarlyLookup on` is enabled. They can share the public cookie-free
 variant without invoking PHP on a warm HIT. Private/login/session cookies are

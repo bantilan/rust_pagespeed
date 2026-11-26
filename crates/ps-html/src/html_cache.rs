@@ -11,7 +11,7 @@
 //!
 //! Divergences from C++, all deliberate: only `Vary: *`
 //! bypasses (named Vary fields address per-variant entries,
-//! since every request header participates in the cache key);
+//! with explicit origin Vary preserved for normalized navigation headers);
 //! per-request `Vary` on the request side follows the ported
 //! `request_headers_cacheable` helper verbatim; request cookies
 //! pass through the allowlist policy in `ps_config::cookies`
@@ -247,8 +247,8 @@ impl HtmlCacheSession {
     }
 
     /// Origin-independent candidate key. File-backed routes use the current
-    /// regular-file mtime; all request headers except rejected cookies remain
-    /// variant inputs. This is a hint, never an authorization to serve alone.
+    /// regular-file mtime; public navigation headers are normalized and
+    /// cookie policy is checked before constructing variant inputs. This is a hint, never an authorization to serve alone.
     fn early_key(
         &self,
         request: &RequestHeaders,
@@ -282,13 +282,13 @@ impl HtmlCacheSession {
         let headers: Vec<(&str, &str)> = request.headers().iter().collect();
         cookie_verdict(&self.driver.options(), &headers).ok()?;
         Some(format!(
-            "early-html-v1:{}",
+            "early-html-v2:{}",
             html_codec::html_cache_key(&format!(
                 "{}\n{}\n{}\n{}\n{:?}",
                 self.url,
                 self.driver.cache_fragment(),
                 self.driver.options_signature(),
-                request.to_http_string_without_cookies(),
+                public_request_identity(request, None),
                 file_mtime
             ))
         ))
@@ -572,11 +572,11 @@ impl HtmlCacheSession {
             i64::MAX
         };
         let mut identity = format!(
-            "{}\n{}\n{}\n{}\n",
+            "public-html-v2\n{}\n{}\n{}\n{}\n",
             self.url,
             self.driver.cache_fragment(),
             self.driver.options_signature(),
-            request.to_http_string_without_cookies(),
+            public_request_identity(request, Some(origin)),
         );
         identity.push_str(&format!(
             "debug:{}\norigin-ttl:{}\n",
@@ -713,10 +713,31 @@ impl HtmlCacheSession {
     }
 }
 
+/// Navigation provenance and scheduling do not define public content unless
+/// the origin explicitly declares otherwise. All other variant inputs remain.
+fn public_request_identity(request: &RequestHeaders, origin: Option<&ResponseHeaders>) -> String {
+    let mut normalized = request.clone();
+    for name in ["Referer", "Sec-Fetch-Site", "Priority"] {
+        let varies = origin.is_some_and(|origin| {
+            origin.headers().lookup("Vary").is_some_and(|values| {
+                values.iter().any(|value| {
+                    value
+                        .split(',')
+                        .any(|field| field.trim().eq_ignore_ascii_case(name))
+                })
+            })
+        });
+        if !varies {
+            normalized.headers_mut().remove_all(name);
+        }
+    }
+    normalized.to_http_string_without_cookies()
+}
+
 /// Whether an origin response varies on everything (`Vary: *`):
 /// any `Vary` line carrying a `*` token vetoes caching (named
-/// fields are safe — every request header participates in the
-/// cache key — but `*` names no keyable dimension). Token-based
+/// fields are safe — explicitly named headers remain variant inputs —
+/// but `*` names no keyable dimension). Token-based
 /// rather than C++'s whole-value match, so technically-invalid
 /// `Vary: <fields>, *` combinations fail closed too.
 fn origin_varies_star(origin: &ResponseHeaders) -> bool {
@@ -1007,6 +1028,69 @@ mod tests {
             .expect("eligible")
             .key;
         assert_eq!(unkeyed, unkeyed_after);
+    }
+
+    #[test]
+    fn public_navigation_shares_hits_but_explicit_vary_separates() {
+        for vary in [
+            None,
+            Some("Referer"),
+            Some("Sec-Fetch-Site"),
+            Some("Priority"),
+        ] {
+            let h = Harness::new();
+            h.options
+                .borrow_mut()
+                .set_option(
+                    "HtmlCacheEarlyLookup",
+                    "on",
+                    ps_config::scope::Scope::Server,
+                )
+                .unwrap();
+            let mut direct = h.get_request();
+            direct.headers_mut().add("Sec-Fetch-Site", "none");
+            direct.headers_mut().add("Priority", "u=0");
+            let mut internal = h.get_request();
+            internal.headers_mut().add("Sec-Fetch-Site", "same-origin");
+            internal.headers_mut().add("Priority", "u=1");
+            internal
+                .headers_mut()
+                .add("Referer", "http://cache.test/another-page");
+            let mut origin = h.ok_origin();
+            if let Some(vary) = vary {
+                origin.headers_mut().add("Vary", vary);
+            }
+            let mut render = h.session();
+            assert!(render
+                .lookup(&origin, &direct, &h.purge, None, START_MS)
+                .is_none());
+            render.write(b"<html>public</html>");
+            render.finish(&direct, START_MS);
+            assert!(h
+                .session()
+                .lookup_early(&direct, &h.purge, None, START_MS + 1)
+                .is_some());
+            assert_eq!(
+                h.session()
+                    .lookup_early(&internal, &h.purge, None, START_MS + 1)
+                    .is_some(),
+                vary.is_none(),
+                "{vary:?}"
+            );
+            assert_eq!(
+                h.session()
+                    .lookup(&origin, &internal, &h.purge, None, START_MS + 1)
+                    .is_some(),
+                vary.is_none(),
+                "{vary:?}"
+            );
+            let mut language = direct.clone();
+            language.headers_mut().add("Accept-Language", "fr");
+            assert!(h
+                .session()
+                .lookup_early(&language, &h.purge, None, START_MS + 1)
+                .is_none());
+        }
     }
 
     #[test]

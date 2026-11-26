@@ -144,6 +144,11 @@ try:
     if a.rum_only:
         assert cold['rum_browser_clock'] and all(x['rum_browser_clock'] for x in warm), warm
     assert counts.get('/', 0) == before, counts
+    # Returning from another public page must not invoke the origin again.
+    before_navigation = counts.get('/', 0)
+    navigation = get(headers={'Referer': 'http://localhost/sample-page/', 'Sec-Fetch-Site': 'same-origin', 'Priority': 'u=1'})
+    assert navigation['marker'] == 'HIT' and navigation['body_hash'] == cold['body_hash'], navigation
+    assert counts.get('/', 0) == before_navigation, counts
     analytics = []
     if a.analytics_early:
         before = counts.get('/', 0)
@@ -164,7 +169,7 @@ try:
     private.extend(get('/private', headers={'Cookie': '_ga=123'}) for _ in range(2))
     assert counts['/private'] == 4, counts
     assert all(x['marker'] == 'BYPASS' for x in private), private
-    result = {'analytics': analytics, 'analytics_median_ms': statistics.median(x['ms'] for x in analytics) if analytics else None, 'analytics_expected': a.analytics_early, 'synthetic_origin_delay_ms': 25, 'cold': cold, 'warm': warm,
+    result = {'navigation_hit_skipped_origin': True, 'navigation': navigation, 'analytics': analytics, 'analytics_median_ms': statistics.median(x['ms'] for x in analytics) if analytics else None, 'analytics_expected': a.analytics_early, 'synthetic_origin_delay_ms': 25, 'cold': cold, 'warm': warm,
               'warm_median_ms': statistics.median(x['ms'] for x in warm),
               'origin_counts': counts, 'warm_hits_skipped_origin': True,
               'cookie_auth_cachecontrol_range_bypass_verified': True,
