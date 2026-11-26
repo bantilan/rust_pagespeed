@@ -208,6 +208,7 @@ pub struct ImageRewriteBehavior {
     is_resized_using_rendered_dimensions: bool,
     base_url: GoogleUrl,
     parent_debug: Option<Rc<std::cell::RefCell<Vec<String>>>>,
+    defer_html_bytes: bool,
 }
 
 impl ImageRewriteBehavior {
@@ -234,7 +235,14 @@ impl ImageRewriteBehavior {
             is_resized_using_rendered_dimensions,
             base_url,
             parent_debug: None,
+            defer_html_bytes: true,
         }
+    }
+
+    /// Pool workers must warm optimized bytes as well as metadata. Keep the
+    /// original rewrite place for HTML inlining/resizing/srcset semantics.
+    pub(crate) fn complete_background_bytes(&mut self) {
+        self.defer_html_bytes = false;
     }
 
     /// Builds a nested CSS behavior (`MakeNestedRewriteContextForCss`
@@ -259,6 +267,7 @@ impl ImageRewriteBehavior {
             is_resized_using_rendered_dimensions: false,
             base_url: GoogleUrl::new(""),
             parent_debug: Some(parent_debug),
+            defer_html_bytes: true,
         }
     }
 }
@@ -419,7 +428,9 @@ impl SingleRewriteBehavior for ImageRewriteBehavior {
         // intricate claim/inline interplay), as do fetch
         // reconstructions (place `Fetch`), which serve bytes
         // directly and must optimize inline.
-        if matches!(self.place, RewritePlace::HtmlAttr | RewritePlace::Srcset) {
+        if self.defer_html_bytes
+            && matches!(self.place, RewritePlace::HtmlAttr | RewritePlace::Srcset)
+        {
             return rewrite_single_deferred(self, driver, input, output, partition);
         }
         rewrite_loaded_resource(self, driver, input, output, partition)

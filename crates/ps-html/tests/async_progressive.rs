@@ -657,3 +657,68 @@ fn failed_candidate_does_not_discard_successful_combinations() {
     ));
     assert_eq!(second, world.drive_markup_on(sync, html));
 }
+
+#[test]
+fn image_background_completion_warms_bytes_before_publishing_url() {
+    use ps_html::filters::image_rewrite::ImageRewriteFilter;
+    let world = World::new(300, 30, 1, 8);
+    world.options.borrow_mut().enable_filter(Filter::RecompressJpeg);
+    let url = "http://test.com/Puzzle.jpg";
+    let image = include_bytes!("data/Puzzle.jpg");
+    let mut headers = ResponseHeaders::new(HttpOptions::default_for_tests());
+    headers.set_first_line(1, 1, 200, "OK");
+    headers
+        .headers_mut()
+        .add(header::CONTENT_TYPE, "image/jpeg");
+    headers.set_date_and_caching(START_MS, 300_000, "");
+    headers.compute_caching();
+    world.fetcher.inner.set_response(url, headers, image);
+    let html = format!("<html><body><img src='{url}'></body></html>");
+    let start = Instant::now();
+    let first = world.drive_markup(&html);
+    let first_ms = start.elapsed().as_secs_f64() * 1000.0;
+    assert!(
+        start.elapsed() < Duration::from_millis(250),
+        "HTML waited for image fetch"
+    );
+    assert!(first.contains(url), "{first}");
+    world.await_completions(1);
+    let warm = world.drive_markup(&html);
+    let rewritten = warm
+        .split("src='")
+        .nth(1)
+        .expect("image src")
+        .split('\'')
+        .next()
+        .unwrap();
+    assert!(rewritten.contains(".pagespeed.ic."), "{warm}");
+    let rewrites = world.stat("image_rewrites");
+    let origin_calls = world.fetcher.count.load(Ordering::SeqCst);
+    let driver = Rc::new(ResourceDriver::new(
+        world.server.clone(),
+        world.options.clone(),
+        rewritten,
+    ));
+    driver.add_filter(Rc::new(ImageRewriteFilter::new(driver.clone())));
+    let mut response = BufferingFetch::new(rewritten, driver.request_context().borrow().clone());
+    let serve_start = Instant::now();
+    assert!(driver.fetch_resource(rewritten, &mut response));
+    assert!(response.done() && response.success());
+    assert!(!response.body().is_empty());
+    eprintln!("image HTML fallback {first_ms:.3} ms; ready {:.3} ms; first optimized serve {:.3} ms; optimized bytes {}", start.elapsed().as_secs_f64()*1000.0, serve_start.elapsed().as_secs_f64()*1000.0, response.body().len());
+    assert!(
+        !rewritten.contains(".ic.0."),
+        "published URL must have completed bytes: {warm}"
+    );
+    assert_eq!(
+        rewrites,
+        world.stat("image_rewrites"),
+        "first image serve re-optimized"
+    );
+    assert_eq!(
+        origin_calls,
+        world.fetcher.count.load(Ordering::SeqCst),
+        "first image serve fetched origin"
+    );
+
+}

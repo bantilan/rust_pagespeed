@@ -255,6 +255,13 @@ Configuration and limits: [Zstd](#zstd-output-compression),
 [early HTML HITs and analytics cookies](#serve-html-cache-hits-before-php),
 [shared caching](#shared-caching), and [AVIF](#avif-runtime-dependency).
 
+Background HTML image jobs finish optimized bytes before publishing their
+versioned URLs, including `srcset` candidates. This avoids putting the first
+encode on the browser's optimized-image request. Pending jobs still return
+original URLs immediately; the existing bounded queue and deduplication apply.
+Image quality and conversion settings are unchanged. Older cached hash-`0`
+URLs remain valid and can still reconstruct on first serve until refreshed.
+
 ### Public-site browser cache grouping
 
 For a public site that serves equivalent HTML to browsers with the same rewrite

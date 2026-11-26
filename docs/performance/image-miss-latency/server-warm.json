@@ -1,0 +1,43 @@
+{
+  "description": "Read-only SSH loopback HTTPS, five requests each, existing resource caches preserved; no forced cold encoding",
+  "resources": [
+    {
+      "name": "1024w hero",
+      "content_type": "image/avif",
+      "bytes": 110077,
+      "ttfb_ms": [
+        1.03,
+        0.847,
+        0.792,
+        0.816,
+        0.782
+      ],
+      "total_ms": [
+        1.291,
+        1.025,
+        0.917,
+        0.963,
+        0.917
+      ]
+    },
+    {
+      "name": "header.jpg",
+      "content_type": "image/avif",
+      "bytes": 181199,
+      "ttfb_ms": [
+        0.653,
+        0.668,
+        0.719,
+        1.139,
+        0.782
+      ],
+      "total_ms": [
+        1.032,
+        0.943,
+        0.99,
+        1.51,
+        0.957
+      ]
+    }
+  ]
+}

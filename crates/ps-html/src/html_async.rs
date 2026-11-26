@@ -527,7 +527,7 @@ fn run_behavior_rewrite(
             is_resized_using_rendered_dimensions,
             base_url,
         } => {
-            let behavior = super::filters::image_rewrite::ImageRewriteBehavior::new(
+            let mut behavior = super::filters::image_rewrite::ImageRewriteBehavior::new(
                 driver.clone(),
                 resource_context,
                 place,
@@ -537,6 +537,7 @@ fn run_behavior_rewrite(
                 is_resized_using_rendered_dimensions,
                 GoogleUrl::new(&base_url),
             );
+            behavior.complete_background_bytes();
             let mut context = SingleRewriteContext::new(driver.clone(), behavior);
             context.add_fetch_slot(input);
             context.run_background_to_partitions(partition_key)
@@ -1136,80 +1137,91 @@ mod tests {
             }
         }
 
-        // Worker-side eager image optimization (the CSS/fetch shape)
-        // must report its admin row through the installed sink;
+        // Every image place in a worker must finish bytes and report its
+        // admin row through the installed sink, including HTML/srcset;
         // request-thread drivers drain their own, so without this
         // every background optimization would vanish from the admin
         // images page.
-        let image_url = "http://test.com/Puzzle.jpg";
-        let fetcher = MockUrlFetcher::new();
-        let server_probe = Rc::new(ServerContext::new_with_metadata(
-            Arc::new(MemoryCache::new()),
-            Arc::new(MemoryCache::new()),
-            Arc::new(MockUrlFetcher::new()),
-            START_MS_FOR_SINK_TEST,
-        ));
-        let mut headers = ResponseHeaders::new(HttpOptions::default_for_tests());
-        server_probe.set_default_long_cache_headers(
-            ps_http::content_type::mime_to_content_type("image/jpeg"),
-            "",
-            "",
-            &mut headers,
-        );
-        let image_bytes = include_bytes!("../tests/data/Puzzle.jpg");
-        fetcher.set_response(image_url, headers, image_bytes);
-        let server = Rc::new(ServerContext::new_with_metadata(
-            Arc::new(MemoryCache::new()),
-            Arc::new(MemoryCache::new()),
-            Arc::new(fetcher),
-            START_MS_FOR_SINK_TEST,
-        ));
-        let sink = Arc::new(CollectingSink::default());
-        server.set_message_sink(sink.clone());
-        let mut options = RewriteOptions::new();
-        options.soft_enable_filter_for_testing(Filter::RecompressJpeg);
-        options.soft_enable_filter_for_testing(Filter::RecompressPng);
-        options.soft_enable_filter_for_testing(Filter::ConvertJpegToWebp);
-        let options = Rc::new(RefCell::new(options));
-        let driver = Rc::new(ResourceDriver::new(
-            server.clone(),
-            options.clone(),
-            "http://test.com/page.html",
-        ));
-        let shared = snapshot_shared(&driver);
-        assert!(shared.message_sink.is_some());
-        let snapshot = HtmlRewriteSnapshot {
-            behavior: BackgroundBehavior::Image {
-                resource_context: ImageResourceContext::default(),
-                place: super::super::filters::image_rewrite::RewritePlace::Fetch,
-                image_index: 0,
-                in_noscript_element: false,
-                css_image_inline_max_bytes: 0,
-                is_resized_using_rendered_dimensions: false,
+        for place in [
+            super::super::filters::image_rewrite::RewritePlace::Fetch,
+            super::super::filters::image_rewrite::RewritePlace::HtmlAttr,
+            super::super::filters::image_rewrite::RewritePlace::Srcset,
+        ] {
+            let image_url = "http://test.com/Puzzle.jpg";
+            let fetcher = MockUrlFetcher::new();
+            let server_probe = Rc::new(ServerContext::new_with_metadata(
+                Arc::new(MemoryCache::new()),
+                Arc::new(MemoryCache::new()),
+                Arc::new(MockUrlFetcher::new()),
+                START_MS_FOR_SINK_TEST,
+            ));
+            let mut headers = ResponseHeaders::new(HttpOptions::default_for_tests());
+            server_probe.set_default_long_cache_headers(
+                ps_http::content_type::mime_to_content_type("image/jpeg"),
+                "",
+                "",
+                &mut headers,
+            );
+            let image_bytes = include_bytes!("../tests/data/Puzzle.jpg");
+            fetcher.set_response(image_url, headers, image_bytes);
+            let server = Rc::new(ServerContext::new_with_metadata(
+                Arc::new(MemoryCache::new()),
+                Arc::new(MemoryCache::new()),
+                Arc::new(fetcher),
+                START_MS_FOR_SINK_TEST,
+            ));
+            let sink = Arc::new(CollectingSink::default());
+            server.set_message_sink(sink.clone());
+            let mut options = RewriteOptions::new();
+            options.soft_enable_filter_for_testing(Filter::RecompressJpeg);
+            options.soft_enable_filter_for_testing(Filter::RecompressPng);
+            options.soft_enable_filter_for_testing(Filter::ConvertJpegToWebp);
+            let options = Rc::new(RefCell::new(options));
+            let driver = Rc::new(ResourceDriver::new(
+                server.clone(),
+                options.clone(),
+                "http://test.com/page.html",
+            ));
+            let shared = snapshot_shared(&driver);
+            assert!(shared.message_sink.is_some());
+            let snapshot = HtmlRewriteSnapshot {
+                behavior: BackgroundBehavior::Image {
+                    resource_context: ImageResourceContext::default(),
+                    place,
+                    image_index: 0,
+                    in_noscript_element: false,
+                    css_image_inline_max_bytes: 0,
+                    is_resized_using_rendered_dimensions: false,
+                    base_url: "http://test.com/page.html".to_string(),
+                },
+                input_url: image_url.to_string(),
+                input_authorized: true,
+                font_service: false,
+                partition_key: "test-sink-partition".to_string(),
                 base_url: "http://test.com/page.html".to_string(),
-            },
-            input_url: image_url.to_string(),
-            input_authorized: true,
-            font_service: false,
-            partition_key: "test-sink-partition".to_string(),
-            base_url: "http://test.com/page.html".to_string(),
-            options: options.borrow().clone(),
-            user_agent: String::new(),
-            request_headers: driver.request_headers().clone(),
-            request_context: driver.request_context().borrow().clone(),
-            response_charset: None,
-            now_ms: START_MS_FOR_SINK_TEST,
-        };
-        assert!(run_rewrite_job(snapshot, shared));
-        let lines = sink.lines.lock().unwrap();
-        assert_eq!(1, lines.len(), "{lines:?}");
-        assert!(lines[0].starts_with("PS_IMAGE_DETAIL\t"), "{}", lines[0]);
-        assert!(lines[0].contains("Puzzle.jpg"), "{}", lines[0]);
-        // The partition landed in the shared metadata cache too.
-        assert_eq!(
-            server.metadata_cache().get("test-sink-partition").state,
-            ps_cache::cache::KeyState::Available
-        );
+                options: options.borrow().clone(),
+                user_agent: String::new(),
+                request_headers: driver.request_headers().clone(),
+                request_context: driver.request_context().borrow().clone(),
+                response_charset: None,
+                now_ms: START_MS_FOR_SINK_TEST,
+            };
+            let start = std::time::Instant::now();
+            assert!(run_rewrite_job(snapshot, shared));
+            eprintln!(
+                "image worker {place:?}: {:.3} ms",
+                start.elapsed().as_secs_f64() * 1000.0
+            );
+            let lines = sink.lines.lock().unwrap();
+            assert_eq!(1, lines.len(), "{lines:?}");
+            assert!(lines[0].starts_with("PS_IMAGE_DETAIL\t"), "{}", lines[0]);
+            assert!(lines[0].contains("Puzzle.jpg"), "{}", lines[0]);
+            // The partition landed in the shared metadata cache too.
+            assert_eq!(
+                server.metadata_cache().get("test-sink-partition").state,
+                ps_cache::cache::KeyState::Available
+            );
+        }
     }
 
     #[test]

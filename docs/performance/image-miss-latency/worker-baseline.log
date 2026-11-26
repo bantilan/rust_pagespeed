@@ -1,0 +1,23 @@
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.66s
+     Running unittests src/lib.rs (target/debug/build/ps-html/3190878eb5345cc4/out/ps_html-3190878eb5345cc4)
+
+running 1 test
+image worker Fetch: 525.715 ms
+image worker HtmlAttr: 142.835 ms
+
+thread 'html_async::tests::worker_image_rewrite_reports_record_to_sink' (1205833) panicked at crates/ps-html/src/html_async.rs:1212:9:
+assertion `left == right` failed: []
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test html_async::tests::worker_image_rewrite_reports_record_to_sink ... FAILED
+
+failures:
+
+failures:
+    html_async::tests::worker_image_rewrite_reports_record_to_sink
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 209 filtered out; finished in 0.68s
+
+error: test failed, to rerun pass `-p ps-html --lib`
