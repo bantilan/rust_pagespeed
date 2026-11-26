@@ -1,0 +1,2360 @@
+{
+  "/": {
+    "summary": {
+      "normal": {
+        "median_ms": 1.5513439939240925,
+        "p95_ms": 1.8023909942712635,
+        "cache": {
+          "HIT": 20
+        },
+        "statuses": {
+          "200": 20
+        }
+      },
+      "unique_header": {
+        "median_ms": 69.19780850148527,
+        "p95_ms": 81.48044600966386,
+        "cache": {
+          "MISS": 20
+        },
+        "statuses": {
+          "200": 20
+        }
+      },
+      "pagespeed_off": {
+        "median_ms": 63.39094650320476,
+        "p95_ms": 83.8847500126576,
+        "cache": {
+          "absent": 20
+        },
+        "statuses": {
+          "200": 20
+        }
+      }
+    },
+    "rows": [
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 81.74256299389526,
+        "status": 200,
+        "cache": "BYPASS",
+        "bytes": 62971,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 72.70351999613922,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 67.53768799535464,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 69.4623750023311,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 64.36480199045036,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 71.48177199997008,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 1.4626260090153664,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 64.31358899862971,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 68.90613700670656,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 69.82354800857138,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 1.5106450009625405,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 66.40146400604863,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 1.973135003936477,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 68.44866099709179,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 64.76299700443633,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 63.08393299696036,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 67.26711899682414,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3491389981936663,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 67.72762299806345,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.7069750028895214,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 69.83495199528988,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 68.71762599621434,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.4384889946086332,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 67.11298400477972,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.679415989201516,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 69.69064999429975,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 63.69796000944916,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.979026012122631,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 67.24443699931726,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 70.59680300881155,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 60.956251007155515,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.5052689996082336,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 67.63207100448199,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 60.8335800061468,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.5719210059614852,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 67.92171199049335,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 67.0276040036697,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.53189200500492,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 62.01738800154999,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 67.19179800711572,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.7786969983717427,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 89.20949599996675,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.572856999700889,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 62.77000698901247,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 81.48044600966386,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.5333769988501444,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 62.77700599457603,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 66.90852199972142,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 60.80225000914652,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.508218003436923,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 69.82722300745081,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3783499889541417,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 62.15674000850413,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 67.5383580091875,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 66.41835099435411,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 83.8847500126576,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.5145870129344985,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.2009710044367239,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 59.912928991252556,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 71.85493700671941,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 69.6779910067562,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 66.11021200660616,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.5693109889980406,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 64.02922399865929,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 60.715939005604014,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.8023909942712635,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.576583003043197,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 97.61487199284602,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 75.0749069993617,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.4773380098631606,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 67.32414700672962,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 73.71949400112499,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.6720659914426506,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 59944,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 64.58397601090837,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 60493,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 71.74500699329656,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 59945,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      }
+    ]
+  },
+  "/hello-world/": {
+    "summary": {
+      "normal": {
+        "median_ms": 1.4775649979128502,
+        "p95_ms": 1.8100849993061274,
+        "cache": {
+          "HIT": 20
+        },
+        "statuses": {
+          "200": 20
+        }
+      },
+      "unique_header": {
+        "median_ms": 79.98887849680614,
+        "p95_ms": 82.02339999843389,
+        "cache": {
+          "MISS": 20
+        },
+        "statuses": {
+          "200": 20
+        }
+      },
+      "pagespeed_off": {
+        "median_ms": 73.70243899640627,
+        "p95_ms": 78.49880499998108,
+        "cache": {
+          "absent": 20
+        },
+        "statuses": {
+          "200": 20
+        }
+      }
+    },
+    "rows": [
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 78.38175899814814,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 88.44226200017147,
+        "status": 200,
+        "cache": "BYPASS",
+        "bytes": 82015,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 76.80930598871782,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 94.95128100388683,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 78.51550399209373,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 78.19895200373139,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 94.37442799389828,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 1.5975089918356389,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 77.38416000211146,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 76.88565101125278,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 1.4201860030880198,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 74.75497901032213,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 76.53765699069481,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 1.3179970119381323,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 70.86648800759576,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 76.8998540006578,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.4472509938059375,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 72.50603901047725,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.8037150002783164,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 78.49880499998108,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 93.2486039964715,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.4100230037001893,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 81.91216200066265,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 71.11171599535737,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 76.69564000389073,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 79.89591998921242,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.5766459982842207,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.239421995705925,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 80.86878398898989,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 73.71296299970709,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.8100849993061274,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 79.20708099845797,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 75.55724000849295,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 75.17087600717787,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.6528069972991943,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 81.77128700481262,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3059669872745872,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 75.88642698829062,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 81.06154299457557,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 72.61759399261791,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.8106820061802864,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 80.4073400067864,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.5307630092138425,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 77.1232530096313,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 81.17945400590543,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 82.02339999843389,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.507879002019763,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 73.69191499310546,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 74.20793299388606,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 80.08183700439986,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.5622600039932877,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 74.64636200165842,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 67.57427599222865,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.7624890024308115,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3634640054078773,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 77.82430600491352,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 73.22544099588413,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 69.87474499328528,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 77.38171200617217,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3983460085000843,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 72.97269100672565,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 73.22080599260516,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.4026650023879483,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.0412249976070598,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 66.70170198776759,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 70.74577499588486,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3128519931342453,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 72.21246699918993,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 73.49129400972743,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 83.39748399157543,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.5120210009627044,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 80.79579699551687,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 66.6830140107777,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 82660,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 71.17029700020794,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 78932,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3602960098069161,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 78931,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      }
+    ]
+  },
+  "/sample-page/": {
+    "summary": {
+      "normal": {
+        "median_ms": 1.3591105016530491,
+        "p95_ms": 1.7749399994499981,
+        "cache": {
+          "HIT": 20
+        },
+        "statuses": {
+          "200": 20
+        }
+      },
+      "unique_header": {
+        "median_ms": 57.59863899584161,
+        "p95_ms": 63.08690199512057,
+        "cache": {
+          "MISS": 20
+        },
+        "statuses": {
+          "200": 20
+        }
+      },
+      "pagespeed_off": {
+        "median_ms": 54.012672502722126,
+        "p95_ms": 59.231674997136,
+        "cache": {
+          "absent": 20
+        },
+        "statuses": {
+          "200": 20
+        }
+      }
+    },
+    "rows": [
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 67.56832099927124,
+        "status": 200,
+        "cache": "BYPASS",
+        "bytes": 68811,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 56.684043986024335,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 54.261241006315686,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 1.6921609931159765,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 57.955972995841876,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 56.06926899054088,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 56.51149799814448,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 59.189265011809766,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 1.333899999735877,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 64.1141560045071,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 1.2807440070901066,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 58.8375920051476,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": true,
+        "ms": 53.06258000200614,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": true,
+        "ms": 1.4441109960898757,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": true,
+        "ms": 57.217897003283724,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 56.76412100729067,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 54.19271599384956,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3905029918532819,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 52.606002005632035,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 57.08091100677848,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3406369980657473,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 55.21130999841262,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3140880037099123,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 53.418231997056864,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 56.24376500782091,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 56.627931000548415,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.521288009826094,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.0860469919862226,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 55.969100998481736,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 53.83262901159469,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 59.5385690103285,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.2774909992003813,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 55.61565299285576,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 57.439073993009515,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.2729119916912168,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 52.91268299333751,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 52.476914002909325,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 57.75820399867371,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.331323990598321,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 56.332028994802386,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 52.63081000884995,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.7749399994499981,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 57.3593730077846,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.4066959993215278,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 52.93996399268508,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 53.050458009238355,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 56.72818300081417,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3405680074356496,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.078457004041411,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 52.32875200454146,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 57.00201699801255,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3791020028293133,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 52.38950300554279,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 61.243167001521215,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 58.50230500800535,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 59.9123790016165,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.5669599961256608,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.226741005666554,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 59.12056300439872,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 58.35395799658727,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 55.57853799837176,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 57.96330100565683,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.5482610033359379,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.0971860028803349,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 57.01549199875444,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 61.4158079988556,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 63.08690199512057,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.3877519959351048,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 56.85391700535547,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 55.3295769932447,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 2.215694999904372,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 89.07510900462512,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "normal",
+        "warmup": false,
+        "ms": 1.377584005240351,
+        "status": 200,
+        "cache": "HIT",
+        "bytes": 68827,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "pagespeed_off",
+        "warmup": false,
+        "ms": 59.231674997136,
+        "status": 200,
+        "cache": "absent",
+        "bytes": 69624,
+        "page_speed_header": null,
+        "server": "nginx/1.31.10+732d534"
+      },
+      {
+        "phase": "unique_header",
+        "warmup": false,
+        "ms": 63.074764009797946,
+        "status": 200,
+        "cache": "MISS",
+        "bytes": 68828,
+        "page_speed_header": "0.1.0",
+        "server": "nginx/1.31.10+732d534"
+      }
+    ]
+  }
+}
