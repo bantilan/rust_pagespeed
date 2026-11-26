@@ -1,0 +1,130 @@
+{
+  "rows": [
+    {
+      "trial": 1,
+      "version": "before",
+      "mode": "hit-off",
+      "median_us": 27.861,
+      "allocations": 571
+    },
+    {
+      "trial": 1,
+      "version": "before",
+      "mode": "hit-on",
+      "median_us": 28.402,
+      "allocations": 576
+    },
+    {
+      "trial": 1,
+      "version": "after",
+      "mode": "hit-off",
+      "median_us": 17.442,
+      "allocations": 406
+    },
+    {
+      "trial": 1,
+      "version": "after",
+      "mode": "hit-on",
+      "median_us": 19.998,
+      "allocations": 411
+    },
+    {
+      "trial": 2,
+      "version": "after",
+      "mode": "hit-off",
+      "median_us": 8.446,
+      "allocations": 406
+    },
+    {
+      "trial": 2,
+      "version": "after",
+      "mode": "hit-on",
+      "median_us": 9.507,
+      "allocations": 411
+    },
+    {
+      "trial": 2,
+      "version": "before",
+      "mode": "hit-off",
+      "median_us": 16.37,
+      "allocations": 571
+    },
+    {
+      "trial": 2,
+      "version": "before",
+      "mode": "hit-on",
+      "median_us": 17.402,
+      "allocations": 576
+    },
+    {
+      "trial": 3,
+      "version": "before",
+      "mode": "hit-off",
+      "median_us": 16.511,
+      "allocations": 571
+    },
+    {
+      "trial": 3,
+      "version": "before",
+      "mode": "hit-on",
+      "median_us": 15.429,
+      "allocations": 576
+    },
+    {
+      "trial": 3,
+      "version": "after",
+      "mode": "hit-off",
+      "median_us": 10.41,
+      "allocations": 406
+    },
+    {
+      "trial": 3,
+      "version": "after",
+      "mode": "hit-on",
+      "median_us": 10.99,
+      "allocations": 411
+    }
+  ],
+  "summary": [
+    {
+      "mode": "hit-off",
+      "version": "before",
+      "median_of_medians_us": 16.511,
+      "allocations": [
+        571,
+        571,
+        571
+      ]
+    },
+    {
+      "mode": "hit-off",
+      "version": "after",
+      "median_of_medians_us": 10.41,
+      "allocations": [
+        406,
+        406,
+        406
+      ]
+    },
+    {
+      "mode": "hit-on",
+      "version": "before",
+      "median_of_medians_us": 17.402,
+      "allocations": [
+        576,
+        576,
+        576
+      ]
+    },
+    {
+      "mode": "hit-on",
+      "version": "after",
+      "median_of_medians_us": 10.99,
+      "allocations": [
+        411,
+        411,
+        411
+      ]
+    }
+  ]
+}

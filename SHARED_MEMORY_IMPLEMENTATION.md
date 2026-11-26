@@ -189,11 +189,13 @@ Commands run from `/home/gamingph/Projects/Rust/pagespeed-rust` unless noted.
 
 ## Next Session Resume Point
 
+**Completed latency milestone (2026-11-27):** ordinary HTML HIT skips publication-only early key/header serialization. Full HTML suite1775pass plus targeted26cachetests including corrupt-entry repair; release example and matching NGINX1.31.10 module built. Three alternating release trials:16.511→10.410us (fonts off),17.402→10.990us (on);165 fewer allocator calls each. Results/raws/commands: docs/performance/html-hit-policy-20261127/RESULTS.md. No deployment or claimed production speedup.
+
 **Previous milestone (2026-11-26):** public browser grouping implemented; user requested default ON whenever HTML caching is used. `HtmlCachePublicBrowserGrouping off` restores exact UA/Accept variants. Configuration is signature-bearing and cannot be changed via query. Compatible Firefox/Chrome reuse early and normal entries; device and incompatible rewrite capabilities remain separate. README documents public-site content contract and remaining privacy/language variants.
 
-**Current investigation (2026-11-27):** deployed855c1a2 homepage: Firefox147 replay3BYPASS(no collector),Chrome158replay3HIT. Prior collector fix did not resolve reportedbehavior. Added ShowCacheTimestamp secondary store-skip reason comment; test retains all gates and verifies detachedreason. HTML211+cookies4+Vary8 pass; NGINX294 and matchedreleasebuild passed. No live config/install changes. See docs/performance/live-bypass-20261127/RESULTS.md.
+**Current investigation (2026-11-27):** installed1eec8fb diagnostic live benchmark initially saw homepage20/20BYPASS reason resource-optimization-pending, then settled to HIT. Latest warm live baseline1.42/1.88/1.87ms local for home/hello/sample. Pending-resource identity remains unknown; sampling is not established cause.
 
-**Exact next action:** install matched diagnostic module and read failingFirefox response's PageSpeed Cache Detail. This is unresolved; do not claim fixed or normal sampling. If no secondarycomment, inspect pre-armeligibility. RealChromeDOMdidnotexposecomments, so do not substitute browserDOM for explicitcurlresult. Preserve private/sampling/optimization functionality.
+**Exact next action:** deploy the tested ordinary-HIT milestone through normal user installation, then repeat live-20261127 keepalive benchmark without conflating ordinary and successful early HIT paths. Independently instrument/identify resource URLs repeatedly detaching when resource-optimization-pending recurs; preserve async processing and publication validity. Redundant early-HIT NGINX body copy remains an unimplemented candidate requiring its own baseline. No user changes to discard.
 
 **Deployment:** local only, no push. Preserve existing RUM, image/CSS/JS optimization, cookie/authorization bypass, and cache validity. Default change alters option signatures, so entries warm in a new namespace.
 
@@ -946,3 +948,24 @@ Live homepage diagnostics completed locally: HTML211+cookie4+Vary8+NGINX294 and 
 User requests current/previous benchmark. Running same HTTP1.1 identity persistentTLS probes as live-20261126 (3warm+20measured/page) public and loopback, plus same randomized normal/uniqueheader/PageSpeedoff audit as latency-audit-20261126 (5warm+20measured/phase/page). No purge/config/reload/deploy; probes warm bounded variants. Record cache statuses/server perrow; compare like-for-like only and separate network fromserver. Raw output docs/performance/live-20261127.
 
 Live latency comparison completed2026-11-27: reported1eec8fb. Initial homepage20/20BYPASS localmedian116.70ms/public195.65ms allreasonresource-optimization-pending; later audit20HIT and finalretest20HIT/page/location. Final localhomepage1.42ms vs previous0.90; public73.19vs71.93ms. Detailedcomparisons/initialstates/rawsamples docs/performance/live-20261127/RESULTS.md. Samehistoricalmethods, notcode-onlycontrolledbenchmark; no coldpurge/livechanges/profiling. Pendingresourceidentity remains nextdiagnostic if recurs; do not label as sampling or permanentlyfixed. All commandscomplete, measurementonly no applicationtests needed.
+
+## HTML HIT publication-policy overhead — 2026-11-27 IN PROGRESS
+
+- Audit: clean tree at e5f238e; read ledger/recent commits. Ordinary HtmlCacheSession::lookup prepares early publication hint even on valid HIT (key build + cloned response binary serialization). Early lookup itself already avoids this work.
+- Plan: establish current tests/build and allocation/timing baseline with existing font_lookup_latency example; move publication-only preparation to MISS path; verify ordinary and early HIT/MISS behavior and full HTML tests; compare release allocation/timings. Separately remove redundant owned-body copy in NGINX early HIT if verified safe. Do not claim these explain the entire live regression.
+- Acceptance: same HTML/body/TTL/purge/cookie/Vary/beacon behavior; fewer HIT allocations; compile/test pass; persisted commands/results and incremental tested commit.
+- Pending: baseline completing, implementation, verification, benchmark/report/commit. No production changes.
+
+- Baseline cache tests:25pass. Existing release example updated to enable HtmlCacheEarlyLookup for ordinary HIT profiling (defaultoff would omit the candidate work). Before.csv saved: HIT without font15.168us/571allocations, with font15.269us/576allocations. Full before binary temporarily retained locally for alternating matched reruns; not to commit. Implementation defers hint only until MISS and retains invalid-entry arming. Full ps-html tests/build running. Workspace formatter touched unrelated files; restored only those formatter-only edits from initially clean tree.
+
+- Implementation complete (html_cache.rs only): valid normal HIT returns before publication-hint key/header construction; both absent and invalid entries share unchanged arming/preparation. Benchmark fixture explicitly enables early lookup to cover candidate. Full `cargo test --locked -p ps-html` still compiling integration targets under substantial host load; no pass claimed until completed. Saved original benchmark executable locally for alternating trials; remove it before commit. No runtime NGINX edits.
+
+Resumed after interruption: prior full tests did not finish and release after benchmark did not start. Resumed with -j2 to bound compiler concurrency; retained original partial log. Added corrupt HTML entry repair/early publication regression. No test results assumed from interrupted run.
+
+Verification update: resumed full ps-html test command completed successfully; targeted cache rerun26passed including newly added corrupt-entry regression. Release example rebuilding and matched NGINX1.31.10 module build queued. Alternating benchmark/report/commit remain pending; no live changes.
+
+Release verification complete: example compiled and executed; first after ordinary HIT allocations406/411 vs baseline571/576 (165 fewer each). Full resumed ps-html suite1775passed across64summaries (new regression added during compilation, verified separately by26cachetests). Matched NGINX1.31.10 release module built successfully. Alternating three paired release runs now executing with compilation finished; timing conclusions pending.
+
+## HTML HIT policy milestone — VERIFIED LOCALLY 2026-11-27
+
+All planned implementation/test/benchmark/report tasks complete; pending-resource investigation remains separate. Files: html_cache.rs, existing font_lookup_latency example, this ledger, docs/performance/html-hit-policy-20261127 artifacts. Three alternating before/after trials confirm37.0%/36.8% ordinary HIT microbenchmark reduction and165fewer allocations; savings~0.006ms, not full live request improvement. Correctness checks/fullHTML/release/matchedNGINXbuild passed. No NGINX runtime edits, deployment or push. Removed only owned temporary baseline binary after persisting raw trials. Commit this tested milestone; next actions above.

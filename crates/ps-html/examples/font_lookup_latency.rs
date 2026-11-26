@@ -204,6 +204,10 @@ fn html_hit() {
         options
             .set_option("HtmlCache", "on", Scope::Server)
             .unwrap();
+        // Include publication-hint preparation in the ordinary HIT profile.
+        options
+            .set_option("HtmlCacheEarlyLookup", "on", Scope::Server)
+            .unwrap();
         if enabled {
             options.filters_mut().enable(Filter::PreloadCriticalFonts);
         } else {

@@ -202,48 +202,41 @@ impl HtmlCacheSession {
             beacon_identity,
             ..
         } = eligibility;
+        let lookup = self.driver.server_context().metadata_cache().get(&key);
+        if let ps_cache::cache::Lookup {
+            state: ps_cache::cache::KeyState::Available,
+            value: Some(blob),
+        } = lookup
+        {
+            if let Some(entry) = html_codec::validate_value(
+                &blob,
+                &self.url,
+                now_ms,
+                ttl_ms,
+                origin_expiry_ms,
+                purge,
+            ) {
+                self.count("html_cache_hits", 1);
+                self.count("html_cache_bytes_served", entry.body.len() as i64);
+                self.state = SessionState::Hit;
+                return Some(entry);
+            }
+        }
+        // Only a MISS can publish a new early-lookup hint. Avoid building its
+        // key and cloning/serializing origin headers for an existing HIT.
         self.early_policy = self.early_key(request, file_mtime).and_then(|hint_key| {
             let bytes = origin.clone().write_as_binary();
             (bytes.len() <= 65000).then_some((hint_key, bytes))
         });
-        let lookup = self.driver.server_context().metadata_cache().get(&key);
-        let blob = match lookup {
-            ps_cache::cache::Lookup {
-                state: ps_cache::cache::KeyState::Available,
-                value: Some(blob),
-            } => blob,
-            _ => {
-                self.count("html_cache_misses", 1);
-                self.state = SessionState::Armed {
-                    key,
-                    ttl_ms,
-                    origin_expiry_ms,
-                    body: Vec::new(),
-                    beacon_identity,
-                };
-                return None;
-            }
+        self.count("html_cache_misses", 1);
+        self.state = SessionState::Armed {
+            key,
+            ttl_ms,
+            origin_expiry_ms,
+            body: Vec::new(),
+            beacon_identity,
         };
-        match html_codec::validate_value(&blob, &self.url, now_ms, ttl_ms, origin_expiry_ms, purge)
-        {
-            Some(entry) => {
-                self.count("html_cache_hits", 1);
-                self.count("html_cache_bytes_served", entry.body.len() as i64);
-                self.state = SessionState::Hit;
-                Some(entry)
-            }
-            None => {
-                self.count("html_cache_misses", 1);
-                self.state = SessionState::Armed {
-                    key,
-                    ttl_ms,
-                    origin_expiry_ms,
-                    body: Vec::new(),
-                    beacon_identity,
-                };
-                None
-            }
-        }
+        None
     }
 
     /// Origin-independent candidate key. File-backed routes use the current
@@ -1607,6 +1600,50 @@ mod tests {
             .session()
             .lookup_early(&request, &h.purge, mtime, START_MS + 1)
             .is_none());
+    }
+
+    #[test]
+    fn corrupt_html_miss_republishes_early_lookup_policy() {
+        let h = Harness::new();
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheEarlyLookup",
+                "on",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        let request = h.get_request();
+        let origin = h.ok_origin();
+        let mut first = h.session();
+        assert!(first
+            .lookup(&origin, &request, &h.purge, None, START_MS)
+            .is_none());
+        let SessionState::Armed { key, .. } = &first.state else {
+            panic!("MISS must arm");
+        };
+        let key = key.clone();
+        first.write(b"old HTML");
+        first.finish(&request, START_MS);
+        h.driver
+            .server_context()
+            .metadata_cache()
+            .put(&key, b"corrupt HTML entry");
+        assert!(h
+            .session()
+            .lookup_early(&request, &h.purge, None, START_MS + 1)
+            .is_none());
+        let mut repair = h.session();
+        assert!(repair
+            .lookup(&origin, &request, &h.purge, None, START_MS + 1)
+            .is_none());
+        repair.write(b"repaired HTML");
+        repair.finish(&request, START_MS + 1);
+        let (entry, _) = h
+            .session()
+            .lookup_early(&request, &h.purge, None, START_MS + 2)
+            .expect("invalid cached HTML must still republish its early policy after repair");
+        assert_eq!(entry.body, b"repaired HTML");
     }
 
     #[test]
