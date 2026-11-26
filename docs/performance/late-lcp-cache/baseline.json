@@ -1,0 +1,170 @@
+[
+  {
+    "asset": "critical_images_beacon_opt.js",
+    "mode": "lazy-empty",
+    "reports": [
+      {
+        "transport": "beacon",
+        "body": "oh=options&n=testnonce&lcpk=text"
+      }
+    ],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_opt.js",
+    "mode": "lazy-delayed",
+    "reports": [
+      {
+        "transport": "beacon",
+        "body": "oh=options&n=testnonce&lcpk=text"
+      }
+    ],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_opt.js",
+    "mode": "lazy-images",
+    "reports": [],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_opt.js",
+    "mode": "hidden-native",
+    "reports": [
+      {
+        "transport": "beacon",
+        "body": "oh=options&n=testnonce&lcpk=unknown"
+      }
+    ],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_opt.js",
+    "mode": "hidden-fallback",
+    "reports": [
+      {
+        "transport": "xhr",
+        "body": "oh=options&n=testnonce&lcpk=unknown"
+      }
+    ],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_opt.js",
+    "mode": "hidden-throw",
+    "reports": [
+      {
+        "transport": "xhr",
+        "body": "oh=options&n=testnonce&lcpk=unknown"
+      }
+    ],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_opt.js",
+    "mode": "image-late-onload",
+    "reports": [],
+    "passed": false
+  },
+  {
+    "asset": "critical_images_beacon_opt.js",
+    "mode": "image-late-lazy",
+    "reports": [],
+    "passed": false
+  },
+  {
+    "asset": "critical_images_beacon_opt.js",
+    "mode": "image-late-duplicate",
+    "reports": [
+      {
+        "transport": "beacon",
+        "body": "oh=options&n=testnonce&lcp=hero-hash"
+      }
+    ],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_dbg.js",
+    "mode": "lazy-empty",
+    "reports": [
+      {
+        "transport": "beacon",
+        "body": "oh=options&n=testnonce&lcpk=text"
+      }
+    ],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_dbg.js",
+    "mode": "lazy-delayed",
+    "reports": [
+      {
+        "transport": "beacon",
+        "body": "oh=options&n=testnonce&lcpk=text"
+      }
+    ],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_dbg.js",
+    "mode": "lazy-images",
+    "reports": [],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_dbg.js",
+    "mode": "hidden-native",
+    "reports": [
+      {
+        "transport": "beacon",
+        "body": "oh=options&n=testnonce&lcpk=unknown"
+      }
+    ],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_dbg.js",
+    "mode": "hidden-fallback",
+    "reports": [
+      {
+        "transport": "xhr",
+        "body": "oh=options&n=testnonce&lcpk=unknown"
+      }
+    ],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_dbg.js",
+    "mode": "hidden-throw",
+    "reports": [
+      {
+        "transport": "xhr",
+        "body": "oh=options&n=testnonce&lcpk=unknown"
+      }
+    ],
+    "passed": true
+  },
+  {
+    "asset": "critical_images_beacon_dbg.js",
+    "mode": "image-late-onload",
+    "reports": [],
+    "passed": false
+  },
+  {
+    "asset": "critical_images_beacon_dbg.js",
+    "mode": "image-late-lazy",
+    "reports": [],
+    "passed": false
+  },
+  {
+    "asset": "critical_images_beacon_dbg.js",
+    "mode": "image-late-duplicate",
+    "reports": [
+      {
+        "transport": "beacon",
+        "body": "oh=options&n=testnonce&lcp=hero-hash"
+      }
+    ],
+    "passed": true
+  }
+]

@@ -4332,7 +4332,9 @@ pagespeed.CriticalImages.Beacon_.prototype.setupLcpObserver_ = function() {
         for (var c = 0; c < b.length; ++c) {
           a.trackLcpEntry_(b[c]);
         }
-        a.imageFreeLoaded_ && a.checkCriticalImages_();
+        // Retry only after onload/lazyload explicitly requested collection.
+        // LCP callbacks can arrive after that first check found no entries.
+        a.checkRequested_ && a.checkCriticalImages_();
       }), a.lcpObserver_.observe({type:"largest-contentful-paint", buffered:!0}), pagespeedutils.addHandler(document, "visibilitychange", function() {
         "hidden" == document.visibilityState && b();
       }), pagespeedutils.addHandler(window, "pagehide", b);
@@ -4343,6 +4345,7 @@ pagespeed.CriticalImages.Beacon_.prototype.setupLcpObserver_ = function() {
 };
 pagespeed.CriticalImages.Beacon_.prototype.checkCriticalImages_ = function() {
   if (!this.beaconSent_) {
+    this.checkRequested_ = !0;
     if (this.lcpObserver_ && this.lcpObserver_.takeRecords) {
       for (var a = this.lcpObserver_.takeRecords(), b = 0; b < a.length; ++b) {
         this.trackLcpEntry_(a[b]);
@@ -4399,7 +4402,6 @@ pagespeed.CriticalImages.Run = function(a, b, c, d, e, f) {
   // With no images there is no lazyload callback to trigger collection.
   // Keep observing until usable LCP evidence exists or the page is hidden.
   (d || !document.getElementsByTagName("IMG").length) && pagespeedutils.addHandler(window, "load", function() {
-    g.imageFreeLoaded_ = !document.getElementsByTagName("IMG").length;
     window.setTimeout(function() {
       g.checkCriticalImages_();
     }, 0);

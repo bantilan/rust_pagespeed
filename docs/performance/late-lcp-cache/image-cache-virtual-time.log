@@ -1,0 +1,6 @@
+nginx: [alert] could not open error log file: open() "/var/log/nginx/error.log" failed (13: Permission denied)
+Traceback (most recent call last):
+  File "/home/gamingph/Projects/Rust/pagespeed-rust/tools/verify_early_html_cache.py", line 182, in <module>
+    assert base64.urlsafe_b64decode(sample_record()[6] + '===').decode() == 'img', sample_record()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ['beacon-evidence/1', '0', '4', '0', '1795707222283', '4', '', '', '0', '1', 'MjE2MzQ5OTA0\t0']

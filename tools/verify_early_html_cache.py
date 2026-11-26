@@ -25,9 +25,13 @@ p.add_argument('--rum-only', action='store_true', help='Isolate RUM clock retent
 p.add_argument('--analytics-early', choices=['baseline', 'fixed'], help='Verify analytics origin counter before/after allowlist parity fix')
 p.add_argument('--sampled-image-free', action='store_true', help='Real Chrome image-free lazyload sampling through stable cache HITs')
 p.add_argument('--browser-groups', action='store_true', help='Replay Chrome/Firefox navigation header differences against one public entry')
+p.add_argument('--sampled-image', action='store_true', help='Real Chrome sampling on an image-bearing page through stable cache HITs')
 a = p.parse_args()
+assert not (a.sampled_image and a.sampled_image_free), 'choose one sampled fixture'
 root = Path(tempfile.mkdtemp(prefix='ps-early-html-'))
 (root / 'logs').mkdir()
+if a.sampled_image:
+    (root / 'hero.jpg').write_bytes((Path(__file__).resolve().parent.parent / 'crates/ps-html/tests/data/Puzzle.jpg').read_bytes())
 counts = {}
 lock = threading.Lock()
 
@@ -74,6 +78,8 @@ class Origin(socketserver.BaseRequestHandler):
         time.sleep(.025)  # Explicit synthetic origin cost, not production timing.
         cookie = 'Set-Cookie: session=private\r\n' if uri.startswith('/private') else ''
         body = b'<html><head><title>Origin counter</title></head><body>' + b'hello world ' * 4000 + b'</body></html>'
+        if a.sampled_image:
+            body = b'<html><head><title>Image sample</title><style>body{margin:0}img{display:block;width:640px;height:400px}</style></head><body><img src="/hero.jpg" width="640" height="400"><p>Image LCP</p></body></html>'
         response = ('Status: 200 OK\r\nContent-Type: text/html\r\nCache-Control: public, max-age=60\r\n' + cookie + '\r\n').encode() + body
         self.request.sendall(struct.pack('!BBHHBB', 1, 6, req, len(response), 0, 0) + response)
         self.request.sendall(struct.pack('!BBHHBB', 1, 6, req, 0, 0, 0))
@@ -108,6 +114,8 @@ http {{
  }}
 }}
 '''
+if a.sampled_image:
+    conf = conf.replace('  location / {', f'  location = /hero.jpg {{ alias {root}/hero.jpg; pagespeed off; }}\n  location = /favicon.ico {{ return 204; }}\n  location / {{')
 if a.sampled_image_free:
     conf = conf.replace('  pagespeed on;', '  pagespeed on;\n  pagespeed EnableFilters lazyload_images;')
 if a.rum_only:
@@ -139,7 +147,7 @@ try:
                 break
         except OSError:
             time.sleep(.05)
-    if a.sampled_image_free:
+    if a.sampled_image_free or a.sampled_image:
         # Real browser + actual POST receiver, no forged sampling completion.
         # The fourth issuance observes three accepted samples and selects low frequency.
         import zlib
@@ -157,6 +165,11 @@ try:
             assert len(records) <= 1, records
             return records[0] if records else None
         def chrome_visit():
+            if a.sampled_image:
+                from chrome_cdp import capture_page
+                captured = capture_page(f'http://127.0.0.1:{port}/')
+                markers = re.findall(r'<!-- PageSpeed Cache: (HIT|MISS|BYPASS)', captured['html'])
+                return markers[-1] if markers else 'DOM_NO_MARKER'
             run = subprocess.run(['google-chrome', '--headless', '--no-sandbox', '--disable-gpu',
                 '--no-proxy-server', '--virtual-time-budget=2000', '--dump-dom',
                 f'http://127.0.0.1:{port}/'], capture_output=True, text=True, timeout=25, check=True)
@@ -169,6 +182,9 @@ try:
             assert record and int(record[2]) >= count, (visits, record)
             if count < 4:
                 time.sleep(5.1)
+        if a.sampled_image:
+            import base64
+            assert base64.urlsafe_b64decode(sample_record()[6] + '===').decode() == 'img', sample_record()
         visits.append(chrome_visit())
         # Fresh probe identity, same learned page/device evidence.
         headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36'}
@@ -179,8 +195,8 @@ try:
         stable.append(get(headers=headers)['marker'])
         assert all(marker == 'HIT' for marker in stable), (visits, stable)
         assert counts.get('/', 0) == before, counts
-        result = {'sampling_visits': visits, 'publication': publication, 'stable_visits': stable,
-                  'valid_beacons': int(sample_record()[2]), 'origin_counts': counts,
+        result = {'sampled_image': a.sampled_image, 'sampling_visits': visits, 'publication': publication, 'stable_visits': stable,
+                  'valid_beacons': int(sample_record()[2]), 'lcp_kind': 'img' if a.sampled_image else 'image-free', 'origin_counts': counts,
                   'warm_hits_skipped_origin': True, 'prefix': str(root)}
         Path(a.output).write_text(json.dumps(result, indent=2) + '\n')
         print(json.dumps(result))

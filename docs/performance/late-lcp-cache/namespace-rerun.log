@@ -1,0 +1,33 @@
+warning: unused import: `ps_http::fetch::AsyncFetch`
+   --> crates/ps-nginx/src/file_fetch.rs:652:13
+    |
+652 |         use ps_http::fetch::AsyncFetch;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Cache`
+   --> crates/ps-nginx/src/beacon.rs:349:31
+    |
+349 |         use ps_cache::cache::{Cache, KeyState};
+    |                               ^^^^^
+
+warning: variable does not need to be mutable
+   --> crates/ps-nginx/src/send.rs:673:13
+    |
+673 |         let mut make_sink = |metadata: std::sync::Arc<dyn ps_cache::cache::Cache>| {
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-nginx` (lib test) generated 3 warnings (run `cargo fix --lib -p ps-nginx --tests` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.14s
+     Running unittests src/lib.rs (target/debug/build/ps-nginx/0e11ea6e28b64271/out/ps_nginx-0e11ea6e28b64271)
+
+running 1 test
+test caches::tests::restart_namespace_prevents_old_shared_generation_hits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 293 filtered out; finished in 0.00s
+
