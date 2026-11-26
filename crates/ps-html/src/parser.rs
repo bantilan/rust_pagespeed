@@ -165,6 +165,12 @@ impl Dom {
         self.element(id).name.keyword()
     }
 
+    /// Original tag spelling borrowed from the DOM, without copying.
+    #[must_use]
+    pub fn element_name_bytes(&self, id: NodeId) -> &[u8] {
+        self.element(id).name.value()
+    }
+
     #[must_use]
     pub fn element_name(&self, id: NodeId) -> Vec<u8> {
         self.element(id).name.value().to_vec()

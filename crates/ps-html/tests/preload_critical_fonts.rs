@@ -530,3 +530,43 @@ fn driver_run_emits_through_chain() {
     assert!(out.contains("rel=\"preload\""), "{out}");
     assert!(out.contains("manrope-400.woff2"), "{out}");
 }
+
+#[test]
+fn selector_evidence_preserves_case_entities_and_document_isolation() {
+    for (selector, present, absent) in [
+        ("h1", "<H1>heading</H1>", "<section>text</section>"),
+        (
+            "my-card",
+            "<MY-CARD>text</MY-CARD>",
+            "<another-card>text</another-card>",
+        ),
+        (
+            ".Used",
+            "<div class='Used Used &#85;sed'>text</div>",
+            "<div class='used'>text</div>",
+        ),
+        (
+            "#Main",
+            "<div id='M&#97;in'>text</div>",
+            "<div id='main'>text</div>",
+        ),
+    ] {
+        let (server, options) = fixture();
+        let driver = driver_for(&server, &options);
+        let css = format!("@font-face{{font-family:A;src:url(https://test.com/a.woff2)}}{selector}{{font-family:A}}");
+        let doc = |content: &str| {
+            format!("<html><head><style>{css}</style></head><body>{content}</body></html>")
+        };
+        // New documents with changed selector evidence must not reuse a
+        // positive or negative decision belonging to the previous document.
+        for content in [present, absent, present, present] {
+            let out = render_filter(&driver, &doc(content));
+            assert_eq!(
+                out.matches("as=\"font\"").count(),
+                usize::from(content == present),
+                "{selector}: {out}"
+            );
+        }
+        assert_eq!(stat(&server, FONT_PRELOAD_CACHE_HIT), 1, "{selector}");
+    }
+}

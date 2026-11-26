@@ -444,16 +444,25 @@ impl PreloadCriticalFontsFilter {
     /// verification (bounded; tags lowercased, classes/ids exact).
     fn note_dom_token(&mut self, dom: &mut Dom, id: NodeId) {
         if self.dom_tags.len() < MAX_DOM_TAGS {
-            let tag = dom.element_name(id).to_ascii_lowercase();
-            if !tag.is_empty() && tag.len() <= MAX_DOM_TOKEN_BYTES {
-                if let Ok(tag) = String::from_utf8(tag) {
-                    self.dom_tags.insert(tag);
+            let bytes = dom.element_name_bytes(id);
+            if !bytes.is_empty() && bytes.len() <= MAX_DOM_TOKEN_BYTES {
+                if let Ok(tag) = std::str::from_utf8(bytes) {
+                    // Most tags are already lowercase and already present.
+                    // Borrow that common path; preserve custom/mixed-case tags.
+                    let tag = if bytes.iter().any(u8::is_ascii_uppercase) {
+                        std::borrow::Cow::Owned(tag.to_ascii_lowercase())
+                    } else {
+                        std::borrow::Cow::Borrowed(tag)
+                    };
+                    if !self.dom_tags.contains(tag.as_ref()) {
+                        self.dom_tags.insert(tag.into_owned());
+                    }
                 }
             }
         }
         if self.dom_classes.len() < MAX_DOM_CLASSES {
             if let Some(index) = dom.find_attribute(id, Keyword::Class) {
-                if let (Some(value), _) = dom.decoded_attribute(id, index) {
+                if let Some(value) = dom.element_attributes_mut(id)[index].decoded_value_or_null() {
                     for class in value.split(|byte| byte.is_ascii_whitespace()) {
                         if class.is_empty() || class.len() > MAX_DOM_TOKEN_BYTES {
                             continue;
@@ -461,8 +470,10 @@ impl PreloadCriticalFontsFilter {
                         if self.dom_classes.len() >= MAX_DOM_CLASSES {
                             break;
                         }
-                        if let Ok(class) = String::from_utf8(class.to_vec()) {
-                            self.dom_classes.insert(class);
+                        if let Ok(class) = std::str::from_utf8(class) {
+                            if !self.dom_classes.contains(class) {
+                                self.dom_classes.insert(class.to_owned());
+                            }
                         }
                     }
                 }
@@ -470,13 +481,15 @@ impl PreloadCriticalFontsFilter {
         }
         if self.dom_ids.len() < MAX_DOM_IDS {
             if let Some(index) = dom.find_attribute(id, Keyword::Id) {
-                if let (Some(value), _) = dom.decoded_attribute(id, index) {
+                if let Some(value) = dom.element_attributes_mut(id)[index].decoded_value_or_null() {
                     let clean = !value.is_empty()
                         && value.len() <= MAX_DOM_TOKEN_BYTES
                         && !value.iter().any(|byte| byte.is_ascii_whitespace());
                     if clean {
-                        if let Ok(id) = String::from_utf8(value.to_vec()) {
-                            self.dom_ids.insert(id);
+                        if let Ok(id) = std::str::from_utf8(value) {
+                            if !self.dom_ids.contains(id) {
+                                self.dom_ids.insert(id.to_owned());
+                            }
                         }
                     }
                 }
