@@ -11,3 +11,11 @@ Read-only SSH access-log check found multiple critical-image POSTs (query only u
 Reproduction commands: Python urllib.request homepage GET with HAR navigation headers (no private cookies), identity encoding, three repetitions; curl -sS --compressed --max-time 20 with supplied HAR headers, five repetitions; ssh root@157.245.148.68 nginx -T and filtered site access logs. Raw private logs/headers are not persisted. PageSpeed=off query showed origin response lacks explicit Cache-Control; rewritten max-age=0,no-cache alone is not sufficient evidence of origin prohibition.
 
 Next: capture consecutive browser navigations including HTML response bodies and critical beacon POST completion, or instrument explicit non-cookie store-skip reasons before making a source fix. Do not disable beacon sampling or private-response gates to force HIT.
+
+## Firefox/Chrome comparison — deployment 5e74c19
+
+New captures at 12:14:18 UTC (Chrome158) and 12:14:35 UTC (Firefox147) target the same /sample-page/. Both desktop Linux, HTTP/2, identical language en-US,en;q=0.9 and encoding gzip, deflate, br, zstd; no request cookies. Firefox body explicitly shows HIT created12:13:35 UTC; Chrome body omitted, so its status cannot be independently read.
+
+Current request_identity removes UA/Accept/client-brand hints and canonicalizes casing/order, but serializes other request headers. Firefox alone sends Sec-GPC:1, Connection:keep-alive and TE:trailers. Chrome alone sends Cache-Control:max-age=0. These retained inputs prevent identical identities independently of UA grouping. Host vs :authority in HAR is transport representation; not claimed as a confirmed internal-key difference. No source fix or new runtime test in this read-only comparison.
+
+Follow-up design: canonicalize transport headers and refresh-only max-age=0 where safe, preserving explicit origin Vary and force-revalidation/no-store behavior. Sec-GPC is intentionally retained as a privacy/content dimension; never suppress the signal to the origin or casually merge privacy-dependent HTML. Existing grouping test used requests matching these other headers, so it did not establish sharing for this actual browser pair.
