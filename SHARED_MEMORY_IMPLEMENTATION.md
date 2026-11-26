@@ -854,3 +854,7 @@ Before fix isolatedwire reproduces500. Initial absentbuffer-only guard failed on
 ## README latest features — 2026-11-26
 
 Documentation-only user request completed: CoreFilters automatic fontpreloads/options/limits/customproperties/variableweights/selectorverification/beacontransport/caching; analytics earlyHITwithprivacycontract; intentional samplingBY PASS/MISSexplanation; componentvsisolatedvslivebenchmark distinction; corrected outdated sharedmetadata/RUMstatus from verifiedchain/oracles and immutablevsrequestlocalinitialization claim. Historical ef9aeb5table now labeled baseline rather thanlatest. README links to latestbenchmark/verification artifacts. No runtime/config/deployment changes. Checked filter/default names against implementation, relativelinks anddiff; no builds/tests rerun for prose. Implementation resume remains emptyfontPOST install/retest above.
+
+## README discoverability follow-up — 2026-11-26
+
+User asked where Zstd/fontlookup/etc appear. Added prominent feature quickreference beforePerformance with exactdirectives/defaults and internal links forZstd,fontpreload,earlyHTML/analytics,AVIF,LCP,sharedcache,RUM; added Zstd comparisontable entry. Existing detailedsections retained. Documentation-only; checkedheadinganchors/directive names/diff. No runtime/deploy changes; implementation resume unchanged.

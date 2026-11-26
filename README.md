@@ -14,6 +14,33 @@ proxy mode). The latest recorded full workspace run passed 2,920 primary tests a
 [verification record](SHARED_MEMORY_IMPLEMENTATION.md)). It is still maturing: keep backups of
 your C++ configuration when switching over.
 
+## Feature quick reference
+
+| Feature | Configuration / behavior | Details |
+|---|---|---|
+| **Zstd compression** | `pagespeed EnableFilters compress_zstd;` — negotiated with supporting clients | [Compression and caching](#zstd-output-compression) |
+| **Automatic font lookup and preloading** | `preload_critical_fonts` is on in CoreFilters; disable with `pagespeed DisableFilters preload_critical_fonts;` | [Discovery, learning, and controls](#automatic-critical-font-preloads) |
+| **HTML cache before PHP** | `pagespeed HtmlCache on;` plus `pagespeed HtmlCacheEarlyLookup on;` | [Early HITs and analytics cookies](#serve-html-cache-hits-before-php) |
+| **WebP / AVIF images** | Image conversion and per-client format negotiation; AVIF needs the runtime encoder | [AVIF dependency](#avif-runtime-dependency) |
+| **LCP and critical-image learning** | Beacon evidence, priority/preload hints, logo detection, and fallback hero selection | [Supported features](#features-vs-c-pagespeed) |
+| **Shared metadata caching** | Optional bounded cross-worker tier, alongside default local LRU and disk persistence | [Shared caching](#shared-caching) |
+| **RUM instrumentation** | `pagespeed EnableFilters add_instrumentation;` — navigation timing remains active in cached HTML | [HTML-cache behavior](#serve-html-cache-hits-before-php) |
+
+Example inside an existing PageSpeed-enabled NGINX `http {}` or `server {}` block:
+
+```nginx
+pagespeed EnableFilters compress_zstd;
+# Font lookup/preloading already runs with CoreFilters.
+# pagespeed EnableFilters preload_critical_fonts;
+
+# Optional, for public routes with suitable cache invalidation:
+pagespeed HtmlCache on;
+pagespeed HtmlCacheEarlyLookup on;
+```
+
+Read each feature's eligibility and cache-policy requirements below before
+changing an existing deployment.
+
 ## Performance
 
 The following controlled static-page baseline uses **`ef9aeb5`**, tested on 2026-11-24 with the default
@@ -205,6 +232,7 @@ Legend: ✅ supported · 🔶 partial · 📋 planned · ❌ not supported (out 
 | **Async CSS/JS combination** | ✅ threads | ✅ adapted | Background combiners with failure memory; uncombinable members never block HTML caching |
 | **Background admin reporting** | ✅ | ✅ | Worker completions land on the admin images page |
 | Admin / console / statistics / graphs | ✅ | ✅ | `ps-admin` + cross-process shared counters |
+| **Zstd output compression** | — | ✅ | `compress_zstd`; negotiated, streaming, bounded payload cache |
 | Gzip handling, Vary, downstream caching | ✅ | ✅ | |
 | Apache module | ✅ | ❌ | NGINX only |
 | Envoy integration | ✅ | ❌ | |
