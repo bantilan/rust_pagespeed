@@ -158,6 +158,8 @@ pagespeed HtmlCacheEarlyLookup on;
 pagespeed ShowCacheTimestamp on;  # Optional HIT/MISS/BYPASS comment
 ```
 
+Cache timestamp comments are added only to complete source HTML documents with explicit `<html>` and `</html>` tags. Plain text, JSON, HTML fragments, and incomplete documents receive no cache timestamp or cache-detail comment, including on cache hits. This is automatic and does not disable caching or rewriting.
+
 After an eligible rewrite publishes its body and origin-policy metadata, warm
 GET requests can return before PHP or another origin handler runs. Missing,
 expired, purged, corrupt, or differently keyed entries fall through to the

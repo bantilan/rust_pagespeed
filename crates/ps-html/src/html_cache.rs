@@ -54,6 +54,8 @@ pub struct HtmlCacheSession {
     device_suffix: String,
     state: SessionState,
     early_policy: Option<(String, Vec<u8>)>,
+    diagnostic_shape: Option<super::document_shape::DocumentShape>,
+    source_shape: Option<super::document_shape::DocumentShape>,
 }
 
 /// Why a lookup bypassed (cookie names only; cookie values never
@@ -167,6 +169,7 @@ impl HtmlCacheSession {
             "Original formats"
         }
         .to_string();
+        let diagnostic_shape = driver.options().show_cache_timestamp().then(super::document_shape::DocumentShape::default);
         HtmlCacheSession {
             driver,
             url: url.to_string(),
@@ -175,6 +178,8 @@ impl HtmlCacheSession {
             device_suffix,
             state: SessionState::Pending,
             early_policy: None,
+            diagnostic_shape,
+            source_shape: None,
         }
     }
 
@@ -365,15 +370,25 @@ impl HtmlCacheSession {
     /// unless `ShowCacheTimestamp`).
     #[must_use]
     pub fn hit_comment(&self, entry: &html_codec::HtmlCacheEntry, now_ms: i64) -> Option<Vec<u8>> {
-        if !self.driver.options().show_cache_timestamp() {
+        if !self.driver.options().show_cache_timestamp() || !entry.source_document {
             return None;
         }
         Some(show_comment(true, entry.created_ms, now_ms).into_bytes())
     }
 
-    /// Buffers rewritten bytes for a later store (over-cap bodies
-    /// disqualify, like C++).
+    /// Observe original response bytes before rewrite filters can synthesize tags.
+    pub fn observe_source(&mut self, bytes: &[u8]) {
+        // Diagnostic configuration is signature-bearing; do no scan when off.
+        if self.diagnostic_shape.is_some() {
+            self.source_shape.get_or_insert_with(Default::default).write(bytes);
+        }
+    }
+
+    /// Buffers rewritten bytes for a later store (over-cap bodies disqualify).
     pub fn write(&mut self, bytes: &[u8]) {
+        if self.source_shape.is_none() {
+            if let Some(shape) = &mut self.diagnostic_shape { shape.write(bytes); }
+        }
         if let SessionState::Armed { body, .. } = &mut self.state {
             if body.len() + bytes.len() <= html_codec::MAX_HTML_BODY_BYTES {
                 body.extend_from_slice(bytes);
@@ -395,7 +410,9 @@ impl HtmlCacheSession {
     /// HIT/MISS/BYPASS comment. Idempotent.
     pub fn finish(&mut self, request: &RequestHeaders, now_ms: i64) -> HtmlCacheFinish {
         let options = self.driver.options();
-        let show = options.show_cache_timestamp();
+        let document = self.source_shape.as_ref().or(self.diagnostic_shape.as_ref())
+            .is_some_and(|shape| shape.complete());
+        let show = options.show_cache_timestamp() && document;
         // Publication re-check: the store path enforces the same
         // request policy as lookup (fail closed).
         let request_pairs: Vec<(&str, &str)> = request.headers().iter().collect();
@@ -444,7 +461,7 @@ impl HtmlCacheSession {
                 {
                     let expires_ms = html_codec::store_expiry_ms(origin_expiry_ms, now_ms, ttl_ms);
                     if expires_ms > now_ms {
-                        if let Some(value) = html_codec::encode_value(now_ms, expires_ms, &body) {
+                        if let Some(value) = html_codec::encode_document_value(now_ms, expires_ms, &body, document) {
                             self.driver
                                 .server_context()
                                 .metadata_cache()
@@ -614,7 +631,7 @@ impl HtmlCacheSession {
             i64::MAX
         };
         let mut identity = format!(
-            "public-html-v2\n{}\n{}\n{}\n{}\n",
+            "public-html-v3\n{}\n{}\n{}\n{}\n",
             self.url,
             self.driver.cache_fragment(),
             self.driver.options_signature(),
@@ -1962,6 +1979,10 @@ mod tests {
             .borrow_mut()
             .set_option("ShowCacheTimestamp", "on", ps_config::scope::Scope::Server)
             .unwrap();
+        // Legacy/off-diagnostic entries do not acquire a timestamp later.
+        assert!(second.hit_comment(&entry, START_MS + 61000).is_none());
+        let mut entry = entry;
+        entry.source_document = true;
         let comment = second.hit_comment(&entry, START_MS + 61000);
         let comment = String::from_utf8(comment.expect("hit comment")).unwrap();
         assert!(comment.contains("PageSpeed Cache: HIT"), "{comment}");
@@ -2476,6 +2497,49 @@ mod tests {
         let finish = render.finish(&request, START_MS + 1000);
         assert!(finish.detail_line.is_none());
         assert_eq!(0, settled.counter("html_cache_inserts"));
+    }
+
+    #[test]
+    fn fragment_diagnostics_suppressed_for_miss_hit_early_and_bypass() {
+        for source in [b"1000".as_slice(), b"<div>1000</div>", b"{\"price\":1000}", b"<html>incomplete"] {
+            let h = Harness::new();
+            h.options.borrow_mut().set_option("ShowCacheTimestamp", "on", ps_config::scope::Scope::Server).unwrap();
+            h.options.borrow_mut().set_option("HtmlCacheEarlyLookup", "on", ps_config::scope::Scope::Server).unwrap();
+            let request = h.get_request();
+            let origin = h.ok_origin();
+            let mut miss = h.session();
+            assert!(miss.lookup(&origin, &request, &h.purge, None, START_MS).is_none());
+            for chunk in source.chunks(2) { miss.observe_source(chunk); }
+            // Simulate filters which synthesize complete markup around fragments.
+            miss.write(b"<html><head></head><body>1000</body></html>");
+            let finish = miss.finish(&request, START_MS + 1);
+            assert!(finish.detail_line.is_some(), "fragment cache itself is retained");
+            assert!(finish.show_comment.is_none());
+            let mut hit = h.session();
+            let entry = hit.lookup(&origin, &request, &h.purge, None, START_MS + 2).unwrap();
+            assert!(hit.hit_comment(&entry, START_MS + 2).is_none());
+            let mut early = h.session();
+            let (entry, _) = early.lookup_early(&request, &h.purge, None, START_MS + 3).unwrap();
+            assert!(early.hit_comment(&entry, START_MS + 3).is_none());
+            let mut private = request.clone();
+            private.headers_mut().add("Cookie", "session=private");
+            let mut bypass = h.session();
+            bypass.lookup(&origin, &private, &h.purge, None, START_MS + 4);
+            bypass.observe_source(source);
+            bypass.write(b"<html><body>1000</body></html>");
+            assert!(bypass.finish(&private, START_MS + 5).show_comment.is_none());
+        }
+        let h = Harness::new();
+        h.options.borrow_mut().set_option("ShowCacheTimestamp", "on", ps_config::scope::Scope::Server).unwrap();
+        let request = h.get_request();
+        let mut miss = h.session();
+        miss.lookup(&h.ok_origin(), &request, &h.purge, None, START_MS);
+        for chunk in b"<!DOCTYPE html><HTML><body>page</body></HTML>".chunks(1) { miss.observe_source(chunk); }
+        miss.write(b"<html>page</html>");
+        assert!(String::from_utf8_lossy(&miss.finish(&request, START_MS+1).show_comment.unwrap()).contains("Cache: MISS"));
+        let mut hit = h.session();
+        let entry = hit.lookup(&h.ok_origin(), &request, &h.purge, None, START_MS+2).unwrap();
+        assert!(String::from_utf8_lossy(&hit.hit_comment(&entry, START_MS+2).unwrap()).contains("Cache: HIT"));
     }
 
     #[test]

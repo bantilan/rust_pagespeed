@@ -29,6 +29,7 @@ pub mod doctype;
 pub mod domain_lawyer;
 pub mod downstream_caching_directives;
 pub mod driver;
+pub mod document_shape;
 pub mod element;
 pub mod event;
 pub mod fake_filter;

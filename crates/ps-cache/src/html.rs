@@ -135,6 +135,15 @@ pub fn encode_value(created_ms: i64, expires_ms: i64, body: &[u8]) -> Option<Vec
     Some(out)
 }
 
+/// HTML bodies carry source-document diagnostic eligibility independently of
+/// rewritten markup. Policy-hint records continue to use encode_value.
+pub fn encode_document_value(created_ms: i64, expires_ms: i64, body: &[u8], document: bool) -> Option<Vec<u8>> {
+    if body.len() > MAX_HTML_BODY_BYTES { return None; }
+    let mut out = format!("D1:{created_ms}\n{expires_ms}\nps-source-document:{}\n", u8::from(document)).into_bytes();
+    out.extend_from_slice(body);
+    Some(out)
+}
+
 /// Decoded + validated value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HtmlCacheEntry {
@@ -144,6 +153,8 @@ pub struct HtmlCacheEntry {
     pub expires_ms: i64,
     /// Cached body.
     pub body: Vec<u8>,
+    /// Explicit complete source document, recorded by the producer.
+    pub source_document: bool,
 }
 
 /// Validates a stored value (`HtmlCacheLookup::ValidateCandidate`).
@@ -162,19 +173,29 @@ pub fn validate_value(
     purge_set: &PurgeSet,
 ) -> Option<HtmlCacheEntry> {
     let first = blob.iter().position(|byte| *byte == b'\n')?;
-    if first > 20 {
+    if first > 23 {
         return None;
     }
     let second = blob[first + 1..].iter().position(|byte| *byte == b'\n')? + first + 1;
     if second - first > 21 {
         return None;
     }
-    let created: i64 = std::str::from_utf8(&blob[..first]).ok()?.parse().ok()?;
+    let created_line = std::str::from_utf8(&blob[..first]).ok()?;
+    let document_codec = created_line.starts_with("D1:");
+    let created: i64 = created_line.strip_prefix("D1:").unwrap_or(created_line).parse().ok()?;
     let expires: i64 = std::str::from_utf8(&blob[first + 1..second])
         .ok()?
         .parse()
         .ok()?;
-    let body = blob[second + 1..].to_vec();
+    let payload = &blob[second + 1..];
+    let (source_document, payload) = if !document_codec {
+        (false, payload)
+    } else if let Some(body) = payload.strip_prefix(b"ps-source-document:1\n") {
+        (true, body)
+    } else if let Some(body) = payload.strip_prefix(b"ps-source-document:0\n") {
+        (false, body)
+    } else { return None; };
+    let body = payload.to_vec();
     if created <= 0
         || created > now_ms
         || expires <= now_ms
@@ -193,6 +214,7 @@ pub fn validate_value(
         created_ms: created,
         expires_ms: expires,
         body,
+        source_document,
     })
 }
 
@@ -206,6 +228,25 @@ pub fn store_expiry_ms(origin_expiry_ms: i64, now_ms: i64, ttl_ms: i64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn document_codec_preserves_body_and_rejects_invalid_metadata() {
+        let set = PurgeSet::new(crate::purge::CACHE_PURGE_BYTES);
+        let check = |blob: &[u8]| validate_value(blob, "http://x/", 2000, 60_000, 9000, &set);
+        for document in [false, true] {
+            let body = b"ps-source-document:1\n1000";
+            let blob = encode_document_value(1000, 5000, body, document).unwrap();
+            let entry = check(&blob).unwrap();
+            assert_eq!(entry.body, body);
+            assert_eq!(entry.source_document, document);
+        }
+        let body = b"ps-source-document:1\nlegacy";
+        let legacy = check(&encode_value(1000, 5000, body).unwrap()).unwrap();
+        assert_eq!(legacy.body, body);
+        assert!(!legacy.source_document);
+        assert!(check(b"D1:1000\n5000\nps-source-document:2\nx").is_none());
+        assert!(check(b"D1:1000\n5000\nx").is_none());
+    }
 
     #[test]
     fn signature_shape_and_determinism() {
