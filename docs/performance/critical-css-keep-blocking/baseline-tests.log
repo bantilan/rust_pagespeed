@@ -1,0 +1,186 @@
+warning: variable does not need to be mutable
+   --> crates/ps-html/tests/critical_selector.rs:159:13
+    |
+159 |         let mut selector =
+    |             ----^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `wrap_body` is never used
+  --> crates/ps-html/tests/harness.rs:34:8
+   |
+34 | pub fn wrap_body(fragment: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `run_with_filters` is never used
+  --> crates/ps-html/tests/harness.rs:44:8
+   |
+44 | pub fn run_with_filters(input: &[u8], build: impl FnOnce(&mut Parser)) -> Vec<u8> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `round_trip` is never used
+  --> crates/ps-html/tests/harness.rs:56:8
+   |
+56 | pub fn round_trip(input: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^^
+
+warning: function `validate_expected` is never used
+  --> crates/ps-html/tests/harness.rs:62:8
+   |
+62 | pub fn validate_expected(id: &str, input: &[u8], expected: &[u8]) {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: struct `SharedFilter` is never constructed
+  --> crates/ps-html/tests/harness.rs:72:12
+   |
+72 | pub struct SharedFilter<F> {
+   |            ^^^^^^^^^^^^
+
+warning: associated items `new` and `with` are never used
+  --> crates/ps-html/tests/harness.rs:86:12
+   |
+84 | impl<F> SharedFilter<F> {
+   | ----------------------- associated items in this implementation
+85 |     /// Wraps a filter for shared ownership.
+86 |     pub fn new(filter: F) -> Self {
+   |            ^^^
+...
+93 |     pub fn with<R>(&self, read: impl FnOnce(&F) -> R) -> R {
+   |            ^^^^
+
+warning: struct `ExplicitCloseTag` is never constructed
+   --> crates/ps-html/tests/harness.rs:181:12
+    |
+181 | pub struct ExplicitCloseTag;
+    |            ^^^^^^^^^^^^^^^^
+
+warning: struct `InsertCommentOnFirstDiv` is never constructed
+   --> crates/ps-html/tests/harness.rs:200:12
+    |
+200 | pub struct InsertCommentOnFirstDiv {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `new` and `insert` are never used
+   --> crates/ps-html/tests/harness.rs:207:12
+    |
+205 | impl InsertCommentOnFirstDiv {
+    | ---------------------------- associated items in this implementation
+206 |     #[must_use]
+207 |     pub fn new(at_start: bool) -> Self {
+    |            ^^^
+...
+214 |     fn insert(&mut self, at_start: bool, dom: &mut Dom, lexer: &Lexer, id: NodeId) {
+    |        ^^^^^^
+
+warning: struct `InsertScripts` is never constructed
+   --> crates/ps-html/tests/harness.rs:238:12
+    |
+238 | pub struct InsertScripts {
+    |            ^^^^^^^^^^^^^
+
+warning: associated items `new` and `insert` are never used
+   --> crates/ps-html/tests/harness.rs:246:12
+    |
+244 | impl InsertScripts {
+    | ------------------ associated items in this implementation
+245 |     #[must_use]
+246 |     pub fn new(before: bool, at_start: bool, external: bool) -> Self {
+    |            ^^^
+...
+254 |     fn insert(&mut self, at_start: bool, dom: &mut Dom, id: NodeId) {
+    |        ^^^^^^
+
+warning: struct `DeleteCounts` is never constructed
+   --> crates/ps-html/tests/harness.rs:285:12
+    |
+285 | pub struct DeleteCounts {
+    |            ^^^^^^^^^^^^
+
+warning: struct `DeleteCountValues` is never constructed
+   --> crates/ps-html/tests/harness.rs:291:12
+    |
+291 | pub struct DeleteCountValues {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: method `values` is never used
+   --> crates/ps-html/tests/harness.rs:300:12
+    |
+298 | impl DeleteCounts {
+    | ----------------- method in this implementation
+299 |     #[must_use]
+300 |     pub fn values(&self) -> DeleteCountValues {
+    |            ^^^^^^
+
+warning: struct `DeleteNodes` is never constructed
+   --> crates/ps-html/tests/harness.rs:306:12
+    |
+306 | pub struct DeleteNodes {
+    |            ^^^^^^^^^^^
+
+warning: associated items `new`, `set_delete_node_type`, `set_delete_from_type`, `set_delete_on_open_tag`, and `delete_elements` are never used
+   --> crates/ps-html/tests/harness.rs:318:12
+    |
+316 | impl DeleteNodes {
+    | ---------------- associated items in this implementation
+317 |     #[must_use]
+318 |     pub fn new(counts: &DeleteCounts) -> Self {
+    |            ^^^
+...
+330 |     pub fn set_delete_node_type(&mut self, keyword: Keyword) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+334 |     pub fn set_delete_from_type(&mut self, keyword: Keyword) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+338 |     pub fn set_delete_on_open_tag(&mut self, on_open: bool) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+342 |     fn delete_elements(&mut self, dom: &mut Dom) {
+    |        ^^^^^^^^^^^^^^^
+
+warning: `ps-html` (test "critical_selector") generated 17 warnings (run `cargo fix --test "critical_selector" -p ps-html` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running tests/critical_selector.rs (target/debug/build/ps-html/bd2021225ada1db2/out/critical_selector-bd2021225ada1db2)
+
+running 24 tests
+test disabled_for_ie ... ok
+test empty_block ... ok
+test less_than_in_kept_rule_keeps_the_link_in_xhtml ... ok
+test fragment_reference_kept_on_rewrite_domain ... ok
+test escaped_closing_style_tag_is_inlined_verbatim_in_html ... ok
+test avoid_trying_to_inline_twice ... ok
+test alternate ... ok
+test basic_operation ... ok
+test media ... ok
+test allow_unauthorized_css ... ok
+test combiner_interaction ... ok
+test resolve_urls_properly ... ok
+test non_screen_media ... ok
+test no_script ... ok
+test dont_mix_unopt_and_opt_styles ... ok
+test retain_pseudo_only ... ok
+test retain_unparseable ... ok
+test same_css_different_selectors ... ok
+test unauthorized_css ... ok
+test no_selector_info ... ok
+test styles_in_body ... ok
+test resolve_when_combine_across_paths ... ok
+test subset_that_would_hold_markup_keeps_the_link ... ok
+test properly_used_optimized ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/html_cache_critical_css.rs (target/debug/build/ps-html/aebe05e49e3ac26e/out/html_cache_critical_css-aebe05e49e3ac26e)
+
+running 4 tests
+test evidence_changed_during_render_never_publishes_under_old_key ... ok
+test sampling_and_private_requests_still_cannot_publish_or_reuse_css_html ... ok
+test learned_output_preserves_critical_and_full_css_on_normal_and_early_hits ... ok
+test missing_selectors_cache_full_styles_then_learned_evidence_rekeys_both_paths ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

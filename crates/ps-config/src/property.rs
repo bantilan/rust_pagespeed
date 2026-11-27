@@ -314,7 +314,7 @@ mod tests {
     fn table_count_and_uniqueness() {
         // 167 `AddBaseProperty`/`AddRequestProperty` calls in C++ order,
         // plus cookie policy, early lookup, public browser and six-group modes.
-        assert_eq!(NUM_PROPERTIES, 172);
+        assert_eq!(NUM_PROPERTIES, 173);
         let ids: HashSet<&str> = PROPERTIES.iter().map(|p| p.id).collect();
         assert_eq!(ids.len(), NUM_PROPERTIES, "duplicate option id");
         let names: HashSet<&str> = PROPERTIES

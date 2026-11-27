@@ -58,5 +58,7 @@ pub fn snapshot(driver: &crate::server_context::ResourceDriver) -> (HashSet<Stri
         identity.push(b':');
         identity.extend_from_slice(selector.as_bytes());
     }
+    identity.extend_from_slice(b"\nblocking:\n");
+    identity.extend_from_slice(&crate::critical_css_blocking::snapshot(driver));
     (selectors, identity)
 }

@@ -84,3 +84,21 @@ cannot change record; no write to other format group. Matched release build
 running; no automatic producer activation or production changes.
 
 Phase1 matched1.31.10 release PASS25.17s; finalcachefixture2000HITs/cell. All commands complete, gitdiffcheckpass. Commit tested backend milestone locally without push.
+
+## User-approved cross-page positive stylesheet policy — 2026-11-27
+
+Add a bounded shared keep-blocking registry before Phase2: once validated CSS has
+positive critical selector output on one page, retain its entire blocking link
+on other pages with same URL/content version, origin and effective options.
+Freshness limited by origin and 1h cap; never propagate safe-to-defer negatives.
+Registry changes join HTML evidence identity; unsupported/unlearned CSS keeps
+full fallback. This is conservative, may reduce deferral, and is distinct from
+sharing parsing metadata. Automatic collector is still unfinished. Commands and
+verification in ../critical-css-keep-blocking/RESULTS.md.
+
+Cross-page keepblocking milestone COMPLETE2026-11-27: default-on config, bounded
+sharedregistry+expiry/contentvalidation, actualfilter and HTMLcacheidentity wired.
+Workerparsedcache8records avoids repeated128entryparse while checking sharedbytes
+on everylookup. FullHTML1801/config97/NGINX295+actualcacheRUMoracle pass, matched
+release built. Results/limits ../critical-css-keep-blocking/RESULTS.md. Automatic
+collector remains pending; resumePhase2 summaries without duplicating registry.

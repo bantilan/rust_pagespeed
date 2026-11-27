@@ -210,6 +210,22 @@ in cache identity; a change during rendering prevents publication under the old
 set. Sampled collector responses, private requests and incomplete resource rewrites
 remain uncached. Unsupported critical-CSS clients cannot reuse transformed output.
 
+Known-important external stylesheets are kept render-blocking across pages by
+default (`pagespeed CriticalCssKeepBlocking on;`). A positive critical-selector
+result retains the whole original link, including on later pages where the same
+validated URL and contents appear. Decisions are scoped to the page origin and
+effective rewrite configuration, bounded to 128 entries, and expire no later than
+the stylesheet response or one hour. Changed contents do not reuse an old decision.
+No “safe to defer” classification is propagated to other pages. This conservative
+policy may defer fewer files. `CriticalCssKeepBlocking off` restores per-page
+critical-rule extraction for external stylesheets. Registry changes can cause
+one new HTML cache MISS/publication retry before the updated output settles.
+
+This registry reuses trusted selector evidence; it does not discover importance
+without that evidence. Current external input validation still uses the existing
+resource path. It avoids repeated selector analysis for recognized versions;
+metadata-only asynchronous discovery remains unfinished.
+
 Automatic critical-selector collection is not connected in the current production
 integration. Without selector evidence, the filter preserves the complete CSS;
 that valid output can still be cached. Enabling the directive alone does not

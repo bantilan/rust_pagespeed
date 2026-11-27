@@ -3196,6 +3196,12 @@ impl RewriteOptions {
         self.set_image_bool("cibe", value);
     }
 
+    /// Share positive stylesheet keep-blocking decisions across public pages.
+    #[must_use]
+    pub fn critical_css_keep_blocking(&self) -> bool {
+        self.image_bool("CriticalCssKeepBlocking", true)
+    }
+
     /// Settle critical-image/LCP learning after one accepted report.
     #[must_use]
     pub fn beacon_single_decision(&self) -> bool {
@@ -4702,6 +4708,17 @@ pub fn apply_nginx_directive(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn critical_css_blocking_default_scope_signature() {
+        let mut options = RewriteOptions::new();
+        assert!(options.critical_css_keep_blocking());
+        let signature = options.signature();
+        assert!(options.set_option("CriticalCssKeepBlocking", "off", Scope::Query).is_err());
+        options.set_option("CriticalCssKeepBlocking", "off", Scope::Server).unwrap();
+        assert!(!options.critical_css_keep_blocking());
+        assert_ne!(signature, options.signature());
+    }
 
     #[test]
     fn single_beacon_decision_default_scope_signature() {

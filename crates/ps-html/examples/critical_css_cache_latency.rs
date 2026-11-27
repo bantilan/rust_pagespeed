@@ -16,7 +16,12 @@ fn main() {
     const NOW: i64 = 1_700_000_000_000;
     const URL: &str = "https://cookies.test/page";
     println!("fixture,path,median_us,p95_us,measured_hits");
-    for (fixture, critical_css) in [("css-off", false), ("css-on-unlearned", true)] {
+    for (fixture, critical_css, known) in [
+        ("css-off", false, 0),
+        ("css-on-unlearned", true, 0),
+        ("css-on-known-1", true, 1),
+        ("css-on-known-128", true, 128),
+    ] {
         let server = Rc::new(ServerContext::new_with_metadata(
             Arc::new(MemoryCache::new()),
             Arc::new(MemoryCache::new()),
@@ -37,6 +42,14 @@ fn main() {
             Rc::new(RefCell::new(options)),
             URL,
         ));
+        for i in 0..known {
+            assert!(ps_html::critical_css_blocking::remember(
+                &driver,
+                &format!("https://cookies.test/{i}.css"),
+                b"div{color:red}",
+                NOW + 300000,
+            ));
+        }
         let mut request = RequestHeaders::new();
         request.set_method(Method::Get);
         request.set_version(1, 1);

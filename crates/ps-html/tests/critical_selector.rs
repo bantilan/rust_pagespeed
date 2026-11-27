@@ -79,6 +79,7 @@ impl Fixture {
             user_agent: RefCell::new(String::new()),
             xhtml: Cell::new(false),
         };
+        fixture.options.borrow_mut().set_option("CriticalCssKeepBlocking", "off", ps_config::scope::Scope::Server).unwrap();
         fixture.set_up();
         fixture
     }
@@ -888,4 +889,38 @@ fn combined_leaf(names: &[&str], hash: &str) -> String {
         "{}.pagespeed.cc.{hash}.css",
         String::from_utf8_lossy(&MultipartEncoder.encode(&inputs))
     )
+}
+
+#[test]
+fn known_important_sheet_stays_blocking_on_other_pages() {
+    let fixture = Fixture::new();
+    fixture.options.borrow_mut().set_option("CriticalCssKeepBlocking", "on", ps_config::scope::Scope::Server).unwrap();
+    fixture.set_current_user_agent("Mozilla/5.0 Chrome/120.0 Safari/537.36");
+    fixture.finder.set_selectors(&["div"]);
+    let html = "<html><head><link rel=\"stylesheet\" href=\"a.css\"></head><body><div>one</div></body></html>";
+    let first = fixture.parse_chain("http://test.com/one", html, Chain::SelectorOnly);
+    assert!(first.contains("href=\"a.css\""), "{first}");
+    assert!(!first.contains("psa_add_styles"));
+    // Same CSS appears on a page whose own selector set does not need it.
+    // Positive cross-page policy must override the usual defer-whole-sheet result.
+    fixture.finder.set_selectors(&["article"]);
+    let second = fixture.parse_chain("http://test.com/two", html, Chain::SelectorOnly);
+    assert!(second.contains("href=\"a.css\""), "{second}");
+    assert!(!second.contains("psa_add_styles"), "{second}");
+    // A different file remains eligible for this page's ordinary selector decision.
+    let other = html.replace("a.css", "b.css");
+    let unknown = fixture.parse_chain("http://test.com/three", &other, Chain::SelectorOnly);
+    assert!(unknown.contains("psa_add_styles"), "{unknown}");
+    // A changed body at the same URL is a new version, even while the old
+    // positive entry is fresh. No stale URL-only classification may apply.
+    let resource_driver = fixture.driver_for("http://test.com/one");
+    let fragment = resource_driver.cache_fragment();
+    fixture.server.http_cache().delete("http://test.com/a.css", &fragment);
+    fixture.set_response_with_default_headers("a.css", "text/css", b"aside{color:red}", 100);
+    let changed = fixture.parse_chain("http://test.com/changed", html, Chain::SelectorOnly);
+    assert!(changed.contains("psa_add_styles"), "{changed}");
+    // Explicit opt-out restores the old behavior; no positive record is reused.
+    fixture.options.borrow_mut().set_option("CriticalCssKeepBlocking", "off", ps_config::scope::Scope::Server).unwrap();
+    let opted_out = fixture.parse_chain("http://test.com/four", html, Chain::SelectorOnly);
+    assert!(opted_out.contains("psa_add_styles"), "{opted_out}");
 }

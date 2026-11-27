@@ -1,0 +1,31 @@
+    Blocking waiting for file lock on build directory
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+warning: variable does not need to be mutable
+   --> crates/ps-html/tests/critical_selector.rs:160:13
+    |
+160 |         let mut selector =
+    |             ----^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+error[E0716]: temporary value dropped while borrowed
+   --> crates/ps-html/tests/critical_selector.rs:916:20
+    |
+916 |     let fragment = fixture.driver_for("http://test.com/one").cache_fragment();
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                 - temporary value is freed at the end of this statement
+    |                    |
+    |                    creates a temporary value which is freed while still in use
+917 |     fixture.server.http_cache().delete("http://test.com/a.css", &fragment);
+    |                                                                 --------- borrow later used here
+    |
+help: consider using a `let` binding to create a longer lived value
+    |
+916 ~     let binding = fixture.driver_for("http://test.com/one");
+917 ~     let fragment = binding.cache_fragment();
+    |
+
+For more information about this error, try `rustc --explain E0716`.
+warning: `ps-html` (test "critical_selector") generated 1 warning
+error: could not compile `ps-html` (test "critical_selector") due to 1 previous error; 1 warning emitted

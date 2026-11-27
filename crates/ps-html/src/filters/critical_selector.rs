@@ -330,8 +330,27 @@ impl CriticalSelectorFilter {
         summary.base = input.url().to_string();
         summary.location = input.url().to_string();
         let contents = input.contents();
+        let (safe, _) = input.is_safe_to_rewrite(false);
+        let fresh = input.cache_expiration_time_ms() > self.driver.server_context().now_ms();
+        if safe && fresh && crate::critical_css_blocking::known(&self.driver, url.spec(), &contents) {
+            // Leave this link in situ. Do not add it to the delayed full-CSS
+            // bundle, even when another stylesheet on this page is deferred.
+            return;
+        }
         match self.rewrite_css(&contents, &summary.base.clone()) {
             Some(data) => {
+                if safe && fresh && !data.is_empty() && !summary.is_inside_noscript
+                    && !is_alternate_stylesheet(&summary.rel)
+                    && (summary.media_from_html.is_empty()
+                        || can_media_affect_screen(&String::from_utf8_lossy(&summary.media_from_html)))
+                {
+                    crate::critical_css_blocking::remember(
+                        &self.driver, url.spec(), &contents, input.cache_expiration_time_ms(),
+                    );
+                    // A known-important file must remain blocking on the
+                    // learning page too, including if metadata writes contend.
+                    if self.driver.options().critical_css_keep_blocking() { return; }
+                }
                 summary.state = SummaryState::Ok;
                 summary.data = data;
                 self.summaries.push(summary);

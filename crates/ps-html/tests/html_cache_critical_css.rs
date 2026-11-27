@@ -242,3 +242,50 @@ fn sampling_and_private_requests_still_cannot_publish_or_reuse_css_html() {
         .lookup(&f.origin, &f.request, &f.purge, None, NOW + 3)
         .is_none());
 }
+
+#[test]
+fn another_pages_positive_blocking_decision_invalidates_normal_and_early_html() {
+    let f = Fixture::new(Some(&["div"]));
+    f.publish();
+    assert!(f
+        .session()
+        .lookup_early(&f.request, &f.purge, None, NOW + 2)
+        .is_some());
+    let other_page = ResourceDriver::new(
+        f.driver.server_context().clone(),
+        f.options.clone(),
+        "https://critical.test/another-page",
+    );
+    assert!(ps_html::critical_css_blocking::remember(
+        &other_page,
+        "https://critical.test/theme.css",
+        b"div{color:red}",
+        NOW + 60000,
+    ));
+    assert!(f
+        .session()
+        .lookup_early(&f.request, &f.purge, None, NOW + 3)
+        .is_none());
+    assert!(f
+        .session()
+        .lookup(&f.origin, &f.request, &f.purge, None, NOW + 3)
+        .is_none());
+    f.publish();
+    let mut during = f.session();
+    // A distinct decision learned during a new render cannot publish stale HTML.
+    f.finder.set_selectors(&["span"]);
+    assert!(during
+        .lookup(&f.origin, &f.request, &f.purge, None, NOW + 4)
+        .is_none());
+    assert!(ps_html::critical_css_blocking::remember(
+        &other_page,
+        "https://critical.test/extra.css",
+        b"span{color:blue}",
+        NOW + 60000,
+    ));
+    during.write(&f.render());
+    let finish = during.finish(&f.request, NOW + 5);
+    assert!(finish.detail_line.is_none());
+    assert!(String::from_utf8_lossy(&finish.show_comment.unwrap())
+        .contains("critical-css-evidence-changed"));
+}
