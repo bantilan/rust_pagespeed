@@ -207,6 +207,9 @@ fn parse_beacon_report(query_params: &QueryParams) -> BeaconReport {
             report.html_hashes = Some(std::collections::HashSet::new());
         }
     }
+    if let Some(escaped) = query_params.lookup1_escaped("cs") {
+        report.css_selectors = ps_html::critical_css_evidence::parse_report(escaped);
+    }
     if let Some(nonce) = query_params.lookup1_unescaped(beacon_finder::PARAM_NONCE) {
         report.nonce = nonce;
     }
@@ -365,6 +368,45 @@ mod tests {
             "http://h/hero.png",
             record
         ));
+    }
+
+    #[test]
+    fn combined_css_evidence_uses_one_nonce_and_original_html_group() {
+        use ps_html::beacon_finder::{BeaconEvidence, CssCandidateError};
+        let metadata: std::sync::Arc<dyn ps_cache::cache::Cache> =
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new());
+        let server = crate::rewrite::html_context(
+            std::sync::Arc::new(ps_cache::cache::MemoryCache::new()), metadata.clone(),
+            std::sync::Arc::new(ps_stats::core::Statistics::new()), 0,
+            std::sync::Arc::new(crate::rewrite::UnavailableFetcher),
+        );
+        let finder = BeaconFinder::new(&metadata);
+        let mut evidence = BeaconEvidence::default();
+        evidence.single_decision = true;
+        assert_eq!(beacon_finder::register_css_candidates(&mut evidence,
+            ["div".into(), ":is(.a,.b)".into()].into()), Ok(true));
+        let nonce = beacon_finder::prepare_beacon(&mut evidence, 1000, 5, 42).unwrap();
+        finder.store("https://h/p", "combined", "avif-desktop", &evidence);
+        let send = |tail: &str| handle_beacon_evidence(
+            &format!("bvg=avif-desktop&oh=combined&n={nonce}&lcpk=unknown{tail}"),
+            "https://h/p", "Firefox/147", &server, 1001,
+        );
+        for rejected in ["", "&cs=unknown", "&cs=%FF", "&cs=div&cs=div", "&cs=div,"] {
+            assert_eq!(send(rejected), Some(AcceptOutcome::InvalidReport));
+            assert_eq!(finder.load("https://h/p", "combined", "avif-desktop").record().unwrap(), &evidence);
+        }
+        assert_eq!(send("&cs=%3Ais%28.a%2C.b%29"), Some(AcceptOutcome::Accepted));
+        let stored = finder.load("https://h/p", "combined", "avif-desktop").into_record();
+        assert_eq!(stored.valid_beacons, 1);
+        assert_eq!(stored.generation, 1);
+        assert_eq!(stored.critical_css.as_ref().unwrap().matched().unwrap(), &[":is(.a,.b)".into()].into());
+        assert!(stored.pending_nonces.is_empty());
+        assert_eq!(send("&cs=div"), Some(AcceptOutcome::BadNonce));
+        assert_eq!(finder.load("https://h/p", "combined", "avif-desktop").into_record(), stored);
+        let mut updated = stored.clone();
+        assert_eq!(beacon_finder::register_css_candidates(&mut updated, ["other".into()].into()), Err(CssCandidateError::Settled));
+        assert_eq!(updated, stored);
+        assert!(finder.load("https://h/p", "combined", "webp-desktop").record().is_none());
     }
 
     #[test]

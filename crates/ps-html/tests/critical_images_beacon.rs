@@ -142,6 +142,7 @@ fn learned_evidence_stamps_without_reinstrumenting() {
         lcp_image_url: String::new(),
         nonce,
         font_families: Vec::new(),
+            css_selectors: None,
     };
     assert_eq!(
         ps_html::beacon_finder::accept_beacon(&mut evidence, &report, 1000),

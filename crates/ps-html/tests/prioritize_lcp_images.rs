@@ -78,6 +78,7 @@ impl Harness {
             lcp_image_url: String::new(),
             nonce,
             font_families: Vec::new(),
+            css_selectors: None,
         };
         assert_eq!(
             finder::accept_beacon(&mut evidence, &report, 1000),
@@ -108,6 +109,7 @@ impl Harness {
             lcp_image_url: url.to_string(),
             nonce,
             font_families: Vec::new(),
+            css_selectors: None,
         };
         assert_eq!(
             finder::accept_beacon(&mut evidence, &report, 1000),

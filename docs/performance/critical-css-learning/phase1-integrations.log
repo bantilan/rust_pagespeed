@@ -1,0 +1,215 @@
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+warning: function `wrap_body` is never used
+  --> crates/ps-html/tests/harness.rs:34:8
+   |
+34 | pub fn wrap_body(fragment: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `run_with_filters` is never used
+  --> crates/ps-html/tests/harness.rs:44:8
+   |
+44 | pub fn run_with_filters(input: &[u8], build: impl FnOnce(&mut Parser)) -> Vec<u8> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `round_trip` is never used
+  --> crates/ps-html/tests/harness.rs:56:8
+   |
+56 | pub fn round_trip(input: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^^
+
+warning: function `validate_expected` is never used
+  --> crates/ps-html/tests/harness.rs:62:8
+   |
+62 | pub fn validate_expected(id: &str, input: &[u8], expected: &[u8]) {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: struct `SharedFilter` is never constructed
+  --> crates/ps-html/tests/harness.rs:72:12
+   |
+72 | pub struct SharedFilter<F> {
+   |            ^^^^^^^^^^^^
+
+warning: associated items `new` and `with` are never used
+  --> crates/ps-html/tests/harness.rs:86:12
+   |
+84 | impl<F> SharedFilter<F> {
+   | ----------------------- associated items in this implementation
+85 |     /// Wraps a filter for shared ownership.
+86 |     pub fn new(filter: F) -> Self {
+   |            ^^^
+...
+93 |     pub fn with<R>(&self, read: impl FnOnce(&F) -> R) -> R {
+   |            ^^^^
+
+warning: struct `ExplicitCloseTag` is never constructed
+   --> crates/ps-html/tests/harness.rs:181:12
+    |
+181 | pub struct ExplicitCloseTag;
+    |            ^^^^^^^^^^^^^^^^
+
+warning: struct `InsertCommentOnFirstDiv` is never constructed
+   --> crates/ps-html/tests/harness.rs:200:12
+    |
+200 | pub struct InsertCommentOnFirstDiv {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `new` and `insert` are never used
+   --> crates/ps-html/tests/harness.rs:207:12
+    |
+205 | impl InsertCommentOnFirstDiv {
+    | ---------------------------- associated items in this implementation
+206 |     #[must_use]
+207 |     pub fn new(at_start: bool) -> Self {
+    |            ^^^
+...
+214 |     fn insert(&mut self, at_start: bool, dom: &mut Dom, lexer: &Lexer, id: NodeId) {
+    |        ^^^^^^
+
+warning: struct `InsertScripts` is never constructed
+   --> crates/ps-html/tests/harness.rs:238:12
+    |
+238 | pub struct InsertScripts {
+    |            ^^^^^^^^^^^^^
+
+warning: associated items `new` and `insert` are never used
+   --> crates/ps-html/tests/harness.rs:246:12
+    |
+244 | impl InsertScripts {
+    | ------------------ associated items in this implementation
+245 |     #[must_use]
+246 |     pub fn new(before: bool, at_start: bool, external: bool) -> Self {
+    |            ^^^
+...
+254 |     fn insert(&mut self, at_start: bool, dom: &mut Dom, id: NodeId) {
+    |        ^^^^^^
+
+warning: struct `DeleteCounts` is never constructed
+   --> crates/ps-html/tests/harness.rs:285:12
+    |
+285 | pub struct DeleteCounts {
+    |            ^^^^^^^^^^^^
+
+warning: struct `DeleteCountValues` is never constructed
+   --> crates/ps-html/tests/harness.rs:291:12
+    |
+291 | pub struct DeleteCountValues {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: method `values` is never used
+   --> crates/ps-html/tests/harness.rs:300:12
+    |
+298 | impl DeleteCounts {
+    | ----------------- method in this implementation
+299 |     #[must_use]
+300 |     pub fn values(&self) -> DeleteCountValues {
+    |            ^^^^^^
+
+warning: struct `DeleteNodes` is never constructed
+   --> crates/ps-html/tests/harness.rs:306:12
+    |
+306 | pub struct DeleteNodes {
+    |            ^^^^^^^^^^^
+
+warning: associated items `new`, `set_delete_node_type`, `set_delete_from_type`, `set_delete_on_open_tag`, and `delete_elements` are never used
+   --> crates/ps-html/tests/harness.rs:318:12
+    |
+316 | impl DeleteNodes {
+    | ---------------- associated items in this implementation
+317 |     #[must_use]
+318 |     pub fn new(counts: &DeleteCounts) -> Self {
+    |            ^^^
+...
+330 |     pub fn set_delete_node_type(&mut self, keyword: Keyword) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+334 |     pub fn set_delete_from_type(&mut self, keyword: Keyword) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+338 |     pub fn set_delete_on_open_tag(&mut self, on_open: bool) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+342 |     fn delete_elements(&mut self, dom: &mut Dom) {
+    |        ^^^^^^^^^^^^^^^
+
+warning: `ps-html` (test "prioritize_lcp_images") generated 15 warnings (15 duplicates)
+warning: `ps-html` (test "html_cache_vary") generated 16 warnings
+warning: unused import: `ps_html::filter::HtmlFilter`
+ --> crates/ps-html/tests/critical_images_beacon.rs:6:5
+  |
+6 | use ps_html::filter::HtmlFilter;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "critical_images_beacon") generated 16 warnings (15 duplicates) (run `cargo fix --test "critical_images_beacon" -p ps-html` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.92s
+     Running tests/critical_images_beacon.rs (target/debug/build/ps-html/c0cfe0f03145ebeb/out/critical_images_beacon-c0cfe0f03145ebeb)
+
+running 6 tests
+test bots_never_instrument ... ok
+test learned_evidence_stamps_without_reinstrumenting ... ok
+test first_visit_instruments_stamps_and_registers ... ok
+test pre_phase_visit_instruments_and_stamps ... ok
+test immediate_revisit_stands_down_without_evidence ... ok
+test image_free_documents_receive_one_live_beacon ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/html_cache_critical_css.rs (target/debug/build/ps-html/aebe05e49e3ac26e/out/html_cache_critical_css-aebe05e49e3ac26e)
+
+running 4 tests
+test evidence_changed_during_render_never_publishes_under_old_key ... ok
+test sampling_and_private_requests_still_cannot_publish_or_reuse_css_html ... ok
+test learned_output_preserves_critical_and_full_css_on_normal_and_early_hits ... ok
+test missing_selectors_cache_full_styles_then_learned_evidence_rekeys_both_paths ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/html_cache_vary.rs (target/debug/build/ps-html/5d0d891ecd40e89c/out/html_cache_vary-5d0d891ecd40e89c)
+
+running 8 tests
+test non_beacon_clients_ignore_sampling_due ... ok
+test unlearned_beacon_requests_publish_and_hit ... ok
+test detached_rewrite_blocks_publication ... ok
+test beacon_arrival_rekeys_variant ... ok
+test named_vary_caches_per_variant_with_isolated_bodies ... ok
+test sampling_due_bypasses_preserving_collection ... ok
+test vary_star_still_bypasses ... ok
+test slow_fetch_defers_publication_until_complete ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+     Running tests/prioritize_lcp_images.rs (target/debug/build/ps-html/cd773c6dd65bedc4/out/prioritize_lcp_images-cd773c6dd65bedc4)
+
+running 26 tests
+test bare_itemprop_without_context_stays_candidate ... ok
+test author_preload_suppresses_duplicate_hint ... ok
+test explicit_high_priority_is_never_lazy ... ok
+test element_hero_class_still_vetoes_despite_header ... ok
+test article_logo_image_not_confused ... ok
+test custom_header_svg_logo_skipped ... ok
+test background_lcp_yields_to_image_hero ... ok
+test background_lcp_author_preload_wins ... ok
+test fallback_hero_skips_logo_candidate ... ok
+test fallback_does_not_double_spend_learned_budget ... ok
+test background_lcp_preloads_head_hint ... ok
+test filename_only_logo_stays_candidate ... ok
+test hero_mentioning_logo_still_prioritized ... ok
+test heuristic_hero_preloads_and_rest_lazy ... ok
+test hidden_trackers_and_data_urls_skip ... ok
+test logo_with_author_priority_left_byte_identical ... ok
+test logo_inside_banner_region_still_skipped ... ok
+test logo_inside_picture_skipped ... ok
+test background_lcp_format_mismatch_skips ... ok
+test learned_evidence_overrides_position ... ok
+test wordpress_block_logo_skipped ... ok
+test wordpress_custom_logo_skipped_hero_passes_to_content ... ok
+test schema_org_itemprop_logo_skipped ... ok
+test text_lcp_evidence_falls_back_to_visual_hero ... ok
+test stale_evidence_naming_absent_image_falls_back ... ok
+test measured_lcp_logo_still_prioritized ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

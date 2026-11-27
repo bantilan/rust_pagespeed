@@ -221,7 +221,7 @@ pub fn unescape_query_value_best_effort(value: &str) -> String {
 
 /// Decodes `%XX` and `+` (`UnescapeQueryParamValue`-ish):
 /// `None` on malformed escapes.
-fn unescape_query_value(value: &str) -> Option<String> {
+pub fn unescape_query_value(value: &str) -> Option<String> {
     let mut out = Vec::with_capacity(value.len());
     let bytes = value.as_bytes();
     let mut index = 0;

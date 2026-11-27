@@ -19,6 +19,7 @@ pub mod beacon_finder;
 pub mod cacheable_resource;
 pub mod chain;
 pub mod critical_selector_finder;
+pub mod critical_css_evidence;
 pub mod css_tag_scanner;
 pub mod css_util;
 pub mod decode_url;

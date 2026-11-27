@@ -220,6 +220,8 @@ pub struct BeaconEvidence {
     /// Stop sampling and merging after one accepted report. Set by the issuer
     /// from effective options, so the receiver needs no request-option lookup.
     pub single_decision: bool,
+    /// Complete, bounded CSS candidates and the optional accepted decision.
+    pub critical_css: Option<crate::critical_css_evidence::CssEvidence>,
     /// Accepted-beacon generation (HTML identity input).
     pub generation: u64,
 }
@@ -261,6 +263,11 @@ pub fn encode_evidence(evidence: &BeaconEvidence) -> Vec<u8> {
         out.push_str(&format!("{}\t{support}\n", web64_encode(key.as_bytes())));
     }
     out.push_str(if evidence.single_decision { "single-decision=1\n" } else { "single-decision=0\n" });
+    if let Some(css) = &evidence.critical_css {
+        out.push_str("css-evidence=");
+        out.push_str(&web64_encode(&css.encode()));
+        out.push('\n');
+    }
     out.into_bytes()
 }
 
@@ -310,7 +317,17 @@ pub fn decode_evidence(bytes: &[u8]) -> Option<BeaconEvidence> {
         Some("single-decision=0" | "") | None => false,
         _ => return None,
     };
+    let critical_css = match lines.next() {
+        Some(line) if line.starts_with("css-evidence=") => {
+            let encoded = line.strip_prefix("css-evidence=")?;
+            if encoded.len() > crate::critical_css_evidence::MAX_ENCODED_BYTES { return None; }
+            Some(crate::critical_css_evidence::CssEvidence::decode(&web64_decode(encoded)?)?)
+        }
+        Some("") | None => None,
+        _ => return None,
+    };
     Some(BeaconEvidence {
+        critical_css,
         single_decision,
         support,
         max_support,
@@ -641,12 +658,40 @@ pub fn update_candidates(
     true
 }
 
+/// Registration errors leave the existing cohort unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CssCandidateError { OverLimit, Settled }
+
+/// Register only complete server-discovered inputs before issuing a combined
+/// nonce. Replacing candidates retires old nonces so reports cannot cross input
+/// generations. A final single decision cannot be reopened by this operation.
+pub fn register_css_candidates(
+    evidence: &mut BeaconEvidence,
+    candidates: std::collections::BTreeSet<String>,
+) -> Result<bool, CssCandidateError> {
+    let css = crate::critical_css_evidence::CssEvidence::new(candidates)
+        .ok_or(CssCandidateError::OverLimit)?;
+    if evidence.critical_css.as_ref().is_some_and(|old| old.candidates() == css.candidates()) {
+        return Ok(false);
+    }
+    if evidence.single_decision && evidence.valid_beacons > 0 {
+        return Err(CssCandidateError::Settled);
+    }
+    evidence.critical_css = Some(css);
+    evidence.pending_nonces.clear();
+    evidence.valid_beacons = 0;
+    evidence.next_beacon_ms = 0;
+    Ok(true)
+}
+
 /// A parsed beacon evidence report (the pcache half's inputs).
 #[derive(Debug, Clone, Default)]
 pub struct BeaconReport {
     /// Stamped critical-image hashes (`Some`, possibly empty, when
     /// the beacon carries LCP evidence).
     pub html_hashes: Option<HashSet<String>>,
+    /// CSS selector components, decoded before report validation.
+    pub css_selectors: Option<std::collections::BTreeSet<String>>,
     /// Reported LCP kind (`""` when absent or invalid).
     pub lcp_kind: String,
     /// Reported LCP loaded URL (`""` when absent, over-long,
@@ -666,6 +711,8 @@ pub enum AcceptOutcome {
     Accepted,
     /// Nonce missing, over-long, unknown, or expired.
     BadNonce,
+    /// CSS input incomplete, over-limit or outside registered candidates.
+    InvalidReport,
     /// Nothing reportable carried (no store, no validation).
     Empty,
 }
@@ -687,8 +734,16 @@ pub fn accept_beacon(
     if evidence.single_decision && evidence.valid_beacons > 0 {
         return AcceptOutcome::BadNonce;
     }
+    match (&evidence.critical_css, &report.css_selectors) {
+        (Some(css), Some(reported)) if css.accepts(reported) => {}
+        (None, None) => {}
+        _ => return AcceptOutcome::InvalidReport,
+    }
     if !validate_nonce(now_ms, &report.nonce, evidence) {
         return AcceptOutcome::BadNonce;
+    }
+    if let (Some(css), Some(reported)) = (&mut evidence.critical_css, &report.css_selectors) {
+        css.record(reported.clone());
     }
     if evidence.single_decision {
         // Competing reports from already issued nonces cannot replace the
@@ -860,6 +915,60 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn combined_css_report_is_complete_candidate_validated_and_final() {
+        use std::collections::BTreeSet;
+        let mut evidence = BeaconEvidence::default();
+        evidence.single_decision = true;
+        let candidates: BTreeSet<String> = ["div".into(), ":is(.a,.b)".into()].into();
+        assert_eq!(register_css_candidates(&mut evidence, candidates.clone()), Ok(true));
+        let nonce = prepare_beacon(&mut evidence, 1000, 5, 42).unwrap();
+        let mut report = report_with(Some(HashSet::new()), "unknown", "", &nonce);
+        let pending = evidence.clone();
+        assert_eq!(accept_beacon(&mut evidence, &report, 1001), AcceptOutcome::InvalidReport);
+        assert_eq!(evidence, pending, "LCP-only report must not finalize CSS-required learning");
+        report.css_selectors = Some(["unknown".into()].into());
+        assert_eq!(accept_beacon(&mut evidence, &report, 1001), AcceptOutcome::InvalidReport);
+        assert_eq!(evidence, pending);
+        report.css_selectors = Some([":is(.a,.b)".into()].into());
+        assert_eq!(accept_beacon(&mut evidence, &report, 1001), AcceptOutcome::Accepted);
+        assert_eq!(evidence.valid_beacons, 1);
+        assert_eq!(evidence.generation, 1);
+        assert_eq!(evidence.critical_css.as_ref().unwrap().matched(), report.css_selectors.as_ref());
+        assert!(evidence.pending_nonces.is_empty());
+        let final_record = evidence.clone();
+        assert_eq!(decode_evidence(&encode_evidence(&evidence)), Some(evidence.clone()));
+        assert_eq!(accept_beacon(&mut evidence, &report, 1002), AcceptOutcome::BadNonce);
+        assert_eq!(register_css_candidates(&mut evidence, ["span".into()].into()), Err(CssCandidateError::Settled));
+        assert_eq!(evidence, final_record);
+        assert_eq!(register_css_candidates(&mut evidence, candidates), Ok(false));
+    }
+
+    #[test]
+    fn css_candidate_generation_retires_old_nonces_and_invalid_metadata_fails_closed() {
+        let mut evidence = BeaconEvidence::default();
+        let old_nonce = prepare_beacon(&mut evidence, 1000, 5, 1).unwrap();
+        assert_eq!(register_css_candidates(&mut evidence, ["div".into()].into()), Ok(true));
+        assert!(evidence.pending_nonces.is_empty());
+        let mut old_report = report_with(Some(HashSet::new()), "text", "", &old_nonce);
+        old_report.css_selectors = Some(["div".into()].into());
+        assert_eq!(accept_beacon(&mut evidence, &old_report, 1001), AcceptOutcome::BadNonce);
+        let nonce = prepare_beacon(&mut evidence, 1001, 5, 2).unwrap();
+        let mut report = report_with(Some(HashSet::new()), "text", "", &nonce);
+        report.css_selectors = Some(Default::default());
+        assert_eq!(accept_beacon(&mut evidence, &report, 1002), AcceptOutcome::Accepted);
+        assert!(evidence.critical_css.as_ref().unwrap().matched().unwrap().is_empty());
+        let encoded = String::from_utf8(encode_evidence(&evidence)).unwrap();
+        assert!(decode_evidence(encoded.replace("css-evidence=", "css-evidence=%").as_bytes()).is_none());
+        let mut legacy = BeaconEvidence::default();
+        let legacy_bytes = encode_evidence(&legacy);
+        assert!(!String::from_utf8_lossy(&legacy_bytes).contains("css-evidence="));
+        assert_eq!(decode_evidence(&legacy_bytes), Some(legacy.clone()));
+        let original = legacy.clone();
+        assert_eq!(register_css_candidates(&mut legacy, ["a".repeat(1025)].into()), Err(CssCandidateError::OverLimit));
+        assert_eq!(legacy, original);
+    }
 
     #[test]
     fn unknown_lcp_acknowledges_without_erasing_evidence() {
@@ -1035,6 +1144,7 @@ mod tests {
             lcp_image_url: url.to_string(),
             nonce: nonce.to_string(),
             font_families: Vec::new(),
+            css_selectors: None,
         }
     }
 

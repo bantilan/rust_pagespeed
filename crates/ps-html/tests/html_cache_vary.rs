@@ -181,6 +181,7 @@ fn seed_learned_beacon(harness: &VaryHarness) -> ps_html::beacon_finder::BeaconE
         lcp_image_url: String::new(),
         nonce,
         font_families: Vec::new(),
+            css_selectors: None,
     };
     assert_eq!(
         finder::accept_beacon(&mut evidence, &report, START_MS),
