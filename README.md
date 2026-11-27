@@ -213,8 +213,12 @@ With `pagespeed HtmlCache on;`, the supplied common-cookie allowlist is active
 without additional cookie directives. It applies to every website, independently
 of its CMS: analytics, advertising, monitoring, load-balancer affinity, WordPress
 test/numeric settings cookies and `mage-cache-sessid` are treated as
-non-personalizing under their normal usage. Allowed values never enter the HTML
-cache key, and request cookies are still forwarded unchanged to the origin.
+non-personalizing under their normal usage. Ignored tracking values never enter
+HTML cache keys. `tk_qs` and `wordpress_test_cookie` share this default behavior.
+`wp_lang` and `trx_addons_is_retina` instead select separate public cached
+variants using opaque value digests, including early HITs, so language/retina
+HTML cannot mix. No extra directives are needed. Request cookies remain
+unchanged upstream; duplicate preference cookies bypass.
 
 Unknown cookies bypass. Recognized authentication, login/session, cart and CSRF
 cookies take precedence over both built-in and custom allowances. Existing

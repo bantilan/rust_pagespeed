@@ -744,6 +744,10 @@ impl AdminSite {
     /// patterns, and explicit `HtmlCacheBypassCookie` rules.
     fn write_html_cache_cookie_policy(options: &RewriteOptions, fetch: &mut dyn AsyncFetch) {
         let builtin = ps_config::cookies::builtin_ignore_patterns();
+        let preferences: Vec<String> = ps_config::cookies::BUILTIN_PREFERENCE_COOKIES
+            .iter()
+            .map(|s| (*s).to_owned())
+            .collect();
         let chips = |patterns: &[String]| -> String {
             if patterns.is_empty() {
                 return "<span class='pagespeed-dashboard-muted'>None</span>".to_string();
@@ -756,7 +760,7 @@ impl AdminSite {
         };
         fetch.handle_write(
             format!(
-                "<section class='pagespeed-dashboard-panel'><div class='pagespeed-dashboard-panel-heading'><div><h2>Cookie allowlist</h2><p>Requests carrying only allowlisted cookies cache exactly like cookie-free requests; cookie values never enter cache keys. Common cookies: <strong>{}</strong> ({} built-in patterns).</p></div></div><dl class='pagespeed-admin-data-list'><dt>Built-in common cookies</dt><dd>{}</dd><dt>HtmlCacheIgnoreCookie (custom, extends built-in)</dt><dd>{}</dd><dt>HtmlCacheBypassCookie (forces bypass)</dt><dd>{}</dd></dl><p class='pagespeed-dashboard-footnote'>Allowlisted cookies must not influence server-generated HTML: a cached variant is served to every visitor regardless of their ignored-cookie values. Unknown, authentication, session, cart, and personalization cookies always bypass. Cookie values are never logged; bypass history below names cookies only.</p></section>",
+                "<section class='pagespeed-dashboard-panel'><div class='pagespeed-dashboard-panel-heading'><div><h2>Cookie allowlist</h2><p>Ignored tracking cookies share cookie-free entries without keying their values. Public preference cookies use separate cached variants with opaque value digests. Common cookies: <strong>{}</strong> ({} built-in patterns).</p></div></div><dl class='pagespeed-admin-data-list'><dt>Built-in common cookies</dt><dd>{}</dd><dt>Public preference variants (default on)</dt><dd>{}</dd><dt>HtmlCacheIgnoreCookie (custom, extends built-in)</dt><dd>{}</dd><dt>HtmlCacheBypassCookie (forces bypass)</dt><dd>{}</dd></dl><p class='pagespeed-dashboard-footnote'>Ignored tracking cookies must not influence server-generated HTML: a cached variant is served to every visitor regardless of those ignored values. Public preferences above instead select distinct variants. Unknown, authentication, session, cart, and personalization cookies always bypass. Cookie values are never logged; bypass history below names cookies only.</p></section>",
                 if options.html_cache_ignore_common_cookies() {
                     "Ignored"
                 } else {
@@ -764,6 +768,7 @@ impl AdminSite {
                 },
                 builtin.len(),
                 chips(&builtin),
+                chips(&preferences),
                 chips(options.html_cache_ignore_cookies().patterns()),
                 chips(options.html_cache_bypass_cookies().patterns()),
             )

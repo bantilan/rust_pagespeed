@@ -373,3 +373,118 @@ fn configured_patterns_exclusions_and_protected_cookie_precedence() {
         assert!(session.bypass_reason().is_some(), "{cookie}");
     }
 }
+
+#[test]
+fn wordpress_preference_variants_isolate_bodies_for_ordinary_and_early_hits() {
+    for grouped in ["on", "off"] {
+        let h = CookiesHarness::new();
+        h.options
+            .borrow_mut()
+            .set_option("HtmlCacheEarlyLookup", "on", Scope::Server)
+            .unwrap();
+        h.options
+            .borrow_mut()
+            .set_option("HtmlCachePublicBrowserGrouping", grouped, Scope::Server)
+            .unwrap();
+        let origin = ok_origin();
+        let variants = [
+            "tk_qs=first",
+            "tk_qs=first; wp_lang=en_US; trx_addons_is_retina=0",
+            "tk_qs=first; wp_lang=fr_FR; trx_addons_is_retina=0",
+            "tk_qs=first; wp_lang=en_US; trx_addons_is_retina=1",
+            "tk_qs=first; wp_lang=",
+            "tk_qs=first; wp_lang=en_US",
+            "tk_qs=first; wp_lang=en_US ",
+        ];
+        for (index, cookies) in variants.iter().enumerate() {
+            let request = cookie_request(cookies);
+            assert!(
+                h.session()
+                    .lookup_early(&request, &h.purge, None, START_MS)
+                    .is_none(),
+                "must not use another preference's policy/body"
+            );
+            let mut session = h.session();
+            assert!(session
+                .lookup(&origin, &request, &h.purge, None, START_MS)
+                .is_none());
+            assert!(session.bypass_reason().is_none(), "{cookies}");
+            session.write(format!("<html>variant {index}</html>").as_bytes());
+            session.finish(&request, START_MS);
+        }
+        for (index, cookies) in variants.iter().enumerate() {
+            let mut request =
+                cookie_request(&cookies.replace("tk_qs=first", "tk_qs=another-visitor"));
+            let forwarded = request.headers().lookup1("Cookie").unwrap();
+            let expected = format!("<html>variant {index}</html>");
+            let normal = h
+                .session()
+                .lookup(&origin, &request, &h.purge, None, START_MS + 1)
+                .expect("ordinary HIT");
+            assert_eq!(normal.body, expected.as_bytes());
+            // Reorder/split Cookie fields: the same preferences must share.
+            request.headers_mut().remove_all("Cookie");
+            for pair in forwarded.rsplit("; ") {
+                request.headers_mut().add("Cookie", pair);
+            }
+            let early = h
+                .session()
+                .lookup_early(&request, &h.purge, None, START_MS + 1)
+                .expect("early HIT")
+                .0;
+            assert_eq!(early.body, expected.as_bytes());
+        }
+        // Login/session/unknown mixtures and ambiguous preference cookies bypass.
+        for cookies in [
+            "wp_lang=en_US; trx_addons_is_retina=1; wordpress_logged_in_x=private",
+            "wp_lang=en_US; PHPSESSID=private",
+            "trx_addons_is_retina=1; unknown_cookie=private",
+            "wp_lang=en_US; wp_lang=fr_FR",
+            "trx_addons_is_retina=1; trx_addons_is_retina=1",
+        ] {
+            let request = cookie_request(cookies);
+            assert!(h
+                .session()
+                .lookup_early(&request, &h.purge, None, START_MS + 2)
+                .is_none());
+            let mut session = h.session();
+            assert!(session
+                .lookup(&origin, &request, &h.purge, None, START_MS + 2)
+                .is_none());
+            assert!(session.bypass_reason().is_some());
+        }
+        let logged_out =
+            cookie_request("wp_lang=en_US; trx_addons_is_retina=1; tk_qs=after-logout");
+        assert_eq!(
+            h.session()
+                .lookup_early(&logged_out, &h.purge, None, START_MS + 3)
+                .unwrap()
+                .0
+                .body,
+            b"<html>variant 3</html>"
+        );
+        h.options
+            .borrow_mut()
+            .parse_and_set_1("HtmlCacheBypassCookie", "wp_lang", Scope::Server)
+            .unwrap();
+        assert!(h
+            .session()
+            .lookup_early(&logged_out, &h.purge, None, START_MS + 3)
+            .is_none());
+        let mut rejected = h.session();
+        assert!(rejected
+            .lookup(&origin, &logged_out, &h.purge, None, START_MS + 3)
+            .is_none());
+        assert!(rejected.bypass_reason().is_some());
+        h.options
+            .borrow_mut()
+            .set_option("HtmlCacheIgnoreCommonCookies", "off", Scope::Server)
+            .unwrap();
+        let request = cookie_request("trx_addons_is_retina=1");
+        let mut rejected = h.session();
+        assert!(rejected
+            .lookup(&origin, &request, &h.purge, None, START_MS + 3)
+            .is_none());
+        assert!(rejected.bypass_reason().is_some());
+    }
+}

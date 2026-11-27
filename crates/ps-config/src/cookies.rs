@@ -7,17 +7,19 @@
 //! sites) never cached. This module implements the allowlist rule:
 //! requests carrying only ignorable cookies cache exactly like
 //! cookie-free requests, with cookie values excluded from the cache
-//! key, while unknown, authentication, session, cart, and
-//! personalization cookies still bypass.
+//! key. Two public preferences (`wp_lang` and `trx_addons_is_retina`)
+//! instead select distinct cached variants. Unknown, authentication,
+//! session, cart and other personalization cookies still bypass.
 //!
-//! Security contract: an allowlisted cookie MUST NOT influence
+//! Security contract: an ignored cookie MUST NOT influence
 //! server-generated HTML. The built-in list covers first-party
 //! public bookkeeping, analytics/tracking and load-balancer names under
 //! their intended usage. Administrators extending the list with
 //! `HtmlCacheIgnoreCookie` take responsibility for that invariant;
 //! when in doubt, leave the cookie bypassing (the default) or force
-//! it with `HtmlCacheBypassCookie`. Cookie values are never read
-//! beyond parsing, never logged, and never enter diagnostics — only
+//! it with `HtmlCacheBypassCookie`. Only the two public preference values
+//! are read beyond parsing for opaque variant digests; values are never
+//! logged and never enter diagnostics — only
 //! cookie names appear in bypass reasons.
 //!
 //! Matching is allocation-free on the accept path: the built-in list
@@ -37,7 +39,7 @@ pub const MAX_REASON_NAME_LEN: usize = 128;
 /* Built-in policy: static matchers, no request-time compilation. */
 
 /// Policy generation participates in effective options signatures.
-pub const COOKIE_POLICY_VERSION: &str = "public-cookies-v2";
+pub const COOKIE_POLICY_VERSION: &str = "public-cookies-v3";
 
 macro_rules! exact_cookies {
     ($($name:literal),* $(,)?) => {
@@ -47,6 +49,7 @@ macro_rules! exact_cookies {
     };
 }
 exact_cookies! {
+    "tk_qs",
     "wordpress_test_cookie",
     "mage-cache-sessid",
     "_ga",
@@ -182,6 +185,14 @@ pub const BUILTIN_IGNORE_PREFIXES: &[&str] = &[
     "AMP_MKTG_",
     "mf_",
 ];
+
+/// Public preferences vary HTML instead of having their values ignored.
+/// Fixed order provides a canonical identity across cookie/header orderings.
+pub const BUILTIN_PREFERENCE_COOKIES: &[&str] = &["wp_lang", "trx_addons_is_retina"];
+
+fn preference_index(name: &str) -> Option<usize> {
+    BUILTIN_PREFERENCE_COOKIES.iter().position(|p| *p == name)
+}
 
 /// Numeric WordPress settings suffixes: one or more ASCII digits only.
 pub const BUILTIN_IGNORE_NUMERIC: &[&str] = &["wp-settings-", "wp-settings-time-"];
@@ -531,6 +542,7 @@ pub fn evaluate_cookie_headers(headers: &[(&str, &str)], policy: &CookiePolicy) 
     let mut count = 0;
     let mut saw_cookie_header = false;
     let mut offending = None;
+    let mut preferences_seen = 0u8;
     for (header_name, value) in headers {
         if header_name.eq_ignore_ascii_case("Cookie2") {
             return CookieDecision::Bypass(CookieBypass::Cookie2);
@@ -539,7 +551,14 @@ pub fn evaluate_cookie_headers(headers: &[(&str, &str)], policy: &CookiePolicy) 
             continue;
         }
         saw_cookie_header = true;
-        if scan_cookie_names(value, |name| {
+        if scan_cookie_pairs(value, |name, _| {
+            if let Some(index) = preference_index(name) {
+                let bit = 1 << index;
+                if preferences_seen & bit != 0 {
+                    return Err(());
+                }
+                preferences_seen |= bit;
+            }
             count += 1;
             if count > MAX_COOKIES_PER_REQUEST {
                 return Err(());
@@ -547,7 +566,8 @@ pub fn evaluate_cookie_headers(headers: &[(&str, &str)], policy: &CookiePolicy) 
             if offending.is_none()
                 && (protected_cookie(name)
                     || policy.bypass.matches(name)
-                    || !((policy.common_enabled && builtin_ignored(name))
+                    || !((policy.common_enabled
+                        && (builtin_ignored(name) || preference_index(name).is_some()))
                         || policy.ignore.matches(name)))
             {
                 offending = Some(name);
@@ -570,9 +590,9 @@ pub fn evaluate_cookie_headers(headers: &[(&str, &str)], policy: &CookiePolicy) 
 
 /// Scan borrowed names without retaining or allocating cookie values/names.
 /// Validate the complete header even after a disallowed name is found.
-fn scan_cookie_names<'a>(
+fn scan_cookie_pairs<'a>(
     value: &'a str,
-    mut visit: impl FnMut(&'a str) -> Result<(), ()>,
+    mut visit: impl FnMut(&'a str, &'a str) -> Result<(), ()>,
 ) -> Result<(), ()> {
     let bytes = value.as_bytes();
     let mut start = 0;
@@ -583,10 +603,9 @@ fn scan_cookie_names<'a>(
             in_quotes = !in_quotes;
         }
         if boundary {
-            let piece = value[start..index].trim_matches([' ', '\t']);
+            let piece = value[start..index].trim_start_matches([' ', '\t']);
             if !piece.is_empty() {
-                let (name, _) = piece.split_once('=').ok_or(())?;
-                let name = name.trim_matches([' ', '\t']);
+                let (name, cookie_value) = piece.split_once('=').ok_or(())?;
                 if name.is_empty()
                     || name
                         .bytes()
@@ -594,7 +613,7 @@ fn scan_cookie_names<'a>(
                 {
                     return Err(());
                 }
-                visit(name)?;
+                visit(name, cookie_value)?;
             }
             start = index + 1;
         }
@@ -603,6 +622,39 @@ fn scan_cookie_names<'a>(
         return Err(());
     }
     Ok(())
+}
+
+/// Borrow preference values using the same validated parser as eligibility.
+/// Duplicates fail closed because upstream applications can select first/last
+/// values differently. Callers must still apply the complete eligibility policy.
+pub fn preference_cookie_values<'a>(
+    headers: impl IntoIterator<Item = (&'a str, &'a str)>,
+) -> Result<[Option<&'a str>; 2], CookieBypass> {
+    let mut values = [None; 2];
+    let mut count = 0;
+    for (name, value) in headers {
+        if name.eq_ignore_ascii_case("Cookie2") {
+            return Err(CookieBypass::Cookie2);
+        }
+        if !name.eq_ignore_ascii_case("Cookie") {
+            continue;
+        }
+        scan_cookie_pairs(value, |name, value| {
+            count += 1;
+            if count > MAX_COOKIES_PER_REQUEST {
+                return Err(());
+            }
+            if let Some(index) = preference_index(name) {
+                if values[index].is_some() {
+                    return Err(());
+                }
+                values[index] = Some(value);
+            }
+            Ok(())
+        })
+        .map_err(|_| CookieBypass::Malformed)?;
+    }
+    Ok(values)
 }
 
 /// Truncates a cookie name for diagnostics (char-boundary safe).
@@ -634,6 +686,64 @@ mod tests {
         bypass: &'a CookiePatternSet,
     ) -> CookiePolicy<'a> {
         make_policy(true, ignore, bypass)
+    }
+
+    #[test]
+    fn preference_cookies_are_default_eligible_and_duplicates_fail_closed() {
+        let empty = CookiePatternSet::new();
+        let policy = default_policy(&empty, &empty);
+        for name in BUILTIN_PREFERENCE_COOKIES {
+            let header = format!("tk_qs=track; {name}=one");
+            assert!(evaluate_cookie_headers(&[("Cookie", &header)], &policy).allowed());
+            assert!(!evaluate_cookie_headers(
+                &[("Cookie", &header)],
+                &make_policy(false, &empty, &empty)
+            )
+            .allowed());
+            let mut bypass = CookiePatternSet::new();
+            bypass.add(name).unwrap();
+            assert!(!evaluate_cookie_headers(
+                &[("Cookie", &header)],
+                &default_policy(&empty, &bypass)
+            )
+            .allowed());
+        }
+        let headers = [
+            ("Cookie", "wp_lang=en_US; tk_qs=x"),
+            ("Cookie", "trx_addons_is_retina=1"),
+        ];
+        assert_eq!(
+            preference_cookie_values(headers).unwrap(),
+            [Some("en_US"), Some("1")]
+        );
+        assert_eq!(
+            preference_cookie_values([("Cookie", "wp_lang=; trx_addons_is_retina=0")]).unwrap(),
+            [Some(""), Some("0")]
+        );
+        assert_eq!(
+            preference_cookie_values([("Cookie", "wp_lang=en_US ")]).unwrap(),
+            [Some("en_US "), None]
+        );
+        assert_eq!(
+            preference_cookie_values([("Cookie", "wp_lang =en_US")]),
+            Err(CookieBypass::Malformed)
+        );
+        for headers in [
+            vec![("Cookie", "wp_lang=en_US; wp_lang=fr_FR")],
+            vec![
+                ("Cookie", "trx_addons_is_retina=1"),
+                ("Cookie", "trx_addons_is_retina=1"),
+            ],
+        ] {
+            assert_eq!(
+                evaluate_cookie_headers(&headers, &policy),
+                CookieDecision::Bypass(CookieBypass::Malformed)
+            );
+            assert_eq!(
+                preference_cookie_values(headers),
+                Err(CookieBypass::Malformed)
+            );
+        }
     }
 
     #[test]

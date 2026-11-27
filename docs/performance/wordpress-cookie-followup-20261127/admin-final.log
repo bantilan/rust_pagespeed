@@ -1,0 +1,68 @@
+   Compiling ps-admin v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-admin)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.96s
+     Running unittests src/lib.rs (target/debug/build/ps-admin/8455da7d98dfc1be/out/ps_admin-8455da7d98dfc1be)
+
+running 5 tests
+test access::tests::empty_group_allows_all ... ok
+test access::tests::later_rules_override ... ok
+test access::tests::wildcard_basics ... ok
+test assets::tests::assets_are_nonempty ... ok
+test log_buffer::tests::resize_toggles_and_trims ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/admin_site.rs (target/debug/build/ps-admin/2c1adfeecbf82523/out/admin_site-2c1adfeecbf82523)
+
+running 49 tests
+test admin_access_groups_gate_each_endpoint_family ... ok
+test a_completed_cache_lookup_frees_its_slot ... ok
+test cache_lookup_admits_one_read_at_a_time ... ok
+test cache_lookup_reports_through_the_hook ... ok
+test console_json_serves_logged_samples ... ok
+test delete_allowed_when_purge_enabled ... ok
+test delete_refused_when_purge_disabled ... ok
+test archive_read_does_not_require_live_snapshot ... ok
+test dashboard_recovers_previous_instance_counters ... ok
+test cache_listing_renders_inventory_and_purge_placeholders ... ok
+test dashboard_shows_html_activity_without_inventing_savings ... ok
+test console_gating_names_every_missing_prerequisite ... ok
+test debug_assets_serve_unminified_builds ... ok
+test dashboard_shows_savings_and_uptime ... ok
+test graph_defaults_ask_for_the_graphs_over_the_whole_log ... ok
+test full_purge_set_reports_the_refusal_reason ... ok
+test graph_granularity_is_held_to_the_bounds ... ok
+test graph_times_are_non_negative_and_not_far_in_the_future ... ok
+test history_archive_helpers_match_their_contracts ... ok
+test history_matches_html_cache_bypass_lines ... ok
+test history_controls_render_the_browse_form ... ok
+test existing_diagnostics_are_filtered_without_inventing_rewrite_fields ... ok
+test graph_variable_names_are_listed_and_bounded ... ok
+test graphs_page_gates_on_the_console_logger ... ok
+test html_cache_bypass_reasons_escape_html ... ok
+test every_leaf_serves_and_unknown_pages_404 ... ok
+test html_cache_cookie_bypasses_render_newest_first ... ok
+test html_cache_rejects_malformed_and_non_web_records ... ok
+test html_cache_summary_counts_allowlist_accepts ... ok
+test html_cache_metrics_stay_on_dedicated_page ... ok
+test html_cache_records_are_escaped_and_deduplicated ... ok
+test html_cache_cookie_policy_panel_lists_effective_rules ... ok
+test html_cache_history_is_bounded_and_newest_first ... ok
+test purge_scope_checks_run_ahead_of_the_enabled_check ... ok
+test images_page_parses_emitted_record_format ... ok
+test images_page_shows_recorded_rewrite_and_comparison ... ok
+test structured_messages_in_history_page ... ok
+test vhost_console_purge_may_not_evict ... ok
+test vhost_purge_set_lists_own_host_only ... ok
+test message_history_reports_a_disabled_buffer ... ok
+test whole_cache_purge_stamps_the_global_timestamp ... ok
+test leaves_do_not_block_each_other ... ok
+test purge_edge_cases_answer_plainly ... ok
+test statistics_page_serves_its_query_shapes ... ok
+test a_busy_slot_is_waited_for_briefly ... ok
+test config_admits_one_read_at_a_time ... ok
+test cache_status_admits_one_read_at_a_time ... ok
+test graphs_json_admits_one_read_at_a_time ... ok
+test message_history_admits_one_read_at_a_time ... ok
+
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+

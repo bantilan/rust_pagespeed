@@ -4,14 +4,30 @@ The existing `HtmlCacheIgnoreCommonCookies` option defaults to **on**. With HTML
 
 Default cookies are considered non-personalizing under normal intended use. Site-specific exceptions belong in `HtmlCacheBypassCookie`. Unknown cookies continue to bypass. Recognized login/authentication, session, shopping-cart and CSRF cookies bypass even when a custom allowance such as `*` matches them. Exact predefined analytics session/bookkeeping names (for example `ai_session` and `mage-cache-sessid`) retain their intended non-login meaning. No name detector can determine an application's arbitrary personalization semantics; exclude names your application uses to vary public HTML.
 
-Allowed values are excluded from cache identity, never stripped from upstream requests, and never logged by this policy. Authorization, response privacy/Set-Cookie, access control, freshness, Vary, purge and per-request beacon eligibility remain unchanged. Allowed cookies do not guarantee a HIT if another eligibility check rejects the request.
+Ignored tracking-cookie values are excluded from cache identity. The two public preference cookies below select separate variants through opaque value digests; their raw values never enter cache keys or diagnostics. Cookies are never stripped from upstream requests. Authorization, response privacy/Set-Cookie, access control, freshness, Vary, purge and per-request beacon eligibility remain unchanged. Allowed cookies do not guarantee a HIT if another eligibility check rejects the request.
 
-## Default entries
+## Default public preference variants
+
+No extra configuration is needed for these exact names when common-cookie support and HTML caching are on:
+
+| Cookie | Core handling |
+| --- | --- |
+| `tk_qs` | Ignored tracking value; shares the cookie-free entry if no preferences are present. |
+| `wordpress_test_cookie` | Already ignored by the default list. |
+| `wp_lang` | Separate cached variant for each supplied language value. |
+| `trx_addons_is_retina` | Separate cached variant for each supplied retina preference value. |
+
+Both ordinary and early HIT identities include the same opaque preference selectors. Same values share across cookie/header order and tracking values; different values, empty and absent cookies stay separate. Values are kept byte-distinct rather than guessing application normalization. Duplicate preference cookies bypass because upstream first/last-value handling can be ambiguous. Login/session/cart/CSRF, unknown cookies and other HTTP/privacy/beacon gates still take precedence.
+
+`HtmlCacheBypassCookie "wp_lang";` (or the retina name) excludes a preference; `HtmlCacheIgnoreCommonCookies off;` disables its default acceptance. Explicitly allowing either name with `HtmlCacheIgnoreCookie` still preserves preference variants rather than ignoring its value. This targeted preference behavior is separate from the ordinary tracking-cookie allowlist.
+
+## Default ignored entries
 
 `*` is a wildcard; `[0-9]+` means one or more ASCII digits at the end, with a literal prefix. `wp-settings-12` matches; `wp-settings-abc` does not. Mixpanel/PostHog suffixes are anchored. Google Ads `_gcl_` and Hotjar rules are narrowed to the names/prefixes below rather than arbitrary vendor prefixes.
 
 ```text
 wordpress_test_cookie
+tk_qs
 wp-settings-[0-9]+
 wp-settings-time-[0-9]+
 mage-cache-sessid

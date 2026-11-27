@@ -516,7 +516,8 @@ impl HtmlCacheSession {
     /// Computes eligibility plus the identity key (`ShouldCache`
     /// plus identity construction), or the attributed bypass reason.
     /// The identity drops `Cookie` lines (requests that reach key
-    /// generation hold only ignored cookies) and snapshots the
+    /// generation hold only ignored cookies/public preferences), adds opaque
+    /// preference selectors, and snapshots the
     /// lookup-time beacon evidence (`None` when beaconing is
     /// inactive).
     fn eligibility_key(
@@ -721,6 +722,38 @@ impl HtmlCacheSession {
     }
 
     fn request_identity(
+        &self,
+        request: &RequestHeaders,
+        origin: Option<&ResponseHeaders>,
+    ) -> String {
+        let mut identity = self.request_identity_without_preferences(request, origin);
+        // Tracking cookies stay omitted. These two public preferences can
+        // affect generated HTML, so both normal and early keys must vary.
+        // Only opaque digests join identity; raw values never reach keys/logs.
+        match ps_config::cookies::preference_cookie_values(request.headers().iter()) {
+            Ok(values) => {
+                for (name, value) in ps_config::cookies::BUILTIN_PREFERENCE_COOKIES
+                    .iter()
+                    .zip(values)
+                {
+                    if let Some(value) = value {
+                        identity.push_str("\npublic-cookie-preference:");
+                        identity.push_str(name);
+                        identity.push(':');
+                        identity.push_str(&html_codec::sign_url(
+                            "pagespeed-public-cookie-preference-v1",
+                            value,
+                        ));
+                    }
+                }
+            }
+            // Eligibility rejects malformed/duplicate cookies before key use.
+            Err(_) => identity.push_str("\ninvalid-cookie-preference"),
+        }
+        identity
+    }
+
+    fn request_identity_without_preferences(
         &self,
         request: &RequestHeaders,
         origin: Option<&ResponseHeaders>,
@@ -1510,6 +1543,30 @@ mod tests {
             .session()
             .early_key(&cookie_request(&h, "tracker=x"), None)
             .is_none());
+    }
+
+    #[test]
+    fn preference_identity_is_opaque_and_tracking_values_are_ignored() {
+        let h = Harness::new();
+        let first = cookie_request(
+            &h,
+            "tk_qs=one; wp_lang=private-language-value; trx_addons_is_retina=1",
+        );
+        let other = cookie_request(
+            &h,
+            "trx_addons_is_retina=1; tk_qs=another; wp_lang=private-language-value",
+        );
+        let key = h.session().request_identity(&first, None);
+        assert!(!key.contains("private-language-value"));
+        assert!(!key.contains("tk_qs"));
+        assert_eq!(key, h.session().request_identity(&other, None));
+        assert_ne!(
+            key,
+            h.session().request_identity(
+                &cookie_request(&h, "wp_lang=another-language; trx_addons_is_retina=1"),
+                None
+            )
+        );
     }
 
     #[test]

@@ -1,0 +1,28 @@
+   Compiling ps-config v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-config)
+warning: unused import: `super::Scope`
+    --> crates/ps-config/src/options.rs:6456:13
+     |
+6456 |         use super::Scope;
+     |             ^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-config` (lib test) generated 1 warning (run `cargo fix --lib -p ps-config --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.57s
+     Running unittests src/lib.rs (target/debug/build/ps-config/1b8ba0bb0cb77675/out/ps_config-1b8ba0bb0cb77675)
+
+running 11 tests
+test cookies::tests::builtin_covers_required_vendors ... ok
+test cookies::tests::builtin_rejects_personalization_and_case_variants ... ok
+test cookies::tests::evaluate_bypasses_unknown_and_mixed ... ok
+test cookies::tests::evaluate_absent_and_allowlisted ... ok
+test cookies::tests::custom_lists_extend_override_and_disable ... ok
+test cookies::tests::bypass_names_truncate_and_lists_render ... ok
+test cookies::tests::patterns_validate_match_and_sign ... ok
+test cookies::tests::narrow_defaults_numeric_suffix_and_compiled_globs ... ok
+test cookies::tests::protected_names_win_over_all_wildcards ... ok
+test cookies::tests::evaluate_fails_closed ... ok
+test cookies::tests::supplied_defaults_and_optional_entries ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.00s
+
