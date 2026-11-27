@@ -52,7 +52,14 @@ window.pagespeed.FontPreloads = (function() {
     }
     return out;
   }
+  var sent = {};
   function send(beaconUrl, pageUrl, oh, nonce) {
+    var storageKey = 'pagespeed.font-report:' + JSON.stringify([pageUrl, oh]);
+    if (sent[storageKey] === nonce) { return; }
+    try {
+      if (window.sessionStorage.getItem(storageKey) === nonce) { return; }
+    } catch (ignored) {}
+
     var faces;
     try {
       faces = collect();
@@ -67,10 +74,16 @@ window.pagespeed.FontPreloads = (function() {
         '&n=' + encodeURIComponent(nonce) +
         '&ff=' + encodeURIComponent(faces.join(','));
     try {
+      var queued = false;
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(url);
+        queued = navigator.sendBeacon(url);
       } else {
         new Image().src = url;
+        queued = true;
+      }
+      if (queued) {
+        sent[storageKey] = nonce;
+        try { window.sessionStorage.setItem(storageKey, nonce); } catch (ignored) {}
       }
     } catch (ignored) {}
   }

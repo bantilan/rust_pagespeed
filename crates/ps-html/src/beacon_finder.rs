@@ -122,7 +122,7 @@ pub const NONCE_TIMEOUT_MS: i64 = 60_000;
 pub const MAX_STALE_CANDIDATE_KEYS: usize = 100;
 /// Valid beacons before low-frequency sampling
 /// (`kHighFreqBeaconCount`).
-pub const HIGH_FREQ_BEACON_COUNT: u64 = 3;
+pub const HIGH_FREQ_BEACON_COUNT: u64 = 1;
 /// Low-frequency interval multiplier (`kLowFreqBeaconMult`).
 pub const LOW_FREQ_BEACON_MULT: i64 = 100;
 /// Expired nonces before low-frequency sampling
@@ -1097,6 +1097,35 @@ mod tests {
         ));
         assert_eq!(1, old.nonces_expired);
         assert!(old.pending_nonces.is_empty());
+    }
+
+    #[test]
+    fn one_accepted_report_enables_low_frequency_learning() {
+        let mut evidence = BeaconEvidence::default();
+        let nonce = prepare_beacon(&mut evidence, 0, 5, 77).unwrap();
+        let report = BeaconReport {
+            nonce,
+            html_hashes: Some(HashSet::new()),
+            lcp_kind: LCP_KIND_TEXT.into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            accept_beacon(&mut evidence, &report, 1),
+            AcceptOutcome::Accepted
+        );
+        assert_eq!(evidence.valid_beacons, 1);
+        assert!(prepare_beacon(&mut evidence, 5000, 5, 78).is_some());
+        assert_eq!(evidence.next_beacon_ms, 505000);
+        assert!(!should_beacon(
+            10000,
+            Some(&evidence),
+            DownstreamBeacon::Inactive
+        ));
+        assert!(should_beacon(
+            505000,
+            Some(&evidence),
+            DownstreamBeacon::Inactive
+        ));
     }
 
     #[test]

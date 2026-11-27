@@ -198,6 +198,12 @@ verified zero origin calls across 20 analytics HITs; median latency changed from
 26.77 ms to 0.69 ms with a synthetic 25 ms origin delay. These are isolated local
 measurements, not a live-site speedup claim.
 
+Font learning remembers the last queued nonce per page/options in the tab's
+session storage, avoiding repeated POSTs when cached HTML replays that nonce.
+Fresh nonces still report; blocked storage falls back to same-document deduplication.
+RUM timing beacons are unchanged. Critical-image sampling uses the existing
+low-frequency interval after one accepted report; changed candidates restart learning.
+
 One accepted valid critical-image report makes learning available. HTML cache
 identity follows the resulting critical-image set and LCP choice, so repeated
 reports with identical decisions and nonce/scheduling/candidate bookkeeping do

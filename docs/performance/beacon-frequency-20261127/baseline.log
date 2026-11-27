@@ -1,0 +1,22 @@
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.25s
+     Running unittests src/lib.rs (target/debug/build/ps-html/3190878eb5345cc4/out/ps_html-3190878eb5345cc4)
+
+running 14 tests
+test beacon_finder::tests::availability_needs_a_valid_beacon ... ok
+test beacon_finder::tests::criticality_needs_max_support ... ok
+test beacon_finder::tests::candidates_gate_and_reset ... ok
+test beacon_finder::tests::accept_unstamped_and_text_lcp ... ok
+test beacon_finder::tests::accept_stamped_beacon_end_to_end ... ok
+test beacon_finder::tests::codec_round_trip_and_rejects ... ok
+test beacon_finder::tests::finder_round_trips_through_cache ... ok
+test beacon_finder::tests::html_identity_tracks_effective_decisions_not_collection_bookkeeping ... ok
+test beacon_finder::tests::nonces_validate_once_and_expire ... ok
+test beacon_finder::tests::font_triples_parse_validate_and_cap ... ok
+test beacon_finder::tests::sampling_cadence_and_low_frequency ... ok
+test beacon_finder::tests::unknown_lcp_acknowledges_without_erasing_evidence ... ok
+test beacon_finder::tests::url_hash_matches_reference ... ok
+test beacon_finder::tests::multiprocess_evidence_updates_preserve_nonces_and_reports ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 201 filtered out; finished in 0.02s
+
