@@ -117,11 +117,9 @@ impl CriticalSelectorFilter {
 
     /// Reads the beaconed selectors for this page.
     fn read_critical_selectors(&self) -> HashSet<String> {
-        self.driver
-            .server_context()
-            .critical_selector_finder()
-            .map(|finder| finder.get_critical_selectors(self.driver.base_url().spec()))
-            .unwrap_or_default()
+        self.driver.critical_css_snapshot().unwrap_or_else(|| {
+            crate::critical_selector_finder::snapshot(&self.driver).0
+        })
     }
 
     /// Computes the critical subset of a parsed stylesheet

@@ -789,6 +789,7 @@ pub struct ResourceDriver {
     request_headers: RefCell<RequestHeaders>,
     image_records: RefCell<Vec<ImageRewriteRecord>>,
     beacon_evidence_identity: RefCell<Option<Vec<u8>>>,
+    critical_css_snapshot: RefCell<Option<std::collections::HashSet<String>>>,
     fetch_budget_ms: RefCell<Option<i64>>,
     fetch_window_started: Cell<Option<std::time::Instant>>,
     partition_hash: RefCell<Option<(Arc<str>, String)>>,
@@ -904,6 +905,7 @@ impl ResourceDriver {
             request_headers: RefCell::new(RequestHeaders::new()),
             image_records: RefCell::new(Vec::new()),
             beacon_evidence_identity: RefCell::new(None),
+            critical_css_snapshot: RefCell::new(None),
             fetch_budget_ms: RefCell::new(None),
             fetch_window_started: Cell::new(None),
             partition_hash: RefCell::new(None),
@@ -1015,6 +1017,21 @@ impl ResourceDriver {
     #[must_use]
     pub fn beacon_evidence_identity(&self) -> Option<Vec<u8>> {
         self.beacon_evidence_identity.borrow().clone()
+    }
+
+    /// Start a new cache session without retaining a prior document's selectors.
+    pub fn clear_critical_css_snapshot(&self) {
+        self.critical_css_snapshot.borrow_mut().take();
+    }
+
+    /// Freeze selector inputs for the HTML-cache render that follows lookup.
+    pub fn set_critical_css_snapshot(&self, selectors: std::collections::HashSet<String>) {
+        *self.critical_css_snapshot.borrow_mut() = Some(selectors);
+    }
+
+    /// The exact selector inputs used by the current cache session, if any.
+    pub fn critical_css_snapshot(&self) -> Option<std::collections::HashSet<String>> {
+        self.critical_css_snapshot.borrow().clone()
     }
 
     /// Sets the request's resource reconstruction coordination budget.

@@ -21,6 +21,7 @@ p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--nginx', required=True)
 p.add_argument('--module', required=True)
 p.add_argument('--output', required=True)
+p.add_argument('--critical-css', action='store_true', help='Verify prioritize_critical_css caching with full styles retained when selector evidence is absent')
 p.add_argument('--rum-only', action='store_true', help='Isolate RUM clock retention with add_instrumentation; core beacon sampling tested separately')
 p.add_argument('--analytics-early', choices=['baseline', 'fixed'], help='Verify analytics origin counter before/after allowlist parity fix')
 p.add_argument('--sampled-image-free', action='store_true', help='Real Chrome image-free lazyload sampling through stable cache HITs')
@@ -80,6 +81,8 @@ class Origin(socketserver.BaseRequestHandler):
         body = b'<html><head><title>Origin counter</title></head><body>' + b'hello world ' * 4000 + b'</body></html>'
         if a.sampled_image:
             body = b'<html><head><title>Image sample</title><style>body{margin:0}img{display:block;width:640px;height:400px}</style></head><body><img src="/hero.jpg" width="640" height="400"><p>Image LCP</p></body></html>'
+        if a.critical_css:
+            body = body.replace(b'<head>', b'<head><style>body{color:#333}span{color:blue}</style>')
         response = ('Status: 200 OK\r\nContent-Type: text/html\r\nCache-Control: public, max-age=60\r\n' + cookie + '\r\n').encode() + body
         self.request.sendall(struct.pack('!BBHHBB', 1, 6, req, len(response), 0, 0) + response)
         self.request.sendall(struct.pack('!BBHHBB', 1, 6, req, 0, 0, 0))
@@ -120,6 +123,8 @@ if a.sampled_image_free:
     conf = conf.replace('  pagespeed on;', '  pagespeed on;\n  pagespeed EnableFilters lazyload_images;')
 if a.rum_only:
     conf = conf.replace('  pagespeed on;', '  pagespeed on;\n  pagespeed RewriteLevel PassThrough;\n  pagespeed EnableFilters add_instrumentation;')
+if a.critical_css:
+    conf = conf.replace('  pagespeed on;', '  pagespeed on;\n  pagespeed EnableFilters prioritize_critical_css;')
 (root / 'nginx.conf').write_text(conf)
 proc = None
 
@@ -131,6 +136,8 @@ def get(path='/', headers=None):
         c.request('GET', path, headers={**browser, **(headers or {})})
         r = c.getresponse(); body = r.read()
         assert r.status == 200, (r.status, body[:100])
+        if a.critical_css:
+            assert b'<style>body{color:' in body, 'full CSS lost without selector evidence'
         marker = body.rsplit(b'PageSpeed Cache:', 1)[-1].split(b'|', 1)[0].strip().decode()
         return {'ms': (time.perf_counter() - start) * 1000, 'marker': marker, 'bytes': len(body),
                 'rum_browser_clock': b'window.mod_pagespeed_start = Number(new Date())' in body,
@@ -257,7 +264,7 @@ try:
     private.extend(get('/private', headers={'Cookie': '_ga=123'}) for _ in range(2))
     assert counts['/private'] == 4, counts
     assert all(x['marker'] == 'BYPASS' for x in private), private
-    result = {'cross_browser_hits': browser_groups, 'navigation_hit_skipped_origin': True, 'navigation': navigation, 'analytics': analytics, 'analytics_median_ms': statistics.median(x['ms'] for x in analytics) if analytics else None, 'analytics_expected': a.analytics_early, 'synthetic_origin_delay_ms': 25, 'cold': cold, 'warm': warm,
+    result = {'critical_css_filter_enabled': a.critical_css, 'cross_browser_hits': browser_groups, 'navigation_hit_skipped_origin': True, 'navigation': navigation, 'analytics': analytics, 'analytics_median_ms': statistics.median(x['ms'] for x in analytics) if analytics else None, 'analytics_expected': a.analytics_early, 'synthetic_origin_delay_ms': 25, 'cold': cold, 'warm': warm,
               'warm_median_ms': statistics.median(x['ms'] for x in warm),
               'origin_counts': counts, 'warm_hits_skipped_origin': True,
               'cookie_auth_cachecontrol_range_bypass_verified': True,
@@ -267,5 +274,9 @@ try:
 finally:
     if proc:
         os.killpg(proc.pid, signal.SIGTERM)
-        proc.wait(timeout=10)
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            proc.wait(timeout=5)
     origin.shutdown(); origin.server_close()

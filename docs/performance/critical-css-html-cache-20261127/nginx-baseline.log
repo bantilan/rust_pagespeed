@@ -1,0 +1,6 @@
+nginx: [alert] could not open error log file: open() "/var/log/nginx/error.log" failed (13: Permission denied)
+Traceback (most recent call last):
+  File "/home/gamingph/Projects/Rust/pagespeed-rust/tools/verify_early_html_cache.py", line 212, in <module>
+    assert cold['marker'] == 'MISS', cold
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'ms': 32.5162770022871, 'marker': 'BYPASS', 'bytes': 50338, 'rum_browser_clock': True, 'body_hash': '3737e011f17a516b0a6b137282d179fbce4e7d5c30cf8f8d732f2990e69ab525'}

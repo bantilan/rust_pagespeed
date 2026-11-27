@@ -109,6 +109,10 @@ impl Driver {
                 // once a resource driver exists (external
                 // resources need fetch machinery).
                 let bound: Option<Box<dyn crate::filter::HtmlFilter>> = match slot {
+                    ChainFilter::CriticalSelector => resource_driver.clone().map(|driver| {
+                        Box::new(filters::critical_selector::CriticalSelectorFilter::new(driver))
+                            as Box<dyn crate::filter::HtmlFilter>
+                    }),
                     ChainFilter::CssFilter => resource_driver.clone().map(|driver| {
                         Box::new(filters::css::CssFilter::new(driver))
                             as Box<dyn crate::filter::HtmlFilter>

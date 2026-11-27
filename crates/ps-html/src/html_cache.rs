@@ -84,6 +84,8 @@ struct Eligibility {
     /// Lookup-time beacon evidence identity (`None` when
     /// beaconing is inactive).
     beacon_identity: Option<Vec<u8>>,
+    /// Exact selector evidence used to render CSS.
+    css_identity: Option<Vec<u8>>,
     /// Cookies accepted through the allowlist (0 when cookie-free).
     allowlisted_cookies: usize,
 }
@@ -111,6 +113,7 @@ enum SessionState {
         /// Lookup-time beacon evidence identity (`None` when
         /// beaconing is inactive).
         beacon_identity: Option<Vec<u8>>,
+        css_identity: Option<Vec<u8>>,
     },
     /// Lookup hit; the caller serves the returned entry.
     Hit,
@@ -136,6 +139,9 @@ impl HtmlCacheSession {
     /// fully installed by the time the sink exists).
     #[must_use]
     pub fn new(driver: Rc<super::server_context::ResourceDriver>, url: &str) -> Self {
+        if driver.options().enabled(ps_config::filter::Filter::PrioritizeCriticalCss) {
+            driver.clear_critical_css_snapshot();
+        }
         let mut properties = driver.request_properties();
         let device_type = properties.device_type();
         let device = ps_http::user_agent_matcher::UserAgentMatcher::device_type_string(device_type)
@@ -210,6 +216,7 @@ impl HtmlCacheSession {
             ttl_ms,
             origin_expiry_ms,
             beacon_identity,
+            css_identity,
             ..
         } = eligibility;
         let lookup = self.driver.server_context().metadata_cache().get(&key);
@@ -245,6 +252,7 @@ impl HtmlCacheSession {
             origin_expiry_ms,
             body: Vec::new(),
             beacon_identity,
+            css_identity,
         };
         None
     }
@@ -407,6 +415,7 @@ impl HtmlCacheSession {
                 origin_expiry_ms,
                 body,
                 beacon_identity,
+                css_identity,
             } => {
                 let mut created_ms = 0;
                 let mut detail_line = None;
@@ -419,12 +428,16 @@ impl HtmlCacheSession {
                         (Some(_), None) => false,
                         (None, _) => true,
                     };
+                let css_settled = css_identity.as_ref().is_none_or(|then| {
+                    then == &super::critical_selector_finder::snapshot(&self.driver).1
+                });
                 // Detached rewrites (deadline-pending inputs serving
                 // fallback content) never publish: the background
                 // completion warms the caches for a complete later
                 // rewrite instead.
                 if !body.is_empty()
                     && evidence_settled
+                    && css_settled
                     && publication_ok
                     && self.driver.detached_rewrites() == 0
                     && !contains_sampled_beacon_init(&body)
@@ -474,6 +487,8 @@ impl HtmlCacheSession {
                             "beacon-evidence-changed"
                         } else if self.driver.detached_rewrites() != 0 {
                             "resource-optimization-pending"
+                        } else if !css_settled {
+                            "critical-css-evidence-changed"
                         } else if contains_sampled_beacon_init(&body) {
                             "beacon-sampling"
                         } else {
@@ -569,7 +584,10 @@ impl HtmlCacheSession {
                 && !origin.headers().has("Set-Cookie2"),
             vary_star_absent: !origin_varies_star(origin),
             no_experiment: !options.running_experiment(),
-            critical_css_ok: !options.enabled(Filter::PrioritizeCriticalCss),
+            // Unsupported clients must not receive cached critical-CSS output
+            // from a supported browser in the same public format/device group.
+            critical_css_ok: !options.enabled(Filter::PrioritizeCriticalCss)
+                || self.driver.request_properties().supports_critical_css(),
             request_headers_ok: strict.is_ok(),
             cookies_ok: cookies.is_ok(),
             origin_cacheable: origin_cacheable || file_ok,
@@ -704,6 +722,15 @@ impl HtmlCacheSession {
                 .push_str(&String::from_utf8(encoded.clone()).expect("evidence codec emits UTF-8"));
             beacon_identity = Some(encoded);
         }
+        let css_identity = if options.enabled(Filter::PrioritizeCriticalCss) {
+            let (selectors, encoded) = super::critical_selector_finder::snapshot(&self.driver);
+            self.driver.set_critical_css_snapshot(selectors);
+            identity.push_str("\ncritical-css:");
+            identity.push_str(&ps_cache::base64::web64_encode(&encoded));
+            Some(encoded)
+        } else {
+            None
+        };
         // Font learning participation: the confirmed set joins the
         // identity so learned confirmations version the variant away
         // (content-addressed refresh). Unlearned variants cache under
@@ -733,6 +760,7 @@ impl HtmlCacheSession {
             ttl_ms,
             origin_expiry_ms,
             beacon_identity,
+            css_identity,
             allowlisted_cookies,
         })
     }
@@ -2033,15 +2061,7 @@ mod tests {
                         .unwrap();
                 }),
             ),
-            (
-                "prioritize",
-                Box::new(|harness, _, _| {
-                    harness
-                        .options
-                        .borrow_mut()
-                        .soft_enable_filter_for_testing(Filter::PrioritizeCriticalCss);
-                }),
-            ),
+
         ];
         for (name, tweak) in cases {
             let harness = Harness::new();

@@ -41,3 +41,22 @@ impl CriticalSelectorFinder for FakeCriticalSelectorFinder {
         self.selectors.borrow().clone()
     }
 }
+
+/// Snapshot the effective selector input and its unambiguous canonical identity.
+/// No finder means full CSS is retained, matching C++ DetermineEnabled.
+pub fn snapshot(driver: &crate::server_context::ResourceDriver) -> (HashSet<String>, Vec<u8>) {
+    let selectors = driver
+        .server_context()
+        .critical_selector_finder()
+        .map(|finder| finder.get_critical_selectors(driver.base_url().spec()))
+        .unwrap_or_default();
+    let mut sorted: Vec<&str> = selectors.iter().map(String::as_str).collect();
+    sorted.sort_unstable();
+    let mut identity = b"critical-css-selectors/1\n".to_vec();
+    for selector in sorted {
+        identity.extend_from_slice(selector.len().to_string().as_bytes());
+        identity.push(b':');
+        identity.extend_from_slice(selector.as_bytes());
+    }
+    (selectors, identity)
+}

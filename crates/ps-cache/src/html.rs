@@ -65,7 +65,7 @@ pub struct HtmlEligibility {
     pub vary_star_absent: bool,
     /// No experiment active.
     pub no_experiment: bool,
-    /// PrioritizeCriticalCss not evaluating/admin.
+    /// Client can consume critical-CSS output when that filter is enabled.
     pub critical_css_ok: bool,
     /// Request carries no `Authorization` or request `Vary`
     /// (cookies are judged separately by `cookies_ok`).

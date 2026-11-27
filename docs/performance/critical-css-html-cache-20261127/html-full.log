@@ -1,0 +1,2767 @@
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+warning: unused import: `ps_config::filter::Filter`
+  --> crates/ps-html/tests/preload_critical_fonts.rs:11:5
+   |
+11 | use ps_config::filter::Filter;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `build_chain`
+  --> crates/ps-html/tests/preload_critical_fonts.rs:13:22
+   |
+13 | use ps_html::chain::{build_chain, ChainContext, ChainFilter};
+   |                      ^^^^^^^^^^^
+
+warning: unused import: `ps_cache::hash::Hasher`
+   --> crates/ps-html/tests/css_image_rewriter.rs:321:13
+    |
+321 |         use ps_cache::hash::Hasher;
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `debug_with_message` is never used
+   --> crates/ps-html/tests/css_image_rewriter.rs:155:8
+    |
+ 61 | impl Fixture {
+    | ------------ method in this implementation
+...
+155 |     fn debug_with_message(&self, message: &str) {
+    |        ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `wrap_body` is never used
+  --> crates/ps-html/tests/harness.rs:34:8
+   |
+34 | pub fn wrap_body(fragment: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^
+
+warning: function `run_with_filters` is never used
+  --> crates/ps-html/tests/harness.rs:44:8
+   |
+44 | pub fn run_with_filters(input: &[u8], build: impl FnOnce(&mut Parser)) -> Vec<u8> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `round_trip` is never used
+  --> crates/ps-html/tests/harness.rs:56:8
+   |
+56 | pub fn round_trip(input: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^^
+
+warning: function `validate_expected` is never used
+  --> crates/ps-html/tests/harness.rs:62:8
+   |
+62 | pub fn validate_expected(id: &str, input: &[u8], expected: &[u8]) {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: struct `SharedFilter` is never constructed
+  --> crates/ps-html/tests/harness.rs:72:12
+   |
+72 | pub struct SharedFilter<F> {
+   |            ^^^^^^^^^^^^
+
+warning: associated items `new` and `with` are never used
+  --> crates/ps-html/tests/harness.rs:86:12
+   |
+84 | impl<F> SharedFilter<F> {
+   | ----------------------- associated items in this implementation
+85 |     /// Wraps a filter for shared ownership.
+86 |     pub fn new(filter: F) -> Self {
+   |            ^^^
+...
+93 |     pub fn with<R>(&self, read: impl FnOnce(&F) -> R) -> R {
+   |            ^^^^
+
+warning: struct `ExplicitCloseTag` is never constructed
+   --> crates/ps-html/tests/harness.rs:181:12
+    |
+181 | pub struct ExplicitCloseTag;
+    |            ^^^^^^^^^^^^^^^^
+
+warning: struct `InsertCommentOnFirstDiv` is never constructed
+   --> crates/ps-html/tests/harness.rs:200:12
+    |
+200 | pub struct InsertCommentOnFirstDiv {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `new` and `insert` are never used
+   --> crates/ps-html/tests/harness.rs:207:12
+    |
+205 | impl InsertCommentOnFirstDiv {
+    | ---------------------------- associated items in this implementation
+206 |     #[must_use]
+207 |     pub fn new(at_start: bool) -> Self {
+    |            ^^^
+...
+214 |     fn insert(&mut self, at_start: bool, dom: &mut Dom, lexer: &Lexer, id: NodeId) {
+    |        ^^^^^^
+
+warning: struct `InsertScripts` is never constructed
+   --> crates/ps-html/tests/harness.rs:238:12
+    |
+238 | pub struct InsertScripts {
+    |            ^^^^^^^^^^^^^
+
+warning: associated items `new` and `insert` are never used
+   --> crates/ps-html/tests/harness.rs:246:12
+    |
+244 | impl InsertScripts {
+    | ------------------ associated items in this implementation
+245 |     #[must_use]
+246 |     pub fn new(before: bool, at_start: bool, external: bool) -> Self {
+    |            ^^^
+...
+254 |     fn insert(&mut self, at_start: bool, dom: &mut Dom, id: NodeId) {
+    |        ^^^^^^
+
+warning: struct `DeleteCounts` is never constructed
+   --> crates/ps-html/tests/harness.rs:285:12
+    |
+285 | pub struct DeleteCounts {
+    |            ^^^^^^^^^^^^
+
+warning: struct `DeleteCountValues` is never constructed
+   --> crates/ps-html/tests/harness.rs:291:12
+    |
+291 | pub struct DeleteCountValues {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: method `values` is never used
+   --> crates/ps-html/tests/harness.rs:300:12
+    |
+298 | impl DeleteCounts {
+    | ----------------- method in this implementation
+299 |     #[must_use]
+300 |     pub fn values(&self) -> DeleteCountValues {
+    |            ^^^^^^
+
+warning: struct `DeleteNodes` is never constructed
+   --> crates/ps-html/tests/harness.rs:306:12
+    |
+306 | pub struct DeleteNodes {
+    |            ^^^^^^^^^^^
+
+warning: associated items `new`, `set_delete_node_type`, `set_delete_from_type`, `set_delete_on_open_tag`, and `delete_elements` are never used
+   --> crates/ps-html/tests/harness.rs:318:12
+    |
+316 | impl DeleteNodes {
+    | ---------------- associated items in this implementation
+317 |     #[must_use]
+318 |     pub fn new(counts: &DeleteCounts) -> Self {
+    |            ^^^
+...
+330 |     pub fn set_delete_node_type(&mut self, keyword: Keyword) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+334 |     pub fn set_delete_from_type(&mut self, keyword: Keyword) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+338 |     pub fn set_delete_on_open_tag(&mut self, on_open: bool) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+342 |     fn delete_elements(&mut self, dom: &mut Dom) {
+    |        ^^^^^^^^^^^^^^^
+
+warning: function `wrap_body` is never used
+  --> crates/ps-html/tests/harness.rs:34:8
+   |
+34 | pub fn wrap_body(fragment: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "css_image_rewriter") generated 18 warnings
+warning: `ps-html` (test "preload_critical_fonts") generated 17 warnings (14 duplicates) (run `cargo fix --test "preload_critical_fonts" -p ps-html` to apply 2 suggestions)
+warning: `ps-html` (test "js_inline") generated 16 warnings (16 duplicates)
+warning: function `round_trip` is never used
+  --> crates/ps-html/tests/harness.rs:56:8
+   |
+56 | pub fn round_trip(input: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "driver") generated 16 warnings (16 duplicates)
+warning: unused import: `LoadCallback`
+  --> crates/ps-html/tests/background_fetch.rs:15:28
+   |
+15 |     CacheableResourceBase, LoadCallback, MockLoadCallback, NotCacheablePolicy, ResourceHooks,
+   |                            ^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "resource_tag_scanner") generated 14 warnings (13 duplicates)
+warning: `ps-html` (test "url_left_trim") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "background_fetch") generated 1 warning
+warning: unused imports: `CssMinifyFilter` and `JsMinifyFilter`
+  --> crates/ps-html/tests/filters.rs:10:31
+   |
+10 |     CollapseWhitespaceFilter, CssMinifyFilter, DeferIframeFilter, DeterministicJsFilter,
+   |                               ^^^^^^^^^^^^^^^
+11 |     ElideAttributesFilter, FixReflowFilter, FlushHtmlFilter, HandleNoscriptRedirectFilter,
+12 |     InsertAmpLinkFilter, JsDisableFilter, JsMinifyFilter, PedanticFilter, QuoteRemovalFilter,
+   |                                           ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "css_move_to_head") generated 15 warnings (15 duplicates)
+warning: `ps-html` (test "filters") generated 15 warnings (14 duplicates) (run `cargo fix --test "filters" -p ps-html` to apply 1 suggestion)
+warning: unused variable: `driver`
+    --> crates/ps-html/tests/image_rewrite.rs:3214:9
+     |
+3214 |     let driver = fixture.driver_for(&page_url);
+     |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_driver`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `parse_with` is never used
+   --> crates/ps-html/tests/image_rewrite.rs:233:8
+    |
+ 68 | impl Fixture {
+    | ------------ method in this implementation
+...
+233 |     fn parse_with(&self, url: &str, html: &str, extra: Vec<Box<dyn HtmlFilter>>) -> String {
+    |        ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "local_storage_cache") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "script_scanner") generated 14 warnings (14 duplicates)
+warning: `ps-html` (test "image_rewrite") generated 16 warnings (14 duplicates) (run `cargo fix --test "image_rewrite" -p ps-html` to apply 1 suggestion)
+warning: `ps-html` (test "dedup_inlined_images") generated 14 warnings (14 duplicates)
+warning: `ps-html` (test "google_font_css_inline") generated 16 warnings (16 duplicates)
+warning: unused import: `ps_cache::hash::Hasher`
+  --> crates/ps-html/tests/output_resource.rs:15:5
+   |
+15 | use ps_cache::hash::Hasher;
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `SharedSink` is never constructed
+  --> crates/ps-html/tests/harness.rs:15:12
+   |
+15 | pub struct SharedSink {
+   |            ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `bytes` is never used
+  --> crates/ps-html/tests/harness.rs:21:12
+   |
+19 | impl SharedSink {
+   | --------------- method in this implementation
+20 |     #[must_use]
+21 |     pub fn bytes(&self) -> Vec<u8> {
+   |            ^^^^^
+
+warning: `ps-html` (test "insert_dns_prefetch") generated 14 warnings (14 duplicates)
+warning: unused import: `FALLBACK_FAILURES`
+  --> crates/ps-html/tests/css.rs:19:34
+   |
+19 |     CssFilter, BLOCKS_REWRITTEN, FALLBACK_FAILURES, FALLBACK_REWRITES, FLATTEN_CHARSET_MISMATCH,
+   |                                  ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `ps_cache::hash::Hasher`
+   --> crates/ps-html/tests/css.rs:254:13
+    |
+254 |         use ps_cache::hash::Hasher;
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `ps-html` (test "output_resource") generated 19 warnings (16 duplicates)
+warning: `ps-html` (test "strip_subresource_hints") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "css") generated 18 warnings (16 duplicates) (run `cargo fix --test "css" -p ps-html` to apply 1 suggestion)
+warning: struct `SharedFilter` is never constructed
+  --> crates/ps-html/tests/harness.rs:72:12
+   |
+72 | pub struct SharedFilter<F> {
+   |            ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "html") generated 2 warnings (1 duplicate)
+warning: unused import: `ps_cache::hash::Hasher`
+   --> crates/ps-html/tests/js_combine.rs:386:9
+    |
+386 |     use ps_cache::hash::Hasher;
+    |         ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/ps-html/tests/js_combine.rs:179:13
+    |
+179 |         let mut fixture = Fixture {
+    |             ----^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `use_test_namer` is never read
+   --> crates/ps-html/tests/js_combine.rs:137:5
+    |
+129 | struct Fixture {
+    |        ------- field in this struct
+...
+137 |     use_test_namer: bool,
+    |     ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "prioritize_lcp_images") generated 15 warnings (15 duplicates)
+warning: `ps-html` (test "js_combine") generated 19 warnings (16 duplicates) (run `cargo fix --test "js_combine" -p ps-html` to apply 1 suggestion)
+warning: `ps-html` (test "amp_document") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "redirect_on_size_limit") generated 16 warnings (16 duplicates)
+warning: unused import: `ps_html::resource::Resource`
+   --> crates/ps-html/tests/css_inline.rs:725:9
+    |
+725 |     use ps_html::resource::Resource;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "driver_resources") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "html_cache_vary") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "css_inline") generated 17 warnings (16 duplicates) (run `cargo fix --test "css_inline" -p ps-html` to apply 1 suggestion)
+warning: unused import: `ps_cache::hash::Hasher`
+   --> crates/ps-html/tests/js_outline.rs:260:13
+    |
+260 |         use ps_cache::hash::Hasher;
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `ps_cache::hash::Hasher`
+   --> crates/ps-html/tests/js_outline.rs:244:13
+    |
+244 |         use ps_cache::hash::Hasher;
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ps_cache::hash::Hasher`
+   --> crates/ps-html/tests/js_outline.rs:113:13
+    |
+113 |         use ps_cache::hash::Hasher;
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ps_cache::hash::Hasher`
+   --> crates/ps-html/tests/js_outline.rs:167:13
+    |
+167 |         use ps_cache::hash::Hasher;
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `fetcher` is never read
+  --> crates/ps-html/tests/js_outline.rs:31:5
+   |
+28 | struct Fixture {
+   |        ------- field in this struct
+...
+31 |     fetcher: Arc<MockUrlFetcher>,
+   |     ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "js_outline") generated 21 warnings (16 duplicates)
+warning: unused import: `ps_http::google_url::GoogleUrl`
+  --> crates/ps-html/tests/cache_extender.rs:26:5
+   |
+26 | use ps_http::google_url::GoogleUrl;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `serve_relative_url` is never used
+   --> crates/ps-html/tests/cache_extender.rs:263:8
+    |
+ 65 | impl Fixture {
+    | ------------ method in this implementation
+...
+263 |     fn serve_relative_url(&self, rel_path: &str) -> Option<Vec<u8>> {
+    |        ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "rewrite_single_resource") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "cache_extender") generated 18 warnings (16 duplicates) (run `cargo fix --test "cache_extender" -p ps-html` to apply 1 suggestion)
+warning: `ps-html` (test "debug") generated 16 warnings (16 duplicates)
+warning: unused import: `ps_cache::hash::Hasher`
+   --> crates/ps-html/tests/flatten.rs:328:13
+    |
+328 |         use ps_cache::hash::Hasher;
+    |             ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated function `flatten_and_images` is never used
+   --> crates/ps-html/tests/flatten.rs:108:8
+    |
+ 82 | impl Fixture {
+    | ------------ associated function in this implementation
+...
+108 |     fn flatten_and_images() -> Self {
+    |        ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "flatten") generated 18 warnings (16 duplicates)
+warning: unused import: `ps_html::filter::HtmlFilter`
+ --> crates/ps-html/tests/critical_images_beacon.rs:6:5
+  |
+6 | use ps_html::filter::HtmlFilter;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "critical_images_beacon") generated 16 warnings (15 duplicates) (run `cargo fix --test "critical_images_beacon" -p ps-html` to apply 1 suggestion)
+warning: `ps-html` (test "make_show_ads_async") generated 14 warnings (14 duplicates)
+warning: `ps-html` (test "delay_images") generated 14 warnings (14 duplicates)
+warning: `ps-html` (test "insert_ga") generated 16 warnings (16 duplicates)
+warning: variable does not need to be mutable
+   --> crates/ps-html/tests/domain_rewrite.rs:826:9
+    |
+826 |     let mut filter = DomainRewriteFilter::new(idem, TestUrlNamer::new(), &lawyer);
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "domain_rewrite") generated 15 warnings (14 duplicates) (run `cargo fix --test "domain_rewrite" -p ps-html` to apply 1 suggestion)
+warning: `ps-html` (test "css_combine") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "js_defer_disabled") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "resource_slot") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "add_instrumentation") generated 14 warnings (14 duplicates)
+warning: `ps-html` (test "css_inline_import_to_link") generated 14 warnings (14 duplicates)
+warning: unused import: `UrlInputResource`
+  --> crates/ps-html/tests/url_input_resource.rs:21:60
+   |
+21 | use ps_html::url_input_resource::{make_url_input_resource, UrlInputResource};
+   |                                                            ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "async_progressive") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "url_input_resource") generated 19 warnings (18 duplicates) (run `cargo fix --test "url_input_resource" -p ps-html` to apply 1 suggestion)
+warning: unused import: `IMAGE_FILE_COUNT_REDUCTION`
+  --> crates/ps-html/tests/image_combine.rs:15:59
+   |
+15 | use ps_html::filters::image_combine::{ImageCombineFilter, IMAGE_FILE_COUNT_REDUCTION};
+   |                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `stat` is never used
+   --> crates/ps-html/tests/image_combine.rs:210:8
+    |
+ 40 | impl Fixture {
+    | ------------ method in this implementation
+...
+210 |     fn stat(&self, name: &str) -> i64 {
+    |        ^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "image_combine") generated 18 warnings (16 duplicates) (run `cargo fix --test "image_combine" -p ps-html` to apply 1 suggestion)
+warning: method `bytes` is never used
+  --> crates/ps-html/tests/harness.rs:21:12
+   |
+19 | impl SharedSink {
+   | --------------- method in this implementation
+20 |     #[must_use]
+21 |     pub fn bytes(&self) -> Vec<u8> {
+   |            ^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "lazyload_images") generated 14 warnings (14 duplicates)
+warning: unused import: `LoadCallback`
+  --> crates/ps-html/tests/cacheable_resource.rs:18:56
+   |
+18 |     CacheableResourceBase, FreshenCallback, InputInfo, LoadCallback, MockLoadCallback,
+   |                                                        ^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "rewritten_content_scanning") generated 15 warnings (14 duplicates)
+warning: `ps-html` (test "cacheable_resource") generated 19 warnings (18 duplicates)
+warning: `ps-html` (test "decode_rewritten_urls") generated 16 warnings (16 duplicates)
+warning: unused import: `ps_http::content_type::ContentType`
+  --> crates/ps-html/tests/in_place.rs:29:5
+   |
+29 | use ps_http::content_type::ContentType;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "google_analytics") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "in_place") generated 1 warning (run `cargo fix --test "in_place" -p ps-html` to apply 1 suggestion)
+warning: variable does not need to be mutable
+   --> crates/ps-html/tests/critical_selector.rs:159:13
+    |
+159 |         let mut selector =
+    |             ----^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-html` (test "critical_selector") generated 17 warnings (16 duplicates) (run `cargo fix --test "critical_selector" -p ps-html` to apply 1 suggestion)
+warning: `ps-html` (test "meta_tag") generated 16 warnings (16 duplicates)
+warning: `ps-html` (test "dom_stats") generated 14 warnings (14 duplicates)
+warning: unused import: `ps_html::filters::js_inline::JsInlineFilter`
+  --> crates/ps-html/tests/javascript.rs:19:5
+   |
+19 | use ps_html::filters::js_inline::JsInlineFilter;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `ps_cache::hash::Hasher`
+    --> crates/ps-html/tests/javascript.rs:2561:21
+     |
+ 260 | macro_rules! javascript_tests {
+...
+2561 |                 use ps_cache::hash::Hasher;
+     |                     ^^^^^^^^^^^^^^^^^^^^^^
+...
+2911 | javascript_tests!(legacy, false);
+     | -------------------------------- in this macro invocation
+
+warning: unused import: `ps_cache::hash::Hasher`
+    --> crates/ps-html/tests/javascript.rs:2069:21
+     |
+ 260 | macro_rules! javascript_tests {
+...
+2069 |                 use ps_cache::hash::Hasher;
+     |                     ^^^^^^^^^^^^^^^^^^^^^^
+...
+2910 | javascript_tests!(experimental, true);
+     | ------------------------------------- in this macro invocation
+
+warning: unused import: `ps_cache::hash::Hasher`
+    --> crates/ps-html/tests/javascript.rs:2561:21
+     |
+ 260 | macro_rules! javascript_tests {
+...
+2561 |                 use ps_cache::hash::Hasher;
+     |                     ^^^^^^^^^^^^^^^^^^^^^^
+...
+2910 | javascript_tests!(experimental, true);
+     | ------------------------------------- in this macro invocation
+
+warning: unused import: `ps_cache::hash::Hasher`
+    --> crates/ps-html/tests/javascript.rs:2069:21
+     |
+ 260 | macro_rules! javascript_tests {
+...
+2069 |                 use ps_cache::hash::Hasher;
+     |                     ^^^^^^^^^^^^^^^^^^^^^^
+...
+2911 | javascript_tests!(legacy, false);
+     | -------------------------------- in this macro invocation
+
+warning: constant `INTROSPECTIVE_JS` is never used
+  --> crates/ps-html/tests/javascript.rs:36:7
+   |
+36 | const INTROSPECTIVE_JS: &str = "<script type='text/javascript' src='introspective.js'></script>";
+   |       ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `experimental` is never read
+  --> crates/ps-html/tests/javascript.rs:44:5
+   |
+38 | struct Fixture {
+   |        ------- field in this struct
+...
+44 |     experimental: bool,
+   |     ^^^^^^^^^^^^
+
+warning: `ps-html` (test "javascript") generated 23 warnings (16 duplicates) (run `cargo fix --test "javascript" -p ps-html` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 09s
+     Running unittests src/lib.rs (target/debug/build/ps-html/3190878eb5345cc4/out/ps_html-3190878eb5345cc4)
+
+running 221 tests
+test ads_attribute::tests::lookup_not_matched ... ok
+test ads_util::tests::ads_by_google_src_match ... ok
+test ads_attribute::tests::lookup_basic ... ok
+test ads_util::tests::publisher_id_no_match ... ok
+test ads_util::tests::show_ads_src_match ... ok
+test background::tests::executes_and_returns ... ok
+test base_tracker::tests::resolve_matrix ... ok
+test base_tracker::tests::observe_first_wins_and_problems_poison ... ok
+test beacon_finder::tests::accept_stamped_beacon_end_to_end ... ok
+test background::tests::duplicates_share_one_execution ... ok
+test background::tests::shutdown_releases_and_joins ... ok
+test base_tracker::tests::lawyer_suffixes_adopted_bases ... ok
+test base_tracker::tests::max_url_size_boundary ... ok
+test beacon_finder::tests::accept_unstamped_and_text_lcp ... ok
+test beacon_finder::tests::availability_needs_a_valid_beacon ... ok
+test beacon_finder::tests::criticality_needs_max_support ... ok
+test beacon_finder::tests::codec_round_trip_and_rejects ... ok
+test beacon_finder::tests::candidates_gate_and_reset ... ok
+test beacon_finder::tests::font_triples_parse_validate_and_cap ... ok
+test beacon_finder::tests::finder_round_trips_through_cache ... ok
+test background::tests::queue_overflow_rejects_fast ... ok
+test beacon_finder::tests::html_identity_tracks_effective_decisions_not_collection_bookkeeping ... ok
+test beacon_finder::tests::nonces_validate_once_and_expire ... ok
+test beacon_finder::tests::sampling_cadence_and_low_frequency ... ok
+test beacon_finder::tests::single_decision_stops_sampling_competing_reports_and_survives_codec ... ok
+test beacon_finder::tests::unknown_lcp_acknowledges_without_erasing_evidence ... ok
+test beacon_finder::tests::url_hash_matches_reference ... ok
+test css_tag_scanner::tests::alternate_rel_fail ... ok
+test css_tag_scanner::tests::alternate_stylesheet_matrix ... ok
+test css_tag_scanner::tests::bad_type_fail ... ok
+test css_tag_scanner::tests::has_import_matrix ... ok
+test css_tag_scanner::tests::missing_rel_fail ... ok
+test css_tag_scanner::tests::nonstandard_attribute_ok ... ok
+test css_tag_scanner::tests::rel_case_insensitive_ok ... ok
+test css_tag_scanner::tests::stylesheet_or_alternate_matrix ... ok
+test css_tag_scanner::tests::with_media_ok ... ok
+test css_tag_scanner::tests::with_type_ok ... ok
+test css_util::tests::media_screen_matrix ... ok
+test decode_url::tests::combined_url_yields_many ... ok
+test beacon_finder::tests::one_accepted_report_enables_low_frequency_learning ... ok
+test css_tag_scanner::tests::minimal_ok ... ok
+test ads_util::tests::valid_ads_by_google_matrix ... ok
+test css_tag_scanner::tests::doubled_rel_ok ... ok
+test css_tag_scanner::tests::doubled_href_fail ... ok
+test css_tag_scanner::tests::missing_href_doubled_rel_fail ... ok
+test decode_url::tests::oblivious_and_forbidden_gates ... ok
+test decode_url::tests::outline_decodes_empty ... ok
+test decode_url::tests::proxy_modes ... ok
+test decode_url::tests::rejects_cleanly ... ok
+test doctype::tests::html5_doctype ... ok
+test css_tag_scanner::tests::missing_rel_doubled_href_fail ... ok
+test doctype::tests::non_doctype_untouched ... ok
+test doctype::tests::legacy_doctypes ... ok
+test ads_util::tests::publisher_id_match ... ok
+test decode_url::tests::single_url_round_trip ... ok
+test element::tests::quote_need_predicate ... ok
+test element::tests::attribute_value_triad ... ok
+test element::tests::set_escaped_value_invalidates_cache ... ok
+test element::tests::set_value_reescapes_and_repairs_quotes ... ok
+test event::tests::insert_erase_splice ... ok
+test decode_url::tests::image_id_decodes_through_image_encoder ... ok
+test file_input_resource::tests::empty_file_loads ... ok
+test file_input_resource::tests::failures_are_graceful_and_retryable ... ok
+test file_input_resource::tests::explicit_ttl_wins ... ok
+test file_input_resource::tests::loads_valid_file_with_headers ... ok
+test file_input_resource::tests::negative_cap_is_unlimited ... ok
+test filters::image_combine::tests::div_dimensions_need_both ... ok
+test filters::image_combine::tests::position_keywords ... ok
+test filters::logo_detection::tests::css_url_extraction ... ok
+test file_input_resource::tests::typeless_url_loads_without_content_type ... ok
+test filters::image_combine::tests::position_lengths ... ok
+test filters::image_combine::tests::position_rejections ... ok
+test filters::logo_detection::tests::css_background_logo_pipeline ... ok
+test filters::logo_detection::tests::org_scopes_are_ascii ... ok
+test device_properties::tests::firefox_navigation_infers_alpha_but_respects_explicit_rejection ... ok
+test filters::logo_detection::tests::url_scoring_prefers_filenames ... ok
+test flush_early::tests::round_trip_and_rejections ... ok
+test filters::prioritize_lcp_images::tests::format_matrix ... ok
+test font_discovery::tests::css_wide_keywords_are_not_families ... ok
+test flush_early::tests::keys_isolate_pages_and_variants ... ok
+test font_discovery::tests::eligibility_prunes_icons_and_subsets ... ok
+test font_discovery::tests::best_source_prefers_woff2_over_woff ... ok
+test font_discovery::tests::discovery_is_declaration_order_independent ... ok
+test font_discovery::tests::matching_covers_ranges_and_synthesis ... ok
+test font_discovery::tests::mime_mapping_by_extension ... ok
+test font_discovery::tests::explained_selection_reports_reasons ... ok
+test font_discovery::tests::scan_skips_malformed_without_aborting ... ok
+test font_discovery::tests::selector_verification_ranks_and_drops ... ok
+test font_discovery::tests::print_only_media_is_skipped_everywhere ... ok
+test font_discovery::tests::selection_prefers_confirmed_caps_two_and_dedups ... ok
+test font_discovery::tests::scan_handles_ranges_comments_and_media ... ok
+test font_discovery::tests::scan_extracts_faces_and_imports ... ok
+test font_discovery::tests::usage_scan_orders_and_dedups ... ok
+test font_discovery::tests::usage_scan_skips_generic_and_malformed ... ok
+test font_discovery::tests::variable_weight_ranges_overlap_both_directions ... ok
+test font_discovery::tests::wordpress_preset_var_body_resolves_to_manrope ... ok
+test font_store::tests::confirmed_fails_closed_to_empty ... ok
+test font_store::tests::css_faces_rejects_corrupt ... ok
+test font_store::tests::css_faces_round_trips ... ok
+test font_discovery::tests::var_resolution_substitutes_fallbacks_and_nests ... ok
+test font_discovery::tests::weight_and_style_forms ... ok
+test font_store::tests::confirmed_round_trips ... ok
+test font_store::tests::decision_rejects_corrupt ... ok
+test font_store::tests::decision_round_trips ... ok
+test font_store::tests::fingerprint_is_stable ... ok
+test font_store::tests::nonce_issue_evicts_oldest_past_capacity ... ok
+test font_store::tests::keys_namespace_page_options_device ... ok
+test font_store::tests::nonces_round_trip_issue_consume_expire ... ok
+test html_async::tests::coordinated_worker_subprocess ... ok
+test filters::critical_images_beacon::tests::accepted_decision_does_not_insert_another_collector ... ok
+test filters::critical_images_beacon::tests::prepare_inserts_on_first_visit ... ok
+test html_async::tests::no_pool_keeps_sync_rewrite ... ok
+test html_async::tests::inline_miss_defers_and_warm_view_inlines ... ok
+test html_async::tests::remote_claim_defers_fetch_and_release_allows_metadata_publication ... ok
+test html_async::tests::shutdown_pool_keeps_original_url ... ok
+test html_async::tests::miss_schedules_async_and_serves_original_then_optimized ... ok
+test html_cache::tests::auth_and_generic_bypasses_stay_quiet ... ok
+test html_cache::tests::cookie_configuration_overrides ... ok
+test beacon_finder::tests::multiprocess_evidence_updates_preserve_nonces_and_reports ... ok
+test html_cache::tests::each_gate_bypasses_alone ... ok
+test html_async::tests::separate_worker_processes_fetch_once_and_recover_killed_optimizer ... ok
+test html_cache::tests::bypass_reasons_sanitize_and_truncate ... ok
+test html_cache::tests::early_lookup_rejects_corrupt_hint_and_private_origin ... ok
+test html_cache::tests::allowlisted_cookies_miss_store_and_hit ... ok
+test html_cache::tests::candidate_registration_does_not_prevent_html_publication ... ok
+test html_cache::tests::corrupt_html_miss_republishes_early_lookup_policy ... ok
+test html_cache::tests::experiment_bypasses ... ok
+test html_cache::tests::early_lookup_requires_publication_and_preserves_variants ... ok
+test html_cache::tests::font_confirmed_set_versions_cache_key ... ok
+test html_cache::tests::identity_splits_user_agents_and_purges ... ok
+test html_cache::tests::beacon_learning_gates_lookup_store_and_identity ... ok
+test html_cache::tests::file_mtime_stands_in_for_invisible_freshness ... ok
+test html_cache::tests::malformed_and_cookie2_bypass_with_lines ... ok
+test html_cache::tests::pending_optimization_bypass_reports_reason_without_changing_gate ... ok
+test html_cache::tests::miss_stores_and_hit_serves ... ok
+test html_cache::tests::preference_identity_is_opaque_and_tracking_values_are_ignored ... ok
+test html_cache::tests::early_lookup_uses_configured_cookie_policy ... ok
+test html_cache::tests::oversize_and_sampled_bodies_do_not_store ... ok
+test html_cache::tests::show_comment_shapes ... ok
+test html_cache::tests::publication_rechecks_request_cookies ... ok
+test filters::critical_images_beacon::tests::public_evidence_has_exactly_six_format_device_groups ... ok
+test html_cache::tests::public_refresh_keeps_revalidation_controls_and_exact_mode ... ok
+test js_escape::tests::js_avoid_close_script ... ok
+test js_escape::tests::js_avoid_weird_parsing_sequence ... ok
+test js_escape::tests::js_dont_escape_way_too_much ... ok
+test js_escape::tests::js_escape_basic ... ok
+test js_escape::tests::js_single_quotes ... ok
+test keywords::tests::escape_basics ... ok
+test keywords::tests::tag_sets_match_cpp ... ok
+test keywords::tests::unescape_basics ... ok
+test html_cache::tests::unknown_and_mixed_cookies_bypass_with_named_reason ... ok
+test html_cache::tests::sampling_due_and_unsettled_renders_bypass ... ok
+test keywords::tests::unescape_failure_modes ... ok
+test keywords::tests::unescape_numeric ... ok
+test name::tests::discriminant_order_matches_cpp ... ok
+test name::tests::lookup_handles_long_names ... ok
+test name::tests::lookup_is_case_insensitive ... ok
+test name::tests::names_keep_original_spelling ... ok
+test rewrite_filter::tests::filter_defaults ... ok
+test rewrite_filter::tests::script_charset_priority ... ok
+test rewrite_filter::tests::stylesheet_charset_priority ... ok
+test script_scanner::tests::mimetypes_sorted ... ok
+test rewrite_stats::tests::roster_lists_console_names ... ok
+test server_context::tests::chain_plan_reuses_config_but_separates_debug_and_context ... ok
+test server_context::tests::custom_servant_overrides_lazy_builtin ... ok
+test server_context::tests::capabilities_refresh_after_request_changes ... ok
+test html_cache::tests::single_decision_preserves_browser_hit_past_sampling_deadline ... ok
+test server_context::tests::options_signature_memo_matches_direct ... ok
+test server_context::tests::partition_hash_refreshes_with_live_options ... ok
+test server_context::tests::options_signature_separates_cache_keys ... ok
+test html_cache::tests::public_navigation_shares_hits_but_explicit_vary_separates ... ok
+test html_cache::tests::public_browser_grouping_defaults_on_and_preserves_variants ... ok
+test server_context::tests::deadline_counts_elapsed_work_and_rearms_on_flush ... ok
+test server_context::tests::serving_filters_are_lazy_and_do_not_retain_the_driver ... ok
+test html_cache::tests::six_public_groups_share_headers_preferences_and_encoding ... ok
+test html_cache::tests::public_browser_headers_share_unless_origin_varies ... ok
+test show_ads_snippet_parser::tests::parse_strict_empty ... ok
+test background::tests::panicking_job_releases_waiters_and_worker_survives ... ok
+test show_ads_snippet_parser::tests::parse_color_array ... ok
+test show_ads_snippet_parser::tests::parse_strict_invalid_attribute_name_illegal_char ... ok
+test show_ads_snippet_parser::tests::parse_short_attribute ... ok
+test show_ads_snippet_parser::tests::parse_strict_google_ad_format_with_unexpected_prefix ... ok
+test show_ads_snippet_parser::tests::parse_strict_google_ad_format_with_unexpected_ends ... ok
+test show_ads_snippet_parser::tests::parse_strict_invalid_assignment ... ok
+test show_ads_snippet_parser::tests::parse_strict_google_ad_format_with_whitespaces ... ok
+test show_ads_snippet_parser::tests::parse_strict_google_ad_format ... ok
+test show_ads_snippet_parser::tests::parse_strict_invalid_attribute_name_not_started_with_google ... ok
+test show_ads_snippet_parser::tests::parse_strict_invalid_duplicate ... ok
+test show_ads_snippet_parser::tests::parse_strict_invalid_modified ... ok
+test show_ads_snippet_parser::tests::parse_strict_invalid_missing_semicolon ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid_single_quote ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid_empty_statement ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid_with_enclosing_comment_tag ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid_with_enclosing_comment_tag_and_whitespaces ... ok
+test show_ads_snippet_parser::tests::parse_weird_google_ad_format ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid_without_semicolon ... ok
+test static_assets::tests::client_domain_rewriter_markers ... ok
+test static_assets::tests::deterministic_js_markers ... ok
+test static_assets::tests::defer_iframe_markers ... ok
+test static_assets::tests::instrumentation_markers ... ok
+test show_ads_snippet_parser::tests::parse_strict_valid_empty_lines ... ok
+test url_namer::tests::decode_reconstruction ... ok
+test url_namer::tests::encode_url_assembly ... ok
+test url_namer::tests::proxy_encoding_matrix ... ok
+test url_namer::tests::path_encoding_matrix ... ok
+test url_segment_encoder::tests::css_encode_decode_round_trip ... ok
+test url_segment_encoder::tests::css_legacy_letters_decode ... ok
+test url_segment_encoder::tests::default_single_url ... ok
+test url_segment_encoder::tests::multipart_edge_cases ... ok
+test url_segment_encoder::tests::multipart_escape_round_trip ... ok
+test html_async::tests::coordinated_css_and_js_combinations_warm_later_html ... ok
+test background::tests::timeout_releases_waiter_but_job_completes ... ok
+test static_assets::tests::dedup_inlined_images_markers ... ok
+test static_assets::tests::local_storage_cache_markers ... ok
+test static_assets::tests::font_preload_beacon_markers ... ok
+test static_assets::tests::delay_images_markers ... ok
+test static_assets::tests::critical_css_loader_markers ... ok
+test static_assets::tests::lazyload_images_markers ... ok
+test static_assets::tests::beacon_and_defer_markers ... ok
+test html_async::tests::worker_image_rewrite_reports_record_to_sink ... ok
+
+test result: ok. 221 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
+
+     Running tests/add_instrumentation.rs (target/debug/build/ps-html/b40e8927d303cbe8/out/add_instrumentation-b40e8927d303cbe8)
+
+running 17 tests
+test disable_for_bots ... ok
+test experiment_id_reporting ... ok
+test beacon_url_is_js_escaped ... ok
+test no_defer_marker_deferred ... ok
+test extended_instrumentation ... ok
+test no_defer_marker_present ... ok
+test headers_fetch_timing_reporting ... ok
+test quoting ... ok
+test request_id ... ok
+test script_after_title_and_meta ... ok
+test non200_response ... ok
+test script_injection ... ok
+test script_injection_with_https ... ok
+test script_injection_with_navigation ... ok
+test script_injection_with_https_unload_and_xhtml ... ok
+test script_tag_type_attribute ... ok
+test script_tag_type_attribute_pedantic ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/amp_document.rs (target/debug/build/ps-html/72eb4a60d344e8be/out/amp_document-72eb4a60d344e8be)
+
+running 15 tests
+test empty_html ... ok
+test doctype_only ... ok
+test doctype_text ... ok
+test just_text ... ok
+test too_late_for_amp_tag ... ok
+test too_late_for_amp_text ... ok
+test doctype_image ... ok
+test just_image ... ok
+test is_not_amp ... ok
+test two_html_tags_amp_in_first ... ok
+test is_amp_html ... ok
+test is_amp_lightning_bolt ... ok
+test two_html_tags_amp_in_second ... ok
+test is_amp_html_case_insensitive ... ok
+test gives_up_after_buffering_a_lot ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/async_progressive.rs (target/debug/build/ps-html/775dcc49ab81fc34/out/async_progressive-775dcc49ab81fc34)
+
+running 8 tests
+test failed_candidate_does_not_discard_successful_combinations ... ok
+test concurrent_html_renders_share_one_fetch ... ok
+test saturated_pool_serves_fallback_html_fast_then_recovers ... ok
+test font_service_miss_defers_and_warm_hit_keeps_ua_hooks ... ok
+test html_miss_falls_back_then_progresses_to_metadata_hit ... ok
+test queue_full_load_sheds_without_waiting ... ok
+test image_background_completion_warms_bytes_before_publishing_url ... ok
+test combinations_defer_then_match_sync_without_refetching ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s
+
+     Running tests/background_fetch.rs (target/debug/build/ps-html/94e7425f1464b567/out/background_fetch-94e7425f1464b567)
+
+running 8 tests
+test ipro_scope_selects_ipro_deadline ... ok
+test shutdown_html_keeps_fallback_without_fetching ... ok
+test shutdown_preserves_foreground_resource_serving ... ok
+test failed_fetch_preserves_fallback ... ok
+test fast_fetch_completes_inline_through_pool ... ok
+test concurrent_loads_share_one_fetch ... ok
+test slow_fetch_times_out_then_warms_cache ... ok
+test exhausted_budget_skips_waiting ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.53s
+
+     Running tests/cache_extender.rs (target/debug/build/ps-html/61cce431348cb944/out/cache_extender-61cce431348cb944)
+
+running 54 tests
+test do_extend_introspective_javascript ... ok
+test defang_html ... ok
+test do_not_extend_unauthorized_resources ... ok
+test consistent_hash_with_rewrite ... ok
+test canonical_on_fallback_to_input ... ok
+test consistent_hash_with_shard ... ok
+test canonical_on_fallback_to_other_pagespeed ... ok
+test do_extend_link_rel_case_insensitive ... ok
+test do_not_extend_unauthorized_resources_with_unauth_enabled ... ok
+test dont_extend_introspective_default ... ok
+test alternate_stylesheet ... ok
+test extend_if_sharded_and_rewritten ... ok
+test dont_extend_introspective_debug ... ok
+test extend_if_origin_mapped_https ... ok
+test extend_if_rewritten ... ok
+test extend_if_sharded ... ok
+test do_extend_for_images_only ... ok
+test extend_unhealthy ... ok
+test handle_404 ... ok
+test handle_503 ... ok
+test extend_if_sharded_to_https ... ok
+test missing_content_type_is_guessed_from_path_only ... ok
+test made_on_the_fly ... ok
+test fragment_reference_kept_on_rewrite_domain ... ok
+test no_extend_origin_uncacheable ... ok
+test do_extend ... ok
+test no_extend_already_cached_properly ... ok
+test no_input_resource ... ok
+test preserve_all_urls_on ... ok
+test no_preserve_url_relativity ... ok
+test preserve_image_urls_on ... ok
+test no_extension_corruption ... ok
+test preserve_url_relativity ... ok
+test no_link_canonical_if_domain_map_complexity ... ok
+test preserve_css_urls_on ... ok
+test preserve_js_urls_on ... ok
+test retain_extra_headers ... ok
+test extend_if_sharded_and_rewriting_and_mapping_https ... ok
+test serve_files ... ok
+test serve_files_with_rewrite_domain_and_path_enabled ... ok
+test no_query_corruption ... ok
+test no_wrong_ext_corruption ... ok
+test serve_files_no_last_modified_on_origin ... ok
+test serve_files_unhealthy ... ok
+test trim_url_interaction ... ok
+test serve_files_with_rewrite_domains_enabled ... ok
+test serve_files_with_shard ... ok
+test srcset ... ok
+test content_type_validation ... ok
+test vary_origin ... ok
+test unrecognized_content_type_is_not_guessed_from_url ... ok
+test serve_files_from_delayed_fetch ... ok
+test url_too_long ... ok
+test do_not_extend_oversized_gzip ... ok
+
+test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.78s
+
+     Running tests/cacheable_resource.rs (target/debug/build/ps-html/3cdba6b4e61e66cb/out/cacheable_resource-3cdba6b4e61e66cb)
+
+running 10 tests
+test private ... ok
+test fallback ... ok
+test fallback_empty ... ok
+test fetch_failure ... ok
+test freshen_info ... ok
+test private_for_fetch ... ok
+test prepare_hooks ... ok
+test drop_handling ... ok
+test basic_cached ... ok
+test same_url_different_key ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/chain.rs (target/debug/build/ps-html/76a0e1fb000bb99d/out/chain-76a0e1fb000bb99d)
+
+running 20 tests
+test critical_css_beacon_arms ... ok
+test css_filter_forced_by_flatten ... ok
+test critical_images_beacon_gate ... ok
+test debug_and_writer_terminals ... ok
+test insert_ga_needs_id ... ok
+test domain_rewrite_needs_mappings ... ok
+test inline_import_forced_by_critical_css ... ok
+test level_golden_all ... ok
+test level_golden_bandwidth ... ok
+test level_golden_core ... ok
+test level_golden_passthrough ... ok
+test level_golden_testing ... ok
+test outline_css_skipped_by_prioritize ... ok
+test ordering_rules ... ok
+test responsive_images_needs_both ... ok
+test rewritten_content_scanning_needs_preconnect ... ok
+test preserve_urls_skip_resource_filters ... ok
+test scalar_gates ... ok
+test size_limit_wiring ... ok
+test single_gates ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/critical_images_beacon.rs (target/debug/build/ps-html/c0cfe0f03145ebeb/out/critical_images_beacon-c0cfe0f03145ebeb)
+
+running 6 tests
+test bots_never_instrument ... ok
+test pre_phase_visit_instruments_and_stamps ... ok
+test first_visit_instruments_stamps_and_registers ... ok
+test learned_evidence_stamps_without_reinstrumenting ... ok
+test immediate_revisit_stands_down_without_evidence ... ok
+test image_free_documents_receive_one_live_beacon ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/critical_selector.rs (target/debug/build/ps-html/bd2021225ada1db2/out/critical_selector-bd2021225ada1db2)
+
+running 24 tests
+test disabled_for_ie ... ok
+test empty_block ... ok
+test escaped_closing_style_tag_is_inlined_verbatim_in_html ... ok
+test no_selector_info ... ok
+test less_than_in_kept_rule_keeps_the_link_in_xhtml ... ok
+test fragment_reference_kept_on_rewrite_domain ... ok
+test combiner_interaction ... ok
+test avoid_trying_to_inline_twice ... ok
+test basic_operation ... ok
+test media ... ok
+test no_script ... ok
+test non_screen_media ... ok
+test alternate ... ok
+test allow_unauthorized_css ... ok
+test resolve_urls_properly ... ok
+test properly_used_optimized ... ok
+test dont_mix_unopt_and_opt_styles ... ok
+test resolve_when_combine_across_paths ... ok
+test retain_pseudo_only ... ok
+test retain_unparseable ... ok
+test same_css_different_selectors ... ok
+test subset_that_would_hold_markup_keeps_the_link ... ok
+test styles_in_body ... ok
+test unauthorized_css ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.32s
+
+     Running tests/css.rs (target/debug/build/ps-html/fcc06919b835fed7/out/css-fcc06919b835fed7)
+
+running 66 tests
+test css_preserve_urls_no_preemptive_rewrite ... ok
+test css_preserve_urls ... ok
+test css_preserve_urls_overriding_extend ... ok
+test absolutify_cursor_urls_with_domain_mapping ... ok
+test alternate_stylesheet ... ok
+test absolutify_parseable_urls ... ok
+test default_is_two_mebibytes ... ok
+test absolutify_other_urls_with_proxy ... ok
+test absolutify_with_bom ... ok
+test absolutify_unparseable_urls_with_domain_mapping ... ok
+test absolutify_unparseable_urls ... ok
+test dont_absolutify_css_import_urls ... ok
+test embedded_tag ... ok
+test css_preserve_urls_with_merged_cache_extend ... ok
+test empty_leaf_fetch ... ok
+test absolutify_serving_fallback ... ok
+test dont_absolutify_urls_if_no_domain_mapping ... ok
+test flush_in_end_tag ... ok
+test external_over_bound_is_left_alone ... ok
+test flush_in_inline_css ... ok
+test empty_leaf_full ... ok
+test empty_output ... ok
+test inline_over_bound_is_left_alone ... ok
+test inline_style_without_markup_is_minified ... ok
+test inline_style_that_would_hold_markup_is_left_alone ... ok
+test dont_absolutify_cursor_urls_without_domain_mapping ... ok
+test inline_at_bound_is_rewritten ... ok
+test external_at_bound_is_rewritten ... ok
+test dont_absolutify_empty_url ... ok
+test link_href_case_insensitive ... ok
+test inline_css_optimized_from_cache ... ok
+test inline_style_does_not_gain_literal_markup ... ok
+test no_query_corruption ... ok
+test no_extension_corruption ... ok
+test legacy_letter_url_still_fetches ... ok
+test no_wrong_ext_corruption ... ok
+test no_quirks_mode_fixes ... ok
+test over_bound_skips_fallback_rewriting ... ok
+test not_rewritten_when_origin_type_is_not_css ... ok
+test retain_extra_headers ... ok
+test rewrite_css_404 ... ok
+test rewrite_empty_css_test ... ok
+test no_always_rewrite_css ... ok
+test non_8bit_encoding ... ok
+test rewrite_style_attribute_different_dirs_abs_url ... ok
+test remove_comments ... ok
+test rewrite_style_attribute_different_dirs_rel_url ... ok
+test rewrite_repeated_parse_error ... ok
+test rewrite_style_attribute ... ok
+test servant_leaves_unfetchable_imports_and_images ... ok
+test rewrite_style_attribute_different_dirs_no_url ... ok
+test simple_fetch ... ok
+test simple_fetch_unhealthy ... ok
+test simple_rewrite_css_test_external_unhealthy ... ok
+test rewrite_repeated ... ok
+test transition_time_units ... ok
+test url_too_long ... ok
+test simple_rewrite_css_test ... ok
+test to_optimize ... ok
+test non_utf8 ... ok
+test css_rewrite_random_drop_all ... ok
+test default_bound_leaves_large_stylesheet_alone ... ok
+test complex_css_test ... ok
+test css_rewrite_random_drop_none ... ok
+test rewrite_various_css ... ok
+test servant_flattens_imports_and_rewrites_images ... ok
+
+test result: ok. 66 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.31s
+
+     Running tests/css_combine.rs (target/debug/build/ps-html/c9c6c03980a3e86e/out/css_combine-c9c6c03980a3e86e)
+
+running 76 tests
+test alternate_stylesheets ... ok
+test combine_css_absolute_base_url_out_of_order ... ok
+test at_bound_is_combined ... ok
+test claims_xhtml_but_has_unclosed_link ... ok
+test alternate_stylesheet_barrier ... ok
+test bogus_link_barrier_debug ... ok
+test alternate_stylesheet_barrier_debug ... ok
+test bogus_link_barrier ... ok
+test combine_css_no_input ... ok
+test combine_css_missing_resource ... ok
+test combine_css_base_url_correctly_ordered ... ok
+test combine_css_unhealthy ... ok
+test combine_css_base_url_out_of_order ... ok
+test combine_css ... ok
+test combine_css_not_cached ... ok
+test async_combine_with_missing_member_converges ... ok
+test combine_css_with_import_in_first ... ok
+test combine_css_with_import_in_second ... ok
+test combine_css_md5 ... ok
+test combine_css_with_fake_noscript_barrier ... ok
+test combine_css_with_non_media_barrier ... ok
+test combine_css_with_media_barrier ... ok
+test combine_css_with_noscript_barrier ... ok
+test combine_css_xhtml_with_flush ... ok
+test combine_css_xhtml ... ok
+test cross_across_paths_disallowed ... ok
+test combine_style_tag ... ok
+test cross_unmapped_domain_with_unauth_enabled ... ok
+test do_rewrite_for_different_dir ... ok
+test debug_unauthorized_domain ... ok
+test cross_unmapped_domain ... ok
+test combine_css_recombine ... ok
+test css_combine_across_proxy_domains ... ok
+test fetch ... ok
+test css_do_not_combine_across_not_proxied_domains ... ok
+test cross_mapped_domain ... ok
+test fetch_with_no_inputs_is_refused ... ok
+test deal_with_params ... ok
+test fetch_result_does_not_decide_html_combination ... ok
+test fetch_unhealthy ... ok
+test fetch_with_oversized_name_is_refused ... ok
+test cross_across_paths_exceeding_url_size ... ok
+test fragment_reference_kept_with_shards ... ok
+test fetch_of_inputs_beyond_cacheable_size_is_refused ... ok
+test id_alone_is_no_barrier ... ok
+test fetch_of_many_inputs_combines_in_order ... ok
+test invalid_fetch_cache ... ok
+test no_combine_parse_errors ... ok
+test no_combine_parse_errors_at_rule ... ok
+test no_combine_parse_errors_unclosed_comment ... ok
+test no_combine_parse_error_unclosed_import ... ok
+test no_combine_css_base_url_out_of_order ... ok
+test no_absolutify_same_dir ... ok
+test ie_directive_barrier ... ok
+test no_query_corruption ... ok
+test no_extension_corruption ... ok
+test ie_directive_barrier_debug ... ok
+test non_standard_attributes_barrier_with_allowed_id_debug ... ok
+test no_wrong_ext_corruption ... ok
+test non_standard_attributes_barrier_with_allowed_id ... ok
+test non_standard_attributes_barrier ... ok
+test non_standard_attributes_barrier_with_id ... ok
+test robustness_unclosed_string ... ok
+test over_bound_is_not_combined ... ok
+test strip_bom_reconstruct ... ok
+test non_standard_attributes_barrier_debug ... ok
+test shard_subresources ... ok
+test xhtml_combine_link_closed ... ok
+test non_standard_attributes_barrier_with_id_debug ... ok
+test stats ... ok
+test strip_bom ... ok
+test style_barrier ... ok
+test style_barrier_debug ... ok
+test two_combinations_twice ... ok
+test combine_css_many_files_one_orphan ... ok
+test combine_css_many_files ... ok
+
+test result: ok. 76 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/css_image_rewriter.rs (target/debug/build/ps-html/23b45eedd01bf02b/out/css_image_rewriter-23b45eedd01bf02b)
+
+running 44 tests
+test cache_inline_parse_failures ... ok
+test cache_extends_repeated_top_level ... ok
+test cache_extends_repeated_top_level_fallback ... ok
+test cache_extends_images_in_style_attributes ... ok
+test cache_extends_when_css_grows ... ok
+test cache_extends_images_embedded_space ... ok
+test cache_extends_images_simple ... ok
+test fallback_fails ... ok
+test cache_extends_images_embedded_comma ... ok
+test cache_extends_images_fallback ... ok
+test fallback_absolutify ... ok
+test dummy_ruleset ... ok
+test fragment_reference_kept_when_parse_fails ... ok
+test fallback_no_absolutify ... ok
+test fetch_rewrite_failure ... ok
+test fragment_reference_kept_when_parse_fails_no_fallback ... ok
+test cache_extends_images_simple_fallback ... ok
+test inline_paths ... ok
+test cache_extends_images ... ok
+test minify_images_embedded_space ... ok
+test inline_images ... ok
+test inline_in_external_css_only ... ok
+test no_inline_when_image_too_large_for_css ... ok
+test style_attributes_neither_enabled ... ok
+test style_attributes_only_recompress_enabled ... ok
+test rewrite_cached ... ok
+test inline_images_in_fallback_mode ... ok
+test style_attributes_only_style_enabled ... ok
+test css_image_preserve_urls_no_preemptive_rewrite ... ok
+test no_image_debug_messages_stored_with_debug_off ... ok
+test trims_image_urls ... ok
+test debug_message ... ok
+test trims_image_urls_url_namer ... ok
+test use_correct_base_url ... ok
+test style_attributes_recompress_and_style_enabled ... ok
+test css_image_preserve_urls ... ok
+test recompress_images ... ok
+test recompress_images_fallback ... ok
+test fallback_imports_and_unknown_content_type ... ok
+test style_attributes_serve_css_to_different_ua ... ok
+test rewrite_css_images_verify_quality ... ok
+test style_attributes_recompress_and_webp_and_style_enabled ... ok
+test style_attributes_recompress_and_webp_lossless_and_style_enabled ... ok
+test image_debug_messages_stay_within_budget ... ok
+
+test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.99s
+
+     Running tests/css_inline.rs (target/debug/build/ps-html/77e3667ec4dd99c1/out/css_inline-77e3667ec4dd99c1)
+
+running 43 tests
+test do_inline_css_with_media_query ... ok
+test do_inline_css_with_media_screen ... ok
+test do_inline_css_with_media_all ... ok
+test claims_xhtml_but_has_unclosed_link ... ok
+test check_inlining_of_link_style_tag_in_body_pedantic ... ok
+test disabled_for_amp ... ok
+test carry_across_other_attributes ... ok
+test check_inlining_of_link_style_tag_in_body_non_pedantic ... ok
+test correctly_inline_css_with_imports ... ok
+test alternate_stylesheet ... ok
+test do_inline_css_different_domain ... ok
+test charset_determination ... ok
+test do_not_inline_css_with_media_not_screen ... ok
+test do_inline_with_incompatible_bom_and_ascii ... ok
+test dont_inline_in_noscript ... ok
+test do_not_inline_with_incompatible_bom_and_non_ascii ... ok
+test do_not_inline_css_too_big ... ok
+test empty ... ok
+test do_not_inline_css_different_domain ... ok
+test escaped_closing_style_tag_is_inlined_verbatim_in_html ... ok
+test inline_css_rewrite_urls2 ... ok
+test inline_css_simple ... ok
+test inline_css_404 ... ok
+test inline_css_rewrite_urls1 ... ok
+test inline_cache_extend_interaction ... ok
+test inline_css_unhealthy ... ok
+test inline_css_cached ... ok
+test inline_cache_extend_interaction_repeated ... ok
+test inline_css_with_invalid_media ... ok
+test inline_with_compatible_bom ... ok
+test non_css ... ok
+test inlining_of_link_style_tag_in_body ... ok
+test markup_placement_comment_opener ... ok
+test no_inlining_of_close_style_tag ... ok
+test no_inlining_of_close_style_tag_with_capitalization ... ok
+test no_inlining_of_close_style_tag_with_spaces ... ok
+test no_inlining_of_any_tag ... ok
+test no_rel ... ok
+test markup_placement_start_tag ... ok
+test shard_subresources ... ok
+test no_rewrite_urls_same_dir ... ok
+test shared_stylesheet_decided_per_page_charset_in_either_order ... ok
+test markup_placement_closing_tag ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/css_inline_import_to_link.rs (target/debug/build/ps-html/cc85ee76e4abc109/out/css_inline_import_to_link-cc85ee76e4abc109)
+
+running 13 tests
+test convert_style_with_attributes ... ok
+test convert_style_with_different_media ... ok
+test css_preserve_url_off ... ok
+test always_allow_unauthorized_domain ... ok
+test convert_good_style ... ok
+test do_not_convert_scoped ... ok
+test unclosed_style_gets_converted ... ok
+test convert_style_with_same_media ... ok
+test media_queries ... ok
+test publishes_conversion_counter ... ok
+test only_convert_prefix ... ok
+test do_not_convert_bad_style ... ok
+test convert_style_with_multiple_imports ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/css_move_to_head.rs (target/debug/build/ps-html/f049cec60f15d157/out/css_move_to_head-f049cec60f15d157)
+
+running 12 tests
+test move_to_head_over_flush_edge ... ok
+test doesnt_move_out_of_noscript ... ok
+test move_above_scripts_flush_edge ... ok
+test doesnt_reorder_css ... ok
+test move_past_scoped_div ... ok
+test move_above_scripts_over_flush_edge ... ok
+test move_to_head_flush_edge ... ok
+test moves_above_first_script ... ok
+test moves_above_script_after_head ... ok
+test doesnt_move_scoped_style ... ok
+test moves_css_to_head ... ok
+test moves_to_head_even_if_script_after ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/debug.rs (target/debug/build/ps-html/9213f3270688ad4d/out/debug-9213f3270688ad4d)
+
+running 8 tests
+test check_filters_and_options ... ok
+test critical_image_message_blank_src ... ok
+test no_disabled_filters ... ok
+test disabled_filters ... ok
+test zero_flushes ... ok
+test flush_in_style_tag ... ok
+test critical_image_message ... ok
+test two_flushes ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/decode_rewritten_urls.rs (target/debug/build/ps-html/73a4b18e3f5223c0/out/decode_rewritten_urls-73a4b18e3f5223c0)
+
+running 1 test
+test test_all ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/dedup_inlined_images.rs (target/debug/build/ps-html/190747001d67d478/out/dedup_inlined_images-190747001d67d478)
+
+running 9 tests
+test dont_touch_large_image ... ok
+test simple ... ok
+test disabled_without_lazyload_runtime ... ok
+test inline_single_small_image ... ok
+test size_cutoff_boundary ... ok
+test dedup_second_small_image_with_attributes ... ok
+test dedup_second_small_image ... ok
+test dedup_many_small_images ... ok
+test dedup_second_small_image_with_id ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+     Running tests/delay_images.rs (target/debug/build/ps-html/a1aea451eaeb4e5d/out/delay_images-a1aea451eaeb4e5d)
+
+running 22 tests
+test basic ... ok
+test blank_image ... ok
+test delay_with_pagespeed_added_onload ... ok
+test blank_image_on_mobile ... ok
+test jpeg_on_input_element ... ok
+test mobile_aggressive ... ok
+test mobile_lazyload ... ok
+test mobile_with_url_valued_attribute ... ok
+test no_delay_with_onload_attribute ... ok
+test onload_code_guarded ... ok
+test multiple_same_image ... ok
+test multiple_bodies ... ok
+test no_head_tag ... ok
+test only_url_valued_attribute ... ok
+test pcache_miss ... ok
+test preserve_urls_on ... ok
+test query_param ... ok
+test script_debug ... ok
+test script_optimized ... ok
+test unsupported_user_agent ... ok
+test unescaped_query_param ... ok
+test src_and_url_valued_attribute ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/dom_stats.rs (target/debug/build/ps-html/0e2684e3ef895609/out/dom_stats-0e2684e3ef895609)
+
+running 5 tests
+test external_css ... ok
+test inlined_img_tags ... ok
+test critical_images_used ... ok
+test img_tags ... ok
+test num_scripts ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/domain_lawyer.rs (target/debug/build/ps-html/7a44f19edfb624a8/out/domain_lawyer-7a44f19edfb624a8)
+
+running 90 tests
+test about_blank ... ok
+test absolute_domain ... ok
+test add_domain_redundantly ... ok
+test absolute_domain_port ... ok
+test add_mapping_failures ... ok
+test add_two_protocol_origin_domain_mapping ... ok
+test add_two_protocol_origin_with_host_header ... ok
+test add_two_protocol_origin_with_both_ports ... ok
+test add_two_protocol_origin_with_ref_port ... ok
+test add_two_protocol_origin_with_serving_port ... ok
+test compute_signature_rewrite_and_shards ... ok
+test compute_signature_with_origins ... ok
+test conflicted_origin_1 ... ok
+test conflicted_origin_2 ... ok
+test add_two_protocol_rewrite_domain_mapping ... ok
+test external_domain_declared_without_scheme ... ok
+test external_domain_declared_without_trailing_slash ... ok
+test external_domain_not_declared ... ok
+test external_domain_declared ... ok
+test external_upper_case_domain_declared ... ok
+test https_domain ... ok
+test map_https_across_ports ... ok
+test map_https_across_hosts ... ok
+test is_origin_known_test ... ok
+test map_new_url_domain_without_domain_suffix ... ok
+test map_origin_explicit_host ... ok
+test map_new_url_domain ... ok
+test map_origin_without_explicit_host ... ok
+test map_origin_domain ... ok
+test map_rewrite_to_origin_domain ... ok
+test map_rewrite_domain_and_path ... ok
+test map_url_domain_with_leaf ... ok
+test map_rewrite_domain ... ok
+test map_shard_to_origin_domain ... ok
+test mixed_case_path ... ok
+test no_absolute_url_path ... ok
+test failed_origin_mapping_leaves_no_host_header ... ok
+test no_conflict_on_merge_1 ... ok
+test find_domains_rewritten_to ... ok
+test map_https_across_schemes ... ok
+test no_shard_conflict ... ok
+test origin_and_extern_double_slash ... ok
+test no_shard_conflict_scramble ... ok
+test origin_and_extern_with_multiple_matches ... ok
+test origin_and_extern_with_paths ... ok
+test no_shard_conflict_reverse ... ok
+test origin_with_path ... ok
+test map_https_across_schemes_and_ports ... ok
+test origin_with_path_on_source ... ok
+test port_external_domain_not_declared ... ok
+test port_external_domain_declared ... ok
+test port_wildcard_domain_declared ... ok
+test merge ... ok
+test origin_wildcard_target_rejected ... ok
+test proxy_external_resource ... ok
+test proxy_ambiguous ... ok
+test proxy_external_resource_from_https ... ok
+test redundant_ports_on_declaration ... ok
+test relative_domain ... ok
+test relative_domain_port ... ok
+test rejected_mapping_leaves_domains_unauthorized ... ok
+test proxy_external_resource_to_cdn ... ok
+test redundant_ports_on_test ... ok
+test resource_from_https_page ... ok
+test rewrite_https_across_schemes ... ok
+test rewrite_https_across_hosts ... ok
+test rewrite_https_across_ports ... ok
+test rewrite_origin_cycle ... ok
+test rewrite_with_path ... ok
+test rewrite_https_to_https ... ok
+test shard ... ok
+test shard_conflict_1 ... ok
+test rewrite_https_across_schemes_and_ports ... ok
+test shard_https ... ok
+test strip_proxy_suffix ... ok
+test to_string_with_origins ... ok
+test to_string_rewrite_and_shards ... ok
+test verify_port_is_distinct_1 ... ok
+test verify_port_is_distinct_2 ... ok
+test wildcard_domain_declared ... ok
+test verify_wildcarded_port_spec ... ok
+test will_domain_change_subdirectory ... ok
+test will_domain_change ... ok
+test root_domain_of_proxy_source_not_authorized ... ok
+test wildcard_order ... ok
+test will_domain_change_only_one_shard ... ok
+test add_proxy_suffix ... ok
+test rebuild_lawyer_threads_origin_mappings ... ok
+test rebuild_lawyer_threads_rewrite_direction ... ok
+test rebuild_lawyer_threads_proxy_mappings_with_cdn_leg ... ok
+
+test result: ok. 90 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+
+     Running tests/domain_rewrite.rs (target/debug/build/ps-html/bd0d5d57644b3d9c/out/domain_rewrite-bd0d5d57644b3d9c)
+
+running 23 tests
+test client_domain_rewrite_disabled_due_to_amp ... ok
+test client_domain_rewrite ... ok
+test dont_rewrite_crossorigin_script ... ok
+test parse_set_cookie_attributes ... ok
+test parse_refresh_content ... ok
+test dont_rewrite_module_script ... ok
+test no_client_domain_rewrite ... ok
+test dont_touch_if_already_rewritten ... ok
+test proxy_base_url ... ok
+test publishes_rewrite_counter ... ok
+test mapped_and_sharded ... ok
+test dont_touch ... ok
+test rewrite_classic_script ... ok
+test relative_up_reference_shard ... ok
+test rewrite_redirect_locations ... ok
+test rewrite_but_do_not_shard_hyperlinks ... ok
+test update_set_cookie_header_disabled ... ok
+test relative_up_reference_rewrite ... ok
+test rewrite_hyperlinks ... ok
+test update_set_cookie_header ... ok
+test proxy_suffix_refresh ... ok
+test proxy_suffix_set_cookie ... ok
+test proxy_suffix ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/driver.rs (target/debug/build/ps-html/d3cb7e632d5d932f/out/driver-d3cb7e632d5d932f)
+
+running 29 tests
+test amp_verdict_through_driver ... ok
+test executes_implemented_slots_across_phases ... ok
+test flush_html_no_extra_flushes ... ok
+test flush_html_induces_flushes ... ok
+test flush_html_not_enough ... ok
+test google_analytics_runs_through_driver ... ok
+test driver_binds_meta_tag_to_shared_headers ... ok
+test domain_rewrite_runs_through_driver ... ok
+test driver_binds_support_noscript_with_driver_url ... ok
+test dns_prefetch_disabled_writes_nothing ... ok
+test passthrough_round_trip ... ok
+test lazyload_images_runs_through_driver ... ok
+test insert_dns_prefetch_runs_through_driver ... ok
+test max_url_size_blocks_base_adoption_through_driver ... ok
+test dns_prefetch_corrupt_state_fails_safe ... ok
+test phases_run_early_pre_render_post ... ok
+test size_limit_propagates ... ok
+test writer_disabled_means_no_output ... ok
+test dns_prefetch_persists_across_drivers ... ok
+test dns_prefetch_state_is_page_isolated ... ok
+test url_left_trim_runs_through_driver ... ok
+test proxy_suffix_threads_lawyer_through_driver ... ok
+test lazyload_images_stands_down_without_beacon_data ... ok
+test sync_css_inline_baseline_inlines_first_request ... ok
+test core_plan_leaves_unplanned_content_alone ... ok
+test show_ads_async_runs_without_resource_driver ... ok
+test show_ads_async_runs_through_driver ... ok
+test driver_bound_css_inlines_small_link ... ok
+test slow_fetch_falls_back_then_warms_html_rewrites ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+     Running tests/driver_resources.rs (target/debug/build/ps-html/378225d53ac2e373/out/driver_resources-378225d53ac2e373)
+
+running 9 tests
+test slots_deduplicate ... ok
+test data_urls_skip_quietly ... ok
+test claimed_urls_refuse ... ok
+test same_origin_authorizes ... ok
+test disallowed_urls_refuse ... ok
+test cross_origin_needs_inline_policy ... ok
+test proxy_encodings_decode_then_recheck ... ok
+test output_creation_names_and_caps ... ok
+test invalid_base_refuses ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.77s
+
+     Running tests/file_input_resource.rs (target/debug/build/ps-html/492ca079866ecf91/out/file_input_resource-492ca079866ecf91)
+
+running 6 tests
+test missing_mapped_files_fail_gracefully ... ok
+test mapped_urls_become_file_resources ... ok
+test rules_and_regexps_apply ... ok
+test unmapped_and_gated_urls_stay_http ... ok
+test traversal_urls_never_map_to_files ... ok
+test regexp_mappings_map ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/filters.rs (target/debug/build/ps-html/bb879b69773d181a/out/filters-bb879b69773d181a)
+
+running 31 tests
+test collapse_whitespace_pass_through ... ok
+test deterministic_js_cases ... ok
+test add_ids_mid_tag_flush ... ok
+test add_head_cases ... ok
+test defer_iframe_cases ... ok
+test add_ids_two_digit_counts ... ok
+test collapse_whitespace_cases ... ok
+test fix_reflow_cases ... ok
+test filter_names ... ok
+test elide_attributes_cases ... ok
+test iframe_guard_snippet_shape ... ok
+test js_disable_element_after_body_falls_back ... ok
+test css_minify_cases ... ok
+test js_disable_cases ... ok
+test amp_link_cases ... ok
+test base_tag_cases ... ok
+test noscript_enablement_rules ... ok
+test js_disable_prioritize ... ok
+test add_ids_cases ... ok
+test js_disable_experimental_and_ie ... ok
+test pedantic_cases ... ok
+test quote_removal_cases ... ok
+test strip_scripts_cases ... ok
+test remove_comments_cases ... ok
+test support_noscript_cases ... ok
+test strip_legacy_polyfills_allowlist ... ok
+test js_disable_variants ... ok
+test strip_legacy_polyfills_cases ... ok
+test noscript_redirect_cases ... ok
+test registry_maps_implemented_slots ... ok
+test js_minify_cases ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/flatten.rs (target/debug/build/ps-html/f7b479642b16a3a3/out/flatten-f7b479642b16a3a3)
+
+running 38 tests
+test flatten_empty_media ... ok
+test flatten_404 ... ok
+test flatten_font_face ... ok
+test flatten_inline_css ... ok
+test flatten_empty ... ok
+test flatten_all_media ... ok
+test flatten_from_cache_directly ... ok
+test flatten_cache_depends_on_media ... ok
+test flatten_from_cache_indirectly ... ok
+test flatten_nested ... ok
+test flatten_and_trim_inline_css_with_relative_image ... ok
+test flatten_noop ... ok
+test flatten_nested_media ... ok
+test flatten_only_inline_css_with_relative_image ... ok
+test dont_flatten_attribute_css ... ok
+test flatten_fails_if_link_has_wrong_charset ... ok
+test flatten_nested_charsets_mismatch ... ok
+test flatten_invalid_css ... ok
+test flatten_respects_http_equiv_charset ... ok
+test flatten_simple_media ... ok
+test flatten_recursion ... ok
+test flatten_simple_rewrite_on_the_fly ... ok
+test dont_flatten_over_medium_limit ... ok
+test flatten_nested_charsets_ok ... ok
+test dont_flatten_over_tiny_limit ... ok
+test flatten_respects_meta_tag_charset ... ok
+test flatten_respects_http_equiv_charset_unquoted ... ok
+test dont_flatten_with_unauthorized_css ... ok
+test flatten_simple ... ok
+test header_takes_precendence_over_meta_tag1 ... ok
+test invalid_grandchild_url ... ok
+test no_flatten_media_queries_at_media ... ok
+test merge_media_queries ... ok
+test no_flatten_media_queries ... ok
+test no_flatten_media_queries_child ... ok
+test header_takes_precendence_over_meta_tag2 ... ok
+test flatten_too_complex_nested ... ok
+test flatten_under_large_limit ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s
+
+     Running tests/google_analytics.rs (target/debug/build/ps-html/37ea4a6b0679257c/out/google_analytics-37ea4a6b0679257c)
+
+running 10 tests
+test async_give_no_changes ... ok
+test publishes_page_counters ... ok
+test multiple_load_reduced_to_single ... ok
+test nonstandard_init_give_no_changes ... ok
+test sync_document_write_at_position_zero ... ok
+test sync_script_src_no_characters_node_made_async ... ok
+test sync_document_write_made_async ... ok
+test sync_script_src_made_async ... ok
+test unhandled_call_causes_skipped_rewrite ... ok
+test unknown_call_still_allows_rewrite ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/google_font_css_inline.rs (target/debug/build/ps-html/5fbe193216ffb68e/out/google_font_css_inline-5fbe193216ffb68e)
+
+running 7 tests
+test usage_restrictions ... ok
+test with_wide_authorization ... ok
+test protocol_relative ... ok
+test basic_operation ... ok
+test via_inline_import ... ok
+test size_limit ... ok
+test with_wide_authorization_without_font_filter ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
+
+     Running tests/google_font_service_input_resource.rs (target/debug/build/ps-html/be99a8c1db215e1a/out/google_font_service_input_resource-be99a8c1db215e1a)
+
+running 6 tests
+test is_font_service_url_test ... ok
+test creation ... ok
+test fetch_failure ... ok
+test dont_load_non_css ... ok
+test load_resource ... ok
+test ua_normalization ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/harness.rs (target/debug/build/ps-html/0fe50dff52c04642/out/harness-0fe50dff52c04642)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/html.rs (target/debug/build/ps-html/953119b34972117b/out/html-953119b34972117b)
+
+running 14 tests
+test buffer_reuse_across_documents ... ok
+test comment_around_first_div ... ok
+test empty_and_trivial_documents ... ok
+test auto_close_matrix ... ok
+test pass_through_serves_rest_verbatim ... ok
+test delete_saving_children_cases ... ok
+test insert_scripts_around_head ... ok
+test writer_batches_small_tokens ... ok
+test writer_case_folds_names ... ok
+test generated_parse::translated_parse_goldens ... ok
+test three_chunk_splits_match ... ok
+test chunk_splits_match_whole_parse ... ok
+test size_limit_stops_parsing ... ok
+test token_size_limit_stops_huge_tokens ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+
+     Running tests/html_cache_cookies.rs (target/debug/build/ps-html/57f9e7fad7abed9e/out/html_cache_cookies-57f9e7fad7abed9e)
+
+running 7 tests
+test authorization_and_origin_cookies_still_protect ... ok
+test personalization_cookies_still_bypass_after_upgrade ... ok
+test directives_customize_and_disable_the_policy ... ok
+test analytics_requests_cache_by_default_without_configuration ... ok
+test configured_patterns_exclusions_and_protected_cookie_precedence ... ok
+test public_cookie_values_share_early_and_normal_hits_across_login_logout ... ok
+test wordpress_preference_variants_isolate_bodies_for_ordinary_and_early_hits ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.76s
+
+     Running tests/html_cache_critical_css.rs (target/debug/build/ps-html/aebe05e49e3ac26e/out/html_cache_critical_css-aebe05e49e3ac26e)
+
+running 4 tests
+test evidence_changed_during_render_never_publishes_under_old_key ... ok
+test sampling_and_private_requests_still_cannot_publish_or_reuse_css_html ... ok
+test learned_output_preserves_critical_and_full_css_on_normal_and_early_hits ... ok
+test missing_selectors_cache_full_styles_then_learned_evidence_rekeys_both_paths ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/html_cache_vary.rs (target/debug/build/ps-html/5d0d891ecd40e89c/out/html_cache_vary-5d0d891ecd40e89c)
+
+running 8 tests
+test non_beacon_clients_ignore_sampling_due ... ok
+test detached_rewrite_blocks_publication ... ok
+test unlearned_beacon_requests_publish_and_hit ... ok
+test named_vary_caches_per_variant_with_isolated_bodies ... ok
+test sampling_due_bypasses_preserving_collection ... ok
+test beacon_arrival_rekeys_variant ... ok
+test vary_star_still_bypasses ... ok
+test slow_fetch_defers_publication_until_complete ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+
+     Running tests/image_combine.rs (target/debug/build/ps-html/f6084381163a16bb/out/image_combine-f6084381163a16bb)
+
+running 23 tests
+test content_type_validation ... ok
+test no_crash_unknown_type ... ok
+test dont_leak ... ok
+test no_sprite_image_past_resolution_limit ... ok
+test no_combine_across_flattening ... ok
+test no_sprites_multiple ... ok
+test no_sprite_when_canvas_exceeds_limit ... ok
+test css_different_base ... ok
+test sprites_broken_up ... ok
+test sprites_images_external ... ok
+test unauthorized_domain ... ok
+test sprites_and_non_sprites ... ok
+test oob_slot_index_metadata_treated_as_miss ... ok
+test sprite_wrong_mime ... ok
+test sprites_gifs_with_pngs ... ok
+test with_flattening ... ok
+test sprites_ok_after_404 ... ok
+test sprites_multiple ... ok
+test serve_files ... ok
+test sprites_multi_site ... ok
+test sprites_images ... ok
+test full_sprite_is_not_offered_later_images ... ok
+test combine_many_files ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+
+     Running tests/image_rewrite.rs (target/debug/build/ps-html/c601bb6b7998b530/out/image_rewrite-c601bb6b7998b530)
+
+running 124 tests
+test add_dim_test ... ok
+test animated_gif_to_webp_not_enabled ... ok
+test animated_gif_to_webp_with_webp_la_ua ... ok
+test content_type_validation ... ok
+test data_no_transform ... ok
+test data_url_test ... ok
+test chrome_android_inlines_lossless_webp ... ok
+test chrome_ipad_inlines_png ... ok
+test debug_message_inline ... ok
+test chrome_android_inlines_webp ... ok
+test chrome_iphone_outlines_webp ... ok
+test chrome_iphone_inlines_png ... ok
+test debug_no_resize_test ... ok
+test dimension_parsing_fail ... ok
+test dimension_parsing_ok ... ok
+test debug_resize_test ... ok
+test debug_with_map_rewrite_domain ... ok
+test dimension_strip_after_inline ... ok
+test debug_with_map_rewrite_domain_opt_only ... ok
+test fetch_invalid ... ok
+test debug_message_unauthorized ... ok
+test debug_message_image_info ... ok
+test fetch_from_other_directory_keeps_page_url ... ok
+test gif_resolution_limit_counts_the_decoded_canvas ... ok
+test gif_to_png_test_resize_enable_gif_to_png_disabled ... ok
+test gif_to_png_test_with_resize_with_optimize ... ok
+test gif_to_png_test_without_resize_without_optimize ... ok
+test gif_to_jpeg_test_without_resize_with_optimize ... ok
+test gif_to_webp_test_with_resize_with_optimize ... ok
+test gif_to_webp_lossless_with_webp_animated_ua ... ok
+test honor_no_transform ... ok
+test fetch_claims_rewrite_and_proceeds_when_owned ... ok
+test event_loop_fetch_reconstructs_without_polling_when_claimed_elsewhere ... ok
+test gif_to_png_test_without_resize_with_optimize ... ok
+test chrome_ipad_inlines_jpeg ... ok
+test image_rewrite_drop_sometimes ... ok
+test image_rewrite_preserve_urls_disable_preemptive_rewrite ... ok
+test image_rewrite_preserve_urls_explicit_resize_on ... ok
+test gif_to_webp_test_without_resize_with_optimize ... ok
+test image_rewrite_random_drop_repeated_images ... ok
+test image_rewrite_preserve_urls_on_soft_enable ... ok
+test img_srcset ... ok
+test img_srcset_with_cache_extender ... ok
+test image_rewrite_drop_all ... ok
+test image_url_valued_attribute_with_flush ... ok
+test chrome_ipad_outlines_webp ... ok
+test chrome_desktop_inlines_webp ... ok
+test fetch_waits_then_proceeds_when_claimed_elsewhere ... ok
+test image_rewrite_inline_preserve_urls_on_soft_enable ... ok
+test inline_larger_resize ... ok
+test image_rewrite_drop_none ... ok
+test inline_enlarged_image ... ok
+test image_rewrite_inline_preserve_urls_explicit ... ok
+test img_tag_with_compute_statistics ... ok
+test inline_no_resize ... ok
+test inline_test_without_optimize ... ok
+test inline_test_with_resize_keep_dims ... ok
+test inline_test_with_resize_with_optimize_and_url_logging ... ok
+test inline_test_with_resize_with_optimize ... ok
+test animated_no_cache_reuse ... ok
+test inline_no_rewrite ... ok
+test jpeg_progressive_scans_for_small_screens ... ok
+test jpeg_quality_for_small_screens ... ok
+test lazy_image_garbage_fails_fast ... ok
+test lazy_image_inlining_preserved_first_view ... ok
+test lazy_image_renders_unversioned_first_view ... ok
+test cache_control_header_check_for_non_webp_ua ... ok
+test no_crash_on_invalid_dim ... ok
+test animated_gif_to_webp_with_webp_animated_ua ... ok
+test no_dims_in_non_img ... ok
+test lazy_image_serve_optimizes_and_converges ... ok
+test no_transform ... ok
+test no_transform_optimized ... ok
+test no_transform_with_dims ... ok
+test img_tag ... ok
+test null_resize_test ... ok
+test input_tag ... ok
+test optimize_requested_prefetch ... ok
+test jpeg_exceed_resolution_limit ... ok
+test png_fallback_to_png_lack_of_webp_la_ua ... ok
+test no_query_corruption ... ok
+test png_to_jpeg ... ok
+test png_to_jpeg_unhealthy ... ok
+test png_to_webp_with_webp_la_ua ... ok
+test no_extension_corruption ... ok
+test png_to_webp_with_webp_la_ua_and_flag_times_out ... ok
+test png_to_webp_with_webp_ua ... ok
+test png_to_webp_with_webp_la_ua_and_flag ... ok
+test no_wrong_ext_corruption ... ok
+test preserve_url_relativity ... ok
+test resize_height_only ... ok
+test resize_height_rounding ... ok
+test resize_is_really_prefetch ... ok
+test resize_style_over_parse_bound_is_ignored ... ok
+test img_tag_webp ... ok
+test resize_transparent_image ... ok
+test img_tag_webp_la ... ok
+test input_tag_webp ... ok
+test resize_style_test ... ok
+test resize_test ... ok
+test resize_width_only ... ok
+test rewrite_404 ... ok
+test input_tag_webp_la ... ok
+test rewrite_cache_extend_interaction ... ok
+test rewrites_dropped_due_to_mime_type_unknown_test ... ok
+test rewrites_dropped_due_to_no_saving_no_resize_test ... ok
+test respects_base_url ... ok
+test servant_recompresses_without_browser_flag ... ok
+test safari_iphone_inlines_jpeg ... ok
+test resize_width_rounding ... ok
+test webp_quality_for_small_screens ... ok
+test yes_transform ... ok
+test yes_transform_with_option_false ... ok
+test resize_with_px_in_html ... ok
+test rewrite_multiple_attributes ... ok
+test retain_extra_headers ... ok
+test successful_rewrite_records_admin_row ... ok
+test png_exceed_resolution_limit ... ok
+test serve_webp_from_cold_cache ... ok
+test jpeg_in_resolution_limit_no_resizing ... ok
+test png_in_resolution_limit_no_resizing ... ok
+test png_in_resolution_limit ... ok
+test jpeg_in_resolution_limit ... ok
+test resize_higher_dimension_test ... ok
+
+test result: ok. 124 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.42s
+
+     Running tests/image_url_encoder.rs (target/debug/build/ps-html/00e25e12c928ef8c/out/image_url_encoder-00e25e12c928ef8c)
+
+running 55 tests
+test bad_first_mobile ... ok
+test bad_first_webp_la ... ok
+test bad_first ... ok
+test bad_first_webp ... ok
+test bad_first_webp_la_mobile ... ok
+test bad_first_webp_mobile ... ok
+test bad_init_char ... ok
+test bad_height_char ... ok
+test bad_middle_n ... ok
+test bad_second ... ok
+test bad_leading_n ... ok
+test bad_second_mobile ... ok
+test bad_second_webp ... ok
+test bad_second_webp_la ... ok
+test bad_second_webp_la_mobile ... ok
+test bad_second_webp_mobile ... ok
+test bad_size_check ... ok
+test bad_trail_char ... ok
+test bad_width_char ... ok
+test blank_second ... ok
+test blank_second_mobile ... ok
+test blank_second_webp ... ok
+test blank_second_webp_la_mobile ... ok
+test blank_second_webp_mobile ... ok
+test both_dims_missing ... ok
+test cache_key ... ok
+test different_webp_levels ... ok
+test has_dims ... ok
+test has_dims_mobile ... ok
+test has_dims_webp ... ok
+test has_dims_webp_la ... ok
+test has_dims_webp_la_mobile ... ok
+test has_dims_webp_mobile ... ok
+test has_height ... ok
+test has_height_webp ... ok
+test has_height_webp_la ... ok
+test has_width ... ok
+test has_width_webp ... ok
+test has_width_webp_la ... ok
+test no_dims_webp_la ... ok
+test no_dims_webp_la_mobile ... ok
+test no_dims_webp_or_mobile ... ok
+test no_xs ... ok
+test no_xs_mobile ... ok
+test short_both_dims ... ok
+test short_height ... ok
+test short_width ... ok
+test test_encoding_and_decoding ... ok
+test test_encoding_and_decoding_without_webp_and_mobile_ua ... ok
+test test_legacy_mobile_decoding ... ok
+test test_legacy_mobile_webp_decoding ... ok
+test truncated_after_first_dim ... ok
+test truncated_before_sep ... ok
+test very_short_url ... ok
+test webp_detection ... ok
+
+test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/in_place.rs (target/debug/build/ps-html/913c81298eca6b44/out/in_place-913c81298eca6b44)
+
+running 40 tests
+test bad_url_no_rewriting ... ok
+test cacheable_js_url_modified_implicit_cache_ttl ... ok
+test cacheable_png_url_rewriting_fails ... ok
+test cacheable_html_url_no_rewriting ... ok
+test cacheable_js_url_rewriting_succeeds ... ok
+test cacheable_gif_url_rewriting_succeeds ... ok
+test cacheable_js_url_rewriting_with_stale_serving ... ok
+test accept_header_merging ... ok
+test cacheable_png_url_rewriting_succeeds ... ok
+test cacheable_css_url_rewriting_succeeds ... ok
+test fetch_failed_no_rewriting ... ok
+test css_in_undecodable_coding_is_served_as_sent ... ok
+test cacheable_css_url_if_css_rewriting_disabled ... ok
+test handle_resource_creation_failure ... ok
+test cacheable_png_url_rewriting_succeeds_with_shards ... ok
+test cacheable_webp_url_rewriting_succeeds ... ok
+test head_request_does_not_rewrite_empty_input ... ok
+test non_cacheable_url_no_rewriting ... ok
+test json_with_js_content_type_succeeds ... ok
+test json_with_json_content_type_synonym_succeeds ... ok
+test json_with_json_content_type_succeeds ... ok
+test cacheable_jpg_url_rewriting_succeeds ... ok
+test no_accept_header_for_lossless_or_animated ... ok
+test non_cacheable_url_rewriting ... ok
+test private_cacheable_url_rewriting ... ok
+test optimize_on_no_transform_if_option_false ... ok
+test optimize_for_browser_negative ... ok
+test permanent_redirect_no_rewriting ... ok
+test wait_for_optimize_resource_too_big ... ok
+test optimize_for_browser_no_private_for_ie ... ok
+test response_header_mime_type_update ... ok
+test wait_for_optimize_oversized_no_short_content_length ... ok
+test wait_for_optimize_no_transform ... ok
+test stored_css_in_other_coding_is_not_served_or_rewritten ... ok
+test optimize_for_browser_encoding_and_header ... ok
+test saturated_pool_ipro_sheds_without_inline_fetch ... ok
+test optimize_for_browser_rewriting ... ok
+test wait_for_optimize_with_disabled_filter ... ok
+test wait_for_optimized_first_request ... ok
+test wait_for_optimized_slow_origin_falls_back_then_warms ... ok
+
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running tests/insert_dns_prefetch.rs (target/debug/build/ps-html/5f8ccdcdaee165de/out/insert_dns_prefetch-5f8ccdcdaee165de)
+
+running 10 tests
+test store_domains_in_body_max ... ok
+test store_domains_only_in_body ... ok
+test insert_domains_in_head_for_flush_early_flow ... ok
+test ignore_current_domain ... ok
+test ignore_domains_in_head ... ok
+test store_domains_in_body ... ok
+test disable_for_user_agents_not_supported ... ok
+test link_tag_test ... ok
+test full_flow_logging ... ok
+test full_flow ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+     Running tests/insert_ga.rs (target/debug/build/ps-html/3f19b76c04fab90d/out/insert_ga-3f19b76c04fab90d)
+
+running 35 tests
+test analytics_js_no_close_body ... ok
+test analytics_js_no_increased_speed ... ok
+test analytics_js_invalid_no_experiment ... ok
+test asynchronous_dc_custom_var_experiment ... ok
+test analytics_js_detection_quirk ... ok
+test analytics_js_no_custom_var_experiment ... ok
+test analytics_js_no_experiment ... ok
+test analytics_js_invalid_no_custom_var_experiment ... ok
+test analytics_js_content_experiment_no_increase_speed ... ok
+test asynchronous_ga_custom_var_experiment ... ok
+test asynchronous_ga_no_experiment ... ok
+test experiment_analytics_js_cv ... ok
+test existing_urchin_analytics ... ok
+test experiment_analytics_js_cx_string ... ok
+test gtag_snippet_insertion ... ok
+test experiment_no_double ... ok
+test experiment_analytics_js_cx ... ok
+test simple_insert_analytics_js ... ok
+test simple_insert_ga_js_id_unset ... ok
+test synchronous_dc_custom_var_experiment ... ok
+test analytics_js_invalid_content_experiment ... ok
+test synchronous_ga_custom_var_experiment ... ok
+test synchronous_ga_no_experiment ... ok
+test unusable_snippet_cases ... ok
+test analytics_js_content_experiment ... ok
+test analytics_js_content_experiment_speed_tracking ... ok
+test asynchronous_ga_content_experiment ... ok
+test synchronous_ga_content_experiment ... ok
+test asynchronous_ga_content_experiment_flush ... ok
+test experiment_ga_js_cv ... ok
+test experiment_ga_js_cx ... ok
+test experiment_ga_js_cx_string ... ok
+test no_increased_speed ... ok
+test many_heads_and_bodies ... ok
+test simple_insert_ga_js ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+     Running tests/javascript.rs (target/debug/build/ps-html/1e0d1159ca4d62d5/out/javascript-1e0d1159ca4d62d5)
+
+running 168 tests
+test experimental::disallowed_urls_not_checked_for_canonicalization ... ok
+test experimental::allow_when_inlining_urls_still_not_checked ... ok
+test experimental::backslash_in_regexp ... ok
+test experimental::cdata_javascript_html_mimetype ... ok
+test experimental::do_inline_allowed_for_inlining_scripts ... ok
+test experimental::cdata_javascript_no_mimetype ... ok
+test experimental::cdata_javascript_xhtml_mimetype ... ok
+test experimental::aris ... ok
+test experimental::aris_source_maps ... ok
+test experimental::aris_combine_js ... ok
+test experimental::do_rewrite ... ok
+test experimental::dont_rewrite_disallowed_scripts ... ok
+test experimental::dont_rewrite_data_block ... ok
+test experimental::dont_rewrite_unauthorized_domain ... ok
+test experimental::dont_rewrite_import_map ... ok
+test experimental::dont_rewrite_unauthorized_domain_with_unauth_option_set ... ok
+test experimental::dont_rewrite_module_script ... ok
+test experimental::dont_rewrite_integrity_script ... ok
+test experimental::dont_inline_identified ... ok
+test experimental::flush_in_inline_js ... ok
+test experimental::flush_in_end_tag ... ok
+test experimental::html_inline_script_loses_xml_comment ... ok
+test experimental::flush_after_begin_script ... ok
+test experimental::do_rewrite_unhealthy ... ok
+test experimental::extra_cdata_on_malformed_input ... ok
+test experimental::dont_combine_identified ... ok
+test experimental::identify_failure_no_minification ... ok
+test experimental::external_and_not_inline ... ok
+test experimental::identify_library ... ok
+test experimental::inline_and_not_external_preserve ... ok
+test experimental::inline_and_not_external ... ok
+test experimental::inline_javascript ... ok
+test experimental::identify_library_twice ... ok
+test experimental::inline_and_canonical_not_external ... ok
+test experimental::ignore_library_no_identification ... ok
+test experimental::inline_minify_less_than_at_end_of_script ... ok
+test experimental::minified_script_with_text_element_end_tag_is_not_used ... ok
+test experimental::identify_library_no_minification ... ok
+test experimental::invalid_input_mimetype ... ok
+test experimental::js_extend_overriding_preserve ... ok
+test experimental::minify_failure_passthrough ... ok
+test experimental::minification_failure ... ok
+test experimental::js_preserve_overriding_extend ... ok
+test experimental::js_preserve_urls_on_test ... ok
+test experimental::inline_script_inside_noscript_like_element_is_kept ... ok
+test experimental::modern_syntax_class_async ... ok
+test experimental::minify_nomodule_script ... ok
+test experimental::js_preserve_urls_no_preemptive_rewrite_test ... ok
+test experimental::no_minification_inline_js ... ok
+test experimental::modern_syntax_operators ... ok
+test experimental::no_reuse_inline ... ok
+test experimental::inline_minify_does_not_create_text_element_end_tag ... ok
+test experimental::no_extension_corruption ... ok
+test experimental::modern_syntax_template_literal ... ok
+test experimental::no_rewrite_origin_uncacheable ... ok
+test experimental::no_wrong_ext_corruption ... ok
+test experimental::no_query_corruption ... ok
+test experimental::no_source_map_js_combine ... ok
+test experimental::rewrite_js_404 ... ok
+test experimental::retain_inline_data ... ok
+test experimental::proper_source_map_for_pagespeed_input ... ok
+test experimental::not_rewritten_when_origin_type_is_not_script ... ok
+test experimental::retain_extra_headers ... ok
+test experimental::reuse_rewrite ... ok
+test experimental::rewrite_already_cached_properly ... ok
+test experimental::serve_rewritten_library ... ok
+test experimental::serve_files_unhealthy ... ok
+test experimental::source_map_no_opt ... ok
+test experimental::serve_json_file ... ok
+test experimental::source_map_on_demand_not_enabled ... ok
+test experimental::source_map_unsanitary_url ... ok
+test experimental::serve_files ... ok
+test experimental::strip_inline_whitespace ... ok
+test experimental::xhtml_inline_javascript_never_emits_cdata_end ... ok
+test experimental::weird_src_crash ... ok
+test experimental::content_type_validation ... ok
+test experimental::xhtml_inline_javascript_without_cdata_never_emits_cdata_end ... ok
+test experimental::xhtml_inline_javascript ... ok
+test experimental::valid_cdata ... ok
+test experimental::strip_inline_whitespace_flush ... ok
+test experimental::source_maps_medium ... ok
+test experimental::xhtml_inline_script_keeps_xml_comment ... ok
+test legacy::backslash_in_regexp ... ok
+test legacy::allow_when_inlining_urls_still_not_checked ... ok
+test legacy::cdata_javascript_html_mimetype ... ok
+test legacy::cdata_javascript_no_mimetype ... ok
+test experimental::xhtml_inline_script_keeps_cdata_markers ... ok
+test legacy::cdata_javascript_xhtml_mimetype ... ok
+test legacy::disallowed_urls_not_checked_for_canonicalization ... ok
+test experimental::source_maps_simple ... ok
+test legacy::do_rewrite_unhealthy ... ok
+test legacy::do_inline_allowed_for_inlining_scripts ... ok
+test legacy::aris_source_maps ... ok
+test legacy::aris ... ok
+test legacy::do_rewrite ... ok
+test legacy::dont_rewrite_data_block ... ok
+test legacy::dont_rewrite_disallowed_scripts ... ok
+test legacy::aris_combine_js ... ok
+test legacy::dont_rewrite_module_script ... ok
+test legacy::dont_rewrite_import_map ... ok
+test legacy::dont_rewrite_integrity_script ... ok
+test legacy::dont_rewrite_unauthorized_domain ... ok
+test legacy::dont_combine_identified ... ok
+test legacy::dont_inline_identified ... ok
+test legacy::dont_rewrite_unauthorized_domain_with_unauth_option_set ... ok
+test legacy::flush_in_inline_js ... ok
+test legacy::extra_cdata_on_malformed_input ... ok
+test legacy::html_inline_script_loses_xml_comment ... ok
+test legacy::flush_after_begin_script ... ok
+test legacy::identify_library ... ok
+test legacy::identify_failure_no_minification ... ok
+test legacy::identify_library_no_minification ... ok
+test legacy::external_and_not_inline ... ok
+test legacy::flush_in_end_tag ... ok
+test legacy::identify_library_twice ... ok
+test legacy::ignore_library_no_identification ... ok
+test legacy::inline_and_not_external ... ok
+test legacy::inline_javascript ... ok
+test legacy::inline_minify_less_than_at_end_of_script ... ok
+test legacy::inline_and_not_external_preserve ... ok
+test legacy::inline_script_inside_noscript_like_element_is_kept ... ok
+test legacy::inline_and_canonical_not_external ... ok
+test legacy::invalid_input_mimetype ... ok
+test legacy::minified_script_with_text_element_end_tag_is_not_used ... ok
+test legacy::js_extend_overriding_preserve ... ok
+test legacy::js_preserve_overriding_extend ... ok
+test legacy::minify_failure_passthrough ... ok
+test legacy::modern_syntax_class_async ... ok
+test legacy::modern_syntax_operators ... ok
+test legacy::modern_syntax_template_literal ... ok
+test legacy::minification_failure ... ok
+test legacy::minify_nomodule_script ... ok
+test legacy::js_preserve_urls_on_test ... ok
+test legacy::no_reuse_inline ... ok
+test legacy::inline_minify_does_not_create_text_element_end_tag ... ok
+test legacy::no_rewrite_origin_uncacheable ... ok
+test legacy::no_query_corruption ... ok
+test legacy::not_rewritten_when_origin_type_is_not_script ... ok
+test legacy::no_minification_inline_js ... ok
+test legacy::no_extension_corruption ... ok
+test legacy::retain_inline_data ... ok
+test legacy::proper_source_map_for_pagespeed_input ... ok
+test legacy::no_wrong_ext_corruption ... ok
+test legacy::retain_extra_headers ... ok
+test legacy::no_source_map_js_combine ... ok
+test legacy::js_preserve_urls_no_preemptive_rewrite_test ... ok
+test legacy::rewrite_js_404 ... ok
+test legacy::source_map_no_opt ... ok
+test legacy::source_map_unsanitary_url ... ok
+test legacy::rewrite_already_cached_properly ... ok
+test legacy::reuse_rewrite ... ok
+test legacy::serve_rewritten_library ... ok
+test legacy::serve_files_unhealthy ... ok
+test legacy::source_maps_medium ... ok
+test legacy::valid_cdata ... ok
+test legacy::source_maps_simple ... ok
+test legacy::source_map_on_demand_not_enabled ... ok
+test legacy::weird_src_crash ... ok
+test legacy::serve_json_file ... ok
+test legacy::serve_files ... ok
+test legacy::strip_inline_whitespace ... ok
+test legacy::xhtml_inline_javascript_without_cdata_never_emits_cdata_end ... ok
+test legacy::xhtml_inline_javascript_never_emits_cdata_end ... ok
+test legacy::xhtml_inline_script_keeps_xml_comment ... ok
+test legacy::xhtml_inline_javascript ... ok
+test legacy::strip_inline_whitespace_flush ... ok
+test legacy::xhtml_inline_script_keeps_cdata_markers ... ok
+test legacy::content_type_validation ... ok
+
+test result: ok. 168 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/js_combine.rs (target/debug/build/ps-html/5e673143a97f1422/out/js_combine-5e673143a97f1422)
+
+running 47 tests
+test combine_js_preserve_urls_on ... ok
+test charset_determination ... ok
+test combine_js_unhealthy ... ok
+test embedded_bom_reconstruct ... ok
+test fetch_with_no_inputs_is_refused ... ok
+test integrity_script_untouched ... ok
+test is_likely_strict_mode ... ok
+test fetch_result_does_not_decide_html_combination ... ok
+test charset_mismatch_reason_escaped_in_log ... ok
+test all_different_charsets ... ok
+test bom_mismatch ... ok
+test combination_stops_at_cacheable_size ... ok
+test minify_combine_across_hosts ... ok
+test no_combine_data_no_defer_attribute ... ok
+test embedded_bom ... ok
+test minify_combine_same_host_proxy ... ok
+test no_combine_no_defer_attribute ... ok
+test combine_js_no_extra_cache_extension ... ok
+test combine_js ... ok
+test combine_js_avoid_rewriting_introspective_javascrip_on ... ok
+test minify_combine_across_hosts_proxy ... ok
+test map_rewrite_domain_accross_dirs ... ok
+test no_preserve_url_relativity ... ok
+test non_ascii_utf8_script_is_combined_only_on_utf8_page ... ok
+test non_ascii_script_on_multibyte_page_is_not_combined ... ok
+test minify_combine_js ... ok
+test minify_shard_combine_js ... ok
+test serve_files_unhealthy ... ok
+test not_really_strict ... ok
+test partly_invalid_fetch_cache ... ok
+test test_cross_domain_reject ... ok
+test test_cross_domain_reject_unauth_enabled ... ok
+test test_base ... ok
+test test_combine_stats ... ok
+test test_combine_shard ... ok
+test test_cross_domain_recover ... ok
+test test_flush_middle1 ... ok
+test test_flush_middle2 ... ok
+test test_flush_middle3 ... ok
+test test_barriers ... ok
+test oversized_first_file_does_not_poison_rest ... ok
+test test_max_combined_js_size ... ok
+test preserve_url_relativity ... ok
+test test_script_inline_text_rollback ... ok
+test test_non_barriers ... ok
+test pages_in_different_charsets_do_not_share_decision ... ok
+test inline_stands_down_for_combinations ... ok
+
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+
+     Running tests/js_defer_disabled.rs (target/debug/build/ps-html/b6dee769cbe0e5b6/out/js_defer_disabled-b6dee769cbe0e5b6)
+
+running 10 tests
+test defer_script ... ok
+test allow_mobile_user_agent ... ok
+test defer_js_url_from_gstatic ... ok
+test defer_js_url_from_non_gstatic ... ok
+test defer_script_debug ... ok
+test disallow_mobile_user_agent ... ok
+test invalid_user_agent ... ok
+test defer_script_optimized ... ok
+test disable_chain ... ok
+test defer_script_multi_body ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/js_inline.rs (target/debug/build/ps-html/c3cfb4960cb7c9b9/out/js_inline-c3cfb4960cb7c9b9)
+
+running 37 tests
+test charset_match_inlined ... ok
+test do_inline_javascript_no_mimetype ... ok
+test do_inline_javascript_xhtml ... ok
+test do_inline_introspective_javascript ... ok
+test do_inline_javascript_simple_xhtml ... ok
+test do_inline_disallowed_if_allowed_when_inlining ... ok
+test do_inline_javascript_simple_html ... ok
+test cached_with_succesors ... ok
+test cached_rewrite ... ok
+test charset_mismatch_not_inlined ... ok
+test do_inline_javascript_different_domain ... ok
+test do_inline_javascript_whitespace ... ok
+test dont_inline_disallowed ... ok
+test do_not_inline_javascript_different_domain ... ok
+test do_not_inline_javascript_inline_contents ... ok
+test do_not_inline_introspective_javascript_by_default ... ok
+test do_not_inline_javascript_xhtml_with_cdata_end ... ok
+test flush_splitting_script_tag ... ok
+test do_not_inline_javascript_too_big ... ok
+test inline_decision_is_scoped_to_page_charset ... ok
+test inline_js_preserve_urls_on ... ok
+test no_inline_async_script ... ok
+test no_inline_defer_script ... ok
+test inline_preserves_attributes ... ok
+test no_inline_module_script ... ok
+test inlined_script_on_ce_html_page_is_in_cdata ... ok
+test inlined_script_does_not_end_enclosing_element ... ok
+test no_flush_splitting_script_tag ... ok
+test inline_js_404 ... ok
+test less_than_at_end_of_script_is_kept ... ok
+test text_element_end_tags_are_escaped_on_xhtml_page ... ok
+test regex_flags_after_less_than_are_kept ... ok
+test script_with_script_tags ... ok
+test shared_script_decided_per_page_charset_in_either_order ... ok
+test template_literal_is_inlined_only_without_escape ... ok
+test script_inside_noscript_like_element_is_not_inlined ... ok
+test text_element_end_tags_are_escaped ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/js_outline.rs (target/debug/build/ps-html/fa30401bad65a2fc/out/js_outline-fa30401bad65a2fc)
+
+running 14 tests
+test outline_skips_integrity ... ok
+test outline_skips_module ... ok
+test no_outline_script ... ok
+test js_preserve_url ... ok
+test empty_script ... ok
+test outline_script_with_base ... ok
+test outline_preserves_attributes ... ok
+test outline_strips_async_defer ... ok
+test rewrite_domain ... ok
+test outline_script_md5 ... ok
+test js_preserve_url_off ... ok
+test outline_script ... ok
+test url_too_long ... ok
+test url_not_too_long ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/lazyload_images.rs (target/debug/build/ps-html/b6cd45c61c52dedd/out/lazyload_images-b6cd45c61c52dedd)
+
+running 23 tests
+test abort_script_loads_rewritten_images ... ok
+test blacklist ... ok
+test class_contains_slider ... ok
+test disabled_for_googlebot ... ok
+test image_onload_code_is_guarded ... ok
+test disabled_with_jquery_slider ... ok
+test disabled_with_jquery_slider_after_head ... ok
+test critical_images ... ok
+test disabled_for_old_blackberry ... ok
+test disabled_for_xhr ... ok
+test dfcg_class ... ok
+test custom_image_url ... ok
+test lazyload_script_optimized ... ok
+test lazyload_with_pagespeed_added_onload ... ok
+test nivo_class ... ok
+test no_images ... ok
+test preserve_urls_on ... ok
+test no_lazyload_with_onload_attribute ... ok
+test no_head_tag ... ok
+test lazyload_script_debug ... ok
+test multiple_bodies ... ok
+test single_head_load_on_onload ... ok
+test single_head ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/local_storage_cache.rs (target/debug/build/ps-html/2db9d157f4c1b117/out/local_storage_cache-2db9d157f4c1b117)
+
+running 12 tests
+test simple ... ok
+test link_dont_inline ... ok
+test link_rewrite_context_not_executed ... ok
+test link_url_transformation_fails ... ok
+test link ... ok
+test img ... ok
+test repeat_views ... ok
+test cookie_set ... ok
+test repeat_views_with_other_attributes ... ok
+test img_too_big ... ok
+test repeat_views_of_same_image_at_different_sizes ... ok
+test img_local_storage_disabled ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s
+
+     Running tests/make_show_ads_async.rs (target/debug/build/ps-html/e1c99bcbcd4fc009/out/make_show_ads_async-e1c99bcbcd4fc009)
+
+running 20 tests
+test no_ads ... ok
+test one_show_ads ... ok
+test flush_in_the_middle_of_show_ads_data_script ... ok
+test one_show_ads_with_enclosing_comment_tags ... ok
+test one_show_ads_with_comments ... ok
+test mispaired_show_ads_flag ... ok
+test one_show_ads_data2 ... ok
+test flush_in_the_middle_of_show_ads_data_and_api_call ... ok
+test mixed_ads_with_misplaced_snippet ... ok
+test multiple_show_ads ... ok
+test mixed_ads ... ok
+test publishes_conversion_counters ... ok
+test flush_in_the_middle_of_show_ads_api_call ... ok
+test show_ads_missing_attribute ... ok
+test show_ads_invalid_google_ad_format ... ok
+test show_ads_missing_api_call_flag ... ok
+test show_ads_no_parent ... ok
+test show_ads_unexpected_statement ... ok
+test shows_ads_html_google_ad_output ... ok
+test shows_ads_js_google_ad_output ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running tests/meta_tag.rs (target/debug/build/ps-html/650c1fafba034780/out/meta_tag-650c1fafba034780)
+
+running 19 tests
+test charset_without_upstream_dropped ... ok
+test caching_fields_recomputed_after_charset ... ok
+test caching_fields_reflect_new_content_type ... ok
+test converts_charset ... ok
+test converts_charset_only ... ok
+test equiv_without_value_is_safe ... ok
+test converts_tags ... ok
+test filter_name ... ok
+test converts_tags_once ... ok
+test first_tag_wins_conflicts ... ok
+test leaves_non_content_metas_alone ... ok
+test ignores_noscript_metas ... ok
+test no_override_charset_when_both_xhtml ... ok
+test no_override_with_bogus_xhtml_known ... ok
+test no_override_with_bogus_xhtml_unknown ... ok
+test no_override_with_real_xhtml_known ... ok
+test no_override_with_real_xhtml_unknown ... ok
+test rejects_invalid_attribute ... ok
+test unquoted_content_with_charset_attr ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/output_resource.rs (target/debug/build/ps-html/bff39fcd2eefcf70/out/output_resource-bff39fcd2eefcf70)
+
+running 7 tests
+test set_type_syncs_extension ... ok
+test placeholder_url_without_hash ... ok
+test leaf_naming_and_url ... ok
+test unsigned_signatures_pass_empty ... ok
+test write_hashes_contents ... ok
+test cache_key_remaps_domains ... ok
+test signed_urls_embed_deterministic_signatures ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/overload_matrix.rs (target/debug/build/ps-html/951fa5706a1ec4fc/out/overload_matrix-951fa5706a1ec4fc)
+
+running 4 tests
+test beacon_overload_is_missing_not_corrupt ... ok
+test http_cache_overload_is_not_found ... ok
+test html_cache_overload_is_miss_not_bypass ... ok
+test partition_overload_rewrites_from_miss ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/preload_critical_fonts.rs (target/debug/build/ps-html/61f6f9f69b0d5f88/out/preload_critical_fonts-61f6f9f69b0d5f88)
+
+running 19 tests
+test chain_plans_slot_when_enabled ... ok
+test beacon_confirmation_lifts_pruning ... ok
+test beacon_js_withheld_once_confirmed ... ok
+test beacon_js_wrapped_inside_script_element ... ok
+test driver_run_emits_through_chain ... ok
+test beacon_js_injected_while_unconfirmed ... ok
+test decision_hit_stays_quiet_once_learned ... ok
+test decision_hit_keeps_beacon_while_learnable ... ok
+test caps_two_preloads_and_prunes ... ok
+test external_stylesheet_loads_and_caches ... ok
+test inline_face_emits_preload_first_in_head ... ok
+test failed_sheet_decision_revalidates_past_failure_ttl ... ok
+test twentytwentyfive_code_block_lifts_fira_code ... ok
+test twentytwentyfive_preloads_manrope_excludes_fira_code ... ok
+test nested_imports_resolve ... ok
+test debug_comment_explains_selection_and_rejection ... ok
+test pending_sheet_skips_store_and_retries_next_visit ... ok
+test skips_unsafe_and_duplicate_markup ... ok
+test selector_evidence_preserves_case_entities_and_document_isolation ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+     Running tests/prioritize_lcp_images.rs (target/debug/build/ps-html/cd773c6dd65bedc4/out/prioritize_lcp_images-cd773c6dd65bedc4)
+
+running 26 tests
+test author_preload_suppresses_duplicate_hint ... ok
+test explicit_high_priority_is_never_lazy ... ok
+test article_logo_image_not_confused ... ok
+test bare_itemprop_without_context_stays_candidate ... ok
+test element_hero_class_still_vetoes_despite_header ... ok
+test custom_header_svg_logo_skipped ... ok
+test background_lcp_author_preload_wins ... ok
+test background_lcp_yields_to_image_hero ... ok
+test fallback_does_not_double_spend_learned_budget ... ok
+test background_lcp_preloads_head_hint ... ok
+test fallback_hero_skips_logo_candidate ... ok
+test heuristic_hero_preloads_and_rest_lazy ... ok
+test hero_mentioning_logo_still_prioritized ... ok
+test hidden_trackers_and_data_urls_skip ... ok
+test logo_inside_banner_region_still_skipped ... ok
+test filename_only_logo_stays_candidate ... ok
+test learned_evidence_overrides_position ... ok
+test background_lcp_format_mismatch_skips ... ok
+test wordpress_custom_logo_skipped_hero_passes_to_content ... ok
+test logo_with_author_priority_left_byte_identical ... ok
+test logo_inside_picture_skipped ... ok
+test schema_org_itemprop_logo_skipped ... ok
+test stale_evidence_naming_absent_image_falls_back ... ok
+test wordpress_block_logo_skipped ... ok
+test text_lcp_evidence_falls_back_to_visual_hero ... ok
+test measured_lcp_logo_still_prioritized ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
+
+     Running tests/redirect_on_size_limit.rs (target/debug/build/ps-html/92ee9d76f331e500/out/redirect_on_size_limit-92ee9d76f331e500)
+
+running 4 tests
+test no_redirect_when_csp_forbids_inline ... ok
+test escaping_and_flush ... ok
+test one_flush_window ... ok
+test flush_before_limit ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/resource_slot.rs (target/debug/build/ps-html/b5a8e1a2b3ceefe9/out/resource_slot-b5a8e1a2b3ceefe9)
+
+running 6 tests
+test context_tracking_rules ... ok
+test detach_middle_context_panics - should panic ... ok
+test accessors ... ok
+test render_delete ... ok
+test comparator ... ok
+test render_update ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/resource_tag_scanner.rs (target/debug/build/ps-html/1ae8db57ad0b4346/out/resource_tag_scanner-1ae8db57ad0b4346)
+
+running 4 tests
+test url_valued_attribute_override ... ok
+test url_valued_attribute ... ok
+test many_attributes_limit ... ok
+test translated_scanner_cases ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/rewrite_single_resource.rs (target/debug/build/ps-html/24ba07140a0029d8/out/rewrite_single_resource-24ba07140a0029d8)
+
+running 40 tests
+test contexts_chain_through_shared_slots ... ok
+test custom::cache_busy ... ok
+test custom::cache_404 ... ok
+test custom::cache_bad ... ok
+test custom::fetch_bad_status ... ok
+test custom::fetch_invalid_resource_name ... ok
+test custom::basic_async ... ok
+test aggregate_input_infos_collect_when_flagged ... ok
+test aggregate_input_infos_stay_empty_without_flag ... ok
+test custom::fetch_404 ... ok
+test custom::cache_expire_with_reuse_enabled ... ok
+test custom::fetch_good_cache1 ... ok
+test custom::basic_operation ... ok
+test custom::fetch_good ... ok
+test custom::fetch_rewrite_failed ... ok
+test custom::cache_expire ... ok
+test custom::invalid_url ... ok
+test custom::fetch_first_versioned ... ok
+test custom::fetch_good_cache2 ... ok
+test plain::cache_busy ... ok
+test plain::cache_404 ... ok
+test plain::cache_bad ... ok
+test plain::fetch_404 ... ok
+test plain::basic_operation ... ok
+test plain::basic_async ... ok
+test plain::cache_expire_with_reuse_enabled ... ok
+test plain::cache_expire ... ok
+test custom::version_change_bad ... ok
+test plain::fetch_bad_status ... ok
+test plain::fetch_first_versioned ... ok
+test plain::fetch_invalid_resource_name ... ok
+test plain::invalid_url ... ok
+test custom::version_change ... ok
+test plain::fetch_good_cache1 ... ok
+test plain::fetch_good ... ok
+test sequential_contexts_share_one_rewrite ... ok
+test plain::fetch_rewrite_failed ... ok
+test plain::fetch_good_cache2 ... ok
+test plain::version_change_bad ... ok
+test plain::version_change ... ok
+
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+
+     Running tests/rewritten_content_scanning.rs (target/debug/build/ps-html/ec7aa31847b1436a/out/rewritten_content_scanning-ec7aa31847b1436a)
+
+running 2 tests
+test no_rewritten_resource ... ok
+test count_rewritten_resource ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/script_scanner.rs (target/debug/build/ps-html/9597244bca207903/out/script_scanner-9597244bca207903)
+
+running 18 tests
+test find_script_tag ... ok
+test language_empty_is_js ... ok
+test async_defer_flags ... ok
+test for_event_flags ... ok
+test language_no_value_is_js ... ok
+test not_found_script_tag ... ok
+test language_keeps_whitespace_significant ... ok
+test modern_script_types_unknown ... ok
+test language_matrix ... ok
+test script_types_normalize_case_and_whitespace ... ok
+test language_normalizes_case ... ok
+test script_type_matrix ... ok
+test type_beats_language ... ok
+test type_no_value_is_js ... ok
+test undecodable_language_is_unknown ... ok
+test undecodable_type_is_unknown ... ok
+test type_empty_is_js ... ok
+test type_no_value_falls_back_to_language ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/strip_subresource_hints.rs (target/debug/build/ps-html/838dfdc06dac1389/out/strip_subresource_hints-838dfdc06dac1389)
+
+running 16 tests
+test core_filters_level_strips ... ok
+test images_preserved ... ok
+test dont_strip_unknown_types ... ok
+test multi_resource_mixed_links ... ok
+test passthrough_level_freezes_urls ... ok
+test single_resource_disallow ... ok
+test multi_subresource_preserve_images ... ok
+test multi_subresource_preserve_all ... ok
+test scripts_preserved ... ok
+test single_resource_external_link ... ok
+test single_resource_no_link ... ok
+test single_resource_rewrite_domain ... ok
+test single_resource_src_link ... ok
+test single_resource_valid_preload_link ... ok
+test single_resource_valid_link ... ok
+test styles_preserved ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/url_input_resource.rs (target/debug/build/ps-html/7823328c84c6fd47/out/url_input_resource-7823328c84c6fd47)
+
+running 22 tests
+test int_port ... ok
+test background_fetch_referer_domain ... ok
+test non_background_fetch_with_referer_missing ... ok
+test background_fetch_referer_same_domain ... ok
+test own_background_fetch_without_valid_base_sends_no_referer ... ok
+test own_background_fetch_sends_origin_only_referer ... ok
+test no_unauthorized_domain_http_with_wrong_port ... ok
+test no_unauthorized_domain_https_with_http_port ... ok
+test no_unauthorized_domain_https_with_wrong_port ... ok
+test extract_gzipped_resource ... ok
+test no_unauthorized_domain_http_with_https_port ... ok
+test own_fetch_does_not_forward_visitor_referer ... ok
+test own_fetch_referer_omits_userinfo_of_base_url ... ok
+test own_fetch_without_valid_base_sends_no_referer ... ok
+test unauthorized_domain_http ... ok
+test unauthorized_domain_relative_url - should panic ... ok
+test unauthorized_domain_http_with_correct_port ... ok
+test unauthorized_domain_https ... ok
+test unauthorized_domain_wrong_protocol - should panic ... ok
+test unauthorized_domain_https_with_correct_port ... ok
+test oversized_gzipped_resource_not_inflated ... ok
+test first_reads_inflate_once_with_describing_headers ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.53s
+
+     Running tests/url_left_trim.rs (target/debug/build/ps-html/ce19fdaec4635f06/out/url_left_trim-ce19fdaec4635f06)
+
+running 23 tests
+test directories ... ok
+test double_slash_path ... ok
+test dots ... ok
+test one_dot ... ok
+test blank_base ... ok
+test partial_url ... ok
+test publishes_trim_counters ... ok
+test no_changes ... ok
+test annoying_wiki ... ok
+test midway_base_url ... ok
+test query ... ok
+test double_slash_beginning_path ... ok
+test query_with_encoded_ampersand ... ok
+test relative_base ... ok
+test rooted_trims ... ok
+test trim_query ... ok
+test simple_trims ... ok
+test triple_slash_path ... ok
+test xkcd ... ok
+test some_changes ... ok
+test undecodable_base_poison_gate ... ok
+test two_bases ... ok
+test anchors ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ps_html
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

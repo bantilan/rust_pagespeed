@@ -198,6 +198,24 @@ verified zero origin calls across 20 analytics HITs; median latency changed from
 26.77 ms to 0.69 ms with a synthetic 25 ms origin delay. These are isolated local
 measurements, not a live-site speedup claim.
 
+`prioritize_critical_css` can be used with HTML caching:
+
+```nginx
+pagespeed EnableFilters prioritize_lcp_images,prioritize_critical_css,defer_javascript;
+```
+
+Completed critical CSS output retains its full stylesheet fallback and is eligible
+for ordinary and early HTML cache HITs. The effective selector set participates
+in cache identity; a change during rendering prevents publication under the old
+set. Sampled collector responses, private requests and incomplete resource rewrites
+remain uncached. Unsupported critical-CSS clients cannot reuse transformed output.
+
+Automatic critical-selector collection is not connected in the current production
+integration. Without selector evidence, the filter preserves the complete CSS;
+that valid output can still be cached. Enabling the directive alone does not
+provide automatic above-the-fold CSS learning. See the
+[critical CSS cache verification](docs/performance/critical-css-html-cache-20261127/RESULTS.md).
+
 Font learning remembers the last queued nonce per page/options in the tab's
 session storage, avoiding repeated POSTs when cached HTML replays that nonce.
 Fresh nonces still report; blocked storage falls back to same-document deduplication.
