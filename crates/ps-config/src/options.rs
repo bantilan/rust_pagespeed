@@ -2095,9 +2095,8 @@ impl RewriteOptions {
     ///
     /// Requests carrying only allowlisted cookies cache exactly
     /// like cookie-free requests. The built-in list covers
-    /// first-party analytics names (Google Analytics legacy and
-    /// GA4, Google Ads, Meta Pixel, Microsoft Clarity, Hotjar)
-    /// whose values never change server-generated HTML.
+    /// predefined analytics, public bookkeeping and affinity names under
+    /// their intended usage; site exclusions handle personalization.
     #[must_use]
     pub fn html_cache_ignore_common_cookies(&self) -> bool {
         match self.get_by_name("HtmlCacheIgnoreCommonCookies") {
@@ -2114,7 +2113,7 @@ impl RewriteOptions {
     }
 
     /// Custom ignored cookie patterns (`HtmlCacheIgnoreCookie`,
-    /// repeatable): exact names or `prefix*` wildcards extending
+    /// repeatable): exact, `*` wildcard or numeric-suffix patterns extending
     /// the built-in allowlist. Only list cookies that cannot
     /// influence server-generated HTML.
     #[must_use]
@@ -2123,7 +2122,7 @@ impl RewriteOptions {
     }
 
     /// Forced-bypass cookie patterns (`HtmlCacheBypassCookie`,
-    /// repeatable): exact names or `prefix*` wildcards that bypass
+    /// repeatable): exact, `*` wildcard or numeric-suffix patterns that bypass
     /// the HTML cache even when allowlisted.
     #[must_use]
     pub fn html_cache_bypass_cookies(&self) -> &CookiePatternSet {
@@ -2280,6 +2279,7 @@ impl RewriteOptions {
             "ttlwild={}",
             self.override_caching_wildcard.signature()
         ));
+        parts.push(format!("cookiepolicy={}", crate::cookies::COOKIE_POLICY_VERSION));
         parts.push(format!(
             "cookieignore={}",
             self.html_cache_ignore_cookies.signature()

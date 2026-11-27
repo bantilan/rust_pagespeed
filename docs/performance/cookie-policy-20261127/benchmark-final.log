@@ -1,0 +1,30 @@
+before 1 fixture,ns_per_request,allocations_per_request,allowed
+analytics,245.436,1.000,true
+expanded,555.625,3.000,false
+protected,158.372,2.000,false
+
+after 1 fixture,ns_per_request,allocations_per_request,allowed
+analytics,401.840,0.000,true
+expanded,999.290,0.000,true
+protected,213.980,1.000,false
+
+after 2 fixture,ns_per_request,allocations_per_request,allowed
+analytics,399.223,0.000,true
+expanded,1003.303,0.000,true
+protected,217.243,1.000,false
+
+before 2 fixture,ns_per_request,allocations_per_request,allowed
+analytics,241.812,1.000,true
+expanded,548.477,3.000,false
+protected,158.605,2.000,false
+
+before 3 fixture,ns_per_request,allocations_per_request,allowed
+analytics,243.434,1.000,true
+expanded,551.927,3.000,false
+protected,159.673,2.000,false
+
+after 3 fixture,ns_per_request,allocations_per_request,allowed
+analytics,403.720,0.000,true
+expanded,1004.051,0.000,true
+protected,216.374,1.000,false
+

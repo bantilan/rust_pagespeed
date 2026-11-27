@@ -207,6 +207,40 @@ accepted. Font learning and replay checks are covered by the linked verification
 record. Deployment availability depends on the installed module version; the
 latest local fixes are not evidence that a production server has been updated.
 
+### Default public HTML-cache cookie policy
+
+With `pagespeed HtmlCache on;`, the supplied common-cookie allowlist is active
+without additional cookie directives. It applies to every website, independently
+of its CMS: analytics, advertising, monitoring, load-balancer affinity, WordPress
+test/numeric settings cookies and `mage-cache-sessid` are treated as
+non-personalizing under their normal usage. Allowed values never enter the HTML
+cache key, and request cookies are still forwarded unchanged to the origin.
+
+Unknown cookies bypass. Recognized authentication, login/session, cart and CSRF
+cookies take precedence over both built-in and custom allowances. Existing
+private-response, authorization, Vary, expiry and beacon checks still apply.
+If your application uses an otherwise allowed name to personalize HTML, exclude it:
+
+```nginx
+pagespeed HtmlCacheBypassCookie "_ga";
+pagespeed HtmlCacheBypassCookie "wp-settings-[0-9]+";
+```
+
+Drupal `has_js`, Magento private-content bookkeeping, Cloudflare and consent
+cookies are **opt-in**, using the existing `HtmlCacheIgnoreCookie` directive.
+For example, only when the relevant cookie does not change your public HTML:
+
+```nginx
+pagespeed HtmlCacheIgnoreCookie "has_js";
+pagespeed HtmlCacheIgnoreCookie "cmplz_*";
+```
+
+Both directives support exact names, `*` wildcards (including `mp_*_mixpanel`),
+and a literal prefix followed by numeric suffix `[0-9]+`. Matchers compile during
+configuration; names are case sensitive. `HtmlCacheIgnoreCommonCookies off`
+disables defaults while retaining explicit additions and protected-cookie checks.
+See [the full default and optional lists](docs/HTML_CACHE_COOKIES.md).
+
 ## Features vs C++ PageSpeed
 
 Legend: ✅ implemented · 🔶 partial · ❌ unavailable · — Rust extension without

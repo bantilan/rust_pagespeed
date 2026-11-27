@@ -12,8 +12,8 @@
 //!
 //! Security contract: an allowlisted cookie MUST NOT influence
 //! server-generated HTML. The built-in list covers first-party
-//! analytics/tracking names only (values are consumed client-side by
-//! third-party scripts). Administrators extending the list with
+//! public bookkeeping, analytics/tracking and load-balancer names under
+//! their intended usage. Administrators extending the list with
 //! `HtmlCacheIgnoreCookie` take responsibility for that invariant;
 //! when in doubt, leave the cookie bypassing (the default) or force
 //! it with `HtmlCacheBypassCookie`. Cookie values are never read
@@ -21,8 +21,8 @@
 //! cookie names appear in bypass reasons.
 //!
 //! Matching is allocation-free on the accept path: the built-in list
-//! is a `match` plus prefix checks, and custom patterns compile at
-//! config time into exact-name sets plus prefix lists (no regular
+//! uses static exact/prefix/suffix matchers, and custom patterns compile at
+//! config time into exact, wildcard and numeric-suffix tables (no regular
 //! expressions anywhere near the request path).
 #![forbid(unsafe_code)]
 
@@ -34,25 +34,122 @@ pub const MAX_COOKIES_PER_REQUEST: usize = 256;
 /// Maximum cookie-name characters kept in a bypass reason.
 pub const MAX_REASON_NAME_LEN: usize = 128;
 
-/* Built-in allowlist (first-party analytics/tracking names). */
+/* Built-in policy: static matchers, no request-time compilation. */
 
-/// Built-in ignored cookie names (exact, case-sensitive).
-pub const BUILTIN_IGNORE_EXACT: &[&str] = &[
-    // Legacy Google Analytics (ga.js / urchin.js).
-    "__utma", "__utmb", "__utmc", "__utmt", "__utmv", "__utmx", "__utmxx", "__utmz",
-    // Universal Analytics (analytics.js) and GA4 (gtag.js) base names.
-    "_ga", "_gat", "_gid",
-    // Google Ads first-party (`__gpi` gates ad personalization
-    // client-side; it never changes server HTML).
-    "__gads", "__gac", "__gpi", "_fplc", "_FPAU", "_FPGS", "_FPGCLAW", "_FPGCLDC",
-    "_FPGCLGB",
-    // Meta Pixel first-party.
-    "_fbp", "_fbc",
-    // Microsoft Clarity first-party.
-    "_clck", "_clsk",
-    // Hotjar fixed names (modern `_hj*` plus legacy `hj*`).
+/// Policy generation participates in effective options signatures.
+pub const COOKIE_POLICY_VERSION: &str = "public-cookies-v2";
+
+macro_rules! exact_cookies {
+    ($($name:literal),* $(,)?) => {
+        /// Default exact names, including retained legacy analytics entries.
+        pub const BUILTIN_IGNORE_EXACT: &[&str] = &[$($name),*];
+        fn builtin_exact(name: &str) -> bool { matches!(name, $($name)|*) }
+    };
+}
+exact_cookies! {
+    "wordpress_test_cookie",
+    "mage-cache-sessid",
+    "_ga",
+    "_gid",
+    "_gat",
+    "__utma",
+    "__utmb",
+    "__utmc",
+    "__utmt",
+    "__utmz",
+    "__utmv",
+    "_gcl_au",
+    "_gcl_aw",
+    "_gcl_dc",
+    "_gcl_gb",
+    "_gcl_gs",
+    "_gaexp",
+    "_opt_awcid",
+    "_opt_awmid",
+    "_opt_awgid",
+    "_opt_awkid",
+    "_opt_utmc",
+    "_fbp",
+    "_fbc",
+    "_clck",
+    "_clsk",
+    "_uetsid",
+    "_uetvid",
+    "_uetmsclkid",
+    "_MicrosoftApplicationInsightsSession",
+    "ai_user",
+    "ai_session",
     "_hjFirstSeen",
     "_hjAbsoluteSessionInProgress",
+    "_hjIncludedInPageviewSample",
+    "_hjDonePolls",
+    "_hjMinimizedPolls",
+    "_hjShownFeedbackMessage",
+    "_hjRecordingEnabled",
+    "_hjRecordingLastActivity",
+    "__hstc",
+    "__hssc",
+    "__hssrc",
+    "hubspotutk",
+    "_ttp",
+    "_tt_enable_cookie",
+    "_tt_sessionId",
+    "_tt_pixel_session_index",
+    "s_cc",
+    "s_sq",
+    "s_vi",
+    "s_fid",
+    "ajs_anonymous_id",
+    "amplitude_id",
+    "plausible_ignore",
+    "__qca",
+    "_scid",
+    "_scid_r",
+    "_pin_unauth",
+    "_pinterest_ct_ua",
+    "_rdt_uuid",
+    "_twclid",
+    "AnalyticsSyncHistory",
+    "li_fat_id",
+    "li_sugr",
+    "_ym_uid",
+    "_ym_d",
+    "_ym_isad",
+    "_ym_visorc",
+    "_ce.s",
+    "_ce.clock_data",
+    "_ce.clock_event",
+    "_ce.irv",
+    "fs_uid",
+    "fs_lua",
+    "mf_user",
+    "_lo_uid",
+    "_lo_v",
+    "__lotl",
+    "is_unique",
+    "sc_is_visitor_unique",
+    "__atuvc",
+    "__atuvs",
+    "NREUM",
+    "NRBA_SESSION",
+    "RT",
+    "AWSALB",
+    "AWSALBCORS",
+    "AWSALBTG",
+    "AWSALBTGCORS",
+    "ARRAffinity",
+    "ARRAffinitySameSite",
+    "__utmx",
+    "__utmxx",
+    "__gads",
+    "__gac",
+    "__gpi",
+    "_fplc",
+    "_FPAU",
+    "_FPGS",
+    "_FPGCLAW",
+    "_FPGCLDC",
+    "_FPGCLGB",
     "_hjCachedUserAttributes",
     "_hjViewportId",
     "_hjTLDTest",
@@ -62,92 +159,135 @@ pub const BUILTIN_IGNORE_EXACT: &[&str] = &[
     "hjDoneTestUsers",
     "hjIncludedInSample",
     "hjShownFeedbackMessage",
-];
+}
 
-/// Built-in ignored cookie-name prefixes (matched without the `*`).
+/// Narrow vendor prefixes (without the trailing wildcard).
 pub const BUILTIN_IGNORE_PREFIXES: &[&str] = &[
-    // GA4 container cookies (`_ga_<container-id>`).
     "_ga_",
-    // Universal Analytics per-tracker gate (`_gat_gtag_<id>`).
     "_gat_",
-    // Google Ads campaign (`_gac_<property>`, `_gac_gb_<id>`).
     "_gac_",
-    // Google Ads click IDs (`_gcl_aw/dc/gb/gs/au`).
-    "_gcl_",
-    // Hotjar session/sample/survey/poll state (`_hjSession_<id>`,
-    // `_hjSessionUser_<id>`, `_hjIncludedInSessionSample_<id>`, …).
-    "_hjSession",
-    "_hjIncludedIn",
-    "_hjClosed",
-    "_hjDone",
-    "_hjMinimized",
-    "_hjShown",
+    "_hjSession_",
+    "_hjSessionUser_",
+    "_hjIncludedInSessionSample_",
+    "_pk_id.",
+    "_pk_ses.",
+    "_pk_ref.",
+    "_pk_cvar.",
+    "_pk_testcookie.",
+    "_pk_hsr.",
+    "AMCV_",
+    "AMCVS_",
+    "amplitude_id_",
+    "AMP_",
+    "AMP_MKTG_",
+    "mf_",
 ];
 
-/// Whether the built-in allowlist ignores a cookie name
-/// (case-sensitive: cookie names are case-sensitive per RFC 6265,
-/// so `_GA` is a different cookie from `_ga` and still bypasses).
+/// Numeric WordPress settings suffixes: one or more ASCII digits only.
+pub const BUILTIN_IGNORE_NUMERIC: &[&str] = &["wp-settings-", "wp-settings-time-"];
+/// Vendor cookies anchored at both ends, rather than broad vendor prefixes.
+pub const BUILTIN_IGNORE_INFIX: &[(&str, &str)] = &[("mp_", "_mixpanel"), ("ph_", "_posthog")];
+
+fn numeric_suffix(name: &str, prefix: &str) -> bool {
+    name.strip_prefix(prefix)
+        .is_some_and(|tail| !tail.is_empty() && tail.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// Default name matching is case sensitive and does not inspect values.
 #[must_use]
 pub fn builtin_ignored(name: &str) -> bool {
-    if BUILTIN_IGNORE_PREFIXES
+    builtin_exact(name)
+        || BUILTIN_IGNORE_PREFIXES
+            .iter()
+            .any(|prefix| name.starts_with(prefix))
+        || BUILTIN_IGNORE_NUMERIC
+            .iter()
+            .any(|prefix| numeric_suffix(name, prefix))
+        || BUILTIN_IGNORE_INFIX.iter().any(|(prefix, suffix)| {
+            name.len() >= prefix.len() + suffix.len()
+                && name.starts_with(prefix)
+                && name.ends_with(suffix)
+        })
+}
+
+/// Default patterns for administration; never called on the request path.
+#[must_use]
+pub fn builtin_ignore_patterns() -> Vec<String> {
+    BUILTIN_IGNORE_EXACT
         .iter()
-        .any(|prefix| name.starts_with(prefix))
+        .map(|s| (*s).to_owned())
+        .chain(BUILTIN_IGNORE_PREFIXES.iter().map(|s| format!("{s}*")))
+        .chain(BUILTIN_IGNORE_NUMERIC.iter().map(|s| format!("{s}[0-9]+")))
+        .chain(BUILTIN_IGNORE_INFIX.iter().map(|(a, b)| format!("{a}*{b}")))
+        .collect()
+}
+
+/// Known personalized families always win, even against a custom `*` allow.
+/// Explicit analytics session/bookkeeping names retain their intended meaning.
+#[must_use]
+pub fn protected_cookie(name: &str) -> bool {
+    // These exact, predefined analytics/bookkeeping names include intended
+    // session identifiers (ai_session, NRBA_SESSION, etc.), not login sessions.
+    if builtin_exact(name) {
+        return false;
+    }
+    if [
+        "sid",
+        "connect.sid",
+        "frontend",
+        "frontend_cid",
+        "persistent_shopping_cart",
+    ]
+    .iter()
+    .any(|p| name.eq_ignore_ascii_case(p))
     {
         return true;
     }
-    matches!(
-        name,
-        "__utma"
-            | "__utmb"
-            | "__utmc"
-            | "__utmt"
-            | "__utmv"
-            | "__utmx"
-            | "__utmxx"
-            | "__utmz"
-            | "_ga"
-            | "_gat"
-            | "_gid"
-            | "__gads"
-            | "__gac"
-            | "__gpi"
-            | "_fplc"
-            | "_FPAU"
-            | "_FPGS"
-            | "_FPGCLAW"
-            | "_FPGCLDC"
-            | "_FPGCLGB"
-            | "_fbp"
-            | "_fbc"
-            | "_clck"
-            | "_clsk"
-            | "_hjFirstSeen"
-            | "_hjAbsoluteSessionInProgress"
-            | "_hjCachedUserAttributes"
-            | "_hjViewportId"
-            | "_hjTLDTest"
-            | "hjClosedSurveyInvites"
-            | "hjDonePolls"
-            | "hjMinimizedPolls"
-            | "hjDoneTestUsers"
-            | "hjIncludedInSample"
-            | "hjShownFeedbackMessage"
-    )
-}
-
-/// Built-in allowlist as display patterns (prefixes with `*`).
-#[must_use]
-pub fn builtin_ignore_patterns() -> Vec<String> {
-    let mut patterns: Vec<String> = BUILTIN_IGNORE_EXACT
+    let starts = |prefix: &str| {
+        name.get(..prefix.len())
+            .is_some_and(|s| s.eq_ignore_ascii_case(prefix))
+    };
+    if [
+        "wordpress_",
+        "wp-postpass_",
+        "wp_woocommerce_session_",
+        "SESS",
+        "SSESS",
+        "session",
+        "auth_",
+        "csrf",
+        "xsrf",
+        ".AspNet.",
+        ".AspNetCore.",
+    ]
+    .iter()
+    .any(|p| starts(p))
+    {
+        return true;
+    }
+    name.split(['_', '-', '.']).any(|part| {
+        [
+            "auth",
+            "authentication",
+            "authorization",
+            "session",
+            "sessionid",
+            "sessid",
+            "phpsessid",
+            "jsessionid",
+            "csrf",
+            "csrftoken",
+            "xsrf",
+            "token",
+            "cart",
+            "basket",
+            "loggedin",
+            "login",
+            "remember",
+        ]
         .iter()
-        .map(|name| (*name).to_string())
-        .collect();
-    patterns.extend(
-        BUILTIN_IGNORE_PREFIXES
-            .iter()
-            .map(|prefix| format!("{prefix}*")),
-    );
-    patterns
+        .any(|p| part.eq_ignore_ascii_case(p))
+    })
 }
 
 /* Custom pattern sets (`HtmlCacheIgnoreCookie` / `HtmlCacheBypassCookie`). */
@@ -159,7 +299,7 @@ pub enum CookiePatternError {
     Empty,
     /// Forbidden character (`;`, `=`, `,`, whitespace, control).
     BadChar(char),
-    /// `*` anywhere but the final position.
+    /// Numeric syntax must be a literal prefix followed by `[0-9]+`.
     MisplacedWildcard,
 }
 
@@ -173,24 +313,26 @@ impl CookiePatternError {
                 format!("cookie pattern must not contain {char:?}")
             }
             CookiePatternError::MisplacedWildcard => {
-                "wildcard '*' is only allowed as the final character".to_string()
+                "numeric cookie pattern must be a literal prefix followed by [0-9]+".to_string()
             }
         }
     }
 }
 
-/// Compiled cookie-name patterns: exact names plus `prefix*`
+/// Compiled cookie-name patterns: exact names, wildcard and numeric suffix
 /// matchers. Matching borrows the candidate (no allocation);
 /// compilation happens once per config change, never per request.
 ///
-/// Patterns are case-sensitive exact names, a trailing `*` making
-/// the rest a prefix (`_pk_*` ignores `_pk_id.1.x`). A lone `*`
+/// Patterns are case-sensitive; `*` matches arbitrary bytes, `[0-9]+`
+/// matches a numeric suffix after a literal prefix. A lone `*`
 /// matches every cookie. Only allow cookies that cannot influence
 /// server-generated HTML.
 #[derive(Debug, Clone, Default)]
 pub struct CookiePatternSet {
     exact: BTreeSet<String>,
     prefixes: Vec<String>,
+    numeric: Vec<String>,
+    globs: Vec<Vec<String>>,
     raw: Vec<String>,
 }
 
@@ -201,35 +343,41 @@ impl CookiePatternSet {
         CookiePatternSet::default()
     }
 
-    /// Adds a pattern, compiling it into the exact or prefix table
+    /// Adds a pattern, compiling it into the appropriate matcher table
     /// (duplicates ignored). Fails without mutating on invalid
     /// patterns.
     pub fn add(&mut self, pattern: &str) -> Result<(), CookiePatternError> {
         if pattern.is_empty() {
             return Err(CookiePatternError::Empty);
         }
-        if let Some(char) = pattern
-            .chars()
-            .find(|char| *char == ';' || *char == '=' || *char == ',' || char.is_whitespace() || char.is_control())
-        {
+        if let Some(char) = pattern.chars().find(|char| {
+            *char == ';'
+                || *char == '='
+                || *char == ','
+                || char.is_whitespace()
+                || char.is_control()
+        }) {
             return Err(CookiePatternError::BadChar(char));
         }
-        let (body, is_prefix) = match pattern.strip_suffix('*') {
-            Some(body) => (body, true),
-            None => (pattern, false),
-        };
-        if body.contains('*') {
-            return Err(CookiePatternError::MisplacedWildcard);
-        }
-        if body.is_empty() && !is_prefix {
-            return Err(CookiePatternError::Empty);
-        }
-        if is_prefix {
-            if !self.prefixes.iter().any(|prefix| prefix == body) {
-                self.prefixes.push(body.to_string());
+        if pattern.contains("[0-9]+") {
+            let prefix = pattern
+                .strip_suffix("[0-9]+")
+                .filter(|s| !s.is_empty() && !s.contains(['*', '[', ']']))
+                .ok_or(CookiePatternError::MisplacedWildcard)?;
+            if !self.numeric.iter().any(|p| p == prefix) {
+                self.numeric.push(prefix.to_owned());
             }
-        } else if !self.exact.contains(body) {
-            self.exact.insert(body.to_string());
+        } else if pattern.contains('*') {
+            if let Some(prefix) = pattern.strip_suffix('*').filter(|s| !s.contains('*')) {
+                if !self.prefixes.iter().any(|p| p == prefix) {
+                    self.prefixes.push(prefix.to_owned());
+                }
+            } else if !self.raw.iter().any(|p| p == pattern) {
+                self.globs
+                    .push(pattern.split('*').map(str::to_owned).collect());
+            }
+        } else {
+            self.exact.insert(pattern.to_owned());
         }
         if !self.raw.iter().any(|raw| raw == pattern) {
             self.raw.push(pattern.to_string());
@@ -245,6 +393,22 @@ impl CookiePatternSet {
             return true;
         }
         self.prefixes.iter().any(|prefix| name.starts_with(prefix))
+            || self
+                .numeric
+                .iter()
+                .any(|prefix| numeric_suffix(name, prefix))
+            || self.globs.iter().any(|parts| {
+                let Some(mut rest) = name.strip_prefix(parts[0].as_str()) else {
+                    return false;
+                };
+                for part in &parts[1..parts.len() - 1] {
+                    let Some(index) = rest.find(part.as_str()) else {
+                        return false;
+                    };
+                    rest = &rest[index + part.len()..];
+                }
+                rest.ends_with(parts.last().unwrap().as_str())
+            })
     }
 
     /// Whether the set holds no patterns.
@@ -286,6 +450,14 @@ impl CookiePatternSet {
         for prefix in &self.prefixes {
             out.push_str(prefix);
             out.push_str("*,");
+        }
+        for prefix in &self.numeric {
+            out.push_str(prefix);
+            out.push_str("[0-9]+,");
+        }
+        for parts in &self.globs {
+            out.push_str(&parts.join("*"));
+            out.push(',');
         }
         out
     }
@@ -355,72 +527,77 @@ impl CookieDecision {
 /// `Authorization`, request `Vary`, and every other header are the
 /// caller's business (unchanged strict gates).
 #[must_use]
-pub fn evaluate_cookie_headers(
-    headers: &[(&str, &str)],
-    policy: &CookiePolicy,
-) -> CookieDecision {
-    let mut names: Vec<&str> = Vec::new();
+pub fn evaluate_cookie_headers(headers: &[(&str, &str)], policy: &CookiePolicy) -> CookieDecision {
+    let mut count = 0;
     let mut saw_cookie_header = false;
-    for (name, value) in headers {
-        if name.eq_ignore_ascii_case("Cookie2") {
+    let mut offending = None;
+    for (header_name, value) in headers {
+        if header_name.eq_ignore_ascii_case("Cookie2") {
             return CookieDecision::Bypass(CookieBypass::Cookie2);
         }
-        if !name.eq_ignore_ascii_case("Cookie") {
+        if !header_name.eq_ignore_ascii_case("Cookie") {
             continue;
         }
         saw_cookie_header = true;
-        if parse_cookie_names(value, &mut names).is_err() {
+        if scan_cookie_names(value, |name| {
+            count += 1;
+            if count > MAX_COOKIES_PER_REQUEST {
+                return Err(());
+            }
+            if offending.is_none()
+                && (protected_cookie(name)
+                    || policy.bypass.matches(name)
+                    || !((policy.common_enabled && builtin_ignored(name))
+                        || policy.ignore.matches(name)))
+            {
+                offending = Some(name);
+            }
+            Ok(())
+        })
+        .is_err()
+        {
             return CookieDecision::Bypass(CookieBypass::Malformed);
         }
     }
     if !saw_cookie_header {
         return CookieDecision::Absent;
     }
-    if names.len() > MAX_COOKIES_PER_REQUEST {
-        return CookieDecision::Bypass(CookieBypass::Malformed);
+    if let Some(name) = offending {
+        return CookieDecision::Bypass(CookieBypass::Cookie(truncate_name(name)));
     }
-    for name in &names {
-        // Explicit bypass wins over both allowlists.
-        if policy.bypass.matches(name) {
-            return CookieDecision::Bypass(CookieBypass::Cookie(truncate_name(name)));
-        }
-        let allowlisted =
-            (policy.common_enabled && builtin_ignored(name)) || policy.ignore.matches(name);
-        if !allowlisted {
-            return CookieDecision::Bypass(CookieBypass::Cookie(truncate_name(name)));
-        }
-    }
-    CookieDecision::Allowlisted { count: names.len() }
+    CookieDecision::Allowlisted { count }
 }
 
-/// Parses one `Cookie` header value into names (RFC 6265
-/// `cookie-pair *( ";" SP cookie-pair )`): splits on `;` outside
-/// double quotes, drops empties, and requires `name=value` with a
-/// non-empty name. Values are skipped, never retained.
-fn parse_cookie_names<'a>(value: &'a str, names: &mut Vec<&'a str>) -> Result<(), ()> {
+/// Scan borrowed names without retaining or allocating cookie values/names.
+/// Validate the complete header even after a disallowed name is found.
+fn scan_cookie_names<'a>(
+    value: &'a str,
+    mut visit: impl FnMut(&'a str) -> Result<(), ()>,
+) -> Result<(), ()> {
     let bytes = value.as_bytes();
     let mut start = 0;
     let mut in_quotes = false;
-    let mut index = 0;
-    while index <= bytes.len() {
-        let boundary = index == bytes.len()
-            || (!in_quotes && bytes[index] == b';');
+    for index in 0..=bytes.len() {
+        let boundary = index == bytes.len() || (!in_quotes && bytes[index] == b';');
         if index < bytes.len() && bytes[index] == b'"' {
             in_quotes = !in_quotes;
         }
         if boundary {
             let piece = value[start..index].trim_matches([' ', '\t']);
             if !piece.is_empty() {
-                let name = piece.split('=').next().unwrap_or("");
+                let (name, _) = piece.split_once('=').ok_or(())?;
                 let name = name.trim_matches([' ', '\t']);
-                if !piece.contains('=') || name.is_empty() {
+                if name.is_empty()
+                    || name
+                        .bytes()
+                        .any(|b| !b.is_ascii_alphanumeric() && !b"!#$%&'*+-.^_`|~".contains(&b))
+                {
                     return Err(());
                 }
-                names.push(name);
+                visit(name)?;
             }
             start = index + 1;
         }
-        index += 1;
     }
     if in_quotes {
         return Err(());
@@ -460,28 +637,161 @@ mod tests {
     }
 
     #[test]
+    fn supplied_defaults_and_optional_entries() {
+        let empty = CookiePatternSet::new();
+        let defaults = include_str!("../tests/fixtures/html_cache_default_cookies.txt");
+        let optional = include_str!("../tests/fixtures/html_cache_optional_cookies.txt");
+        for pattern in defaults.lines() {
+            let name = pattern.replace("[0-9]+", "123").replace('*', "fixture");
+            let header = format!("{name}=first");
+            assert!(
+                evaluate_cookie_headers(&[("Cookie", &header)], &default_policy(&empty, &empty))
+                    .allowed(),
+                "default {pattern}"
+            );
+        }
+        for pattern in optional.lines() {
+            let name = pattern.replace('*', "fixture");
+            let header = format!("{name}=first");
+            assert!(
+                !evaluate_cookie_headers(&[("Cookie", &header)], &default_policy(&empty, &empty))
+                    .allowed(),
+                "optional unexpectedly default: {pattern}"
+            );
+            let mut ignore = CookiePatternSet::new();
+            ignore.add(pattern).unwrap();
+            assert!(
+                evaluate_cookie_headers(&[("Cookie", &header)], &default_policy(&ignore, &empty))
+                    .allowed(),
+                "opt-in {pattern}"
+            );
+            let mut bypass = CookiePatternSet::new();
+            bypass.add(pattern).unwrap();
+            assert!(!evaluate_cookie_headers(
+                &[("Cookie", &header)],
+                &default_policy(&ignore, &bypass)
+            )
+            .allowed());
+        }
+    }
+
+    #[test]
+    fn protected_names_win_over_all_wildcards() {
+        let mut ignore = CookiePatternSet::new();
+        ignore.add("*").unwrap();
+        let empty = CookiePatternSet::new();
+        for name in [
+            "PHPSESSID",
+            "JSESSIONID",
+            "sessionid",
+            "session",
+            "sid",
+            "connect.sid",
+            "SESS0123456789abcdef",
+            "SSESS0123456789abcdef",
+            "sessionToken123",
+            "frontend",
+            "frontend_cid",
+            "persistent_shopping_cart",
+            "wordpress_logged_in_123",
+            "wordpress_sec_123",
+            "wp-postpass_123",
+            "wp_woocommerce_session_123",
+            "woocommerce_cart_hash",
+            "cart",
+            "csrftoken",
+            "XSRF-TOKEN",
+            "laravel_session",
+            ".AspNetCore.Cookies",
+            "mf_auth",
+            "AMP_cart",
+            "ph_session_posthog",
+            "_hjSession_auth",
+        ] {
+            let header = format!("_ga=public; {name}=secret");
+            assert!(
+                !evaluate_cookie_headers(&[("Cookie", &header)], &default_policy(&ignore, &empty))
+                    .allowed(),
+                "protected {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn narrow_defaults_numeric_suffix_and_compiled_globs() {
+        for name in [
+            "wp-settings-",
+            "wp-settings-time-",
+            "wp-settings-abc",
+            "wp-settings-12x",
+            "wp-settings-１２",
+            "_gcl_unknown",
+            "_hjSessionUnexpected",
+            "_hjDoneAnything",
+            "mp_x_other",
+            "mp_x_mixpanel_extra",
+            "ph_x_other",
+            "_pk_unknown.1",
+        ] {
+            assert!(!builtin_ignored(name), "near miss {name}");
+        }
+        let mut patterns = CookiePatternSet::new();
+        for p in ["mp_*_mixpanel", "wp-settings-[0-9]+", "*tail", "a*b*c"] {
+            patterns.add(p).unwrap();
+        }
+        for name in [
+            "mp_abc_mixpanel",
+            "mp__mixpanel",
+            "wp-settings-123",
+            "tail",
+            "longtail",
+            "axybzc",
+        ] {
+            assert!(patterns.matches(name), "{name}");
+        }
+        for name in [
+            "mp_abc_mixpanelx",
+            "wp-settings-",
+            "wp-settings-1x",
+            "wp-settings-１２",
+            "tails",
+            "acb",
+        ] {
+            assert!(!patterns.matches(name), "{name}");
+        }
+        let mut copy = CookiePatternSet::new();
+        copy.append_from(&patterns);
+        assert_eq!(patterns.signature(), copy.signature());
+        assert!(copy.matches("mp_another_mixpanel"));
+        assert!(copy.matches("wp-settings-9"));
+        let before = copy.signature();
+        assert!(copy.add("x*[0-9]+").is_err());
+        assert_eq!(before, copy.signature());
+    }
+
+    #[test]
     fn builtin_covers_required_vendors() {
         // One exact and one prefix sample per required vendor.
         for name in [
-            "__utma",      // Legacy GA exact.
-            "_ga",         // UA/GA4 exact.
-            "_ga_ABC123",  // GA4 container prefix.
-            "_gid",        // UA/GA4.
-            "_gat_gtag_UA_1", // UA per-tracker prefix.
-            "_gac_UA_1",   // Ads campaign prefix.
-            "_gcl_au",     // Ads click prefix.
-            "__gads",      // Ads exact.
-            "_fplc",       // Ads first-party exact.
-            "_FPGCLAW",    // Ads first-party exact.
-            "_fbp",        // Meta exact.
-            "_fbc",        // Meta exact.
-            "_clck",       // Clarity exact.
-            "_clsk",       // Clarity exact.
-            "_hjFirstSeen", // Hotjar exact.
-            "_hjSession_9", // Hotjar prefix.
-            "_hjSessionUser_9", // Hotjar prefix.
+            "__utma",                       // Legacy GA exact.
+            "_ga",                          // UA/GA4 exact.
+            "_ga_ABC123",                   // GA4 container prefix.
+            "_gid",                         // UA/GA4.
+            "_gat_gtag_UA_1",               // UA per-tracker prefix.
+            "_gac_UA_1",                    // Ads campaign prefix.
+            "_gcl_au",                      // Ads click prefix.
+            "__gads",                       // Ads exact.
+            "_fplc",                        // Ads first-party exact.
+            "_FPGCLAW",                     // Ads first-party exact.
+            "_fbp",                         // Meta exact.
+            "_fbc",                         // Meta exact.
+            "_clck",                        // Clarity exact.
+            "_clsk",                        // Clarity exact.
+            "_hjFirstSeen",                 // Hotjar exact.
+            "_hjSession_9",                 // Hotjar prefix.
+            "_hjSessionUser_9",             // Hotjar prefix.
             "_hjIncludedInSessionSample_9", // Hotjar prefix.
-            "hjDonePolls", // Hotjar legacy exact.
+            "hjDonePolls",                  // Hotjar legacy exact.
         ] {
             assert!(builtin_ignored(name), "{name}");
         }
@@ -655,7 +965,7 @@ mod tests {
         set.add("*").unwrap();
         assert_eq!(set.len(), 3);
         // Invalid patterns fail without mutating.
-        for bad in ["", "a*b", "*x", "a b", "a=b", "a;b", "a,b", "a\tb"] {
+        for bad in ["", "x[0-9]+y", "a b", "a=b", "a;b", "a,b", "a\tb"] {
             assert!(set.add(bad).is_err(), "{bad:?}");
         }
         assert_eq!(set.len(), 3);
@@ -694,7 +1004,10 @@ mod tests {
         let patterns = builtin_ignore_patterns();
         assert_eq!(
             patterns.len(),
-            BUILTIN_IGNORE_EXACT.len() + BUILTIN_IGNORE_PREFIXES.len()
+            BUILTIN_IGNORE_EXACT.len()
+                + BUILTIN_IGNORE_PREFIXES.len()
+                + BUILTIN_IGNORE_NUMERIC.len()
+                + BUILTIN_IGNORE_INFIX.len()
         );
         assert!(patterns.iter().any(|pattern| pattern == "_ga"));
         assert!(patterns.iter().any(|pattern| pattern == "_ga_*"));

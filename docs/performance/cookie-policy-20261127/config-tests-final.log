@@ -1,0 +1,123 @@
+   Compiling ps-config v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-config)
+warning: unused import: `super::Scope`
+    --> crates/ps-config/src/options.rs:6457:13
+     |
+6457 |         use super::Scope;
+     |             ^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ps-config` (lib test) generated 1 warning (run `cargo fix --lib -p ps-config --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.72s
+     Running unittests src/lib.rs (target/debug/build/ps-config/1b8ba0bb0cb77675/out/ps_config-1b8ba0bb0cb77675)
+
+running 93 tests
+test client_options::tests::empty_header_does_not_parse ... ok
+test client_options::tests::non_default_mode_ignores_quality ... ok
+test client_options::tests::invalid_version_does_not_parse ... ok
+test client_options::tests::repeated_names_do_not_parse ... ok
+test client_options::tests::pairs_parse_regardless_of_order ... ok
+test cookies::tests::builtin_covers_required_vendors ... ok
+test client_options::tests::update_applies_proxy_modes ... ok
+test client_options::tests::valid_version_with_bad_options_keeps_defaults ... ok
+test cookies::tests::builtin_rejects_personalization_and_case_variants ... ok
+test cookies::tests::custom_lists_extend_override_and_disable ... ok
+test cookies::tests::evaluate_absent_and_allowlisted ... ok
+test cookies::tests::evaluate_bypasses_unknown_and_mixed ... ok
+test cookies::tests::bypass_names_truncate_and_lists_render ... ok
+test cookies::tests::patterns_validate_match_and_sign ... ok
+test cookies::tests::narrow_defaults_numeric_suffix_and_compiled_globs ... ok
+test file_load::tests::empty_policy_maps_nothing ... ok
+test cookies::tests::protected_names_win_over_all_wildcards ... ok
+test file_load::tests::one_prefix_vectors ... ok
+test file_load::tests::overlapping_prefixes_youngest_wins ... ok
+test cookies::tests::evaluate_fails_closed ... ok
+test file_load::tests::prefixes_gain_terminal_slashes ... ok
+test cookies::tests::supplied_defaults_and_optional_entries ... FAILED
+test file_load::tests::rules_see_collapsed_names ... ok
+test filter::tests::add_by_name_compounds_and_testing ... ok
+test filter::tests::compound_alias_containment ... ok
+test filter::tests::enabled_precedence ... ok
+test filter::tests::filter_set_basics ... ok
+test filter::tests::display_names_spot_check ... ok
+test filter::tests::enum_order_and_count ... ok
+test filter::tests::comma_list_incremental_vs_reset ... ok
+test filter::tests::enable_disable_forbid_lists ... ok
+test filter::tests::filter_sets_in_enum_order ... ok
+test filter::tests::forbid_all_disabled_and_requires_add_head ... ok
+test filter::tests::name_map_aliases_and_case ... ok
+test filter::tests::related_tables_shape ... ok
+test file_load::tests::merge_appends_youngest ... ok
+test filter::tests::rewrite_level_parse ... ok
+test filter::tests::set_sizes_and_enum_order ... ok
+test options::tests::ajax_default_level_and_thresholds ... ok
+test options::tests::cache_path_and_state_helpers ... ok
+test options::tests::defaults_and_html_writer ... ok
+test options::tests::composite_parsing ... ok
+test file_load::tests::rules_youngest_match_wins ... ok
+test options::tests::cache_sizing_options ... ok
+test options::tests::delay_images_options ... ok
+test options::tests::domain_rewrite_flags ... ok
+test options::tests::early_html_lookup_is_explicit_and_not_query_configurable ... ok
+test file_load::tests::regexp_backreferences ... ok
+test options::tests::external_server_specs ... ok
+test options::tests::fetcher_options ... ok
+test options::tests::ipro_recording_caps ... ok
+test options::tests::lazyload_options ... ok
+test options::tests::html_cache_cookie_directives ... ok
+test options::tests::merge_propagates_master_switch ... ok
+test options::tests::nginx_directive_entry ... ok
+test options::tests::nginx_admin_paths_and_purge ... ok
+test options::tests::nginx_switch_formats ... ok
+test options::tests::preserve_subresource_hints_flag ... ok
+test options::tests::merge_semantics ... ok
+test options::tests::proxy_suffix_reads_and_keys ... ok
+test options::tests::public_browser_grouping_configuration_contract ... ok
+test options::tests::query_scan ... ok
+test filter::tests::ids_unique_and_spot_check ... ok
+test options::tests::request_property_by_id ... ok
+test options::tests::rewrite_deadline_defaults_and_sets ... ok
+test options::tests::request_time_option_reads ... ok
+test options::tests::scalar_parsing ... ok
+test options::tests::set_option_scopes_and_sync ... ok
+test options::tests::signature_and_secret_tables ... ok
+test options::tests::shared_signature_survives_clones_and_versions_mutation ... ok
+test file_load::tests::regexp_dot_segments_fall_through ... ok
+test options::tests::signatures_include_collections_and_are_order_stable ... ok
+test options::tests::special_one_arg_directives ... ok
+test filter::tests::resize_mobile_auto_inserts_delay_images ... ok
+test options::tests::signature_memoized_until_mutation ... ok
+test options::tests::domain_mapping_arg_order_matches_cxx ... ok
+test options::tests::oblivious_pagespeed_urls_flag ... ok
+test property::tests::directive_tables ... ok
+test property::tests::golden_defaults ... ok
+test property::tests::golden_scopes_and_kinds ... ok
+test property::tests::help_text_spot_check ... ok
+test property::tests::name_lookup_prefix_rename_case ... ok
+test property::tests::scope_gates ... ok
+test scope::tests::cpp_names_round_trip ... ok
+test scope::tests::ordering_matches_cpp ... ok
+test wildcard::tests::group_last_match_wins ... ok
+test wildcard::tests::literal_and_simple ... ok
+test property::tests::table_count_and_uniqueness ... ok
+test wildcard::tests::middle_blocks_leftmost ... ok
+test wildcard::tests::question_mark ... ok
+test wildcard::tests::star_forms ... ok
+test options::tests::two_and_three_arg_directives ... ok
+test file_load::tests::regexp_registration_validates ... ok
+
+failures:
+
+---- cookies::tests::supplied_defaults_and_optional_entries stdout ----
+
+thread 'cookies::tests::supplied_defaults_and_optional_entries' (13511) panicked at crates/ps-config/src/cookies.rs:643:13:
+default _tt_pixel_session_index
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    cookies::tests::supplied_defaults_and_optional_entries
+
+test result: FAILED. 92 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p ps-config --lib`

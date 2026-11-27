@@ -1,0 +1,41 @@
+[
+  {
+    "fixture": "analytics",
+    "before": {
+      "median_ns": 243.434,
+      "allocations": 1.0,
+      "allowed": "true"
+    },
+    "after": {
+      "median_ns": 401.84,
+      "allocations": 0.0,
+      "allowed": "true"
+    }
+  },
+  {
+    "fixture": "expanded",
+    "before": {
+      "median_ns": 551.927,
+      "allocations": 3.0,
+      "allowed": "false"
+    },
+    "after": {
+      "median_ns": 1003.303,
+      "allocations": 0.0,
+      "allowed": "true"
+    }
+  },
+  {
+    "fixture": "protected",
+    "before": {
+      "median_ns": 158.605,
+      "allocations": 2.0,
+      "allowed": "false"
+    },
+    "after": {
+      "median_ns": 216.374,
+      "allocations": 1.0,
+      "allowed": "false"
+    }
+  }
+]
