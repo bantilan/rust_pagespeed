@@ -199,7 +199,7 @@ fn settle_driver_identity(harness: &VaryHarness) {
     let evidence = cohort.load(PAGE_URL, &oh, "@Desktop").into_record();
     harness
         .driver
-        .set_beacon_evidence_identity(finder::encode_evidence(&evidence));
+        .set_beacon_evidence_identity(finder::html_evidence_identity(&evidence));
 }
 
 fn enable_beaconing(harness: &VaryHarness) {
@@ -327,12 +327,7 @@ fn non_beacon_clients_ignore_sampling_due() {
         .hasher()
         .hash(harness.options.borrow().signature().as_bytes());
     evidence.next_beacon_ms = START_MS - 1;
-    finder::BeaconFinder::new(server.metadata_cache()).store(
-        PAGE_URL,
-        &oh,
-        "@Desktop",
-        &evidence,
-    );
+    finder::BeaconFinder::new(server.metadata_cache()).store(PAGE_URL, &oh, "@Desktop", &evidence);
     let origin = ok_origin();
     let request = get_request();
     let mut session = harness.session();

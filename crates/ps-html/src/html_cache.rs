@@ -682,7 +682,7 @@ impl HtmlCacheSession {
                     &empty
                 }
             };
-            let encoded = super::beacon_finder::encode_evidence(effective);
+            let encoded = super::beacon_finder::html_evidence_identity(effective);
             identity.push_str("\nbeacon:");
             identity
                 .push_str(&String::from_utf8(encoded.clone()).expect("evidence codec emits UTF-8"));
@@ -2103,7 +2103,7 @@ mod tests {
         let evidence = cohort.load(PAGE_URL, &oh, "@Desktop").into_record();
         harness
             .driver
-            .set_beacon_evidence_identity(finder::encode_evidence(&evidence));
+            .set_beacon_evidence_identity(finder::html_evidence_identity(&evidence));
     }
 
     #[test]
@@ -2155,13 +2155,57 @@ mod tests {
             .lookup(&origin, &request, &harness.purge, None, START_MS + 2000)
             .is_some());
         assert_eq!(2, harness.counter("html_cache_hits"));
-        // A new accepted beacon invalidates the variant (miss).
-        seed_learned_beacon(&harness);
+        // An identical accepted report preserves the effective output/HIT.
+        let mut evidence = seed_learned_beacon(&harness);
         let mut third = harness.session();
         assert!(third
             .lookup(&origin, &request, &harness.purge, None, START_MS + 3000)
+            .is_some());
+        assert_eq!(2, harness.counter("html_cache_misses"));
+        // Actual output changes still invalidate the variant.
+        evidence.lcp_kind = finder::LCP_KIND_BACKGROUND.to_string();
+        evidence.lcp_image_url = "https://cache.test/new-background.jpg".to_string();
+        let server = harness.driver.server_context();
+        let oh = server
+            .hasher()
+            .hash(harness.driver.options().signature().as_bytes());
+        finder::BeaconFinder::new(server.metadata_cache())
+            .store(PAGE_URL, &oh, "@Desktop", &evidence);
+        assert!(harness
+            .session()
+            .lookup(&origin, &request, &harness.purge, None, START_MS + 3001)
             .is_none());
         assert_eq!(3, harness.counter("html_cache_misses"));
+    }
+
+    #[test]
+    fn candidate_registration_does_not_prevent_html_publication() {
+        use crate::beacon_finder as finder;
+        let h = Harness::new();
+        h.options
+            .borrow_mut()
+            .soft_enable_filter_for_testing(Filter::PrioritizeLcpImages);
+        let mut evidence = seed_learned_beacon(&h);
+        let request = h.get_request();
+        let origin = h.ok_origin();
+        let mut render = h.session();
+        assert!(render
+            .lookup(&origin, &request, &h.purge, None, START_MS)
+            .is_none());
+        render.write(b"<html>complete optimized output</html>");
+        evidence
+            .support
+            .insert("new-unobserved-candidate".into(), 0);
+        evidence
+            .pending_nonces
+            .push(("concurrent".into(), START_MS));
+        h.driver
+            .set_beacon_evidence_identity(finder::html_evidence_identity(&evidence));
+        assert!(render.finish(&request, START_MS + 1).detail_line.is_some());
+        assert!(h
+            .session()
+            .lookup(&origin, &request, &h.purge, None, START_MS + 2)
+            .is_some());
     }
 
     #[test]

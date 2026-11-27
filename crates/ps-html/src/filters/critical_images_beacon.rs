@@ -120,7 +120,7 @@ impl CriticalImagesBeaconFilter {
         // Snapshot the pre-render identity; end of document
         // refreshes it after candidate registration.
         self.driver
-            .set_beacon_evidence_identity(beacon_finder::encode_evidence(&evidence));
+            .set_beacon_evidence_identity(beacon_finder::html_evidence_identity(&evidence));
     }
 
     /// Builds the beacon init call (`Run(...)`) appended to the
@@ -315,7 +315,7 @@ impl CriticalImagesBeaconFilter {
             })
             .unwrap_or_else(|| finder.load(&page_url, &oh, suffix).into_record());
         self.driver
-            .set_beacon_evidence_identity(beacon_finder::encode_evidence(&evidence));
+            .set_beacon_evidence_identity(beacon_finder::html_evidence_identity(&evidence));
     }
 }
 

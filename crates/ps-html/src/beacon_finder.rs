@@ -7,8 +7,8 @@
 //! cache (our property-cache cohort), validates nonces, merges
 //! support counts with decay, and answers the lookups filters need:
 //! availability, critical sets, LCP kind/URL, and the sampling
-//! schedule. The learned evidence generation also feeds the HTML
-//! cache identity, so each accepted beacon invalidates the variant.
+//! schedule. HTML cache identity reflects effective learned output,
+//! rather than collection bookkeeping.
 //!
 //! Divergences from C++: rendered dimensions (`rd`) and critical CSS
 //! selectors (`cs`) are ignored (no port consumer reads them); CSS
@@ -326,6 +326,29 @@ pub fn html_critical_images(evidence: &BeaconEvidence) -> HashSet<String> {
         .filter(|(key, support)| !key.is_empty() && **support * 100 >= threshold)
         .map(|(key, _)| key.clone())
         .collect()
+}
+
+/// Canonical HTML output decisions, separate from the persisted evidence codec.
+/// A single accepted report makes evidence available. Repeated reports which
+/// leave critical images/LCP unchanged need not invalidate optimized HTML.
+/// Sampling/nonces/support decay still use the complete stored record.
+#[must_use]
+pub fn html_evidence_identity(evidence: &BeaconEvidence) -> Vec<u8> {
+    let mut effective = BeaconEvidence::default();
+    effective.valid_beacons = u64::from(evidence.valid_beacons > 0);
+    effective.max_support = 1;
+    effective.lcp_kind = evidence.lcp_kind.clone();
+    effective.lcp_image_url = evidence.lcp_image_url.clone();
+    for key in html_critical_images(evidence) {
+        effective.support.insert(key, 1);
+    }
+    // Candidate registration at max_support=0 is bookkeeping, not learned data.
+    if evidence.valid_beacons == 0 {
+        effective.support.clear();
+    }
+    let mut identity = b"html-effective-evidence-v1\n".to_vec();
+    identity.extend_from_slice(&encode_evidence(&effective));
+    identity
 }
 
 /// Whether an image URL is critical (`IsHtmlCriticalImage`).
@@ -725,6 +748,42 @@ impl BeaconFinder {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn html_identity_tracks_effective_decisions_not_collection_bookkeeping() {
+        use super::*;
+        let empty = BeaconEvidence::default();
+        let mut candidates = empty.clone();
+        candidates.support.insert("new-candidate".into(), 0);
+        candidates.pending_nonces.push(("nonce".into(), 1));
+        candidates.next_beacon_ms = 123;
+        assert_eq!(
+            html_evidence_identity(&empty),
+            html_evidence_identity(&candidates)
+        );
+        let mut learned = BeaconEvidence::default();
+        learned.valid_beacons = 1;
+        learned.max_support = 10;
+        learned.support.insert("hero".into(), 10);
+        learned.lcp_kind = LCP_KIND_IMG.into();
+        assert_eq!(availability(true, Some(&learned)), Availability::Available);
+        let identity = html_evidence_identity(&learned);
+        assert_ne!(identity, html_evidence_identity(&empty));
+        learned.valid_beacons = 2;
+        learned.generation = 2;
+        learned.next_beacon_ms = 50000;
+        learned.pending_nonces.push(("other".into(), 100));
+        learned.nonces_expired = 3;
+        learned.max_support = 19;
+        learned.support.insert("hero".into(), 19);
+        learned.support.insert("unused".into(), 0);
+        assert_eq!(identity, html_evidence_identity(&learned));
+        learned.support.insert("hero".into(), 18);
+        assert_ne!(identity, html_evidence_identity(&learned));
+        learned.support.insert("hero".into(), 19);
+        learned.lcp_kind = LCP_KIND_TEXT.into();
+        assert_ne!(identity, html_evidence_identity(&learned));
+    }
+
     use super::*;
 
     #[test]

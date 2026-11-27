@@ -198,8 +198,14 @@ verified zero origin calls across 20 analytics HITs; median latency changed from
 26.77 ms to 0.69 ms with a synthetic 25 ms origin delay. These are isolated local
 measurements, not a live-site speedup claim.
 
+One accepted valid critical-image report makes learning available. HTML cache
+identity follows the resulting critical-image set and LCP choice, so repeated
+reports with identical decisions and nonce/scheduling/candidate bookkeeping do
+not invalidate a completed cached rewrite. Sampling still runs, and responses
+containing sampled nonces or incomplete background resource rewrites stay uncached.
+
 A HIT does not guarantee every later navigation will HIT. Beacon sampling,
-newly accepted learning evidence, request variants, expiration, and invalidation
+changes to effective learned image/LCP decisions, request variants, expiration, and invalidation
 can cause a later BYPASS or MISS. Sampled responses stay uncached so their
 per-request nonces are not reused. A successful beacon transport normally
 returns HTTP 204; that status alone does not prove its nonce/evidence was
