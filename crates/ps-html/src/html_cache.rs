@@ -140,6 +140,16 @@ impl HtmlCacheSession {
         let device_type = properties.device_type();
         let device = ps_http::user_agent_matcher::UserAgentMatcher::device_type_string(device_type)
             .to_string();
+        let device = if driver.options().html_cache_simple_variants() {
+            if device_type == ps_http::user_agent_matcher::DeviceType::Desktop {
+                "desktop"
+            } else {
+                "mobile"
+            }
+            .to_string()
+        } else {
+            device
+        };
         let device_suffix =
             ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(device_type)
                 .to_string();
@@ -592,15 +602,17 @@ impl HtmlCacheSession {
             self.driver.options_signature(),
             self.request_identity(request, Some(origin)),
         );
-        identity.push_str(&format!(
-            "debug:{}\norigin-ttl:{}\n",
-            options.enabled(Filter::Debug),
-            policy.cache_ttl_ms()
-        ));
+        identity.push_str(&format!("debug:{}\n", options.enabled(Filter::Debug)));
+        if !options.html_cache_simple_variants() {
+            identity.push_str(&format!("origin-ttl:{}\n", policy.cache_ttl_ms()));
+        }
         if let Some((secs, nanos)) = file_mtime {
             identity.push_str(&format!("file-mtime:{secs}.{nanos:09}\n"));
         }
         for (name, value) in origin.headers().iter() {
+            if options.html_cache_simple_variants() {
+                break;
+            }
             if IDENTITY_EXCLUDED_HEADERS
                 .iter()
                 .any(|excluded| name.eq_ignore_ascii_case(excluded))
@@ -726,6 +738,22 @@ impl HtmlCacheSession {
         request: &RequestHeaders,
         origin: Option<&ResponseHeaders>,
     ) -> String {
+        if self.driver.options().html_cache_simple_variants() {
+            let mut p = self.driver.request_properties();
+            let format = if p.supports_avif_rewritten_urls() {
+                "avif"
+            } else if p.supports_webp_rewritten_urls() {
+                "webp"
+            } else {
+                "fallback"
+            };
+            let device = if p.device_type() == ps_http::user_agent_matcher::DeviceType::Desktop {
+                "desktop"
+            } else {
+                "mobile"
+            };
+            return format!("public-six-v1:{format}:{device}");
+        }
         let mut identity = self.request_identity_without_preferences(request, origin);
         // Tracking cookies stay omitted. These two public preferences can
         // affect generated HTML, so both normal and early keys must vary.
@@ -1075,6 +1103,14 @@ mod tests {
                 START_MS,
             ));
             let options = Rc::new(RefCell::new(RewriteOptions::new()));
+            options
+                .borrow_mut()
+                .set_option(
+                    "HtmlCacheSimpleVariants",
+                    "off",
+                    ps_config::scope::Scope::Server,
+                )
+                .unwrap();
             options
                 .borrow_mut()
                 .set_option("HtmlCache", "on", ps_config::scope::Scope::Server)
@@ -1543,6 +1579,130 @@ mod tests {
             .session()
             .early_key(&cookie_request(&h, "tracker=x"), None)
             .is_none());
+    }
+
+    #[test]
+    fn six_public_groups_share_headers_preferences_and_encoding() {
+        let h = Harness::new();
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheSimpleVariants",
+                "on",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        h.options
+            .borrow_mut()
+            .set_option(
+                "HtmlCacheEarlyLookup",
+                "on",
+                ps_config::scope::Scope::Server,
+            )
+            .unwrap();
+        let mut keys = std::collections::HashSet::new();
+        let desktop = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36";
+        let mobile = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36";
+        let mut origin = h.ok_origin();
+        origin
+            .headers_mut()
+            .add("Vary", "Accept-Language, User-Agent, Accept");
+        for (device, ua) in [("desktop", desktop), ("mobile", mobile)] {
+            for (format, accept) in [
+                ("avif", "text/html,image/avif,image/webp"),
+                ("webp", "text/html,image/avif;q=0,image/webp"),
+                ("fallback", "text/html,image/avif;q=0,image/webp;q=0"),
+            ] {
+                let mut request = h.get_request();
+                request.headers_mut().add("User-Agent", ua);
+                request.headers_mut().replace("Accept", accept);
+                h.driver.set_user_agent(ua);
+                h.driver.set_request_headers(request.clone());
+                let expected_key = format!("public-six-v1:{format}:{device}");
+                assert_eq!(
+                    h.session().request_identity(&request, Some(&origin)),
+                    expected_key
+                );
+                keys.insert(expected_key.clone());
+                assert!(h
+                    .session()
+                    .lookup_early(&request, &h.purge, None, START_MS)
+                    .is_none());
+                let mut first = h.session();
+                assert!(first
+                    .lookup(&origin, &request, &h.purge, None, START_MS)
+                    .is_none());
+                first.write(expected_key.as_bytes());
+                first.finish(&request, START_MS);
+                let mut other = request.clone();
+                for (name, value) in [
+                    ("Accept-Language", "fr-FR"),
+                    ("Accept-Encoding", "gzip, br, zstd"),
+                    ("X-Arbitrary-Header", "different"),
+                    ("DNT", "1"),
+                    (
+                        "Cookie",
+                        "wp_lang=fr_FR; trx_addons_is_retina=1; tk_qs=another",
+                    ),
+                ] {
+                    other.headers_mut().add(name, value);
+                }
+                let firefox = if device == "desktop" {
+                    "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0"
+                } else {
+                    "Mozilla/5.0 (Android 14; Mobile; rv:147.0) Gecko/147.0 Firefox/147.0"
+                };
+                other.headers_mut().replace("User-Agent", firefox);
+                h.driver.set_user_agent(firefox);
+                h.driver.set_request_headers(other.clone());
+                assert_eq!(h.session().request_identity(&other, None), expected_key);
+                assert_eq!(
+                    h.session()
+                        .lookup_early(&other, &h.purge, None, START_MS + 1)
+                        .expect("early shared HIT")
+                        .0
+                        .body,
+                    expected_key.as_bytes()
+                );
+                assert_eq!(
+                    h.session()
+                        .lookup(&origin, &other, &h.purge, None, START_MS + 1)
+                        .expect("normal shared HIT")
+                        .body,
+                    expected_key.as_bytes()
+                );
+                for (name, value) in [
+                    ("Authorization", "Bearer private"),
+                    ("Cookie", "PHPSESSID=private"),
+                    ("Cookie", "unknown_private=x"),
+                ] {
+                    let mut private = other.clone();
+                    private.headers_mut().add(name, value);
+                    assert!(h
+                        .session()
+                        .lookup_early(&private, &h.purge, None, START_MS + 1)
+                        .is_none());
+                    let mut session = h.session();
+                    assert!(session
+                        .lookup(&origin, &private, &h.purge, None, START_MS + 1)
+                        .is_none());
+                    assert!(session.bypass_reason().is_some());
+                }
+            }
+        }
+        assert_eq!(keys.len(), 6);
+        let tablet = "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1";
+        let mut request = h.get_request();
+        request
+            .headers_mut()
+            .replace("Accept", "text/html,image/avif,image/webp");
+        request.headers_mut().add("User-Agent", tablet);
+        h.driver.set_user_agent(tablet);
+        h.driver.set_request_headers(request.clone());
+        assert_eq!(
+            h.session().request_identity(&request, None),
+            "public-six-v1:avif:mobile"
+        );
     }
 
     #[test]

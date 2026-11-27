@@ -2030,6 +2030,16 @@ impl RewriteOptions {
         }
     }
 
+    /// Default public contract: six format/device client groups only.
+    #[must_use]
+    pub fn html_cache_simple_variants(&self) -> bool {
+        self.html_cache_public_browser_grouping()
+            && !matches!(
+                self.get_by_name("HtmlCacheSimpleVariants"),
+                Some(Value::Bool(false))
+            )
+    }
+
     /// Public-site authorization to share HTML across equivalent browsers.
     #[must_use]
     pub fn html_cache_public_browser_grouping(&self) -> bool {
@@ -4686,6 +4696,22 @@ pub fn apply_nginx_directive(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn simple_html_variants_default_scope_and_signature() {
+        let mut options = RewriteOptions::new();
+        assert!(options.html_cache_simple_variants());
+        let signature = options.signature();
+        assert!(options.set_option("HtmlCacheSimpleVariants", "off", Scope::Query).is_err());
+        assert!(options.html_cache_simple_variants());
+        options.set_option("HtmlCacheSimpleVariants", "off", Scope::Server).unwrap();
+        assert!(!options.html_cache_simple_variants());
+        assert_ne!(signature, options.signature());
+        options.set_option("HtmlCacheSimpleVariants", "on", Scope::Server).unwrap();
+        assert!(options.html_cache_simple_variants());
+        options.set_option("HtmlCachePublicBrowserGrouping", "off", Scope::Server).unwrap();
+        assert!(!options.html_cache_simple_variants());
+    }
 
     #[test]
     fn request_property_by_id() {

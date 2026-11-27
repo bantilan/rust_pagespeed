@@ -219,6 +219,28 @@ accepted. Font learning and replay checks are covered by the linked verification
 record. Deployment availability depends on the installed module version; the
 latest local fixes are not evidence that a production server has been updated.
 
+### Six public HTML client groups
+
+HTML caching defaults to six client groups per URL/configuration and effective
+beacon result: **AVIF / WebP / original JPEG/PNG fallback × desktop / mobile**.
+AVIF-capable browsers take the AVIF group; otherwise WebP, otherwise fallback.
+Tablets join mobile. Firefox/Chrome names and versions, language, arbitrary
+headers, transport encoding and allowed cookie values do not create extra HTML
+variants. Compression remains negotiated separately when sending the response.
+
+This is a public-site contract: your origin must serve equivalent public HTML
+within each format/device group. `wp_lang` and `trx_addons_is_retina` are accepted
+but their values are ignored in this mode, as are ordinary tracking cookies.
+Origin `Vary` fields do not add dimensions (`Vary: *` still bypasses). Authorization,
+private/Set-Cookie responses, login/session/cart/CSRF and unknown cookies still
+bypass; freshness, purge and background/beacon validity checks still run.
+
+No new directive is required. Sites needing the previous header/preference
+separation can use `pagespeed HtmlCacheSimpleVariants off;`; turning
+`HtmlCachePublicBrowserGrouping off` also restores exact request grouping.
+URL/query, effective rewrite configuration, file change detection and learned
+optimization decisions remain correctness inputs, rather than browser variants.
+
 ### Default public HTML-cache cookie policy
 
 With `pagespeed HtmlCache on;`, the supplied common-cookie allowlist is active
@@ -227,9 +249,9 @@ of its CMS: analytics, advertising, monitoring, load-balancer affinity, WordPres
 test/numeric settings cookies and `mage-cache-sessid` are treated as
 non-personalizing under their normal usage. Ignored tracking values never enter
 HTML cache keys. `tk_qs` and `wordpress_test_cookie` share this default behavior.
-`wp_lang` and `trx_addons_is_retina` instead select separate public cached
-variants using opaque value digests, including early HITs, so language/retina
-HTML cannot mix. No extra directives are needed. Request cookies remain
+`wp_lang` and `trx_addons_is_retina` values are ignored in default six-group
+public mode. The previous opaque preference variants remain available with
+`HtmlCacheSimpleVariants off`. No extra directives are needed for the defaults. Request cookies remain
 unchanged upstream; duplicate preference cookies bypass.
 
 Unknown cookies bypass. Recognized authentication, login/session, cart and CSRF

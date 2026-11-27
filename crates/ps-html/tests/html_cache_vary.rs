@@ -46,6 +46,10 @@ impl VaryHarness {
         let options = Rc::new(RefCell::new(RewriteOptions::new()));
         options
             .borrow_mut()
+            .set_option("HtmlCacheSimpleVariants", "off", Scope::Server)
+            .unwrap();
+        options
+            .borrow_mut()
             .set_option("HtmlCache", "on", Scope::Server)
             .unwrap();
         options
