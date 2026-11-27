@@ -94,8 +94,7 @@ impl CriticalImagesBeaconFilter {
             .hasher()
             .hash(self.driver.options_signature().as_bytes());
         self.options_hash = oh.clone();
-        let device = properties.device_type();
-        let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(device);
+        let suffix = beacon_finder::evidence_suffix(&self.driver);
         let page_url = self.driver.base_url().spec().to_string();
         let finder = BeaconFinder::new(server.metadata_cache());
         let downstream = self.downstream_gate();
@@ -104,6 +103,7 @@ impl CriticalImagesBeaconFilter {
             ((server.simple_random_next() as u64) << 32) | server.simple_random_next() as u64;
         let reinstrument = options.beacon_reinstrument_time_sec();
         let prepared = finder.update(&page_url, &oh, suffix, |evidence| {
+            evidence.single_decision = options.beacon_single_decision();
             let nonce = if beacon_finder::should_beacon(now_ms, Some(evidence), downstream) {
                 beacon_finder::prepare_beacon(evidence, now_ms, reinstrument, nonce_value)
             } else {
@@ -128,10 +128,15 @@ impl CriticalImagesBeaconFilter {
     fn init_call(&self) -> Vec<u8> {
         let options = self.driver.options();
         let is_https = self.driver.base_url().scheme() == "https";
-        let beacon_url = options
+        let mut beacon_url = options
             .beacon_url()
             .map(|urls| if is_https { urls.https } else { urls.http })
             .unwrap_or_else(|| DEFAULT_BEACON_URL.to_string());
+        if options.html_cache_simple_variants() {
+            beacon_url.push(if beacon_url.contains('?') { '&' } else { '?' });
+            beacon_url.push_str("bvg=");
+            beacon_url.push_str(beacon_finder::evidence_suffix(&self.driver));
+        }
         let nonce = self.nonce.clone().unwrap_or_default();
         let send_at_onload = !options.filters().enabled(Filter::LazyloadImages);
         let resize = options
@@ -298,10 +303,7 @@ impl CriticalImagesBeaconFilter {
         let oh = server
             .hasher()
             .hash(self.driver.options_signature().as_bytes());
-        let properties = self.driver.request_properties();
-        let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
-            properties.device_type(),
-        );
+        let suffix = beacon_finder::evidence_suffix(&self.driver);
         let page_url = self.driver.base_url().spec();
         let finder = BeaconFinder::new(server.metadata_cache());
         let evidence = finder
@@ -348,6 +350,72 @@ mod tests {
     }
 
     const CHROME: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+
+    #[test]
+    fn public_evidence_has_exactly_six_format_device_groups() {
+        let mobile = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36";
+        let firefox = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:147.0) Gecko/20100101 Firefox/147.0";
+        let mut groups = HashSet::new();
+        for (ua, device) in [(CHROME, "desktop"), (mobile, "mobile")] {
+            for (accept, format) in [
+                ("image/avif,image/webp", "avif"),
+                ("image/avif;q=0,image/webp", "webp"),
+                ("image/avif;q=0,image/webp;q=0", "fallback"),
+            ] {
+                let driver = driver_for(ua);
+                let mut headers = ps_http::request::RequestHeaders::new();
+                headers.headers_mut().add("User-Agent", ua);
+                headers.headers_mut().add("Accept", accept);
+                driver.set_request_headers(headers);
+                let suffix = beacon_finder::evidence_suffix(&driver);
+                assert_eq!(suffix, format!("{format}-{device}"));
+                assert!(beacon_finder::public_evidence_suffix(suffix).is_some());
+                groups.insert(suffix);
+                let filter = CriticalImagesBeaconFilter::new(Rc::clone(&driver));
+                assert!(String::from_utf8(filter.init_call()).unwrap().contains(&format!("bvg={suffix}")));
+                if device == "desktop" {
+                    driver.set_user_agent(firefox);
+                    assert_eq!(beacon_finder::evidence_suffix(&driver), suffix);
+                }
+            }
+        }
+        assert_eq!(groups.len(), 6);
+        let tablet = driver_for("Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 Version/16.0 Mobile/15E148 Safari/604.1");
+        let mut headers = tablet.request_headers().clone();
+        headers.headers_mut().add("Accept", "image/avif,image/webp");
+        tablet.set_request_headers(headers);
+        assert_eq!(beacon_finder::evidence_suffix(&tablet), "avif-mobile");
+
+        assert!(beacon_finder::public_evidence_suffix("chrome-avif-desktop").is_none());
+    }
+
+    #[test]
+    fn accepted_decision_does_not_insert_another_collector() {
+        let driver = driver_for(CHROME);
+        let mut first = CriticalImagesBeaconFilter::new(Rc::clone(&driver));
+        first.prepare();
+        let nonce = first.nonce.clone().unwrap();
+        let server = driver.server_context();
+        let oh = server.hasher().hash(driver.options_signature().as_bytes());
+        let finder = BeaconFinder::new(server.metadata_cache());
+        let report = beacon_finder::BeaconReport {
+            nonce,
+            html_hashes: Some(HashSet::new()),
+            lcp_kind: beacon_finder::LCP_KIND_TEXT.into(),
+            ..Default::default()
+        };
+        assert_eq!(finder.update(driver.base_url().spec(), &oh, beacon_finder::evidence_suffix(&driver), |evidence| {
+            assert!(evidence.single_decision);
+            let outcome = beacon_finder::accept_beacon(evidence, &report, CriticalImagesBeaconFilter::now_ms());
+            evidence.next_beacon_ms = 0;
+            outcome
+        }), Some(beacon_finder::AcceptOutcome::Accepted));
+        let mut later = CriticalImagesBeaconFilter::new(driver);
+        later.prepare();
+        assert!(!later.insert_beacon_js);
+        assert!(later.nonce.is_none());
+        assert!(later.stamp_hashes);
+    }
 
     #[test]
     fn prepare_inserts_on_first_visit() {

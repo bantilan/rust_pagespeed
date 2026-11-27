@@ -149,8 +149,8 @@ fn learned_evidence_stamps_without_reinstrumenting() {
     );
     // Sampling is not due for a long while now.
     evidence.next_beacon_ms = i64::MAX / 2;
-    finder.store(PAGE_URL, &oh, "@Desktop", &evidence);
     let driver = harness.driver_for(CHROME_UA);
+    finder.store(PAGE_URL, &oh, ps_html::beacon_finder::evidence_suffix(&driver), &evidence);
     let out = harness.render(&driver, b"<html><body><img src=\"hero.png\"></body></html>");
     assert_eq!(0, count(&out, b"pagespeed.CriticalImages.Run('"));
     assert_eq!(1, count(&out, b"data-pagespeed-url-hash="));

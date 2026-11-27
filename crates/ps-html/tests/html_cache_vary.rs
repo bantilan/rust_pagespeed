@@ -292,6 +292,7 @@ fn beacon_arrival_rekeys_variant() {
 #[test]
 fn sampling_due_bypasses_preserving_collection() {
     let harness = VaryHarness::new();
+    harness.options.borrow_mut().set_option("BeaconSingleDecision", "off", Scope::Server).unwrap();
     enable_beaconing(&harness);
     harness.driver.set_user_agent(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",

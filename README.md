@@ -201,16 +201,29 @@ measurements, not a live-site speedup claim.
 Font learning remembers the last queued nonce per page/options in the tab's
 session storage, avoiding repeated POSTs when cached HTML replays that nonce.
 Fresh nonces still report; blocked storage falls back to same-document deduplication.
-RUM timing beacons are unchanged. Critical-image sampling uses the existing
-low-frequency interval after one accepted report; changed candidates restart learning.
+RUM timing beacons are unchanged. Critical-image/LCP learning stops after one
+accepted nonce-validated report by
+default (`pagespeed BeaconSingleDecision on;`). Normal subsequent visits reuse
+that decision instead of periodically inserting another collector or bypassing
+HTML cache for sampling. Candidate bookkeeping cannot reopen a settled decision.
+Missing/evicted evidence or changed configuration can restart learning; failed
+reports can retry. Existing
+pending reports cannot replace the first accepted decision. In the default public mode, there is exactly one critical/LCP decision per page
+and AVIF/WebP/fallback × desktop/mobile group; Chrome and Firefox share it when
+they belong to the same group. Tablet clients join mobile. No extra headers
+split that critical evidence. To retain periodic
+sampling, set `pagespeed BeaconSingleDecision off;`; `BeaconReinstrumentTimeSec`
+then controls the existing cadence. Unlike periodic sampling, a settled decision
+will not detect layout-only LCP changes until evidence is reset. RUM timing and the independent font collector/dedup remain active.
 
 One accepted valid critical-image report makes learning available. HTML cache
 identity follows the resulting critical-image set and LCP choice, so repeated
 reports with identical decisions and nonce/scheduling/candidate bookkeeping do
-not invalidate a completed cached rewrite. Sampling still runs, and responses
+not invalidate a completed cached rewrite. Learning still runs before a decision
+is accepted (or periodically with the opt-out), and responses
 containing sampled nonces or incomplete background resource rewrites stay uncached.
 
-A HIT does not guarantee every later navigation will HIT. Beacon sampling,
+A HIT does not guarantee every later navigation will HIT. Required learning,
 changes to effective learned image/LCP decisions, request variants, expiration, and invalidation
 can cause a later BYPASS or MISS. Sampled responses stay uncached so their
 per-request nonces are not reused. A successful beacon transport normally

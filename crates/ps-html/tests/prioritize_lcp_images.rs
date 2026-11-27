@@ -83,7 +83,7 @@ impl Harness {
             finder::accept_beacon(&mut evidence, &report, 1000),
             finder::AcceptOutcome::Accepted
         );
-        backend.store(PAGE_URL, &oh, "@Desktop", &evidence);
+        backend.store(PAGE_URL, &oh, ps_html::beacon_finder::evidence_suffix(&self.driver()), &evidence);
     }
 
     /// Seeds one accepted beacon with explicit hashes, LCP kind,
@@ -113,7 +113,7 @@ impl Harness {
             finder::accept_beacon(&mut evidence, &report, 1000),
             finder::AcceptOutcome::Accepted
         );
-        backend.store(PAGE_URL, &oh, "@Desktop", &evidence);
+        backend.store(PAGE_URL, &oh, ps_html::beacon_finder::evidence_suffix(&self.driver()), &evidence);
     }
 }
 
@@ -244,6 +244,8 @@ const LEGACY_UA: &str = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trid
 #[test]
 fn background_lcp_format_mismatch_skips() {
     let harness = Harness::new();
+    // Exercise the legacy shared-device evidence format guard explicitly.
+    harness.options.borrow_mut().set_option("HtmlCacheSimpleVariants", "off", ps_config::scope::Scope::Server).unwrap();
     harness.seed_lcp_report(&[], ps_html::beacon_finder::LCP_KIND_BACKGROUND, BG_URL);
     let driver = harness.driver_for(LEGACY_UA);
     assert!(
@@ -260,6 +262,7 @@ fn background_lcp_format_mismatch_skips() {
     assert_eq!(0, count(&out, b"rel=\"preload\""));
     // Universal formats still preload for the same client.
     let jpg = Harness::new();
+    jpg.options.borrow_mut().set_option("HtmlCacheSimpleVariants", "off", ps_config::scope::Scope::Server).unwrap();
     jpg.seed_lcp_report(
         &[],
         ps_html::beacon_finder::LCP_KIND_BACKGROUND,

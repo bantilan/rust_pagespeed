@@ -101,7 +101,11 @@ pub fn handle_beacon_evidence(
     }
     let matcher = ps_http::user_agent_matcher::UserAgentMatcher::new();
     let device = matcher.device_type_for_ua(user_agent);
-    let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(device);
+    let group = query_params.lookup1_unescaped("bvg");
+    let suffix = match group.as_deref() {
+        Some(group) => beacon_finder::public_evidence_suffix(group)?,
+        None => ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(device),
+    };
     let finder = BeaconFinder::new(server.metadata_cache());
     finder.update(page_url, &options_hash, suffix, |evidence| {
         beacon_finder::accept_beacon(evidence, &report, now_ms)
@@ -306,16 +310,18 @@ mod tests {
         // Seed a pending nonce through the finder.
         let finder = BeaconFinder::new(server.metadata_cache());
         let mut evidence = BeaconEvidence::default();
+        evidence.single_decision = true;
         let nonce =
             ps_html::beacon_finder::prepare_beacon(&mut evidence, 1000, 5, 42).expect("due");
         let hash = ps_html::beacon_finder::url_hash("http://h/hero.png");
         let keys: std::collections::HashSet<String> = [hash.clone()].into_iter().collect();
         ps_html::beacon_finder::update_candidates(&mut evidence, &keys, false);
-        finder.store("http://h/p", "oh1", "@Desktop", &evidence);
+        evidence.pending_nonces.push(("competing".into(), 1000));
+        finder.store("http://h/p", "oh1", "avif-desktop", &evidence);
         // Bad nonces reject without merging.
         assert_eq!(
             handle_beacon_evidence(
-                &format!("url=http://h/p&oh=oh1&lcp={hash}&n=wrong"),
+                &format!("url=http://h/p&bvg=avif-desktop&oh=oh1&lcp={hash}&n=wrong"),
                 "http://h/p",
                 "Test/1.0",
                 &server,
@@ -323,10 +329,19 @@ mod tests {
             ),
             Some(AcceptOutcome::BadNonce)
         );
+        // A valid nonce for AVIF/desktop cannot write a different group.
+        assert_eq!(handle_beacon_evidence(
+            &format!("bvg=webp-desktop&oh=oh1&lcp={hash}&n={nonce}"),
+            "http://h/p", "Test/1.0", &server, 1000,
+        ), Some(AcceptOutcome::BadNonce));
+        assert!(handle_beacon_evidence(
+            &format!("bvg=invalid&oh=oh1&lcp={hash}&n={nonce}"),
+            "http://h/p", "Test/1.0", &server, 1000,
+        ).is_none());
         // The issued nonce accepts and stores LCP evidence.
         assert_eq!(
             handle_beacon_evidence(
-                &format!("url=http://h/p&oh=oh1&lcp={hash}&n={nonce}"),
+                &format!("url=http://h/p&bvg=avif-desktop&oh=oh1&lcp={hash}&n={nonce}"),
                 "http://h/p",
                 "Test/1.0",
                 &server,
@@ -334,9 +349,17 @@ mod tests {
             ),
             Some(AcceptOutcome::Accepted)
         );
-        let stored = finder.load("http://h/p", "oh1", "@Desktop");
+        let stored = finder.load("http://h/p", "oh1", "avif-desktop");
         let record = stored.record().expect("stored record");
         assert_eq!(1, record.valid_beacons);
+        assert!(record.single_decision);
+        assert!(record.pending_nonces.is_empty());
+        assert_eq!(
+            handle_beacon_evidence("bvg=avif-desktop&oh=oh1&lcpk=text&n=competing", "http://h/p", "Test/1.0", &server, 1001),
+            Some(AcceptOutcome::BadNonce)
+        );
+        assert_eq!(finder.load("http://h/p", "oh1", "avif-desktop").record().unwrap(), record);
+
         assert_eq!(ps_html::beacon_finder::LCP_KIND_IMG, record.lcp_kind);
         assert!(ps_html::beacon_finder::is_html_critical_image(
             "http://h/hero.png",

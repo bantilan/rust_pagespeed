@@ -3196,6 +3196,12 @@ impl RewriteOptions {
         self.set_image_bool("cibe", value);
     }
 
+    /// Settle critical-image/LCP learning after one accepted report.
+    #[must_use]
+    pub fn beacon_single_decision(&self) -> bool {
+        self.image_bool("BeaconSingleDecision", true)
+    }
+
     /// Beacon reinstrumentation interval in seconds
     /// (`BeaconReinstrumentTimeSec`, default 5).
     #[must_use]
@@ -4696,6 +4702,17 @@ pub fn apply_nginx_directive(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn single_beacon_decision_default_scope_signature() {
+        let mut options = RewriteOptions::new();
+        assert!(options.beacon_single_decision());
+        let signature = options.signature();
+        assert!(options.set_option("BeaconSingleDecision", "off", Scope::Query).is_err());
+        options.set_option("BeaconSingleDecision", "off", Scope::Server).unwrap();
+        assert!(!options.beacon_single_decision());
+        assert_ne!(signature, options.signature());
+    }
 
     #[test]
     fn simple_html_variants_default_scope_and_signature() {

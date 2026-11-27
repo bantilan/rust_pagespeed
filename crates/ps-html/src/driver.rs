@@ -435,10 +435,7 @@ impl Driver {
         }
         let server = driver.server_context();
         let options_hash = server.hasher().hash(driver.options_signature().as_bytes());
-        let properties = driver.request_properties();
-        let device_suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
-            properties.device_type(),
-        );
+        let device_suffix = crate::beacon_finder::evidence_suffix(driver);
         let finder = crate::beacon_finder::BeaconFinder::new(server.metadata_cache());
         let lookup = finder.load(driver.base_url().spec(), &options_hash, device_suffix);
         match lookup.record() {

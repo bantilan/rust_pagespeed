@@ -15,7 +15,9 @@
 //! critical sets are never populated (C++ never shipped CSS beacon
 //! detection either); the downstream-cache rebeaconing special case
 //! is omitted (the port has no downstream integration); evidence
-//! records use a line codec instead of protobufs.
+//! records use a line codec instead of protobufs. The default single-decision
+//! policy stops sampling after one accepted report; periodic sampling remains
+//! available through BeaconSingleDecision off.
 #![forbid(unsafe_code)]
 
 use ps_cache::base64::web64_encode;
@@ -165,6 +167,35 @@ pub fn evidence_key(url: &str, options_hash: &str, device_suffix: &str) -> Strin
     )
 }
 
+/// Public evidence uses exactly the same format/device groups as HTML caching.
+/// Detailed legacy mode retains its device cohort.
+#[must_use]
+pub fn evidence_suffix(driver: &crate::server_context::ResourceDriver) -> &'static str {
+    let mut p = driver.request_properties();
+    if !driver.options().html_cache_simple_variants() {
+        return ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(p.device_type());
+    }
+    let desktop = p.device_type() == ps_http::user_agent_matcher::DeviceType::Desktop;
+    match (p.supports_avif_rewritten_urls(), p.supports_webp_rewritten_urls(), desktop) {
+        (true, _, true) => "avif-desktop",
+        (true, _, false) => "avif-mobile",
+        (false, true, true) => "webp-desktop",
+        (false, true, false) => "webp-mobile",
+        (false, false, true) => "fallback-desktop",
+        (false, false, false) => "fallback-mobile",
+    }
+}
+
+/// Valid public cohort supplied by the nonce issuer (not inferred from POST UA).
+#[must_use]
+pub fn public_evidence_suffix(value: &str) -> Option<&str> {
+    match value {
+        "avif-desktop" | "avif-mobile" | "webp-desktop" | "webp-mobile"
+        | "fallback-desktop" | "fallback-mobile" => Some(value),
+        _ => None,
+    }
+}
+
 /// Beacon evidence for one page variant (the port's
 /// `CriticalImages` proto for the beacon cohort).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -186,6 +217,9 @@ pub struct BeaconEvidence {
     /// Last reported LCP loaded URL (`""` when stamped, text, or
     /// unknown).
     pub lcp_image_url: String,
+    /// Stop sampling and merging after one accepted report. Set by the issuer
+    /// from effective options, so the receiver needs no request-option lookup.
+    pub single_decision: bool,
     /// Accepted-beacon generation (HTML identity input).
     pub generation: u64,
 }
@@ -226,6 +260,7 @@ pub fn encode_evidence(evidence: &BeaconEvidence) -> Vec<u8> {
     for (key, support) in &evidence.support {
         out.push_str(&format!("{}\t{support}\n", web64_encode(key.as_bytes())));
     }
+    out.push_str(if evidence.single_decision { "single-decision=1\n" } else { "single-decision=0\n" });
     out.into_bytes()
 }
 
@@ -268,7 +303,15 @@ pub fn decode_evidence(bytes: &[u8]) -> Option<BeaconEvidence> {
         let key = String::from_utf8(web64_decode(key)?).ok()?;
         support.insert(key, value.parse::<i64>().ok()?);
     }
+    // Optional extension: legacy records have no policy line. Old readers
+    // ignore trailing lines, and effective option signatures separate modes.
+    let single_decision = match lines.next() {
+        Some("single-decision=1") => true,
+        Some("single-decision=0" | "") | None => false,
+        _ => return None,
+    };
     Some(BeaconEvidence {
+        single_decision,
         support,
         max_support,
         valid_beacons,
@@ -411,10 +454,28 @@ pub fn should_beacon(
     evidence: Option<&BeaconEvidence>,
     downstream: DownstreamBeacon,
 ) -> bool {
+    if evidence.is_some_and(|record| record.single_decision && record.valid_beacons > 0) {
+        return false;
+    }
     if let DownstreamBeacon::MustMatch(matched) = downstream {
         return matched;
     }
     evidence.is_none_or(|record| now_ms >= record.next_beacon_ms)
+}
+
+/// Shared eligibility gate for HTML lookup and filter issuance. Effective
+/// options take precedence when loading legacy evidence without a policy line.
+#[must_use]
+pub fn should_beacon_for_options(
+    now_ms: i64,
+    evidence: Option<&BeaconEvidence>,
+    downstream: DownstreamBeacon,
+    single_decision: bool,
+) -> bool {
+    if single_decision && evidence.is_some_and(|record| record.valid_beacons > 0) {
+        return false;
+    }
+    should_beacon(now_ms, evidence, downstream)
 }
 
 /// Decays one support value by k/(k+1), rounding down (`Decay`).
@@ -486,7 +547,9 @@ pub fn prepare_beacon(
     reinstrument_sec: i64,
     nonce_value: u64,
 ) -> Option<String> {
-    if now_ms < evidence.next_beacon_ms {
+    if (evidence.single_decision && evidence.valid_beacons > 0)
+        || now_ms < evidence.next_beacon_ms
+    {
         return None;
     }
     let mut interval_ms = reinstrument_sec.max(0) * 1000;
@@ -534,13 +597,17 @@ fn validate_nonce(now_ms: i64, nonce: &str, evidence: &mut BeaconEvidence) -> bo
 
 /// Registers page candidate keys (`UpdateCandidateKeys`): unknown
 /// keys enter with zero support; changed sets reset the beacon
-/// count (high-frequency mode) and optionally force rebeaconing.
+/// count (high-frequency mode) and optionally force rebeaconing. A settled
+/// single-decision record is immutable until reset, including candidate updates.
 /// Returns whether the set changed.
 pub fn update_candidates(
     evidence: &mut BeaconEvidence,
     keys: &HashSet<String>,
     clear_rebeacon: bool,
 ) -> bool {
+    if evidence.single_decision && evidence.valid_beacons > 0 {
+        return false;
+    }
     let mut changed = false;
     for key in keys {
         if !evidence.support.contains_key(key) {
@@ -617,8 +684,16 @@ pub fn accept_beacon(
     let Some(hashes) = report.html_hashes.as_ref() else {
         return AcceptOutcome::Empty;
     };
+    if evidence.single_decision && evidence.valid_beacons > 0 {
+        return AcceptOutcome::BadNonce;
+    }
     if !validate_nonce(now_ms, &report.nonce, evidence) {
         return AcceptOutcome::BadNonce;
+    }
+    if evidence.single_decision {
+        // Competing reports from already issued nonces cannot replace the
+        // first decision. This runs inside the existing cache transaction.
+        evidence.pending_nonces.clear();
     }
     if report.lcp_kind == "unknown" {
         // Acknowledge sampling without treating unavailable browser LCP
@@ -1097,6 +1172,43 @@ mod tests {
         ));
         assert_eq!(1, old.nonces_expired);
         assert!(old.pending_nonces.is_empty());
+    }
+
+    #[test]
+    fn single_decision_stops_sampling_competing_reports_and_survives_codec() {
+        let mut evidence = BeaconEvidence::default();
+        evidence.single_decision = true;
+        let nonce = prepare_beacon(&mut evidence, 0, 5, 77).unwrap();
+        let competing = prepare_beacon(&mut evidence, 5000, 5, 78).unwrap();
+        let report = report_with(Some(HashSet::new()), LCP_KIND_TEXT, "", &nonce);
+        // Invalid reports do not settle the decision or prevent retry.
+        let invalid = report_with(Some(HashSet::new()), LCP_KIND_TEXT, "", "bad");
+        assert_eq!(accept_beacon(&mut evidence, &invalid, 5001), AcceptOutcome::BadNonce);
+        assert_eq!(evidence.valid_beacons, 0);
+        assert_eq!(accept_beacon(&mut evidence, &report, 5001), AcceptOutcome::Accepted);
+        assert!(evidence.pending_nonces.is_empty());
+        let identity = html_evidence_identity(&evidence);
+        let other = report_with(Some(HashSet::new()), LCP_KIND_BACKGROUND, "https://h/other", &competing);
+        assert_eq!(accept_beacon(&mut evidence, &other, 5002), AcceptOutcome::BadNonce);
+        assert_eq!(identity, html_evidence_identity(&evidence));
+        let mut restored = decode_evidence(&encode_evidence(&evidence)).unwrap();
+        assert_eq!(restored, evidence);
+        for now in [10000, 505000, i64::MAX] {
+            assert!(!should_beacon(now, Some(&restored), DownstreamBeacon::Inactive));
+            assert!(!should_beacon(now, Some(&restored), DownstreamBeacon::MustMatch(true)));
+            assert!(prepare_beacon(&mut restored, now, 5, 79).is_none());
+        }
+        // Once final, new candidate bookkeeping must not reopen learning.
+        assert!(!update_candidates(&mut restored, &["new".to_string()].into_iter().collect(), true));
+        assert_eq!(restored, evidence);
+        assert!(!should_beacon(10000, Some(&restored), DownstreamBeacon::Inactive));
+        // Legacy codec has no policy line. Effective config still stops it.
+        let encoded = String::from_utf8(encode_evidence(&evidence)).unwrap();
+        let legacy = encoded.replace("single-decision=1\n", "");
+        let legacy = decode_evidence(legacy.as_bytes()).unwrap();
+        assert!(!legacy.single_decision);
+        assert!(!should_beacon_for_options(505000, Some(&legacy), DownstreamBeacon::Inactive, true));
+        assert!(should_beacon_for_options(505000, Some(&legacy), DownstreamBeacon::Inactive, false));
     }
 
     #[test]

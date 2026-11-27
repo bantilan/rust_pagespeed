@@ -96,10 +96,7 @@ impl PrioritizeLcpImagesFilter {
                 let oh = server
                     .hasher()
                     .hash(self.driver.options_signature().as_bytes());
-                let properties = self.driver.request_properties();
-                let suffix = ps_http::user_agent_matcher::UserAgentMatcher::device_type_suffix(
-                    properties.device_type(),
-                );
+                let suffix = beacon_finder::evidence_suffix(&self.driver);
                 Rc::new(
                     BeaconFinder::new(server.metadata_cache())
                         .load(&self.driver.base_url().spec().to_string(), &oh, suffix)

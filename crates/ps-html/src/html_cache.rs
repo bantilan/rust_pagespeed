@@ -643,7 +643,7 @@ impl HtmlCacheSession {
                 .hasher()
                 .hash(self.driver.options_signature().as_bytes());
             let finder = super::beacon_finder::BeaconFinder::new(server.metadata_cache());
-            let lookup = finder.load(&self.url, &oh, &self.device_suffix);
+            let lookup = finder.load(&self.url, &oh, super::beacon_finder::evidence_suffix(&self.driver));
             match &lookup {
                 super::beacon_finder::EvidenceLookup::Found(_) => {
                     self.count(super::beacon_finder::VALID_COUNT, 1);
@@ -671,12 +671,16 @@ impl HtmlCacheSession {
                 .supports_critical_images_beacon();
             let due = match downstream {
                 super::beacon_finder::DownstreamBeacon::MustMatch(_) => {
-                    super::beacon_finder::should_beacon(now_ms, record, downstream)
+                    super::beacon_finder::should_beacon_for_options(
+                        now_ms, record, downstream, options.beacon_single_decision(),
+                    )
                 }
                 _ => {
                     can_sample
                         && record.is_some_and(|record| {
-                            super::beacon_finder::should_beacon(now_ms, Some(record), downstream)
+                            super::beacon_finder::should_beacon_for_options(
+                                now_ms, Some(record), downstream, options.beacon_single_decision(),
+                            )
                         })
                 }
             };
@@ -2369,10 +2373,39 @@ mod tests {
     }
 
     #[test]
+    fn single_decision_preserves_browser_hit_past_sampling_deadline() {
+        let h = Harness::new();
+        h.driver.set_user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36");
+        h.options.borrow_mut().soft_enable_filter_for_testing(Filter::PrioritizeLcpImages);
+        let mut evidence = seed_learned_beacon(&h);
+        // Legacy evidence without an issuer policy must also settle when the
+        // current effective configuration requests one decision.
+        assert!(!evidence.single_decision);
+        evidence.next_beacon_ms = 0;
+        let server = h.driver.server_context();
+        let oh = server.hasher().hash(h.driver.options_signature().as_bytes());
+        crate::beacon_finder::BeaconFinder::new(server.metadata_cache())
+            .store(PAGE_URL, &oh, "@Desktop", &evidence);
+        let request = h.get_request();
+        let origin = h.ok_origin();
+        let mut miss = h.session();
+        assert!(miss.lookup(&origin, &request, &h.purge, None, START_MS).is_none());
+        assert_eq!(0, h.counter("html_cache_bypasses"));
+        miss.write(b"<html>learned output</html>");
+        settle_driver_identity(&h);
+        assert!(miss.finish(&request, START_MS + 1).detail_line.is_some());
+        for offset in [2, 5000, 50000] {
+            assert!(h.session().lookup(&origin, &request, &h.purge, None, START_MS + offset).is_some());
+        }
+        assert_eq!(0, h.counter("html_cache_bypasses"));
+    }
+
+    #[test]
     fn sampling_due_and_unsettled_renders_bypass() {
         // Sampling-due variants bypass even with learned evidence
         // (beacon-capable client, so the sample is productive).
         let harness = Harness::new();
+        harness.options.borrow_mut().set_option("BeaconSingleDecision", "off", ps_config::scope::Scope::Server).unwrap();
         harness.driver.set_user_agent(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
         );
