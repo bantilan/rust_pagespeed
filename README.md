@@ -64,6 +64,15 @@ optimized URL. Warmed HTML retained the same normalized output across every
 run and both cache modes, including 15 optimized resource references on Moto
 and 23 on Aroma.
 
+If a rewritten image is requested before its optimized bytes are available,
+production workers schedule the conversion on the existing bounded background
+pool. A validated cached original is served through the rewritten URL with its
+original MIME type and `Cache-Control: private, no-store, max-age=0`. These
+bytes are never stored under the optimized URL; later requests use completed
+optimized output. If the original is not cached, a non-cacheable 307 redirect
+reaches its authorized original URL immediately. Queue saturation also uses
+this fallback. Embeddings without a background pool retain synchronous serving.
+
 The [current benchmark report](docs/performance/shared-memory/ef9aeb5-comparison.md)
 contains raw-data links, exact commands, the historical comparison table, and
 results with shared caching enabled. Older measurements used different clients

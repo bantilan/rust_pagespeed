@@ -1,0 +1,266 @@
+   Compiling ps-html v0.1.0 (/home/gamingph/Projects/Rust/pagespeed-rust/crates/ps-html)
+warning: unused variable: `driver`
+    --> crates/ps-html/tests/image_rewrite.rs:3214:9
+     |
+3214 |     let driver = fixture.driver_for(&page_url);
+     |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_driver`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `parse_with` is never used
+   --> crates/ps-html/tests/image_rewrite.rs:233:8
+    |
+ 68 | impl Fixture {
+    | ------------ method in this implementation
+...
+233 |     fn parse_with(&self, url: &str, html: &str, extra: Vec<Box<dyn HtmlFilter>>) -> String {
+    |        ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `wrap_body` is never used
+  --> crates/ps-html/tests/harness.rs:34:8
+   |
+34 | pub fn wrap_body(fragment: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^
+
+warning: function `run_with_filters` is never used
+  --> crates/ps-html/tests/harness.rs:44:8
+   |
+44 | pub fn run_with_filters(input: &[u8], build: impl FnOnce(&mut Parser)) -> Vec<u8> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `round_trip` is never used
+  --> crates/ps-html/tests/harness.rs:56:8
+   |
+56 | pub fn round_trip(input: &[u8]) -> Vec<u8> {
+   |        ^^^^^^^^^^
+
+warning: function `validate_expected` is never used
+  --> crates/ps-html/tests/harness.rs:62:8
+   |
+62 | pub fn validate_expected(id: &str, input: &[u8], expected: &[u8]) {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: struct `ExplicitCloseTag` is never constructed
+   --> crates/ps-html/tests/harness.rs:181:12
+    |
+181 | pub struct ExplicitCloseTag;
+    |            ^^^^^^^^^^^^^^^^
+
+warning: struct `InsertCommentOnFirstDiv` is never constructed
+   --> crates/ps-html/tests/harness.rs:200:12
+    |
+200 | pub struct InsertCommentOnFirstDiv {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `new` and `insert` are never used
+   --> crates/ps-html/tests/harness.rs:207:12
+    |
+205 | impl InsertCommentOnFirstDiv {
+    | ---------------------------- associated items in this implementation
+206 |     #[must_use]
+207 |     pub fn new(at_start: bool) -> Self {
+    |            ^^^
+...
+214 |     fn insert(&mut self, at_start: bool, dom: &mut Dom, lexer: &Lexer, id: NodeId) {
+    |        ^^^^^^
+
+warning: struct `InsertScripts` is never constructed
+   --> crates/ps-html/tests/harness.rs:238:12
+    |
+238 | pub struct InsertScripts {
+    |            ^^^^^^^^^^^^^
+
+warning: associated items `new` and `insert` are never used
+   --> crates/ps-html/tests/harness.rs:246:12
+    |
+244 | impl InsertScripts {
+    | ------------------ associated items in this implementation
+245 |     #[must_use]
+246 |     pub fn new(before: bool, at_start: bool, external: bool) -> Self {
+    |            ^^^
+...
+254 |     fn insert(&mut self, at_start: bool, dom: &mut Dom, id: NodeId) {
+    |        ^^^^^^
+
+warning: struct `DeleteCounts` is never constructed
+   --> crates/ps-html/tests/harness.rs:285:12
+    |
+285 | pub struct DeleteCounts {
+    |            ^^^^^^^^^^^^
+
+warning: struct `DeleteCountValues` is never constructed
+   --> crates/ps-html/tests/harness.rs:291:12
+    |
+291 | pub struct DeleteCountValues {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: method `values` is never used
+   --> crates/ps-html/tests/harness.rs:300:12
+    |
+298 | impl DeleteCounts {
+    | ----------------- method in this implementation
+299 |     #[must_use]
+300 |     pub fn values(&self) -> DeleteCountValues {
+    |            ^^^^^^
+
+warning: struct `DeleteNodes` is never constructed
+   --> crates/ps-html/tests/harness.rs:306:12
+    |
+306 | pub struct DeleteNodes {
+    |            ^^^^^^^^^^^
+
+warning: associated items `new`, `set_delete_node_type`, `set_delete_from_type`, `set_delete_on_open_tag`, and `delete_elements` are never used
+   --> crates/ps-html/tests/harness.rs:318:12
+    |
+316 | impl DeleteNodes {
+    | ---------------- associated items in this implementation
+317 |     #[must_use]
+318 |     pub fn new(counts: &DeleteCounts) -> Self {
+    |            ^^^
+...
+330 |     pub fn set_delete_node_type(&mut self, keyword: Keyword) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+334 |     pub fn set_delete_from_type(&mut self, keyword: Keyword) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+338 |     pub fn set_delete_on_open_tag(&mut self, on_open: bool) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+342 |     fn delete_elements(&mut self, dom: &mut Dom) {
+    |        ^^^^^^^^^^^^^^^
+
+warning: `ps-html` (test "image_rewrite") generated 16 warnings (run `cargo fix --test "image_rewrite" -p ps-html` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.89s
+     Running tests/image_rewrite.rs (target/debug/build/ps-html/c601bb6b7998b530/out/image_rewrite-c601bb6b7998b530)
+
+running 124 tests
+test add_dim_test ... ok
+test chrome_ipad_inlines_png ... ok
+test chrome_android_inlines_lossless_webp ... ok
+test chrome_iphone_inlines_png ... ok
+test content_type_validation ... ok
+test data_no_transform ... ok
+test data_url_test ... ok
+test animated_gif_to_webp_with_webp_la_ua ... ok
+test animated_gif_to_webp_not_enabled ... ok
+test debug_message_inline ... ok
+test debug_no_resize_test ... ok
+test chrome_iphone_outlines_webp ... ok
+test debug_resize_test ... ok
+test dimension_parsing_fail ... ok
+test dimension_parsing_ok ... ok
+test chrome_android_inlines_webp ... ok
+test debug_with_map_rewrite_domain ... ok
+test debug_with_map_rewrite_domain_opt_only ... ok
+test dimension_strip_after_inline ... ok
+test fetch_invalid ... ok
+test debug_message_unauthorized ... ok
+test gif_resolution_limit_counts_the_decoded_canvas ... ok
+test fetch_from_other_directory_keeps_page_url ... ok
+test debug_message_image_info ... ok
+test gif_to_jpeg_test_without_resize_with_optimize ... ok
+test gif_to_png_test_resize_enable_gif_to_png_disabled ... ok
+test gif_to_png_test_without_resize_without_optimize ... ok
+test chrome_ipad_inlines_jpeg ... ok
+test gif_to_png_test_with_resize_with_optimize ... ok
+test gif_to_webp_test_with_resize_with_optimize ... ok
+test honor_no_transform ... ok
+test event_loop_fetch_reconstructs_without_polling_when_claimed_elsewhere ... ok
+test gif_to_webp_test_without_resize_with_optimize ... ok
+test gif_to_webp_lossless_with_webp_animated_ua ... ok
+test image_rewrite_drop_sometimes ... ok
+test fetch_claims_rewrite_and_proceeds_when_owned ... ok
+test image_rewrite_preserve_urls_disable_preemptive_rewrite ... ok
+test gif_to_png_test_without_resize_with_optimize ... ok
+test image_rewrite_preserve_urls_explicit_resize_on ... ok
+test image_rewrite_random_drop_repeated_images ... ok
+test image_rewrite_drop_all ... ok
+test img_srcset ... ok
+test img_srcset_with_cache_extender ... ok
+test image_rewrite_preserve_urls_on_soft_enable ... ok
+test chrome_ipad_outlines_webp ... ok
+test chrome_desktop_inlines_webp ... ok
+test image_url_valued_attribute_with_flush ... ok
+test inline_enlarged_image ... ok
+test fetch_waits_then_proceeds_when_claimed_elsewhere ... ok
+test inline_larger_resize ... ok
+test inline_no_resize ... ok
+test image_rewrite_inline_preserve_urls_explicit ... ok
+test img_tag_with_compute_statistics ... ok
+test inline_test_with_resize_keep_dims ... ok
+test image_rewrite_drop_none ... ok
+test image_rewrite_inline_preserve_urls_on_soft_enable ... ok
+test inline_test_without_optimize ... ok
+test animated_no_cache_reuse ... ok
+test inline_test_with_resize_with_optimize_and_url_logging ... ok
+test inline_test_with_resize_with_optimize ... ok
+test inline_no_rewrite ... ok
+test jpeg_progressive_scans_for_small_screens ... ok
+test jpeg_quality_for_small_screens ... ok
+test lazy_image_garbage_fails_fast ... ok
+test lazy_image_inlining_preserved_first_view ... ok
+test lazy_image_renders_unversioned_first_view ... ok
+test cache_control_header_check_for_non_webp_ua ... ok
+test no_crash_on_invalid_dim ... ok
+test no_dims_in_non_img ... ok
+test animated_gif_to_webp_with_webp_animated_ua ... ok
+test lazy_image_serve_optimizes_and_converges ... ok
+test no_transform ... ok
+test no_transform_optimized ... ok
+test no_transform_with_dims ... ok
+test img_tag ... ok
+test null_resize_test ... ok
+test no_extension_corruption ... ok
+test no_query_corruption ... ok
+test png_fallback_to_png_lack_of_webp_la_ua ... ok
+test jpeg_exceed_resolution_limit ... ok
+test optimize_requested_prefetch ... ok
+test input_tag ... ok
+test png_to_jpeg_unhealthy ... ok
+test png_to_jpeg ... ok
+test png_to_webp_with_webp_la_ua ... ok
+test png_to_webp_with_webp_la_ua_and_flag_times_out ... ok
+test png_to_webp_with_webp_ua ... ok
+test png_to_webp_with_webp_la_ua_and_flag ... ok
+test preserve_url_relativity ... ok
+test no_wrong_ext_corruption ... ok
+test resize_height_only ... ok
+test resize_height_rounding ... ok
+test resize_is_really_prefetch ... ok
+test resize_style_over_parse_bound_is_ignored ... ok
+test img_tag_webp_la ... ok
+test resize_transparent_image ... ok
+test resize_style_test ... ok
+test resize_test ... ok
+test img_tag_webp ... ok
+test input_tag_webp_la ... ok
+test input_tag_webp ... ok
+test rewrite_404 ... ok
+test rewrite_cache_extend_interaction ... ok
+test resize_width_only ... ok
+test rewrites_dropped_due_to_mime_type_unknown_test ... ok
+test rewrites_dropped_due_to_no_saving_no_resize_test ... ok
+test respects_base_url ... ok
+test servant_recompresses_without_browser_flag ... ok
+test safari_iphone_inlines_jpeg ... ok
+test resize_with_px_in_html ... ok
+test webp_quality_for_small_screens ... ok
+test resize_width_rounding ... ok
+test yes_transform ... ok
+test yes_transform_with_option_false ... ok
+test retain_extra_headers ... ok
+test rewrite_multiple_attributes ... ok
+test successful_rewrite_records_admin_row ... ok
+test png_exceed_resolution_limit ... ok
+test serve_webp_from_cold_cache ... ok
+test jpeg_in_resolution_limit_no_resizing ... ok
+test png_in_resolution_limit_no_resizing ... ok
+test png_in_resolution_limit ... ok
+test jpeg_in_resolution_limit ... ok
+test resize_higher_dimension_test ... ok
+
+test result: ok. 124 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.28s
+

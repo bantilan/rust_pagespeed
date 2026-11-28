@@ -2112,6 +2112,7 @@ impl ResourceDriver {
             .request_headers()
             .headers()
             .has(header::IF_MODIFIED_SINCE)
+            && output.full_name().id() != "ic"
         {
             fetch.response_headers_mut().set_status_and_reason(304);
             fetch.headers_complete();
@@ -2150,6 +2151,10 @@ impl ResourceDriver {
             RequestProperties::default(),
             VaryOption::IgnoreVaryOnResources,
             &|headers| {
+                if headers.determine_content_type().is_some_and(|content| content.mime_type() == "image/avif")
+                    && !super::device_properties::accepts_image_format(fetch.request_headers(), "image/avif") {
+                    return false;
+                }
                 if !serve_webp_to_any
                     && !accepts_webp
                     && headers

@@ -1259,6 +1259,11 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
             fetch.handle_done(false);
             return false;
         }
+        // Image misses use the bounded pool instead of taking a foreground
+        // lease which would compete with that very job.
+        if self.async_image_fetch() {
+            return self.start_fetch(fetch);
+        }
         // Cross-process fetch dedup: hold our own claim across the
         // reconstruction so a concurrent background job for this exact
         // rewrite sheds instead of duplicating the encode; when
@@ -1489,6 +1494,9 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
                     return self.start_fetch_reconstruction(fetch);
                 }
             }
+            if self.async_image_fetch() && !tables.partition.iter().any(|p| p.optimizable) {
+                return self.serve_pending_image(fetch);
+            }
             // Non-optimizable (or unbuildable): try the original.
             if self.can_fetch_fallback_to_original(false) {
                 let url = self.inputs[0].url().to_string();
@@ -1544,6 +1552,17 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
         };
         if headers.status_code() != 200 {
             return false;
+        }
+        if self.behavior.id() == "ic" {
+            if let Some(content) = headers.determine_content_type() {
+                let mime = content.mime_type();
+                let allowed = (mime != "image/avif"
+                    || super::device_properties::accepts_image_format(fetch.request_headers(), mime))
+                    && (mime != "image/webp"
+                        || self.driver.options().serve_rewritten_webp_urls_to_any_agent()
+                        || super::device_properties::accepts_image_format(fetch.request_headers(), mime));
+                if !allowed { return false; }
+            }
         }
         let had_public = headers.has_value(ps_http::names::header::CACHE_CONTROL, "public");
         let mut fixed = headers.clone();
@@ -1665,6 +1684,9 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
     /// Reconstructs the output inline (`StartFetchReconstruction` +
     /// `StartRewriteForFetch`, deadlines and budgets mute).
     fn start_fetch_reconstruction(&mut self, fetch: &mut dyn AsyncFetch) -> bool {
+        if self.async_image_fetch() && self.try_schedule_async() {
+            return self.serve_pending_image(fetch);
+        }
         self.partitions.clear();
         // Fetches load inputs even when uncacheable (top-level
         // fetch rewrites may still fall back to them).
@@ -1714,6 +1736,78 @@ impl<B: SingleRewriteBehavior> SingleRewriteContext<B> {
             }
         }
         self.fetch_done(fetch)
+    }
+
+    fn async_image_fetch(&self) -> bool {
+        self.behavior.id() == "ic"
+            && self.inputs.len() == 1
+            && self.can_fetch_fallback_to_original(true)
+            && self.inputs[0].is_authorized_domain()
+            && self.driver.server_context().background_pool().is_some()
+    }
+
+    /// A temporary source response must never become the immutable output.
+    /// Read only an already validated origin cache entry; a cold origin is
+    /// reached by the browser without parking this worker on fetch/encode.
+    fn serve_pending_image(&self, fetch: &mut dyn AsyncFetch) -> bool {
+        use ps_http::http_cache::FindStatus;
+        use ps_http::response::VaryOption;
+        let url = self.inputs[0].url();
+        let mut ctx = self.driver.request_context().borrow().clone();
+        let found = self.driver.server_context().http_cache().find(
+            url,
+            self.driver.cache_fragment(),
+            fetch.request_headers().properties(),
+            VaryOption::RespectVaryOnResources,
+            &|headers| {
+                headers.status_code() == 200
+                    && headers
+                        .determine_content_type()
+                        .is_some_and(|content| content.mime_type().starts_with("image/"))
+            },
+            -1,
+            &mut ctx,
+            self.driver.server_context().now_ms(),
+        );
+        if found.status == FindStatus::Found {
+            if let Some(headers) = found.headers {
+                fetch.response_headers_mut().copy_from(&headers);
+                Self::pending_image_headers(fetch.response_headers_mut());
+                fetch.headers_complete();
+                let ok = fetch.handle_write(&found.body);
+                fetch.handle_done(ok);
+                return ok;
+            }
+        }
+        let headers = fetch.response_headers_mut();
+        headers.set_status_and_reason(307);
+        headers.headers_mut().replace("Location", url);
+        Self::pending_image_headers(headers);
+        fetch.headers_complete();
+        fetch.handle_done(true);
+        true
+    }
+
+    fn pending_image_headers(headers: &mut ps_http::response::ResponseHeaders) {
+        let fields = headers.headers_mut();
+        for name in [
+            "Cache-Control",
+            "Expires",
+            "ETag",
+            "Last-Modified",
+            "Content-Length",
+            "Accept-Ranges",
+            "Content-Range",
+            "Set-Cookie",
+            "Surrogate-Control",
+            "CDN-Cache-Control",
+        ] {
+            fields.remove_all(name);
+        }
+        fields.replace("Cache-Control", "private, no-store, max-age=0");
+        fields.replace("X-Content-Type-Options", "nosniff");
+        fields.add("Vary", "Accept");
+        headers.compute_caching();
     }
 
     /// Whether a fetch stores what HTML would (`FetchWritesPartition`).

@@ -5450,3 +5450,183 @@ fn contended_fetch_with_budget(budget: std::time::Duration) {
     );
     assert_eq!(0, fetch_counter(&fixture.server, "fetch_dedup_hits"));
 }
+
+fn pending_image_response(fixture: &Fixture, url: &str) -> Option<(Vec<u8>, ResponseHeaders)> {
+    let driver = fixture.driver_for(url);
+    driver.add_filter(Rc::new(ImageRewriteFilter::new(driver.clone())));
+    let mut fetch = BufferingFetch::new(url, driver.request_context().borrow().clone());
+    *fetch.request_headers_mut() = fixture.request_headers.borrow().clone();
+    assert!(driver.fetch_resource(url, &mut fetch));
+    assert!(fetch.done());
+    fetch
+        .success()
+        .then(|| (fetch.body().to_vec(), fetch.response_headers().clone()))
+}
+
+/// Hold the only worker so response assertions cannot race conversion.
+fn pending_image_pool(
+    fixture: &Fixture,
+) -> (
+    Arc<ps_html::background::BackgroundPool>,
+    std::sync::mpsc::Sender<()>,
+) {
+    use ps_html::background::{BackgroundPool, PoolConfig};
+    let pool = BackgroundPool::new(
+        PoolConfig {
+            threads: 1,
+            queue_bound: 1,
+        },
+        &fixture.server.statistics_shared(),
+    );
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    pool.submit("test-worker-blocker", move || {
+        started_tx.send(()).unwrap();
+        release_rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap();
+    })
+    .unwrap();
+    started_rx
+        .recv_timeout(std::time::Duration::from_secs(2))
+        .unwrap();
+    fixture.server.set_background_pool(pool.clone());
+    (pool, release_tx)
+}
+
+#[test]
+fn pending_image_serves_original_without_poisoning_optimized_url() {
+    use ps_http::response::{RequestProperties, VaryOption};
+    let fixture = Fixture::new();
+    fixture.add_file_to_mock_fetcher(PUZZLE_URL, PUZZLE_JPG, "image/jpeg", 100);
+    fixture.add_recompress_image_filters();
+    fixture
+        .options
+        .borrow_mut()
+        .set_serve_rewritten_webp_urls_to_any_agent(false);
+    fixture.setup_for_webp();
+    let original = read_image(PUZZLE_JPG);
+    let mut headers = ResponseHeaders::new(HttpOptions::default_for_tests());
+    headers.set_status_and_reason(200);
+    headers.headers_mut().add("Content-Type", "image/jpeg");
+    headers.headers_mut().add("ETag", "source-validator");
+    headers
+        .headers_mut()
+        .add("Last-Modified", "Tue, 14 Nov 2023 00:00:00 GMT");
+    headers.set_date_and_caching(START_MS, 100_000, ",public");
+    assert!(fixture.server.http_cache().put(
+        PUZZLE_URL,
+        "",
+        RequestProperties::default(),
+        VaryOption::RespectVaryOnResources,
+        &mut headers,
+        &original,
+        START_MS
+    ));
+    let (pool, release) = pending_image_pool(&fixture);
+    let url = "http://rewrite_image.test/xPuzzle.jpg.pagespeed.ic.0.webp";
+    // A stale validator for a previous temporary response cannot yield 304.
+    let driver = fixture.driver_for(url);
+    driver.add_filter(Rc::new(ImageRewriteFilter::new(driver.clone())));
+    let mut fetch = BufferingFetch::new(url, driver.request_context().borrow().clone());
+    fetch
+        .request_headers_mut()
+        .headers_mut()
+        .add("If-Modified-Since", "Tue, 14 Nov 2023 00:00:00 GMT");
+    fetch
+        .request_headers_mut()
+        .headers_mut()
+        .add("Accept", "image/avif,image/webp,image/*");
+    let start = std::time::Instant::now();
+    assert!(driver.fetch_resource(url, &mut fetch));
+    assert!(start.elapsed() < std::time::Duration::from_millis(100));
+    assert_eq!(fetch.response_headers().status_code(), 200);
+    assert!(
+        fetch.body() == original,
+        "response must contain original bytes"
+    );
+    assert_eq!(
+        fetch
+            .response_headers()
+            .determine_content_type()
+            .unwrap()
+            .mime_type(),
+        "image/jpeg"
+    );
+    assert!(fetch
+        .response_headers()
+        .has_cache_control_directive("no-store"));
+    assert!(!fetch.response_headers().headers().has("ETag"));
+    assert!(!fetch.response_headers().headers().has("Last-Modified"));
+    // Repeated requests join the queued rewrite and keep returning visible bytes.
+    for _ in 0..3 {
+        let (body, headers) = pending_image_response(&fixture, url).unwrap();
+        assert!(body == original, "response must contain original bytes");
+        assert!(headers.has_cache_control_directive("no-store"));
+    }
+    assert!(
+        fixture
+            .server
+            .variable("html_async_rewrite_completed")
+            .get()
+            == 0
+    );
+    release.send(()).unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while fixture
+        .server
+        .variable("html_async_rewrite_completed")
+        .get()
+        == 0
+    {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "background conversion did not complete"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    let (optimized, headers) = pending_image_response(&fixture, url).unwrap();
+    assert_eq!(headers.status_code(), 200);
+    assert!(
+        optimized != original,
+        "temporary original must not shadow completed optimization"
+    );
+    assert!(!headers.has_cache_control_directive("no-store"));
+    assert_eq!(
+        headers.determine_content_type().unwrap().mime_type(),
+        "image/webp"
+    );
+    // A client without WebP support must not receive those cached WebP bytes.
+    fixture.reset_user_agent("");
+    let (body, headers) = pending_image_response(&fixture, url).unwrap();
+    assert!(body == original, "response must contain original bytes");
+    assert_eq!(
+        headers.determine_content_type().unwrap().mime_type(),
+        "image/jpeg"
+    );
+    assert!(headers.has_cache_control_directive("no-store"));
+    pool.shutdown();
+}
+
+#[test]
+fn pending_image_cold_origin_redirects_without_waiting_and_sheds_saturation() {
+    let fixture = Fixture::new();
+    fixture.add_recompress_image_filters();
+    let (pool, release) = pending_image_pool(&fixture);
+    // First request fills the queue; second distinct image sheds work safely.
+    for name in ["one", "two"] {
+        let url = format!("http://rewrite_image.test/x{name}.jpg.pagespeed.ic.0.avif");
+        let start = std::time::Instant::now();
+        let (body, headers) = pending_image_response(&fixture, &url).unwrap();
+        assert!(start.elapsed() < std::time::Duration::from_millis(100));
+        assert_eq!(headers.status_code(), 307);
+        assert_eq!(
+            headers.headers().lookup1("Location").unwrap(),
+            format!("http://rewrite_image.test/{name}.jpg")
+        );
+        assert!(headers.has_cache_control_directive("no-store"));
+        assert!(body.is_empty());
+    }
+    release.send(()).unwrap();
+    pool.shutdown();
+}
